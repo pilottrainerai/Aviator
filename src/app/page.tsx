@@ -25,19 +25,19 @@ function Header() {
       </Link>
       <nav className="flex items-center gap-6 text-sm text-[var(--color-text-muted)]">
         <a href="#how" className="hover:text-[var(--color-text)] transition-colors">
-          How it works
+          Cómo funciona
         </a>
         <Link
           href="/scenarios"
           className="hover:text-[var(--color-text)] transition-colors"
         >
-          Scenarios
+          Escenarios
         </Link>
         <Link
           href="/pricing"
           className="hover:text-[var(--color-text)] transition-colors"
         >
-          Pricing
+          Precios
         </Link>
         <HeaderAuth />
         <Link
