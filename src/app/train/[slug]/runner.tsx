@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useScenarioRunner } from "@/lib/scenarios/runner";
-import type { Scenario } from "@/scenarios/types";
+import type { Scenario, ScenarioDistraction } from "@/scenarios/types";
 import { ScenarioClock } from "@/components/cockpit/scenario-clock";
 import { EwdDisplay } from "@/components/cockpit/ewd-display";
 import { CockpitControls } from "@/components/cockpit/cockpit-controls";
@@ -13,9 +13,17 @@ import { FireBanner } from "@/components/cockpit/fire-banner";
 import { GuidancePanel } from "@/components/cockpit/guidance-panel";
 import { AudioController } from "@/components/cockpit/audio-controller";
 import { PfdNd } from "@/components/cockpit/pfd-nd";
+import { PfAviatePanel } from "@/components/cockpit/pf-aviate-panel";
+import { DistractionModal } from "@/components/cockpit/distraction-modal";
+import { CommChecklist } from "@/components/cockpit/comm-checklist";
+import { ChclmChecklist } from "@/components/cockpit/chclm-checklist";
+import { GlareshieldPanel } from "@/components/cockpit/glareshield-panel";
+import { FlightCheckPopup } from "@/components/cockpit/flight-check-popup";
 import { track } from "@/lib/analytics";
 
 const AUTO_END_DELAY_MS = 3_000;
+// After "Stand By", ATC resurfaces in this many ms (scenario may override per-call)
+const STANDBY_REQUEUE_DEFAULT_MS = 25_000;
 
 export function ScenarioRunner({ scenario }: { scenario: Scenario }) {
   const [started, setStarted] = useState(false);
@@ -40,6 +48,82 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
   const [error, setError] = useState<string | null>(null);
   const [autoEndAt, setAutoEndAt] = useState<number | null>(null);
 
+  // ── Distraction queue ───────────────────────────────────────────────────────
+  const firedDistractionsRef = useRef<Set<string>>(new Set());
+  const standbyTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [distractionQueue, setDistractionQueue] = useState<ScenarioDistraction[]>([]);
+  const [activeDistraction, setActiveDistraction] = useState<ScenarioDistraction | null>(null);
+
+  // Fire distractions as elapsedMs passes their atMs threshold
+  useEffect(() => {
+    if (runner.status !== "running" || !scenario.distractions) return;
+    for (const d of scenario.distractions) {
+      if (runner.elapsedMs >= d.atMs && !firedDistractionsRef.current.has(d.id)) {
+        firedDistractionsRef.current.add(d.id);
+        setDistractionQueue((prev) => [...prev, d]);
+      }
+    }
+  }, [runner.elapsedMs, runner.status, scenario.distractions]);
+
+  // Promote from queue to active whenever the slot is empty
+  useEffect(() => {
+    if (activeDistraction === null && distractionQueue.length > 0) {
+      const [next, ...rest] = distractionQueue;
+      setActiveDistraction(next);
+      setDistractionQueue(rest);
+    }
+  }, [activeDistraction, distractionQueue]);
+
+  // Clean up standby timers when scenario ends
+  useEffect(() => {
+    if (runner.status === "ended") {
+      standbyTimersRef.current.forEach((t) => clearTimeout(t));
+      standbyTimersRef.current.clear();
+    }
+  }, [runner.status]);
+
+  const handleDistractionRespond = useCallback(
+    (choiceId: string, correct: boolean) => {
+      if (!activeDistraction) return;
+      const d = activeDistraction;
+      setActiveDistraction(null);
+
+      if (!correct) {
+        // Wrong response — ATC calls back (same re-queue logic as Stand By)
+        const existing = standbyTimersRef.current.get(d.id);
+        if (existing) clearTimeout(existing);
+        const delayMs = d.standbyResurfaceMs ?? STANDBY_REQUEUE_DEFAULT_MS;
+        const timer = setTimeout(() => {
+          setDistractionQueue((prev) => [...prev, d]);
+          standbyTimersRef.current.delete(d.id);
+        }, delayMs);
+        standbyTimersRef.current.set(d.id, timer);
+      }
+      // correct: permanent dismiss — no re-queue
+      void choiceId;
+    },
+    [activeDistraction],
+  );
+
+  // Stand By: dismiss for now, re-queue after standbyResurfaceMs
+  const handleDistractionStandby = useCallback(() => {
+    if (!activeDistraction) return;
+    const d = activeDistraction;
+    setActiveDistraction(null);
+
+    // Clear any existing standby timer for this call (in case of repeat Stand By)
+    const existing = standbyTimersRef.current.get(d.id);
+    if (existing) clearTimeout(existing);
+
+    const delayMs = d.standbyResurfaceMs ?? STANDBY_REQUEUE_DEFAULT_MS;
+    const timer = setTimeout(() => {
+      setDistractionQueue((prev) => [...prev, d]);
+      standbyTimersRef.current.delete(d.id);
+    }, delayMs);
+    standbyTimersRef.current.set(d.id, timer);
+  }, [activeDistraction]);
+
+  // ── Session submit ──────────────────────────────────────────────────────────
   const submit = useCallback(async () => {
     setSubmitting(true);
     setError(null);
@@ -97,11 +181,31 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
 
       <div className="flex-1 grid lg:grid-cols-[1fr_400px] gap-6 p-6 max-w-[1400px] mx-auto w-full">
         <div className="flex flex-col gap-6">
-          <div className="grid lg:grid-cols-[1fr_240px] gap-4">
-            <EwdDisplay state={runner.state} />
-            <PfdNd />
+          <PfdNd state={runner.state} />
+          <GlareshieldPanel
+            scenario={scenario}
+            state={runner.state}
+            perform={runner.perform}
+            disabled={runner.status !== "running"}
+          />
+          <div className="grid lg:grid-cols-[1fr_260px] gap-4">
+            <EwdDisplay state={runner.state} scenario={scenario} />
+            <PfAviatePanel state={runner.state} />
           </div>
           <CockpitControls
+            scenario={scenario}
+            state={runner.state}
+            perform={runner.perform}
+            disabled={runner.status !== "running"}
+          />
+          {/* CHCLM crosscheck — appears after Agent 1 discharged, gates CRM checklist */}
+          <ChclmChecklist
+            scenario={scenario}
+            state={runner.state}
+            perform={runner.perform}
+            disabled={runner.status !== "running"}
+          />
+          <CommChecklist
             scenario={scenario}
             state={runner.state}
             perform={runner.perform}
@@ -153,6 +257,15 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             </p>
           )}
 
+          {/* Distraction queue indicator */}
+          {distractionQueue.length > 0 && (
+            <div className="border border-[var(--color-amber)] bg-[var(--color-amber-soft)] px-3 py-2 font-mono">
+              <span className="text-[10px] uppercase tracking-[0.15em] text-[var(--color-amber)]">
+                {distractionQueue.length} ATC COMM{distractionQueue.length > 1 ? "S" : ""} QUEUED
+              </span>
+            </div>
+          )}
+
           <details className="border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
             <summary className="font-mono text-[10px] uppercase tracking-[0.25em] text-[var(--color-text-faint)] cursor-pointer hover:text-[var(--color-text)]">
               EVENT LOG ({runner.events.length})
@@ -189,6 +302,25 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
           </details>
         </aside>
       </div>
+
+      {/* Distraction modal — front and center overlay, outside the grid */}
+      {activeDistraction && runner.status === "running" && (
+        <DistractionModal
+          distraction={activeDistraction}
+          onRespond={handleDistractionRespond}
+          onStandby={handleDistractionStandby}
+        />
+      )}
+
+      {/* PF/PM flightcheck popups — below ATC modal (z-30 vs z-50) */}
+      {runner.status === "running" && (
+        <FlightCheckPopup
+          scenario={scenario}
+          state={runner.state}
+          perform={runner.perform}
+          disabled={runner.status !== "running"}
+        />
+      )}
     </main>
   );
 }

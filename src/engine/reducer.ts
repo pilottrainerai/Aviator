@@ -25,6 +25,8 @@ function applyEffect(state: ScenarioState, e: TriggerEffect): ScenarioState {
       };
     case "SET_MASTER_WARN":
       return { ...state, masterWarnActive: e.active };
+    case "SET_MASTER_CAUT":
+      return { ...state, masterCautActive: e.active };
     case "SET_ALARM_LABEL":
       return { ...state, alarmLabel: e.label };
   }
