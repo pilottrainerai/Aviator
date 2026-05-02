@@ -14,8 +14,10 @@ export type ScenarioState = {
   triggersFired: Record<string, number>;
   /** Live ECAM messages */
   ecamMessages: ECAMMessage[];
-  /** Big red banner active */
+  /** MASTER WARN glareshield light (red, flashing) — CRC active */
   masterWarnActive: boolean;
+  /** MASTER CAUTION glareshield light (amber, steady) — SC chime active */
+  masterCautActive: boolean;
   /** Optional alarm label rendered alongside MASTER WARN */
   alarmLabel: string | null;
   /** Pilot's strategic decision, if any */
@@ -28,6 +30,7 @@ export const initialScenarioState = (): ScenarioState => ({
   triggersFired: {},
   ecamMessages: [],
   masterWarnActive: false,
+  masterCautActive: false,
   alarmLabel: null,
   decision: null,
 });
