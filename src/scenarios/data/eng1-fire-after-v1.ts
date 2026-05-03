@@ -324,6 +324,19 @@ export const eng1FireAfterV1: Scenario = {
       ],
     },
 
+    // ── CR-OEB ── OEB Check — at STATUS, before post-ECAM actions
+    // FCOM: at STATUS page, flight crew checks for applicable OEBs that modify procedure.
+    {
+      id: "oeb_check",
+      label: "OEB CHECK",
+      action: "CONFIRM",
+      hint: "PM: check QRH OEB list for any applicable bulletin modifying ENG 1 FIRE procedure. If none applicable — state 'NO APPLICABLE OEB'. PF acknowledges.",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      requires: ["crew_crosscheck"],
+    },
+
     // ── CR1 ── WX / ATIS — requires CHCLM crosscheck complete
     {
       id: "wx_request",
@@ -348,7 +361,41 @@ export const eng1FireAfterV1: Scenario = {
       requires: ["wx_request"],
     },
 
+    // ── CR2b ── FORDEC — structured decision after wx + performance confirmed
+    // Airbus Threat & Error Management: FORDEC is the standard crew decision framework.
+    {
+      id: "fordec",
+      label: "FORDEC",
+      action: "COMPLETE",
+      hint: "PF leads FORDEC discussion. PM cross-checks each element. Agree and commit to decision before proceeding.",
+      variant: "advisory",
+      crew: "PF",
+      group: "comms",
+      requires: ["ldg_perf"],
+      notes: [
+        "F — FACTS: ENG 1 fire secured. Single engine. VIDP 15 min. RWY 28 LDA 4430 m. Full CFR on field.",
+        "O — OPTIONS: ① Return VIDP RWY 28  ② Divert nearest alternate  ③ Continue (NOT viable)",
+        "R — RISKS & BENEFITS: VIDP = known field, full CFR, adequate LDA. Divert = longer flight, unfamiliar.",
+        "D — DECISION: LAND ASAP — return VIDP RWY 28 with full emergency declared.",
+        "E — EXECUTION: ILS RWY 28, Cat 1, SE approach Vapp+5 kt, full emergency, CFR standing by.",
+        "C — CHECK-BACK: PM confirms 'AGREED — LAND VIDP RWY 28, FULL EMERGENCY'",
+      ],
+    },
+
+    // ── CR2c ── FMGC Preparation — enter diversion/arrival in MCDU
+    {
+      id: "fmgc_prep",
+      label: "FMGC PREP",
+      action: "COMPLETE",
+      hint: "PM: enter VIDP in DEST, select RWY 28, insert ILS 110.30 / CRS 282. Set Vapp = Vref+5 kt (SE). Check F-PLN fuel + ALTN. PF confirms on MCDU.",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      requires: ["fordec"],
+    },
+
     // ── CR3 ── NIS briefing — cabin crew via interphone (Nature · Intentions · Special instructions)
+    // FCOM: cabin crew briefed AFTER decision is made so intentions are confirmed.
     {
       id: "nis_brief",
       label: "NIS BRIEF",
@@ -357,7 +404,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["crew_crosscheck"],
+      requires: ["fordec"],
       notes: [
         "N — NATURE: 'Engine fire, ENG 1 shut down, returning to Delhi'",
         "I — INTENTIONS: 'Landing runway 28 VIDP, approximately 15 minutes'",
@@ -390,16 +437,47 @@ export const eng1FireAfterV1: Scenario = {
       optional: true,
     },
 
-    // ── CR6 ── Approach briefing — PF briefs the approach
+    // ── CR5b ── Go-around review + fuel status — before approach phase
+    {
+      id: "go_around_review",
+      label: "GO-AROUND REVIEW",
+      action: "CONFIRM",
+      hint: "PF briefs go-around plan and confirms fuel state is adequate for alternate if approach is missed.",
+      variant: "advisory",
+      crew: "PF",
+      group: "comms",
+      requires: ["fmgc_prep"],
+      notes: [
+        "GO-AROUND: TOGA (ENG 2 only) — SRS engages — positive rate GEAR UP — maintain V2+10",
+        "FMA: TOGA → SRS / NAV / AP1 — monitor and call FMA at each transition",
+        "FUEL CHECK: confirm total fuel vs [DEST + ALTN + FINAL RESERVE]. If marginal — LAND VIDP.",
+        "RUNWAY VACATION: vacate via first available exit (Golf / Foxtrot). Brake to stop if needed.",
+        "Emergency services attend runway — do NOT delay evacuation call if required.",
+      ],
+    },
+
+    // ── CR5c ── Advise ATC of emergency services required
+    {
+      id: "atc_emergency_services",
+      label: "ATC — EMERG SVCS",
+      action: "ADVISE",
+      hint: "PM advises ATC: 'IFLY101, request Category 3 emergency services on runway 28. Require CFR vehicles, ambulances, and medical standby.'",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      requires: ["go_around_review"],
+    },
+
+    // ── CR6 ── Approach briefing — normal + non-normal, using STATUS page items
     {
       id: "approach_brief",
       label: "APPROACH BRIEF",
       action: "COMPLETE",
-      hint: "PF briefs: ILS RWY 28 VIDP, single-engine, CAT 1. DA 200 ft. Vapp +5 kt. Go-around: TOGA, positive rate, gear up, maintain V2+10.",
+      hint: "PF briefs: ILS RWY 28 VIDP, single-engine CAT 1. DA 200 ft. Vapp +5 kt. Non-normal items from STATUS: APPR CAT 1, HYD GRN LO PR, GEN 1 INOP. Go-around briefed.",
       variant: "advisory",
       crew: "PF",
       group: "comms",
-      requires: ["ldg_perf"],
+      requires: ["atc_emergency_services"],
     },
 
     // ── CR7 ── Approach preparation — MCDU, radio, checklist
@@ -407,11 +485,52 @@ export const eng1FireAfterV1: Scenario = {
       id: "approach_prep",
       label: "APPROACH PREP",
       action: "COMPLETE",
-      hint: "PM: set ILS freq + CRS, set BARO minima, QNH, set LDG configuration on MCDU. PF: confirm DEST, F-PLN, fuel.",
+      hint: "PM: set ILS RWY 28 freq 110.30 / CRS 282. BARO minima 200 ft / QNH set. Autobrake MED. Spoilers ARM. Landing lights ON. Confirm seat belts.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
       requires: ["approach_brief"],
+    },
+
+    // ── APPROACH CHECKLIST ──────────────────────────────────────────────────
+    {
+      id: "approach_cl",
+      label: "APPROACH CL",
+      action: "COMPLETE",
+      hint: "PM runs approach checklist. Call each item, PF cross-checks and responds. Complete before top of descent.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["approach_prep"],
+      notes: [
+        "BARO ................. QNH SET",
+        "MDA/DH ............... 200 ft SET",
+        "SEAT BELTS ........... ON",
+        "AUTOBRAKE ............ MED",
+        "SPOILERS ............. ARM (green)",
+        "LANDING LIGHTS ....... ON",
+        "APPROACH USING HIGHEST LEVEL OF AUTOMATION",
+      ],
+    },
+
+    // ── LANDING CHECKLIST ───────────────────────────────────────────────────
+    {
+      id: "landing_cl",
+      label: "LANDING CL",
+      action: "COMPLETE",
+      hint: "PM runs landing checklist at 1000 ft on final. PF confirms each item. Cross-check standard callouts throughout approach.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["approach_cl"],
+      notes: [
+        "GEAR ................. DOWN — 3 GREEN",
+        "FLAPS ................ FULL (or as required)",
+        "SPOILERS ............. ARM (green)",
+        "AUTOBRAKE ............ MED (SET)",
+        "CABIN ................ ADVISED",
+        "STANDARD CALLOUTS: 1000 ft / 500 ft / 100 ft / 50-40-30-20-10 RETARD",
+      ],
     },
   ],
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useScenarioRunner } from "@/lib/scenarios/runner";
 import type { Scenario, ScenarioDistraction } from "@/scenarios/types";
 import { ScenarioClock } from "@/components/cockpit/scenario-clock";
@@ -13,7 +13,7 @@ import { FireBanner } from "@/components/cockpit/fire-banner";
 import { GuidancePanel } from "@/components/cockpit/guidance-panel";
 import { AudioController } from "@/components/cockpit/audio-controller";
 import { PfdNd } from "@/components/cockpit/pfd-nd";
-import { PfAviatePanel } from "@/components/cockpit/pf-aviate-panel";
+import { FirePanel } from "@/components/cockpit/fire-panel";
 import { DistractionModal } from "@/components/cockpit/distraction-modal";
 import { CommChecklist } from "@/components/cockpit/comm-checklist";
 import { ChclmChecklist } from "@/components/cockpit/chclm-checklist";
@@ -156,6 +156,21 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
     }
   }, [router, runner, scenario.meta.slug]);
 
+  // ── Popup gap: 2-second pause between consecutive crew procedure steps ─────
+  // Prevents back-to-back popups from firing instantly — mirrors real cockpit pacing.
+  const popupGapUntilRef = useRef(0);
+  const [, bumpPopupRevision] = useReducer((n: number) => n + 1, 0);
+
+  const performWithGap = useCallback((action: import("@/engine/events").PilotAction) => {
+    runner.perform(action);
+    if (action.kind === "STEP") {
+      popupGapUntilRef.current = Date.now() + 2000;
+      setTimeout(bumpPopupRevision, 2100);
+    }
+  }, [runner]);
+
+  const popupReady = Date.now() >= popupGapUntilRef.current;
+
   const decisionKey = runner.state.decision?.tMs ?? null;
   useEffect(() => {
     if (decisionKey == null || autoEndAt != null || submitting) return;
@@ -188,9 +203,14 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             perform={runner.perform}
             disabled={runner.status !== "running"}
           />
-          <div className="grid lg:grid-cols-[1fr_260px] gap-4">
+          <div className="grid lg:grid-cols-[1fr_280px] gap-4">
             <EwdDisplay state={runner.state} scenario={scenario} />
-            <PfAviatePanel state={runner.state} />
+            <FirePanel
+              scenario={scenario}
+              state={runner.state}
+              perform={runner.perform}
+              disabled={runner.status !== "running"}
+            />
           </div>
           <CockpitControls
             scenario={scenario}
@@ -220,7 +240,19 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
         </div>
 
         <aside className="flex flex-col gap-4">
-          <GuidancePanel scenario={scenario} state={runner.state} />
+          {/* Coach panel: hidden during active run — appears after decision for self-review */}
+          {runner.state.decision ? (
+            <GuidancePanel scenario={scenario} state={runner.state} />
+          ) : (
+            <div
+              className="border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4 flex items-center gap-3"
+            >
+              <span className="inline-block h-2 w-2 rounded-full bg-[var(--color-brand)] animate-pulse" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[var(--color-text-faint)]">
+                Scenario in progress — coach available after decision
+              </span>
+            </div>
+          )}
 
           {autoEndAt != null && (
             <div className="border border-[var(--color-brand)] bg-[var(--color-brand-soft)] p-4 flex items-center justify-between">
@@ -303,7 +335,7 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
         </aside>
       </div>
 
-      {/* Distraction modal — front and center overlay, outside the grid */}
+      {/* ATC / comms modal — LEFT side, always visible alongside crew popup */}
       {activeDistraction && runner.status === "running" && (
         <DistractionModal
           distraction={activeDistraction}
@@ -312,13 +344,14 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
         />
       )}
 
-      {/* PF/PM flightcheck popups — below ATC modal (z-30 vs z-50) */}
-      {runner.status === "running" && (
+      {/* Crew action popup — RIGHT side, 2-second gap between steps */}
+      {runner.status === "running" && popupReady && (
         <FlightCheckPopup
           scenario={scenario}
           state={runner.state}
-          perform={runner.perform}
+          perform={performWithGap}
           disabled={runner.status !== "running"}
+          compact={!!activeDistraction}
         />
       )}
     </main>
