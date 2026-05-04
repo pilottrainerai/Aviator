@@ -217,16 +217,18 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             perform={runner.perform}
             disabled={runner.status !== "running"}
           />
-          <div className="grid gap-4 min-w-0" style={{ gridTemplateColumns: "minmax(0,1fr) 280px" }}>
+          <div className="grid gap-3 min-w-0" style={{ gridTemplateColumns: "minmax(0,1fr) 260px" }}>
             <div className="min-w-0 overflow-hidden">
               <EwdDisplay state={runner.state} scenario={scenario} />
             </div>
-            <FirePanel
-              scenario={scenario}
-              state={runner.state}
-              perform={runner.perform}
-              disabled={runner.status !== "running"}
-            />
+            <div className="min-w-0 overflow-hidden">
+              <FirePanel
+                scenario={scenario}
+                state={runner.state}
+                perform={runner.perform}
+                disabled={runner.status !== "running"}
+              />
+            </div>
           </div>
           <ScenarioProgress scenario={scenario} state={runner.state} />
         </div>

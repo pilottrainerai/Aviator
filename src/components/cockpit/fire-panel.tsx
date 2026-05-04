@@ -167,24 +167,24 @@ function Param({
   color: string;
 }) {
   return (
-    <div className="flex flex-col items-center" style={{ minWidth: "52px" }}>
+    <div className="flex flex-col items-center" style={{ minWidth: "36px" }}>
       <span
-        style={{ fontSize: "7px", color: C.dim, letterSpacing: "0.15em", fontFamily: "monospace" }}
+        style={{ fontSize: "6px", color: C.dim, letterSpacing: "0.12em", fontFamily: "monospace" }}
       >
         {label}
       </span>
       <span
         style={{
-          fontSize: "14px",
+          fontSize: "11px",
           color,
           fontFamily: "monospace",
           fontWeight: 700,
-          lineHeight: 1.1,
+          lineHeight: 1.15,
         }}
       >
         {value}
       </span>
-      <span style={{ fontSize: "7px", color: C.dim, fontFamily: "monospace" }}>{unit}</span>
+      <span style={{ fontSize: "6px", color: C.dim, fontFamily: "monospace" }}>{unit}</span>
     </div>
   );
 }
@@ -532,10 +532,10 @@ function EngineColumn({
       </span>
 
       {/* N1 circular gauge */}
-      <N1Gauge n1={n1} label="N1 %" color={col} size={84} />
+      <N1Gauge n1={n1} label="N1 %" color={col} size={72} />
 
       {/* EGT / N2 / FF */}
-      <div className="flex gap-3 justify-center">
+      <div className="flex gap-1 justify-center">
         <Param label="EGT" value={egt.toFixed(0)} unit="°C" color={col} />
         <Param label="N2"  value={n2.toFixed(0)}  unit="%" color={col} />
         <Param label="FF"  value={ff >= 1000 ? (ff / 1000).toFixed(1) + "k" : ff.toFixed(0)} unit="KG/H" color={col} />
@@ -616,7 +616,7 @@ export function FirePanel({
       </div>
 
       {/* ── Engine gauges ──────────────────────────────────────────────────── */}
-      <div className="flex justify-around px-3 pt-3 pb-1">
+      <div className="grid grid-cols-[1fr_1px_1fr] gap-x-2 px-2 pt-3 pb-1 items-start">
         <EngineColumn
           engNum={1}
           n1={eng1N1}
@@ -627,14 +627,7 @@ export function FirePanel({
         />
 
         {/* Vertical divider */}
-        <div
-          style={{
-            width: "1px",
-            backgroundColor: "#1C2130",
-            margin: "0 4px",
-            alignSelf: "stretch",
-          }}
-        />
+        <div style={{ backgroundColor: "#1C2130", alignSelf: "stretch" }} />
 
         <EngineColumn
           engNum={2}
