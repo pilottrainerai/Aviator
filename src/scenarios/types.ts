@@ -56,6 +56,11 @@ export type ScenarioStep = {
    * Used for irreversible actions: MASTER OFF, FIRE PB.
    */
   confirmRequired?: boolean;
+  /**
+   * True for steps confirmed by a physical left-panel control (pushbutton, switch, lever).
+   * FlightCheckPopup skips these — they complete when the pilot presses the hardware.
+   */
+  hardware?: boolean;
   /** Optional: side-effect that fires `delayMs` after this step is completed */
   afterEffect?: {
     delayMs: number;

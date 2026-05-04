@@ -102,6 +102,7 @@ function resolveTheme(step: ScenarioStep, executePhase: boolean): Theme {
 function nextPendingStep(steps: ScenarioStep[], state: ScenarioState): ScenarioStep | null {
   for (const s of steps) {
     if (s.optional) continue;
+    if (s.hardware) continue; // completed via left-panel physical controls
     if (state.completedSteps[s.id]) continue;
     const met = (s.requires ?? []).every((r) => !!state.completedSteps[r]);
     if (met) return s;
@@ -117,13 +118,15 @@ export function FlightCheckPopup({
   perform,
   disabled,
   compact,
+  inline = false,
 }: {
   scenario: Scenario;
   state: ScenarioState;
   perform: (action: PilotAction) => void;
   disabled?: boolean;
-  /** true = ATC modal also showing; raise z-index above ATC backdrop */
   compact?: boolean;
+  /** true = render as a block inside the right panel (no fixed position, no backdrop) */
+  inline?: boolean;
 }) {
   const step = nextPendingStep(scenario.steps, state);
 
@@ -147,6 +150,92 @@ export function FlightCheckPopup({
     perform({ kind: "STEP", stepId: step.id });
   };
 
+  // ── INLINE MODE — renders as a block inside the right panel ──────────────
+  if (inline) {
+    return (
+      <>
+        <style>{`
+          @keyframes action-fade-in {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+        <div
+          className="font-mono w-full"
+          style={{
+            backgroundColor: theme.bodyBg,
+            borderLeft: `3px solid ${theme.border}`,
+            animation: "action-fade-in 0.2s ease-out both",
+          }}
+        >
+          {/* Top accent bar */}
+          <div style={{ height: "2px", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent}00)` }} />
+
+          {/* Header */}
+          <div
+            className="flex items-center gap-2 px-4 py-2.5"
+            style={{ backgroundColor: theme.headerBg, borderBottom: `1px solid ${theme.border}25` }}
+          >
+            <span className="px-1.5 py-[2px] rounded-sm font-mono" style={{ fontSize: "7px", letterSpacing: "0.2em", fontWeight: 700, backgroundColor: theme.accent + "28", color: theme.accent, border: `1px solid ${theme.accent}50` }}>
+              {theme.badge}
+            </span>
+            <span style={{ color: isExecutePhase ? "#FFB300" : theme.accent, fontSize: "11px", letterSpacing: "0.1em", fontWeight: 700, textTransform: "uppercase", flex: 1 }}>
+              {step.label}
+            </span>
+            <span className="px-2 py-0.5 border rounded-sm" style={{ fontSize: "8px", letterSpacing: "0.12em", fontWeight: 700, textTransform: "uppercase", borderColor: theme.accent + "50", color: theme.accent, backgroundColor: theme.accent + "14" }}>
+              {step.action}
+            </span>
+          </div>
+
+          {/* Body */}
+          <div className="px-4 py-3">
+            <p style={{ color: "#D0D8E4", fontSize: "12px", lineHeight: "1.6", letterSpacing: "0.02em" }}>
+              {step.hint}
+            </p>
+            {step.notes && step.notes.length > 0 && (
+              <div className="mt-3 rounded-sm px-3 py-2" style={{ backgroundColor: theme.accent + "0C", border: `1px solid ${theme.accent}20` }}>
+                <ul className="flex flex-col gap-1">
+                  {step.notes.map((note, i) => (
+                    <li key={i} style={{ color: "#8AAABB", fontSize: "10px", letterSpacing: "0.03em", lineHeight: "1.55", fontFamily: "monospace" }}>
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: `1px solid ${theme.border}20` }}>
+            <span style={{ color: theme.accent + "60", fontSize: "8px", letterSpacing: "0.18em" }}>
+              {step.crew ?? "PM"} — {step.group?.toUpperCase() ?? "PROCEDURE"}
+            </span>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={handleConfirm}
+              className="font-mono uppercase tracking-widest transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                fontSize: "10px",
+                letterSpacing: "0.18em",
+                fontWeight: 700,
+                padding: "8px 20px",
+                borderRadius: "2px",
+                border: `2px solid ${isExecutePhase ? "#FFB300" : theme.accent}`,
+                backgroundColor: isExecutePhase ? "#FFB30022" : theme.accent + "1E",
+                color: isExecutePhase ? "#FFB300" : theme.accent,
+                boxShadow: `0 0 12px ${isExecutePhase ? "#FFB30030" : theme.accent + "25"}`,
+              }}
+            >
+              {isExecutePhase ? "EXECUTE ▶" : step.confirmRequired ? "CONFIRM?" : "CONFIRM ✓"}
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── OVERLAY MODE — fixed position (legacy, kept for fallback) ──────────────
   return (
     <>
       <style>{`
@@ -157,19 +246,10 @@ export function FlightCheckPopup({
         }
       `}</style>
 
-      {/* Subtle backdrop on the right half — dims cockpit behind the card */}
       {!compact && (
-        <div
-          className="fixed inset-0"
-          style={{
-            zIndex: 38,
-            background: "linear-gradient(270deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 55%, transparent 75%)",
-            pointerEvents: "none",
-          }}
-        />
+        <div className="fixed inset-0" style={{ zIndex: 38, background: "linear-gradient(270deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 55%, transparent 75%)", pointerEvents: "none" }} />
       )}
 
-      {/* Card — right side */}
       <div
         className="fixed font-mono"
         style={{

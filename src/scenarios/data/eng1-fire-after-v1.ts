@@ -118,6 +118,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "warning",
       crew: "PM",
       group: "glareshield",
+      hardware: true,
       requires: ["engage_ap_fma"],
       afterEffect: {
         delayMs: 400,
@@ -152,6 +153,7 @@ export const eng1FireAfterV1: Scenario = {
       hint: "PM retards ENG 1 thrust lever to IDLE. Reduces thrust before fuel isolation.",
       variant: "switch",
       crew: "PM",
+      hardware: true,
       ecamRef: "ecam_thr",
       requires: ["four_hundred_ft_cmd"],
     },
@@ -166,6 +168,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "switch",
       requires: ["thr_lever_idle"],
       crew: "PM",
+      hardware: true,
       ecamRef: "ecam_master",
       confirmRequired: true,
     },
@@ -181,6 +184,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "warning",
       requires: ["eng1_master_off"],
       crew: "PM",
+      hardware: true,
       ecamRef: "ecam_fire_pb",
       confirmRequired: true,
       afterEffect: {
@@ -215,6 +219,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "caution",
       crew: "PM",
       group: "glareshield",
+      hardware: true,
       requires: ["eng1_fire_pb"],
       afterEffect: {
         delayMs: 300,
@@ -235,6 +240,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "caution",
       requires: ["eng1_fire_pb"],
       crew: "PM",
+      hardware: true,
       ecamRef: "ecam_agent1",
       afterEffect: {
         // 25 s: nominal fire extinction (within the 30 s Agent 2 decision window)
