@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useScenarioRunner } from "@/lib/scenarios/runner";
 import type { Scenario, ScenarioDistraction, ScenarioStep } from "@/scenarios/types";
 import type { ScenarioState } from "@/engine/state";
@@ -141,6 +141,20 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
 
   const popupReady = Date.now() >= popupGapUntilRef.current;
 
+  // Hardware step that is currently actionable — shown in right panel idle state
+  const nextHardwareStep = useMemo(() => {
+    if (runner.status !== "running") return null;
+    return (
+      scenario.steps.find(
+        (s) =>
+          !s.optional &&
+          s.hardware &&
+          !runner.state.completedSteps[s.id] &&
+          (s.requires ?? []).every((r) => !!runner.state.completedSteps[r]),
+      ) ?? null
+    );
+  }, [runner.state.completedSteps, runner.status, scenario.steps]);
+
   // ── Auto-end after decision ────────────────────────────────────────────────
   const decisionKey = runner.state.decision?.tMs ?? null;
   useEffect(() => {
@@ -203,8 +217,10 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             perform={runner.perform}
             disabled={runner.status !== "running"}
           />
-          <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 280px" }}>
-            <EwdDisplay state={runner.state} scenario={scenario} />
+          <div className="grid gap-4 min-w-0" style={{ gridTemplateColumns: "minmax(0,1fr) 280px" }}>
+            <div className="min-w-0 overflow-hidden">
+              <EwdDisplay state={runner.state} scenario={scenario} />
+            </div>
             <FirePanel
               scenario={scenario}
               state={runner.state}
@@ -286,13 +302,13 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
               ) : runner.status === "running" && !popupReady ? (
                 <ActionGapCard />
               ) : (
-                <ProcedureIdleCard />
+                <ProcedureIdleCard nextHardwareStep={nextHardwareStep} />
               )}
             </div>
           </div>
 
-          {/* ── DECISION SECTION ── */}
-          {!runner.state.decision && runner.status === "running" && (
+          {/* ── DECISION SECTION — only unlocks after ECAM (agent1) complete ── */}
+          {!!runner.state.completedSteps["agent1"] && !runner.state.decision && runner.status === "running" && (
             <div
               className="shrink-0"
               style={{ borderTop: "1px solid var(--color-border)" }}
@@ -449,12 +465,48 @@ function ActionGapCard() {
   );
 }
 
-function ProcedureIdleCard() {
+function ProcedureIdleCard({ nextHardwareStep }: { nextHardwareStep?: ScenarioStep | null }) {
+  if (nextHardwareStep) {
+    const isEcam = nextHardwareStep.group === "glareshield" || !nextHardwareStep.group;
+    const accent = isEcam ? "#FF3333" : "#FFB300";
+    return (
+      <div className="px-4 py-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <span className="animate-pulse inline-block h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
+          <span className="font-mono text-[9px] uppercase tracking-[0.2em]" style={{ color: accent }}>
+            ← ACTION REQUIRED — LEFT PANEL
+          </span>
+        </div>
+        <div
+          className="px-3 py-2.5 rounded-sm"
+          style={{ backgroundColor: accent + "10", border: `1px solid ${accent}40` }}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-mono text-[11px] font-bold tracking-wider" style={{ color: accent }}>
+              {nextHardwareStep.label}
+            </span>
+            <span className="font-mono text-[9px] px-2 py-0.5 rounded-sm" style={{ backgroundColor: accent + "20", color: accent, border: `1px solid ${accent}40` }}>
+              {nextHardwareStep.action}
+            </span>
+          </div>
+          <p className="font-mono text-[10px] leading-relaxed" style={{ color: "#8A9AAB" }}>
+            {nextHardwareStep.hint}
+          </p>
+        </div>
+        {nextHardwareStep.crew && (
+          <span className="font-mono text-[8px]" style={{ color: "#3A4858" }}>
+            {nextHardwareStep.crew} — see fire panel / glareshield
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 py-4 flex items-center gap-2">
       <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#3A4252" }} />
       <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-faint)]">
-        MONITORING — USE LEFT PANEL
+        MONITORING — STANDBY
       </span>
     </div>
   );
@@ -483,91 +535,148 @@ function ScenarioProgress({ scenario, state }: { scenario: Scenario; state: Scen
   const allRequired = scenario.steps.filter((s) => !s.optional);
   const doneCount = allRequired.filter((s) => state.completedSteps[s.id]).length;
 
+  // Active group = first group that has a step whose requires are all met but not yet done
+  const activeGroup = GROUP_ORDER.find((g) =>
+    grouped[g]?.some(
+      (s) => !state.completedSteps[s.id] && (s.requires ?? []).every((r) => !!state.completedSteps[r]),
+    ),
+  );
+
+  const [expanded, setExpanded] = useState<Set<string>>(() =>
+    new Set(activeGroup ? [activeGroup] : [GROUP_ORDER[0]]),
+  );
+
+  // Auto-expand the newly active group as the procedure advances
+  useEffect(() => {
+    if (activeGroup) {
+      setExpanded((prev) => (prev.has(activeGroup) ? prev : new Set([...prev, activeGroup])));
+    }
+  }, [activeGroup]);
+
+  const toggle = (g: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+      return next;
+    });
+
   return (
     <div className="border border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div
-        className="px-4 py-2 flex items-center justify-between"
-        style={{ borderBottom: "1px solid var(--color-border)" }}
-      >
-        <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-[var(--color-text-faint)]">
-          PROCEDURE PROGRESS
-        </span>
-        <span className="font-mono text-[9px] text-[var(--color-text-faint)]">
-          {doneCount} / {allRequired.length}
-        </span>
+      <div className="px-4 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid var(--color-border)" }}>
+        <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-[var(--color-text-faint)]">PROCEDURE PROGRESS</span>
+        <span className="font-mono text-[9px] text-[var(--color-text-faint)]">{doneCount} / {allRequired.length}</span>
       </div>
-
-      <div style={{ borderBottom: "1px solid var(--color-border)" }}>
-        {/* Progress bar */}
-        <div style={{ height: "2px", backgroundColor: "var(--color-border)" }}>
-          <div
-            className="h-full transition-all duration-500"
-            style={{ width: `${(doneCount / allRequired.length) * 100}%`, backgroundColor: "var(--color-brand)" }}
-          />
-        </div>
+      {/* Overall progress bar */}
+      <div style={{ height: "2px", backgroundColor: "var(--color-border)" }}>
+        <div className="h-full transition-all duration-500" style={{ width: `${(doneCount / allRequired.length) * 100}%`, backgroundColor: "var(--color-brand)" }} />
       </div>
-
       <div className="divide-y divide-[var(--color-border)]">
         {GROUP_ORDER.filter((g) => grouped[g]).map((g) => (
-          <ProgressGroupRow key={g} label={GROUP_LABELS[g] ?? g} steps={grouped[g]} state={state} />
+          <AccordionGroupRow
+            key={g}
+            label={GROUP_LABELS[g] ?? g}
+            steps={grouped[g]}
+            state={state}
+            isActive={activeGroup === g}
+            expanded={expanded.has(g)}
+            onToggle={() => toggle(g)}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function ProgressGroupRow({
-  label,
-  steps,
-  state,
+function AccordionGroupRow({
+  label, steps, state, isActive, expanded, onToggle,
 }: {
   label: string;
   steps: ScenarioStep[];
   state: ScenarioState;
+  isActive: boolean;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   const doneCount = steps.filter((s) => state.completedSteps[s.id]).length;
   const allDone = doneCount === steps.length;
+  const accentColor = allDone ? "var(--color-green)" : isActive ? "var(--color-brand)" : "var(--color-text-faint)";
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5">
-      <span
-        className="font-mono text-[8px] uppercase tracking-[0.2em] shrink-0"
-        style={{ width: "88px", color: allDone ? "var(--color-green)" : "var(--color-text-faint)" }}
+    <div>
+      {/* Clickable header */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
+        style={{ backgroundColor: isActive && !allDone ? "rgba(0,207,255,0.04)" : "transparent" }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(255,255,255,0.04)"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = isActive && !allDone ? "rgba(0,207,255,0.04)" : "transparent"; }}
       >
-        {label}
-      </span>
-      <div className="flex items-center gap-1 flex-1 flex-wrap">
-        {steps.map((s) => {
-          const done = !!state.completedSteps[s.id];
-          const isCurrent =
-            !done &&
-            (s.requires ?? []).every((r) => !!state.completedSteps[r]);
-          return (
-            <div
-              key={s.id}
-              title={`${s.label} ${s.action}`}
-              className={isCurrent ? "animate-pulse" : ""}
-              style={{
-                height: "7px",
-                width: "7px",
-                borderRadius: "50%",
-                backgroundColor: done
-                  ? "var(--color-green)"
-                  : isCurrent
-                  ? "var(--color-brand)"
-                  : "var(--color-border)",
-                flexShrink: 0,
-              }}
-            />
-          );
-        })}
-      </div>
-      <span
-        className="font-mono text-[8px] shrink-0"
-        style={{ color: allDone ? "var(--color-green)" : "var(--color-text-faint)" }}
-      >
-        {doneCount}/{steps.length}
-      </span>
+        {/* Phase label */}
+        <span className="font-mono text-[8px] uppercase tracking-[0.2em] shrink-0" style={{ width: "82px", color: accentColor }}>
+          {label}
+        </span>
+        {/* Step dots */}
+        <div className="flex items-center gap-1 flex-1 flex-wrap">
+          {steps.map((s) => {
+            const done = !!state.completedSteps[s.id];
+            const cur = !done && (s.requires ?? []).every((r) => !!state.completedSteps[r]);
+            return (
+              <div
+                key={s.id}
+                title={`${s.label} ${s.action}`}
+                className={cur ? "animate-pulse" : ""}
+                style={{ height: "6px", width: "6px", borderRadius: "50%", flexShrink: 0, backgroundColor: done ? "var(--color-green)" : cur ? "var(--color-brand)" : "var(--color-border)" }}
+              />
+            );
+          })}
+        </div>
+        <span className="font-mono text-[8px] shrink-0" style={{ color: accentColor }}>{doneCount}/{steps.length}</span>
+        {/* Chevron */}
+        <span className="font-mono text-[9px] shrink-0 ml-1" style={{ color: "var(--color-text-faint)", display: "inline-block", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.18s" }}>▾</span>
+      </button>
+
+      {/* Expanded step list */}
+      {expanded && (
+        <div className="divide-y" style={{ borderTop: "1px solid var(--color-border)", backgroundColor: "rgba(0,0,0,0.25)" }}>
+          {steps.map((s) => {
+            const done = !!state.completedSteps[s.id];
+            const cur = !done && (s.requires ?? []).every((r) => !!state.completedSteps[r]);
+            const stepAccent = done ? "var(--color-text-faint)" : cur ? "var(--color-text)" : "var(--color-text-faint)";
+            return (
+              <div key={s.id} className="flex items-center gap-2.5 px-5 py-2" style={{ borderColor: "var(--color-border)", opacity: done ? 0.45 : 1 }}>
+                {/* Status dot */}
+                <div
+                  className={cur ? "animate-pulse shrink-0" : "shrink-0"}
+                  style={{ height: "5px", width: "5px", borderRadius: "50%", backgroundColor: done ? "var(--color-green)" : cur ? "var(--color-brand)" : "var(--color-border)" }}
+                />
+                {/* Label */}
+                <span className="font-mono text-[10px] flex-1" style={{ color: stepAccent, textDecoration: done ? "line-through" : "none" }}>
+                  {s.label}
+                </span>
+                {/* Action */}
+                <span className="font-mono text-[8px] shrink-0" style={{ color: cur ? "var(--color-brand)" : "var(--color-border)" }}>
+                  {s.action}
+                </span>
+                {/* ← LEFT PANEL badge for active hardware steps */}
+                {s.hardware && cur && (
+                  <span className="shrink-0 px-1.5 py-[1px] font-mono text-[7px] uppercase tracking-wider animate-pulse"
+                    style={{ backgroundColor: "#FF333318", color: "#FF3333", border: "1px solid #FF333335" }}>
+                    ← LEFT
+                  </span>
+                )}
+                {/* Crew badge */}
+                {s.crew && (
+                  <span className="shrink-0 px-1 py-[1px] font-mono text-[7px]" style={{ color: "var(--color-text-faint)", border: "1px solid var(--color-border)" }}>
+                    {s.crew}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
