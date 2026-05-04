@@ -5,12 +5,24 @@ import type { ScenarioState } from "@/engine/state";
 import { defaultAircraftState, type AircraftState } from "@/avionics/core/aircraftState";
 
 // Map ScenarioState → AircraftState
+// FMA transitions per FCOM DSC-22_30-100 for ENG 1 FIRE after V1:
+//   MAN TOGA / SRS / NAV / 1FD2        — initial climb, manual TOGA, no AP
+//   MAN TOGA / SRS / NAV / AP 1 [box]  — after AP1 engaged (~100 ft)
+//   THR MCT  / CLB / NAV / AP 1 [box]  — after level-off at acceleration alt (~1500 ft)
 function buildAircraftState(s?: ScenarioState): AircraftState {
-  const fireActive  = !!(s?.triggersFired?.["fire_warn"] || s?.masterWarnActive);
-  const eng1Failed  = !!(s?.triggersFired?.["fire_warn"]);
-  const apEngaged   = !!(s?.completedSteps?.["engage_ap_fma"]);
-  const masterWarn  = !!(s?.masterWarnActive && !s?.completedSteps?.["cancel_master_warn"]);
-  const masterCaut  = !!(s?.masterCautActive && !s?.completedSteps?.["cancel_master_caut"]);
+  const eng1Failed = !!(s?.triggersFired?.["fire_warn"]);
+  const apEngaged  = !!(s?.completedSteps?.["engage_ap_fma"]);
+  const levelOff   = !!(s?.completedSteps?.["level_off_maa"]);
+  const masterWarn = !!(s?.masterWarnActive && !s?.completedSteps?.["cancel_master_warn"]);
+  const masterCaut = !!(s?.masterCautActive && !s?.completedSteps?.["cancel_master_caut"]);
+
+  // Col 1 — A/THR thrust mode
+  // MAN TOGA: manual TOGA, A/THR armed but not active (pre-thrust-reduction altitude)
+  // THR MCT : A/THR active, managing ENG 2 at MCT (single-engine climb after accel alt)
+  const thrMode = levelOff ? 'THR MCT' : 'MAN TOGA';
+
+  // Col 2 — vertical mode: SRS until acceleration alt, then CLB
+  const vertMode = levelOff ? 'CLB' : 'SRS';
 
   return {
     ...defaultAircraftState,
@@ -19,8 +31,10 @@ function buildAircraftState(s?: ScenarioState): AircraftState {
     masterCaut,
     eng1Failed,
     eng2Failed: false,
-    thrMode: fireActive ? "IDLE" : "CLB",
-    vertMode: apEngaged ? "CLB" : "SRS",
+    thrMode,
+    vertMode,
+    latMode:    'NAV',
+    athrActive: true,  // A/THR armed from liftoff onward
   };
 }
 

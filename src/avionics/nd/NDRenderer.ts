@@ -334,29 +334,10 @@ export class NDRenderer extends Container {
     g.arc(bx + 60, by - 42, 30, 0, Math.PI * 2).fill({ color: C.amber,  alpha: 0.60 });
   }
 
-  // ── ENG FAIL strip ────────────────────────────────────────────────────────
-  private drawFailStrip(s: AircraftState): void {
-    const g = this.gFailStrip;
-    g.clear();
-
-    const active = s.eng1Failed || s.eng2Failed;
-    this.tFail1.visible = active;
-    this.tFail2.visible = active;
-
-    if (!active) return;
-
-    const label  = s.eng1Failed ? 'ENG 1 FAIL' : 'ENG 2 FAIL';
-    const stripY = H - FTR_H - 110;
-    const stripH = 100;
-
-    g.rect(0, stripY, W, stripH)
-     .fill({ color: 0x0C0600, alpha: 0.96 })
-     .stroke({ color: C.amber, width: 2.5 });
-
-    this.tFail1.text = label;
-    this.tFail1.x = W / 2; this.tFail1.y = stripY + 32;
-
-    this.tFail2.text = 'RETURN CONSIDERED';
-    this.tFail2.x = W / 2; this.tFail2.y = stripY + 72;
+  // ── ENG FAIL strip — removed; ECAM handles failure annunciation ──────────
+  private drawFailStrip(_s: AircraftState): void {
+    this.gFailStrip.clear();
+    this.tFail1.visible = false;
+    this.tFail2.visible = false;
   }
 }

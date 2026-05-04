@@ -677,29 +677,24 @@ export class PFDRenderer extends Container {
     const cw = W / 5;
 
     // Col 1 — A/THR thrust mode
-    const thrColor = s.thrMode === 'CLB' ? C.green
-                   : s.thrMode === 'IDLE' || s.thrMode === 'THR IDLE' ? C.white
-                   : C.amber;
+    // MAN* = manual (white), TOGA LK = locked (amber), THR* = A/THR active (green)
+    const thrColor = s.thrMode.startsWith('MAN') ? C.white
+                   : s.thrMode === 'TOGA LK'     ? C.amber
+                   : C.green;
 
-    // Col 2 — vertical mode
-    const vertColor = C.green;
-
-    // Col 3 — lateral mode
-    const latColor = C.green;
-
-    // Col 4 — approach capabilities (blank in climb/cruise)
+    // Col 4 — approach capabilities (blank during climb; CAT 1/2/3 shown on approach)
     const apprCap = '';
 
-    // Col 5 — AP/FD engagement + A/THR sub-row
+    // Col 5 — AP/FD engagement (white text, white box when AP engaged) + A/THR sub-row
     const apfdLabel = s.apEngaged ? 'AP 1' : '1FD2';
     const athrSub   = s.athrActive ? 'A/THR' : '';
 
     const cols: Array<{ top: string; topColor: number; sub: string; subColor: number }> = [
-      { top: s.thrMode,  topColor: thrColor,  sub: '',       subColor: C.cyan  },
-      { top: s.vertMode, topColor: vertColor, sub: '',       subColor: C.cyan  },
-      { top: s.latMode,  topColor: latColor,  sub: '',       subColor: C.cyan  },
-      { top: apprCap,    topColor: C.white,   sub: '',       subColor: C.cyan  },
-      { top: apfdLabel,  topColor: C.cyan,    sub: athrSub,  subColor: C.cyan  },
+      { top: s.thrMode,  topColor: thrColor,   sub: '',       subColor: C.cyan  },
+      { top: s.vertMode, topColor: C.green,    sub: '',       subColor: C.cyan  },
+      { top: s.latMode,  topColor: C.green,    sub: '',       subColor: C.cyan  },
+      { top: apprCap,    topColor: C.white,    sub: '',       subColor: C.cyan  },
+      { top: apfdLabel,  topColor: C.white,    sub: athrSub,  subColor: C.cyan  },
     ];
 
     cols.forEach((col, i) => {
@@ -712,42 +707,21 @@ export class PFDRenderer extends Container {
       this.fmaSub[i].x = cx; this.fmaSub[i].y = FMA_H * 0.72;
     });
 
-    // White box around AP when engaged (col 5) — per Airbus display convention
+    // White box around col 5 when AP engaged — per FCOM FMA convention
     if (s.apEngaged) {
-      g.rect(4 * cw + 6, 3, cw - 12, FMA_H - 6).stroke({ color: C.cyan, width: 2 });
+      g.rect(4 * cw + 6, 3, cw - 12, FMA_H - 6).stroke({ color: C.white, width: 2 });
     }
-    // Dim active-mode outline on vertical column (col 2)
-    g.rect(cw + 4, 3, cw - 8, FMA_H - 6).stroke({ color: C.green, width: 1, alpha: 0.35 });
+    // Dim green outline around active vertical mode col (col 2)
+    g.rect(cw + 4, 3, cw - 8, FMA_H - 6).stroke({ color: C.green, width: 1, alpha: 0.3 });
     // Column separators
     for (let i = 1; i < 5; i++) {
       g.moveTo(i * cw, 6).lineTo(i * cw, FMA_H - 6).stroke({ color: 0x1A2030, width: 1 });
     }
   }
 
-  // ── Engine fail indicator ─────────────────────────────────────────────────
-  private drawEngFail(s: AircraftState): void {
-    const failed = s.eng1Failed || s.eng2Failed;
-    if (!failed) {
-      this.failBox.visible = false;
-      this.failTxt.visible = false;
-      return;
-    }
-
-    this.failBox.visible = true;
-    this.failTxt.visible = true;
-
-    const label = s.eng1Failed ? 'ENG 1 FAIL' : 'ENG 2 FAIL';
-    const col   = s.eng1Failed ? C.red : C.amber;
-    const bx    = ALT_X - 4;
-    const by    = FMA_H + 52;
-    const bw    = ALT_W + VS_W + 4;
-    const bh    = 38;
-
-    this.failBox.clear();
-    this.failBox.rect(bx, by, bw, bh).fill({ color: C.bg }).stroke({ color: col, width: 2 });
-    this.failTxt.text = label;
-    this.failTxt.style.fill = col;
-    this.failTxt.x = bx + bw / 2;
-    this.failTxt.y = by + bh / 2;
+  // ── Engine fail indicator — removed; ECAM handles failure annunciation ───
+  private drawEngFail(_s: AircraftState): void {
+    this.failBox.visible = false;
+    this.failTxt.visible = false;
   }
 }

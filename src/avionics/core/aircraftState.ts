@@ -10,8 +10,8 @@ export interface AircraftState {
   selectedHdg:   number;
   apEngaged:     boolean;
   athrActive:    boolean;
-  thrMode:       string;  // 'CLB' | 'IDLE' | 'MCT' | 'TOGA' | 'MAN THR'
-  vertMode:      string;  // 'SRS' | 'CLB' | 'OP CLB' | 'ALT' | 'ALT*' | 'VS'
+  thrMode:       string;  // FMA col-1 label: 'MAN TOGA'|'MAN MCT'|'THR CLB'|'THR MCT'|'THR IDLE'|'TOGA LK'
+  vertMode:      string;  // FMA col-2 label: 'SRS'|'CLB'|'OP CLB'|'ALT'|'ALT*'|'V/S'
   latMode:       string;  // 'NAV' | 'HDG' | 'TRACK' | 'LOC'
   masterWarn:    boolean;
   masterCaut:    boolean;
@@ -36,8 +36,8 @@ export const defaultAircraftState: AircraftState = {
   selectedHdg:   280,
   apEngaged:     false,
   athrActive:    true,
-  thrMode:       'CLB',
-  vertMode:      'SRS',
+  thrMode:       'MAN TOGA',  // manual TOGA during SRS climb (pre-thrust-reduction alt)
+  vertMode:      'SRS',       // Speed Reference System — active from liftoff to accel alt
   latMode:       'NAV',
   masterWarn:    false,
   masterCaut:    false,
