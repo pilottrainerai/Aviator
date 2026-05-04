@@ -23,23 +23,17 @@ const VS_X   = W - VS_W;
 // Pixels per degree of pitch
 const PX_DEG = 11;
 
-// ─── Airbus EFIS display colours (per FCOM colour-coding standard) ─────────────
-// Green  — engaged/active modes, current values
-// Cyan   — armed modes, selected/target values, A/THR sub-row
-// White  — manual modes, reference information, current readings
-// Amber  — cautions, VLS protection strip
-// Red    — warnings
-// Magenta— flight director bars
-// Yellow — aircraft symbol (fixed reference)
+// ─── Airbus EFIS display colours ─────────────────────────────────────────────
+// Reference palette from FCOM canvas reference (see canvas A320PFD component)
 const C = {
-  sky:     0x1264C8,   // Airbus PFD sky blue  (FCOM: blue artificial horizon)
-  ground:  0x6B3A14,   // Airbus PFD ground    (FCOM: brown artificial horizon)
-  white:   0xE8EAED,   // white — manual modes, reference values
-  green:   0x00CC55,   // green — engaged/active modes, GS, track
-  cyan:    0x00D4FF,   // cyan  — armed modes, selected targets, A/THR
-  amber:   0xFFB300,   // amber — cautions, VLS strip, neg-pitch ladder
-  red:     0xFF3030,   // red   — warnings
-  magenta: 0xDD22DD,   // magenta — flight director bars
+  sky:     0x0066CC,   // Airbus PFD sky blue
+  ground:  0x7A3A00,   // Airbus PFD ground brown
+  white:   0xFFFFFF,   // white  — manual modes, current readings
+  green:   0x00FF00,   // green  — engaged/active modes, GS, track
+  cyan:    0x00FFFF,   // cyan   — armed modes, selected targets, A/THR
+  amber:   0xFFBF00,   // amber  — cautions, VLS strip, neg-pitch
+  red:     0xFF0000,   // red    — warnings
+  magenta: 0xFF00FF,   // magenta— flight director bars
   yellow:  0xFFE200,   // yellow — fixed aircraft reference symbol
   dim:     0x2A3348,
   border:  0x18202E,

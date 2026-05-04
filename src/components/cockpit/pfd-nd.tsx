@@ -4,37 +4,92 @@ import { useEffect, useRef } from "react";
 import type { ScenarioState } from "@/engine/state";
 import { defaultAircraftState, type AircraftState } from "@/avionics/core/aircraftState";
 
-// Map ScenarioState → AircraftState
-// FMA transitions per FCOM DSC-22_30-100 for ENG 1 FIRE after V1:
-//   MAN TOGA / SRS / NAV / 1FD2        — initial climb, manual TOGA, no AP
-//   MAN TOGA / SRS / NAV / AP 1 [box]  — after AP1 engaged (~100 ft)
-//   THR MCT  / CLB / NAV / AP 1 [box]  — after level-off at acceleration alt (~1500 ft)
+// ENG 1 FIRE after V1 — scenario-phase flight model
+// Each completed step advances the aircraft to a physically accurate snapshot.
+// Values match FCTM OP-020 technique and FCOM SRS/CLB performance data for VIDP ISA.
 function buildAircraftState(s?: ScenarioState): AircraftState {
-  const eng1Failed = !!(s?.triggersFired?.["fire_warn"]);
-  const apEngaged  = !!(s?.completedSteps?.["engage_ap_fma"]);
-  const levelOff   = !!(s?.completedSteps?.["level_off_maa"]);
-  const masterWarn = !!(s?.masterWarnActive && !s?.completedSteps?.["cancel_master_warn"]);
-  const masterCaut = !!(s?.masterCautActive && !s?.completedSteps?.["cancel_master_caut"]);
+  const step  = (id: string) => !!(s?.completedSteps?.[id]);
+  const fired = (id: string) => !!(s?.triggersFired?.[id]);
 
-  // Col 1 — A/THR thrust mode
-  // MAN TOGA: manual TOGA, A/THR armed but not active (pre-thrust-reduction altitude)
-  // THR MCT : A/THR active, managing ENG 2 at MCT (single-engine climb after accel alt)
-  const thrMode = levelOff ? 'THR MCT' : 'MAN TOGA';
+  const fireActive  = fired("fire_warn");
+  const eng1Failed  = fireActive;
+  const apEngaged   = step("engage_ap_fma");
+  const thrIdle     = step("thr_lever_idle");
+  const mwCancelled = step("cancel_master_warn");
+  const ecamDone    = step("agent1");
+  const levelOff    = step("level_off_maa");
+  const accelClean  = step("accel_clean");
+  const masterWarn  = !!(s?.masterWarnActive && !mwCancelled);
+  const masterCaut  = !!(s?.masterCautActive && !step("cancel_master_caut"));
 
-  // Col 2 — vertical mode: SRS until acceleration alt, then CLB
+  // ── FMA modes ──────────────────────────────────────────────────────────────
+  // Col 1 (A/THR): MAN TOGA pre-TRA; THR MCT after acceleration alt (single engine)
+  const thrMode  = levelOff ? 'THR MCT' : 'MAN TOGA';
+  // Col 2 (vertical): SRS from liftoff → CLB after acceleration alt
   const vertMode = levelOff ? 'CLB' : 'SRS';
+
+  // ── Flight values per phase ────────────────────────────────────────────────
+  // Phase logic: each step advances the aircraft to the next snapshot.
+  // Speeds/altitudes per FCTM OP-020 ENG FIRE after V1 — VIDP, ~77t, ISA.
+  let speed, altitude, vs, pitch, bank, gs, tas;
+
+  if (accelClean) {
+    // Accelerating through S/F speeds, flap retraction complete
+    speed = 210; altitude = 2200; vs = 1200; pitch = 5; bank = 0;
+    gs    = 208; tas = 212;
+  } else if (levelOff) {
+    // Minimum Acceleration Altitude ~1500ft — level off, hold speed
+    speed = 185; altitude = 1500; vs = 100; pitch = 2; bank = 0;
+    gs    = 183; tas = 187;
+  } else if (ecamDone) {
+    // ECAM actions complete, continuing climb on SRS
+    speed = 172; altitude = 1100; vs = 1800; pitch = 7; bank = 0;
+    gs    = 170; tas = 174;
+  } else if (thrIdle) {
+    // ENG 1 TL at IDLE, ENG 2 still TOGA — climbing through ~800ft
+    speed = 168; altitude = 800; vs = 2000; pitch = 8; bank = 0;
+    gs    = 166; tas = 170;
+  } else if (apEngaged) {
+    // AP1 engaged, SRS tracking V2+10 — ~600ft
+    speed = 166; altitude = 600; vs = 2100; pitch = 8; bank = 0;
+    gs    = 164; tas = 168;
+  } else if (fireActive) {
+    // Fire warning, 400ft AGL, gear retracting
+    speed = 165; altitude = 400; vs = 2200; pitch = 9; bank = 0;
+    gs    = 163; tas = 167;
+  } else {
+    // Pre-fire: just past V1, rotating — 200ft AGL
+    speed = 157; altitude = 200; vs = 1600; pitch = 10; bank = 0;
+    gs    = 155; tas = 159;
+  }
 
   return {
     ...defaultAircraftState,
+    // FMA
     apEngaged,
     masterWarn,
     masterCaut,
     eng1Failed,
-    eng2Failed: false,
+    eng2Failed:   false,
     thrMode,
     vertMode,
-    latMode:    'NAV',
-    athrActive: true,  // A/THR armed from liftoff onward
+    latMode:      'NAV',
+    athrActive:   true,
+    // Flight values
+    speed,
+    altitude,
+    vs,
+    pitch,
+    bank,
+    gs,
+    tas,
+    selectedSpeed: 165,   // SRS target (V2+10 = 145+10+10)
+    selectedAlt:   3000,  // FCU pre-selected ~3000ft QNH
+    selectedHdg:   280,   // RWY 28
+    heading:       280,
+    track:         281,
+    windDir:       260,
+    windSpd:       12,
   };
 }
 
