@@ -20,8 +20,12 @@ const HDG_Y  = H - HDG_H;
 const ALT_X  = W - ALT_W - VS_W;
 const VS_X   = W - VS_W;
 
-// Pixels per degree of pitch
-const PX_DEG = 11;
+// Pixels per degree of pitch (scaled so ±20° fills ~95% of circular AI radius)
+const PX_DEG = 16;
+
+// Circular attitude indicator radius (FCOM: AI has circular boundary)
+const AI_R   = 336;
+const BANK_R = AI_R + 26;  // bank scale arc sits just outside AI circle
 
 // ─── Airbus EFIS display colours ─────────────────────────────────────────────
 // Reference palette from FCOM canvas reference (see canvas A320PFD component)
@@ -127,8 +131,9 @@ export class PFDRenderer extends Container {
     this.horizonCont.addChild(this.gPitch);
     this.horizonCont.addChild(this.pitchLabelCont);
 
+    // Circular AI mask — per FCOM standard A320 PFD layout
     const mask = new Graphics();
-    mask.rect(ATT_X, ATT_Y, ATT_W, ATT_H).fill(0xffffff);
+    mask.circle(ATT_CX, ATT_CY, AI_R).fill(0xffffff);
     this.horizonCont.mask = mask;
     this.addChild(mask);
     this.addChild(this.horizonCont);
@@ -239,31 +244,25 @@ export class PFDRenderer extends Container {
   private drawChrome(): void {
     const g = this.gChrome;
 
-    // Outer bezel
+    // Outer display bezel
     g.rect(0, 0, W, H).stroke({ color: C.border, width: 4 });
-    // FMA bottom line
-    g.moveTo(0, FMA_H).lineTo(W, FMA_H).stroke({ color: C.dim, width: 1 });
-    // FMA column dividers
+
+    // ── FMA box and column dividers (white, per FCOM reference) ───────────
     const cw = W / 5;
+    g.rect(4, 4, W - 8, FMA_H - 8).stroke({ color: C.white, width: 1.5 });
+    g.moveTo(4, FMA_H).lineTo(W - 4, FMA_H).stroke({ color: C.white, width: 1 });
     for (let i = 1; i < 5; i++) {
-      g.moveTo(cw * i, 4).lineTo(cw * i, FMA_H - 4).stroke({ color: C.dim, width: 1 });
+      g.moveTo(cw * i, 6).lineTo(cw * i, FMA_H - 6).stroke({ color: C.white, width: 1 });
     }
-    // Speed tape right edge
+
+    // ── Circular AI bezel ring (per FCOM: circular boundary) ─────────────
+    g.circle(ATT_CX, ATT_CY, AI_R).stroke({ color: C.white, width: 2.5 });
+
+    // ── Tape lane borders (dim, just structural guides) ───────────────────
     g.moveTo(SPD_W, FMA_H).lineTo(SPD_W, HDG_Y).stroke({ color: C.border, width: 1 });
-    // Alt tape left edge
     g.moveTo(ALT_X, FMA_H).lineTo(ALT_X, HDG_Y).stroke({ color: C.border, width: 1 });
-    // VS left edge
-    g.moveTo(VS_X, FMA_H).lineTo(VS_X, HDG_Y).stroke({ color: C.border, width: 1 });
-    // Heading tape top edge
+    g.moveTo(VS_X,  FMA_H).lineTo(VS_X,  HDG_Y).stroke({ color: C.border, width: 1 });
     g.moveTo(ATT_X, HDG_Y).lineTo(ATT_X + ATT_W, HDG_Y).stroke({ color: C.border, width: 1 });
-    // SPD header
-    const sLbl = txt('SPD', 15, C.dim, false, 'center');
-    sLbl.position.set(SPD_W / 2, FMA_H + 18);
-    this.addChild(sLbl);
-    // ALT header
-    const aLbl = txt('ALT', 15, C.dim, false, 'center');
-    aLbl.position.set(ALT_X + ALT_W / 2, FMA_H + 18);
-    this.addChild(aLbl);
   }
 
   // ── Main update ──────────────────────────────────────────────────────────
@@ -302,9 +301,9 @@ export class PFDRenderer extends Container {
     g.rect(-3000, hy, 6000, 3000).fill({ color: C.ground });
     // Horizon line
     g.moveTo(-3000, hy).lineTo(3000, hy).stroke({ color: C.white, width: 4 });
-    // Outer horizon reference bars (far outside aircraft symbol)
-    g.moveTo(-340, hy).lineTo(-120, hy).stroke({ color: C.white, width: 5, alpha: 0.55 });
-    g.moveTo( 120, hy).lineTo( 340, hy).stroke({ color: C.white, width: 5, alpha: 0.55 });
+    // Horizon side reference bars (outside the aircraft symbol area)
+    g.moveTo(-AI_R + 10, hy).lineTo(-130, hy).stroke({ color: C.white, width: 5, alpha: 0.6 });
+    g.moveTo( 130,       hy).lineTo( AI_R - 10, hy).stroke({ color: C.white, width: 5, alpha: 0.6 });
 
     // ── Pitch ladder ──────────────────────────────────────────────────────
     const gp = this.gPitch;
@@ -314,10 +313,10 @@ export class PFDRenderer extends Container {
     for (const deg of rungs) {
       const ly    = hy - deg * PX_DEG;
       const major = Math.abs(deg) % 10 === 0;
-      const hw    = major ? 140 : 80;
+      const hw    = major ? 160 : 90;
       const lw    = major ? 3 : 2;
       const col   = deg < 0 ? C.amber : C.white;
-      const alpha = deg < 0 ? 0.85 : 1;
+      const alpha = deg < 0 ? 0.9 : 1;
 
       if (deg < 0) {
         // Negative pitch: dashed amber
@@ -356,86 +355,95 @@ export class PFDRenderer extends Container {
       const ly = hy - nd.deg * PX_DEG;
       const tL = this.pitchNums[nd.idx];
       const tR = this.pitchNums[nd.idx + 1];
-      // positions are in local coords of pitchLabelCont = local coords of horizonCont
-      tL.position.set(ATT_CX + nd.lx - 8, ATT_CY + ly);
-      tR.position.set(ATT_CX + nd.rx + 8, ATT_CY + ly);
+      // pitchLabelCont is a child of horizonCont whose origin (0,0) IS the AI centre.
+      // Use local coordinates only — no ATT_CX/ATT_CY offset.
+      tL.position.set(nd.lx - 8, ly);
+      tR.position.set(nd.rx + 8, ly);
       tL.visible = true;
       tR.visible = true;
     }
   }
 
   // ── Bank scale ───────────────────────────────────────────────────────────
+  // Arc centred on AI_CX/CY at radius BANK_R, wrapping the top of the circular AI.
   private drawBankScale(s: AircraftState): void {
     const g  = this.gBankArc;
     g.clear();
+    const CX = ATT_CX, CY = ATT_CY;
 
-    const R   = 420;
-    const CX  = ATT_CX;
-    const CY  = ATT_Y + 32;
+    // Top arc: from -150° to -30° (leaves room for heading area below)
+    g.arc(CX, CY, BANK_R, -Math.PI * 5 / 6, -Math.PI / 6)
+     .stroke({ color: C.white, width: 2 });
 
-    // Arc
-    g.arc(CX, CY + R, R, -Math.PI * 0.85, -Math.PI * 0.15).stroke({ color: C.white, width: 2 });
-
-    // Ticks at 0, 10, 20, 30, 45, 60
+    // Tick marks at 0, ±10, ±20, ±30, ±45, ±60°
     for (const deg of [0, 10, 20, 30, 45, 60]) {
-      for (const side of [-1, 1]) {
-        const a  = Math.PI / 2 + deg * side * (Math.PI / 180);
-        const x1 = CX + R * Math.cos(Math.PI - a);
-        const y1 = (CY + R) - R * Math.sin(a);
-        const tl = (deg === 0 || deg === 30 || deg === 60) ? 24 : 14;
-        const x2 = CX + (R - tl) * Math.cos(Math.PI - a);
-        const y2 = (CY + R) - (R - tl) * Math.sin(a);
+      const sides: number[] = deg === 0 ? [0] : [-1, 1];
+      for (const side of sides) {
+        // angle: 0=right, -90=top; bank 0 → top
+        const a  = (-90 + deg * side) * (Math.PI / 180);
+        const tl = [0, 30, 60].includes(deg) ? 24 : 14;
+        const x1 = CX + BANK_R * Math.cos(a);
+        const y1 = CY + BANK_R * Math.sin(a);
+        const x2 = CX + (BANK_R - tl) * Math.cos(a);
+        const y2 = CY + (BANK_R - tl) * Math.sin(a);
         g.moveTo(x1, y1).lineTo(x2, y2)
          .stroke({ color: C.white, width: deg === 0 ? 3 : 2 });
       }
     }
 
-    // Rotating bank pointer
-    const bankA = Math.PI / 2 + s.bank * (Math.PI / 180);
-    const px    = CX + R * Math.cos(Math.PI - bankA);
-    const py    = (CY + R) - R * Math.sin(bankA);
-    const dir   = Math.atan2(CY + R - py, CX - px);
-    const perp  = dir + Math.PI / 2;
+    // Rotating bank pointer (triangle pointing inward from arc)
+    const ba   = (-90 + s.bank) * (Math.PI / 180);
+    const tipX = CX + AI_R * Math.cos(ba);
+    const tipY = CY + AI_R * Math.sin(ba);
+    const basX = CX + BANK_R * Math.cos(ba);
+    const basY = CY + BANK_R * Math.sin(ba);
+    const perp = ba + Math.PI / 2;
     g.poly([
-      px, py,
-      px + Math.cos(perp) * 14, py + Math.sin(perp) * 14,
-      px - Math.cos(perp) * 14, py - Math.sin(perp) * 14,
+      basX, basY,
+      tipX + 14 * Math.cos(perp), tipY + 14 * Math.sin(perp),
+      tipX - 14 * Math.cos(perp), tipY - 14 * Math.sin(perp),
     ]).fill({ color: C.white });
   }
 
   // ── Slip indicator ───────────────────────────────────────────────────────
   private drawSlip(s: AircraftState): void {
     this.gSlip.clear();
-    const slipX = ATT_CX + (s.bank / 60) * 55;
-    const sy    = ATT_Y + ATT_H - HDG_H - 26;
+    // Position at bottom of circular AI area
+    const sy    = ATT_CY + AI_R - 52;
+    const slipX = ATT_CX + (s.bank / 60) * 52;
     this.gSlip.rect(slipX - 14, sy, 28, 14).stroke({ color: C.white, width: 2 });
     this.gSlip.rect(ATT_CX - 24, sy, 10, 14).stroke({ color: C.white, width: 1 });
     this.gSlip.rect(ATT_CX + 14, sy, 10, 14).stroke({ color: C.white, width: 1 });
   }
 
-  // ── Aircraft symbol ──────────────────────────────────────────────────────
+  // ── Aircraft symbol (fixed yellow reference — per FCOM) ─────────────────
   private drawAircraftSymbol(): void {
-    const g = this.gAircraftSym;
+    const g  = this.gAircraftSym;
     g.clear();
     const cx = ATT_CX, cy = ATT_CY;
-    g.rect(cx - 92, cy - 5, 68, 10).fill({ color: C.yellow });   // left wing
-    g.rect(cx + 24,  cy - 5, 68, 10).fill({ color: C.yellow });  // right wing
-    g.rect(cx - 10, cy - 5, 20, 10).fill({ color: C.yellow });   // fuselage
-    g.circle(cx, cy, 7).fill({ color: C.yellow });
-    g.rect(cx - 5, cy - 24, 10, 20).fill({ color: C.yellow });   // tail
+    // Left wing
+    g.moveTo(cx - 120, cy).lineTo(cx - 28, cy).stroke({ color: C.yellow, width: 10 });
+    g.moveTo(cx - 28, cy).lineTo(cx - 28, cy + 16).stroke({ color: C.yellow, width: 10 });
+    // Right wing
+    g.moveTo(cx + 28, cy).lineTo(cx + 120, cy).stroke({ color: C.yellow, width: 10 });
+    g.moveTo(cx + 28, cy).lineTo(cx + 28, cy + 16).stroke({ color: C.yellow, width: 10 });
+    // Centre dot
+    g.circle(cx, cy, 8).fill({ color: C.yellow });
+    // Tail (small vertical fin)
+    g.moveTo(cx, cy - 8).lineTo(cx, cy - 30).stroke({ color: C.yellow, width: 8 });
   }
 
-  // ── Flight directors ─────────────────────────────────────────────────────
+  // ── Flight directors (magenta cross-bars — per FCOM) ─────────────────────
   private drawFlightDirector(_s: AircraftState): void {
     const g = this.gFD;
     g.clear();
     const cx = ATT_CX, cy = ATT_CY;
-    // Pitch bar (horizontal)
-    g.moveTo(cx - 140, cy).lineTo(cx - 28, cy).stroke({ color: C.magenta, width: 11 });
-    g.moveTo(cx +  28, cy).lineTo(cx + 140, cy).stroke({ color: C.magenta, width: 11 });
-    // Roll bar (vertical)
-    g.moveTo(cx, cy - 100).lineTo(cx, cy - 28).stroke({ color: C.magenta, width: 11 });
-    g.moveTo(cx, cy +  28).lineTo(cx, cy + 100).stroke({ color: C.magenta, width: 11 });
+    // Horizontal pitch bar (gap around aircraft symbol)
+    g.moveTo(cx - 200, cy).lineTo(cx - 32, cy).stroke({ color: C.magenta, width: 12 });
+    g.moveTo(cx +  32, cy).lineTo(cx + 200, cy).stroke({ color: C.magenta, width: 12 });
+    // Vertical roll bar (gap around aircraft symbol)
+    g.moveTo(cx, cy - 150).lineTo(cx, cy - 32).stroke({ color: C.magenta, width: 12 });
+    g.moveTo(cx, cy +  32).lineTo(cx, cy + 150).stroke({ color: C.magenta, width: 12 });
   }
 
   // ── Speed tape ───────────────────────────────────────────────────────────
