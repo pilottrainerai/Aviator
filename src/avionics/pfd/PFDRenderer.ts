@@ -23,21 +23,34 @@ const VS_X   = W - VS_W;
 // Pixels per degree of pitch
 const PX_DEG = 11;
 
-// ─── Airbus display colours ────────────────────────────────────────────────────
+// ─── Airbus EFIS display colours (per FCOM colour-coding standard) ─────────────
+// Green  — engaged/active modes, current values
+// Cyan   — armed modes, selected/target values, A/THR sub-row
+// White  — manual modes, reference information, current readings
+// Amber  — cautions, VLS protection strip
+// Red    — warnings
+// Magenta— flight director bars
+// Yellow — aircraft symbol (fixed reference)
 const C = {
-  sky:     0x1A6CC8,   // bright Airbus blue
-  ground:  0x5C3210,   // dark earth brown
-  white:   0xE8EAED,
-  green:   0x00D060,
-  cyan:    0x00CFFF,
-  amber:   0xFFB300,
-  red:     0xFF3333,
-  magenta: 0xFF00FF,
-  yellow:  0xFFE200,   // aircraft symbol
-  dim:     0x2E3440,
-  border:  0x1A2030,
+  sky:     0x1264C8,   // Airbus PFD sky blue  (FCOM: blue artificial horizon)
+  ground:  0x6B3A14,   // Airbus PFD ground    (FCOM: brown artificial horizon)
+  white:   0xE8EAED,   // white — manual modes, reference values
+  green:   0x00CC55,   // green — engaged/active modes, GS, track
+  cyan:    0x00D4FF,   // cyan  — armed modes, selected targets, A/THR
+  amber:   0xFFB300,   // amber — cautions, VLS strip, neg-pitch ladder
+  red:     0xFF3030,   // red   — warnings
+  magenta: 0xDD22DD,   // magenta — flight director bars
+  yellow:  0xFFE200,   // yellow — fixed aircraft reference symbol
+  dim:     0x2A3348,
+  border:  0x18202E,
   bg:      0x000000,
 } as const;
+
+// Scenario-defined FMGC speed schedule (CONF 1+F, typical MTOW VIDP ISA)
+const SPD_VLS = 147;   // Lowest Selectable Speed — top of amber protection strip
+const SPD_S   = 184;   // S speed  — slat retraction (shown as "S" on tape)
+const SPD_F   = 212;   // F speed  — flap retraction (shown as "F" on tape)
+const SPD_GD  = 228;   // Green Dot — best L/D clean manoeuvre speed
 
 // ─── Text helper ──────────────────────────────────────────────────────────────
 function txt(
@@ -84,13 +97,15 @@ export class PFDRenderer extends Container {
   private spdLabels: Text[];
   private spdBox:    Text;
   private spdSel:    Text;
-  private spdKtLbl:  Text;
+  private machText:  Text;   // Mach number below speed box
+  private spdSMark:  Text;   // S-speed marker label
+  private spdFMark:  Text;   // F-speed marker label
 
   // Alt tape text
   private altLabels: Text[];
   private altBox:    Text;
   private altSel:    Text;
-  private flapsLbl:  Text;
+  private baroText:  Text;   // Baro setting (STD / QNH)
 
   // Heading tape text
   private hdgLabels: Text[];
@@ -175,23 +190,27 @@ export class PFDRenderer extends Container {
 
     // ── Text — speed tape ────────────────────────────────────────────────────
     this.spdLabels = Array.from({ length: 14 }, () => txt('', 20, C.white));
-    this.spdBox    = txt('---', 38, C.white, true, 'center');
+    this.spdBox    = txt('---', 38, C.white, true,  'center');
     this.spdSel    = txt('---', 18, C.cyan,  false, 'right');
-    this.spdKtLbl  = txt('--- KT', 20, C.white, false, 'center');
+    this.machText  = txt('.00', 20, C.green, false, 'center');  // Mach number
+    this.spdSMark  = txt('S',   20, C.green, true,  'right');   // S-speed marker
+    this.spdFMark  = txt('F',   20, C.green, true,  'right');   // F-speed marker
     this.spdLabels.forEach((t) => this.addChild(t));
     this.addChild(this.spdBox);
     this.addChild(this.spdSel);
-    this.addChild(this.spdKtLbl);
+    this.addChild(this.machText);
+    this.addChild(this.spdSMark);
+    this.addChild(this.spdFMark);
 
     // ── Text — alt tape ──────────────────────────────────────────────────────
     this.altLabels = Array.from({ length: 14 }, () => txt('', 18, C.white));
     this.altBox    = txt('-----', 30, C.white, true, 'center');
-    this.altSel    = txt('-----', 22, C.cyan,  true,  'center');
-    this.flapsLbl  = txt('FLAPS 1', 19, C.green, false, 'left');
+    this.altSel    = txt('-----', 22, C.cyan,  true, 'center');
+    this.baroText  = txt('STD',   18, C.cyan,  false, 'center');  // Baro setting
     this.altLabels.forEach((t) => this.addChild(t));
     this.addChild(this.altBox);
     this.addChild(this.altSel);
-    this.addChild(this.flapsLbl);
+    this.addChild(this.baroText);
 
     // ── Text — heading tape ──────────────────────────────────────────────────
     this.hdgLabels = Array.from({ length: 14 }, () => txt('', 20, C.white, false, 'center'));
@@ -436,22 +455,24 @@ export class PFDRenderer extends Container {
     const midY    = (tapeTop + tapeBot) / 2;
     const pxPerKt = 5.2;
 
-    g.rect(0, FMA_H, SPD_W, H - FMA_H - HDG_H).fill({ color: C.bg, alpha: 0.9 });
+    // Background
+    g.rect(0, FMA_H, SPD_W, H - FMA_H - HDG_H).fill({ color: C.bg, alpha: 0.92 });
 
-    // Amber/red protection bands (below VLS)
-    const vlsDelta  = 18;
-    const vsBottom  = midY + vlsDelta * pxPerKt;
-    if (vsBottom < tapeBot) {
-      g.rect(SPD_W - 12, vsBottom, 12, tapeBot - vsBottom).fill({ color: C.amber, alpha: 0.35 });
-      g.moveTo(SPD_W - 12, vsBottom).lineTo(SPD_W, vsBottom).stroke({ color: C.amber, width: 3 });
+    // ── VLS amber protection strip (below VLS = Lowest Selectable Speed) ───
+    const vlsY = midY + (spd - SPD_VLS) * pxPerKt;
+    if (vlsY < tapeBot) {
+      const stripTop = Math.max(tapeTop, vlsY);
+      g.rect(SPD_W - 14, stripTop, 14, tapeBot - stripTop)
+       .fill({ color: C.amber, alpha: 0.45 });
+      g.moveTo(SPD_W - 14, vlsY).lineTo(SPD_W, vlsY).stroke({ color: C.amber, width: 3 });
     }
 
-    // Ticks
+    // ── Tape ticks and labels ──────────────────────────────────────────────
     const lo = Math.floor(spd / 10) * 10 - 80;
     let   li = 0;
     for (let v = lo; v <= lo + 160; v += 10) {
-      if (v < 0) continue;
-      const y     = midY + (spd - v) * pxPerKt;
+      if (v < 30) continue;
+      const y = midY + (spd - v) * pxPerKt;
       if (y < tapeTop || y > tapeBot) continue;
       const major = v % 20 === 0;
       const tw    = major ? 28 : 16;
@@ -459,41 +480,72 @@ export class PFDRenderer extends Container {
       if (major && li < this.spdLabels.length) {
         const t = this.spdLabels[li++];
         t.text = String(v);
-        t.x = SPD_W - 36; t.y = y; t.visible = true;
+        t.x = SPD_W - 38; t.y = y; t.visible = true;
       }
     }
     for (let i = li; i < this.spdLabels.length; i++) this.spdLabels[i].visible = false;
 
-    // Speed box
+    // ── Current speed box ─────────────────────────────────────────────────
     const bH = 56, bW = SPD_W - 6;
-    g.rect(3, midY - bH / 2, bW, bH).fill({ color: C.bg }).stroke({ color: C.white, width: 2.5 });
+    g.rect(3, midY - bH / 2, bW, bH)
+     .fill({ color: 0x050810 })
+     .stroke({ color: C.white, width: 2.5 });
     this.spdBox.text = Math.round(spd).toString();
     this.spdBox.x = SPD_W / 2; this.spdBox.y = midY;
 
-    // Trend vector (10 s)
+    // ── Speed trend vector (green line, 10-second lookahead) ─────────────
     const trendPx = (s.vs / 600) * pxPerKt * 10;
     if (Math.abs(trendPx) > 4) {
-      g.moveTo(SPD_W - 5, midY).lineTo(SPD_W - 5, midY - trendPx)
+      g.moveTo(SPD_W - 5, midY)
+       .lineTo(SPD_W - 5, Math.max(tapeTop, Math.min(tapeBot, midY - trendPx)))
        .stroke({ color: C.green, width: 4 });
     }
 
-    // Selected speed bug
+    // ── Selected-speed cyan bug ───────────────────────────────────────────
     const selY = midY + (spd - s.selectedSpeed) * pxPerKt;
     if (selY > tapeTop && selY < tapeBot) {
-      g.moveTo(2, selY - 14).lineTo(28, selY - 14).lineTo(28, selY - 2).lineTo(SPD_W, selY - 2)
+      g.moveTo(4, selY - 14).lineTo(26, selY - 14).lineTo(26, selY - 2).lineTo(SPD_W, selY - 2)
        .stroke({ color: C.cyan, width: 2 });
-      g.moveTo(2, selY + 14).lineTo(28, selY + 14).lineTo(28, selY + 2).lineTo(SPD_W, selY + 2)
+      g.moveTo(4, selY + 14).lineTo(26, selY + 14).lineTo(26, selY + 2).lineTo(SPD_W, selY + 2)
        .stroke({ color: C.cyan, width: 2 });
     }
-
     this.spdSel.text = String(Math.round(s.selectedSpeed));
-    this.spdSel.x    = SPD_W - 6;
-    this.spdSel.y    = Math.max(tapeTop + 14, Math.min(tapeBot - 14, selY - 34));
+    this.spdSel.x    = SPD_W - 4;
+    this.spdSel.y    = Math.max(tapeTop + 14, Math.min(tapeBot - 14, selY - 32));
 
-    // Bottom KT label
-    this.spdKtLbl.text = `${Math.round(spd)} KT`;
-    this.spdKtLbl.x    = SPD_W / 2;
-    this.spdKtLbl.y    = HDG_Y + HDG_H / 2;
+    // ── FMGC speed markers: S, F, Green Dot ──────────────────────────────
+    // S — slat retraction speed (green S on left edge of tape)
+    const sy_s = midY + (spd - SPD_S) * pxPerKt;
+    if (sy_s > tapeTop && sy_s < tapeBot) {
+      g.moveTo(SPD_W - 22, sy_s).lineTo(SPD_W - 2, sy_s)
+       .stroke({ color: C.green, width: 2.5 });
+      this.spdSMark.x = SPD_W - 24; this.spdSMark.y = sy_s; this.spdSMark.visible = true;
+    } else {
+      this.spdSMark.visible = false;
+    }
+
+    // F — flap retraction speed (green F on left edge of tape)
+    const sy_f = midY + (spd - SPD_F) * pxPerKt;
+    if (sy_f > tapeTop && sy_f < tapeBot) {
+      g.moveTo(SPD_W - 22, sy_f).lineTo(SPD_W - 2, sy_f)
+       .stroke({ color: C.green, width: 2.5 });
+      this.spdFMark.x = SPD_W - 24; this.spdFMark.y = sy_f; this.spdFMark.visible = true;
+    } else {
+      this.spdFMark.visible = false;
+    }
+
+    // Green Dot — best L/D clean manoeuvre speed (hollow circle on tape edge)
+    const sy_gd = midY + (spd - SPD_GD) * pxPerKt;
+    if (sy_gd > tapeTop && sy_gd < tapeBot) {
+      g.circle(SPD_W - 8, sy_gd, 6).stroke({ color: C.green, width: 2.5 });
+    }
+
+    // ── Mach number below speed box (FCOM: shown inside speed column) ────
+    const T_K  = Math.max(216.65, 288.15 - 0.0019812 * Math.min(s.altitude, 36089));
+    const mach = s.tas / (661.4788 * Math.sqrt(T_K / 288.15));
+    this.machText.text = '.' + Math.round(mach * 100).toString().padStart(2, '0');
+    this.machText.x    = SPD_W / 2;
+    this.machText.y    = midY + bH / 2 + 22;  // just below speed box
   }
 
   // ── Altitude tape ────────────────────────────────────────────────────────
@@ -548,10 +600,10 @@ export class PFDRenderer extends Container {
     this.altSel.x    = ALT_X + ALT_W / 2;
     this.altSel.y    = FMA_H + 6 + sbH / 2;
 
-    // FLAPS label
-    this.flapsLbl.text = 'FLAPS 1';
-    this.flapsLbl.x    = ALT_X + 4;
-    this.flapsLbl.y    = HDG_Y + HDG_H / 2;
+    // Baro setting (STD above transition altitude — fixed for this scenario)
+    this.baroText.text = 'STD';
+    this.baroText.x    = ALT_X + ALT_W / 2;
+    this.baroText.y    = midY + bH / 2 + 22;  // just below altitude box
   }
 
   // ── VS strip ─────────────────────────────────────────────────────────────
@@ -682,19 +734,26 @@ export class PFDRenderer extends Container {
                    : s.thrMode === 'TOGA LK'     ? C.amber
                    : C.green;
 
+    // Col 2 sub-row — armed vertical mode (cyan, per FCOM FMA layout)
+    // FCOM: CLB armed below SRS; ALT armed below CLB/OP CLB
+    const vertSub = s.vertMode === 'SRS'                         ? 'CLB'
+                  : s.vertMode === 'CLB' || s.vertMode === 'OP CLB' ? 'ALT'
+                  : '';
+
     // Col 4 — approach capabilities (blank during climb; CAT 1/2/3 shown on approach)
     const apprCap = '';
 
-    // Col 5 — AP/FD engagement (white text, white box when AP engaged) + A/THR sub-row
-    const apfdLabel = s.apEngaged ? 'AP 1' : '1FD2';
+    // Col 5 — AP/FD engagement (white) + A/THR armed (cyan sub-row)
+    // FCOM format: "AP1 FD1" when AP engaged, "1FD2" when FDs only
+    const apfdLabel = s.apEngaged ? 'AP1 FD1' : '1FD2';
     const athrSub   = s.athrActive ? 'A/THR' : '';
 
     const cols: Array<{ top: string; topColor: number; sub: string; subColor: number }> = [
-      { top: s.thrMode,  topColor: thrColor,   sub: '',       subColor: C.cyan  },
-      { top: s.vertMode, topColor: C.green,    sub: '',       subColor: C.cyan  },
-      { top: s.latMode,  topColor: C.green,    sub: '',       subColor: C.cyan  },
-      { top: apprCap,    topColor: C.white,    sub: '',       subColor: C.cyan  },
-      { top: apfdLabel,  topColor: C.white,    sub: athrSub,  subColor: C.cyan  },
+      { top: s.thrMode,  topColor: thrColor,  sub: '',       subColor: C.cyan },
+      { top: s.vertMode, topColor: C.green,   sub: vertSub,  subColor: C.cyan },
+      { top: s.latMode,  topColor: C.green,   sub: '',       subColor: C.cyan },
+      { top: apprCap,    topColor: C.white,   sub: '',       subColor: C.cyan },
+      { top: apfdLabel,  topColor: C.white,   sub: athrSub,  subColor: C.cyan },
     ];
 
     cols.forEach((col, i) => {
