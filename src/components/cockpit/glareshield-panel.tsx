@@ -41,21 +41,8 @@ export function GlareshieldPanel({
       className="border font-mono"
       style={{ borderColor: "#1C2130", backgroundColor: "#050709" }}
     >
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-3 py-[4px] border-b"
-        style={{ borderColor: "#1C2130" }}
-      >
-        <span style={{ color: "#3A4050", fontSize: "8px", letterSpacing: "0.25em", textTransform: "uppercase" }}>
-          GLARESHIELD
-        </span>
-        <span style={{ color: "#3A4050", fontSize: "8px", letterSpacing: "0.15em" }}>
-          FCOM DSC-31-20
-        </span>
-      </div>
-
-      {/* Buttons row */}
-      <div className="flex gap-3 p-3">
+      {/* Buttons row — no header, compact */}
+      <div className="flex gap-3 px-3 py-2">
         {/* ── MASTER WARN ── */}
         <MasterButton
           id="cancel_master_warn"

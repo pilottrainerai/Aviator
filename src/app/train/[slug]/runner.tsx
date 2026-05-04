@@ -13,11 +13,13 @@ import { PreflightBrief } from "@/components/cockpit/preflight-brief";
 import { FireBanner } from "@/components/cockpit/fire-banner";
 import { GuidancePanel } from "@/components/cockpit/guidance-panel";
 import { AudioController } from "@/components/cockpit/audio-controller";
-import { PfdNd } from "@/components/cockpit/pfd-nd";
+import { PfdCanvas, NdCanvas } from "@/components/cockpit/pfd-nd";
 import { DistractionModal } from "@/components/cockpit/distraction-modal";
 import { GlareshieldPanel } from "@/components/cockpit/glareshield-panel";
 import { FlightCheckPopup } from "@/components/cockpit/flight-check-popup";
 import { FirePanel } from "@/components/cockpit/fire-panel";
+import { SystemDisplay } from "@/components/cockpit/system-display";
+import { StatusPanel } from "@/components/cockpit/status-panel";
 import { track } from "@/lib/analytics";
 
 const AUTO_END_DELAY_MS = 3_000;
@@ -53,6 +55,7 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoEndAt, setAutoEndAt] = useState<number | null>(null);
+  const [decisionOpen, setDecisionOpen] = useState(false);
 
   // ── ATC state machine ──────────────────────────────────────────────────────
   const [atcPhase, setAtcPhase] = useState<AtcPhase>({ kind: "idle" });
@@ -72,14 +75,30 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
     }
   }, [runner.elapsedMs, runner.status, scenario.distractions]);
 
-  // Promote from queue only when ATC slot is truly idle
+  // Cooldown after a correct answer — next queued call waits this long
+  const [atcNextAllowedAt, setAtcNextAllowedAt] = useState(0);
+
+  // Promote from queue only when idle AND past the post-answer cooldown
   useEffect(() => {
-    if (atcPhase.kind === "idle" && distractionQueue.length > 0) {
-      const [next, ...rest] = distractionQueue;
-      setDistractionQueue(rest);
-      setAtcPhase({ kind: "active", d: next });
+    if (atcPhase.kind !== "idle" || distractionQueue.length === 0) return;
+    const now = Date.now();
+    if (now < atcNextAllowedAt) {
+      const delay = atcNextAllowedAt - now;
+      const id = setTimeout(() => {
+        setDistractionQueue((q) => {
+          if (q.length === 0) return q;
+          const [next, ...rest] = q;
+          setAtcPhase({ kind: "active", d: next });
+          return rest;
+        });
+      }, delay);
+      return () => clearTimeout(id);
     }
-  }, [atcPhase.kind, distractionQueue]);
+    const [next, ...rest] = distractionQueue;
+    setDistractionQueue(rest);
+    setAtcPhase({ kind: "active", d: next });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atcPhase.kind, distractionQueue.length, atcNextAllowedAt]);
 
   // Cleanup ATC timer when scenario ends
   useEffect(() => {
@@ -94,9 +113,10 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
       void choiceId;
       const d = atcPhase.d;
       if (correct) {
-        // Correct → permanently dismiss, free slot
+        // Correct → permanently dismiss, then 9 s gap before next call
         standbyCountRef.current.delete(d.id);
         setAtcPhase({ kind: "idle" });
+        setAtcNextAllowedAt(Date.now() + 9_000);
       } else {
         // Wrong → short re-surface (8 s)
         const count = (standbyCountRef.current.get(d.id) ?? 0) + 1;
@@ -110,6 +130,13 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
     },
     [atcPhase],
   );
+
+  // Lets the pilot manually re-open the response choices from standby
+  const handleAtcManualActivate = useCallback(() => {
+    if (atcPhase.kind !== "standby") return;
+    if (atcTimerRef.current) clearTimeout(atcTimerRef.current);
+    setAtcPhase({ kind: "active", d: atcPhase.d });
+  }, [atcPhase]);
 
   const handleAtcStandby = useCallback(() => {
     if (atcPhase.kind !== "active") return;
@@ -132,8 +159,8 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
     (action: PilotAction) => {
       runner.perform(action);
       if (action.kind === "STEP") {
-        popupGapUntilRef.current = Date.now() + 2_000;
-        setTimeout(bumpPopupRevision, 2_100);
+        popupGapUntilRef.current = Date.now() + 1_000;
+        setTimeout(bumpPopupRevision, 1_100);
       }
     },
     [runner],
@@ -168,6 +195,12 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
       ) ?? null
     );
   }, [runner.state.completedSteps, runner.status, scenario.steps]);
+
+  // Auto-open decision drawer when it first unlocks (agent1 completed)
+  const agent1Done = !!runner.state.completedSteps["agent1"];
+  useEffect(() => {
+    if (agent1Done) setDecisionOpen(true);
+  }, [agent1Done]);
 
   // ── Auto-end after decision ────────────────────────────────────────────────
   const decisionKey = runner.state.decision?.tMs ?? null;
@@ -212,30 +245,51 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
   const remaining = autoEndAt != null ? Math.max(0, autoEndAt - Date.now()) : null;
 
   return (
-    <main className="flex flex-col" style={{ height: "100vh", overflow: "hidden" }}>
+    <main className="flex flex-col">
+
+      {/* ── ABOVE FOLD — fills one full viewport; no scroll needed ── */}
+      <div className="flex flex-col" style={{ height: "100vh", overflow: "hidden" }}>
       <FireBanner state={runner.state} />
       <AudioController active={runner.state.masterWarnActive} />
       <ScenarioClock elapsedMs={runner.elapsedMs} state={runner.state} scenario={scenario} />
 
       <div className="flex flex-1 min-h-0">
 
-        {/* ── LEFT PANEL — 70% — cockpit view ─────────────────────────── */}
+        {/* ── LEFT PANEL — cockpit instruments ────────────────────────── */}
         <div
-          className="flex flex-col gap-4 p-4 overflow-y-auto"
-          style={{ flex: "0 0 70%", borderRight: "1px solid var(--color-border)" }}
+          style={{ flex: "0 0 68%", borderRight: "1px solid var(--color-border)", overflow: "hidden", display: "flex", flexDirection: "row" }}
         >
-          <PfdNd state={runner.state} />
-          <GlareshieldPanel
-            scenario={scenario}
-            state={runner.state}
-            perform={runner.perform}
-            disabled={runner.status !== "running"}
-          />
-          <div className="grid gap-3 min-w-0" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
-            <div className="min-w-0 overflow-hidden">
+          {/* Left sub-column: PFD + ND → Glareshield → ECAM fills remaining height */}
+          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", padding: "10px 4px 8px 10px", overflow: "hidden" }}>
+            {/* PFD + ND */}
+            <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+              <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
+                <PfdCanvas state={runner.state} />
+              </div>
+              <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
+                <NdCanvas state={runner.state} />
+              </div>
+            </div>
+            {/* Glareshield — compact strip */}
+            <div style={{ flexShrink: 0, marginTop: "4px" }}>
+              <GlareshieldPanel
+                scenario={scenario}
+                state={runner.state}
+                perform={runner.perform}
+                disabled={runner.status !== "running"}
+              />
+            </div>
+            {/* ECAM (E/WD) — fills remaining height */}
+            <div style={{ flex: "1 1 0", minHeight: 0, marginTop: "4px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
               <EwdDisplay state={runner.state} scenario={scenario} />
             </div>
-            <div className="min-w-0 overflow-hidden">
+            {/* STATUS page — appears below ECAM once all required steps done */}
+            <StatusPanel scenario={scenario} state={runner.state} />
+          </div>
+
+          {/* Right sub-column: Engine Display (top) + System Display (bottom) */}
+          <div style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: "6px", padding: "10px 10px 8px 4px" }}>
+            <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <FirePanel
                 scenario={scenario}
                 state={runner.state}
@@ -243,8 +297,10 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
                 disabled={runner.status !== "running"}
               />
             </div>
+            <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <SystemDisplay state={runner.state} scenario={scenario} />
+            </div>
           </div>
-          <ScenarioProgress scenario={scenario} state={runner.state} />
         </div>
 
         {/* ── RIGHT PANEL — 30% — action window ───────────────────────── */}
@@ -257,7 +313,7 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             className="px-4 py-2 shrink-0 flex items-center justify-between"
             style={{ borderBottom: "1px solid var(--color-border)" }}
           >
-            <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-[var(--color-text-faint)]">
+            <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
               ◈ ACTION PANEL
             </span>
             {distractionQueue.length > 0 && (
@@ -267,16 +323,16 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             )}
           </div>
 
-          {/* ── COMMS SECTION ── */}
+          {/* ── COMMS SECTION — fixed height, no layout shift ── */}
           <div
             className="shrink-0"
-            style={{ borderBottom: "1px solid var(--color-border)" }}
+            style={{ borderBottom: "1px solid var(--color-border)", height: "290px", overflow: "hidden" }}
           >
             <div
               className="px-4 py-1.5"
-              style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "rgba(0,0,0,0.3)" }}
+              style={{ borderBottom: "1px solid var(--color-border)" }}
             >
-              <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-faint)]">
+              <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-muted)]">
                 ▸ COMMS
               </span>
             </div>
@@ -289,25 +345,32 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
                 inline
               />
             ) : atcPhase.kind === "standby" ? (
-              <AtcStandbyCard d={atcPhase.d} resumesAt={atcPhase.resumesAt} />
+              <AtcStandbyCard
+                d={atcPhase.d}
+                resumesAt={atcPhase.resumesAt}
+                onRespond={handleAtcManualActivate}
+              />
             ) : (
               <CommsClearCard />
             )}
           </div>
 
-          {/* ── PROCEDURE SECTION ── */}
-          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+          {/* ── PROCEDURE SECTION — full active-step card, no internal scroll ── */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            {/* Header */}
             <div
               className="px-4 py-1.5 shrink-0"
-              style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "rgba(0,0,0,0.3)" }}
+              style={{ borderBottom: "1px solid var(--color-border)" }}
             >
-              <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-faint)]">
+              <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-muted)]">
                 ▸ PROCEDURE
               </span>
             </div>
-
-            <div className="flex-1">
-              {runner.status === "running" && popupReady && nextSoftwareStep ? (
+            {/* Body — single active step card; progress tracker is on the left panel */}
+            <div className="flex-1 overflow-y-auto">
+              {runner.status === "running" && !popupReady ? (
+                <ActionGapCard />
+              ) : runner.status === "running" && nextSoftwareStep ? (
                 <FlightCheckPopup
                   scenario={scenario}
                   state={runner.state}
@@ -315,27 +378,35 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
                   disabled={runner.status !== "running"}
                   inline
                 />
-              ) : runner.status === "running" && !popupReady ? (
-                <ActionGapCard />
               ) : (
                 <ProcedureIdleCard nextHardwareStep={nextHardwareStep} />
               )}
             </div>
           </div>
 
-          {/* ── DECISION SECTION — only unlocks after ECAM (agent1) complete ── */}
-          {!!runner.state.completedSteps["agent1"] && !runner.state.decision && runner.status === "running" && (
-            <div
-              className="shrink-0"
-              style={{ borderTop: "1px solid var(--color-border)" }}
-            >
+        </div>
+      </div>
+      </div>{/* end above-fold */}
+
+      {/* ── BELOW FOLD — scroll down to see procedure progress, decision, controls ── */}
+      <div style={{ display: "flex", borderTop: "2px solid var(--color-border)", minHeight: "70vh" }}>
+
+        {/* Left 68%: Full procedure progress tracker */}
+        <div style={{ flex: "0 0 68%", borderRight: "1px solid var(--color-border)", padding: "16px 12px" }}>
+          <ScenarioProgress scenario={scenario} state={runner.state} />
+        </div>
+
+        {/* Right 32%: Decision → Guidance → Submit controls */}
+        <div className="flex flex-col bg-[var(--color-surface)]" style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: "12px", padding: "16px 12px" }}>
+
+          {/* Decision — unlocks after AGENT 1 step */}
+          {agent1Done && !runner.state.decision && runner.status === "running" && (
+            <>
               <div
-                className="px-4 py-1.5"
-                style={{ borderBottom: "1px solid var(--color-border)", backgroundColor: "rgba(0,0,0,0.3)" }}
+                className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-muted)]"
+                style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: "6px" }}
               >
-                <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-faint)]">
-                  ▸ DECISION
-                </span>
+                ▸ DECISION
               </div>
               <DecisionPanel
                 scenario={scenario}
@@ -343,82 +414,75 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
                 perform={runner.perform}
                 disabled={runner.status !== "running"}
               />
-            </div>
+            </>
           )}
 
-          {/* ── COACH — shown only after decision ── */}
+          {/* Guidance — shown after decision committed */}
           {runner.state.decision && (
+            <GuidancePanel scenario={scenario} state={runner.state} />
+          )}
+
+          {/* Auto-finalizing banner */}
+          {autoEndAt != null && (
             <div
-              className="shrink-0 overflow-y-auto"
-              style={{ borderTop: "1px solid var(--color-border)", maxHeight: "220px" }}
+              className="flex items-center justify-between px-3 py-2 border"
+              style={{ borderColor: "var(--color-brand)", backgroundColor: "var(--color-brand-soft)" }}
             >
-              <GuidancePanel scenario={scenario} state={runner.state} />
+              <div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--color-brand)]">AUTO-FINALIZING</div>
+                <div className="font-sans text-xs text-[var(--color-text)] mt-0.5">
+                  Submitting in {Math.ceil((remaining ?? 0) / 1000)}s
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutoEndAt(Number.MAX_SAFE_INTEGER)}
+                className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--color-text-muted)] hover:text-[var(--color-text)] underline"
+              >
+                Cancel
+              </button>
             </div>
           )}
 
-          {/* ── SESSION CONTROLS ── */}
-          <div
-            className="shrink-0 p-3 flex flex-col gap-2"
-            style={{ borderTop: "1px solid var(--color-border)" }}
+          {/* End & Score */}
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting || runner.status !== "running"}
+            className="h-10 bg-[var(--color-brand)] text-[var(--color-bg)] font-mono text-[10px] uppercase tracking-[0.15em] rounded-sm hover:bg-[var(--color-brand)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {autoEndAt != null && (
-              <div
-                className="flex items-center justify-between px-3 py-2 border"
-                style={{ borderColor: "var(--color-brand)", backgroundColor: "var(--color-brand-soft)" }}
-              >
-                <div>
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--color-brand)]">AUTO-FINALIZING</div>
-                  <div className="font-sans text-xs text-[var(--color-text)] mt-0.5">
-                    Submitting in {Math.ceil((remaining ?? 0) / 1000)}s
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAutoEndAt(Number.MAX_SAFE_INTEGER)}
-                  className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--color-text-muted)] hover:text-[var(--color-text)] underline"
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
+            {submitting ? "Scoring…" : "End & Score"}
+          </button>
 
-            <button
-              type="button"
-              onClick={submit}
-              disabled={submitting || runner.status !== "running"}
-              className="h-10 bg-[var(--color-brand)] text-[var(--color-bg)] font-mono text-[10px] uppercase tracking-[0.15em] rounded-sm hover:bg-[var(--color-brand)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {submitting ? "Scoring…" : "End & Score"}
-            </button>
+          {error && (
+            <p className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-red)]">{error}</p>
+          )}
 
-            {error && (
-              <p className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-red)]">{error}</p>
-            )}
+          {/* Event Log */}
+          <details className="border border-[var(--color-border)]">
+            <summary className="font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--color-text-muted)] cursor-pointer px-3 py-2 hover:text-[var(--color-text)]">
+              EVENT LOG ({runner.events.length})
+            </summary>
+            <ol className="flex flex-col gap-1 max-h-60 overflow-y-auto p-3">
+              {runner.events.length === 0 && (
+                <li className="font-mono text-[10px]" style={{ color: "#4b5666" }}>— no events —</li>
+              )}
+              {runner.events.map((e, i) => (
+                <li key={i} className="flex items-baseline gap-2 font-mono text-[10px]">
+                  <span className="text-[var(--color-text-muted)] tabular-nums w-10">
+                    {(e.tMs / 1000).toFixed(1)}s
+                  </span>
+                  <span className={e.source === "pilot" ? "text-[var(--color-text)]" : "text-[var(--color-brand)]"}>
+                    {e.kind === "STEP" ? `STEP · ${e.stepId}`
+                      : e.kind === "DECISION" ? `DECISION · ${e.value}`
+                      : e.kind === "TRIGGER" ? `TRIGGER · ${e.triggerId}`
+                      : `EFFECT · ${e.sourceId}`}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </details>
 
-            <details className="border border-[var(--color-border)]">
-              <summary className="font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--color-text-faint)] cursor-pointer px-3 py-2 hover:text-[var(--color-text)]">
-                EVENT LOG ({runner.events.length})
-              </summary>
-              <ol className="flex flex-col gap-1 max-h-40 overflow-y-auto p-3">
-                {runner.events.length === 0 && (
-                  <li className="font-mono text-[10px] text-[var(--color-text-faint)]">— no events —</li>
-                )}
-                {runner.events.map((e, i) => (
-                  <li key={i} className="flex items-baseline gap-2 font-mono text-[10px]">
-                    <span className="text-[var(--color-text-faint)] tabular-nums w-10">
-                      {(e.tMs / 1000).toFixed(1)}s
-                    </span>
-                    <span className={e.source === "pilot" ? "text-[var(--color-text)]" : "text-[var(--color-brand)]"}>
-                      {e.kind === "STEP" ? `STEP · ${e.stepId}`
-                        : e.kind === "DECISION" ? `DECISION · ${e.value}`
-                        : e.kind === "TRIGGER" ? `TRIGGER · ${e.triggerId}`
-                        : `EFFECT · ${e.sourceId}`}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </details>
-          </div>
         </div>
       </div>
     </main>
@@ -430,42 +494,64 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
 function CommsClearCard() {
   return (
     <div className="px-4 py-3 flex items-center gap-2">
-      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#00D06060" }} />
-      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-faint)]">
+      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#16a34a" }} />
+      <span className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: "#4b5666" }}>
         COMMS CLEAR
       </span>
     </div>
   );
 }
 
-function AtcStandbyCard({ d, resumesAt }: { d: ScenarioDistraction; resumesAt: number }) {
+function AtcStandbyCard({
+  d,
+  resumesAt,
+  onRespond,
+}: {
+  d: ScenarioDistraction;
+  resumesAt: number;
+  onRespond: () => void;
+}) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, []);
+  const totalMs = resumesAt - (Date.now() - (Date.now() - resumesAt + (resumesAt - Date.now())));
   const secLeft = Math.max(0, Math.ceil((resumesAt - now) / 1000));
-  const totalSec = Math.round((resumesAt - (resumesAt - secLeft * 1000 - 250)) / 1000);
-  const pct = Math.max(0, (secLeft / Math.max(secLeft, totalSec)) * 100);
+  // compute initial total by assuming standby countdown hasn't changed since mount
+  const [initTotal] = useState(() => Math.ceil((resumesAt - Date.now()) / 1000));
+  const pct = Math.max(0, (secLeft / Math.max(1, initTotal)) * 100);
+  void totalMs;
 
   return (
-    <div className="px-4 py-3" style={{ opacity: 0.75 }}>
-      <div className="flex items-center gap-2 mb-1">
+    <div className="px-4 py-3 font-mono">
+      {/* Message stays visible in standby — per FCOM radio discipline */}
+      <div className="flex items-center gap-2 mb-1.5">
         <span
-          className="px-1.5 py-[2px] rounded-sm font-mono"
+          className="px-1.5 py-[2px] rounded-sm"
           style={{ fontSize: "7px", letterSpacing: "0.15em", fontWeight: 700, backgroundColor: "#FFB30020", color: "#FFB300", border: "1px solid #FFB30050" }}
         >
           STANDBY
         </span>
-        <span className="font-mono text-[10px]" style={{ color: "#FFB300" }}>{d.from}</span>
-        <span className="ml-auto font-mono text-[9px]" style={{ color: "#4A5566" }}>resumes {secLeft}s</span>
+        <span style={{ color: "#FFB300", fontSize: "10px" }}>{d.from}</span>
+        <span className="ml-auto" style={{ color: "#4A5566", fontSize: "9px" }}>resumes {secLeft}s</span>
       </div>
-      <p className="font-mono text-[10px] italic" style={{ color: "#5A6475", lineHeight: "1.5" }}>
+      <p style={{ color: "#8A9AAB", fontSize: "10px", lineHeight: "1.55", fontStyle: "italic" }}>
         &ldquo;{d.message}&rdquo;
       </p>
-      <div className="mt-2" style={{ height: "1px", backgroundColor: "#1A2030" }}>
-        <div className="h-full transition-all duration-300" style={{ width: `${pct}%`, backgroundColor: "#FFB30040" }} />
+      {/* Countdown bar */}
+      <div className="mt-2 mb-2" style={{ height: "1px", backgroundColor: "#1A2030" }}>
+        <div className="h-full transition-all duration-250" style={{ width: `${pct}%`, backgroundColor: "#FFB30040" }} />
       </div>
+      {/* Pilot can click to re-open response choices at any time */}
+      <button
+        type="button"
+        onClick={onRespond}
+        className="w-full text-left px-2 py-1.5 border border-dashed"
+        style={{ borderColor: "#00D06040", backgroundColor: "#00D06008", color: "#00D060", fontSize: "8px", letterSpacing: "0.15em", textTransform: "uppercase" }}
+      >
+        ▸ TAP TO RESPOND NOW
+      </button>
     </div>
   );
 }
@@ -473,9 +559,9 @@ function AtcStandbyCard({ d, resumesAt }: { d: ScenarioDistraction; resumesAt: n
 function ActionGapCard() {
   return (
     <div className="px-4 py-4 flex items-center gap-2">
-      <span className="inline-block h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#00CFFF60" }} />
-      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-faint)]">
-        NEXT STEP LOADING…
+      <span className="inline-block h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#3981f6" }} />
+      <span className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: "#4b5666" }}>
+        NEXT STEP…
       </span>
     </div>
   );
@@ -556,8 +642,8 @@ function ProcedureIdleCard({ nextHardwareStep }: { nextHardwareStep?: ScenarioSt
 
   return (
     <div className="px-4 py-4 flex items-center gap-2">
-      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#3A4252" }} />
-      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-faint)]">
+      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#94a3b8" }} />
+      <span className="font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: "#4b5666" }}>
         MONITORING — STANDBY
       </span>
     </div>
@@ -616,8 +702,8 @@ function ScenarioProgress({ scenario, state }: { scenario: Scenario; state: Scen
   return (
     <div className="border border-[var(--color-border)] bg-[var(--color-surface)]">
       <div className="px-4 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid var(--color-border)" }}>
-        <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-[var(--color-text-faint)]">PROCEDURE PROGRESS</span>
-        <span className="font-mono text-[9px] text-[var(--color-text-faint)]">{doneCount} / {allRequired.length}</span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.25em]" style={{ color: "#4b5666" }}>PROCEDURE PROGRESS</span>
+        <span className="font-mono text-[9px]" style={{ color: "#4b5666" }}>{doneCount} / {allRequired.length}</span>
       </div>
       {/* Overall progress bar */}
       <div style={{ height: "2px", backgroundColor: "var(--color-border)" }}>
@@ -691,7 +777,7 @@ function AccordionGroupRow({
 
       {/* Expanded step list */}
       {expanded && (
-        <div className="divide-y" style={{ borderTop: "1px solid var(--color-border)", backgroundColor: "rgba(0,0,0,0.25)" }}>
+        <div className="divide-y" style={{ borderTop: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)", borderLeft: "2px solid var(--color-border)" }}>
           {steps.map((s) => {
             const done = !!state.completedSteps[s.id];
             const cur = !done && (s.requires ?? []).every((r) => !!state.completedSteps[r]);

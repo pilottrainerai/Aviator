@@ -154,6 +154,23 @@ export function FlightCheckPopup({
 
   const [pendingConfirm, setPendingConfirm] = useState(false);
 
+  // Reading progress bar — gives trainee time to read before confirming.
+  // Visual only (does not lock the CONFIRM button). Runs for 6 s per step.
+  const READ_SECS = 6;
+  const [readPct, setReadPct] = useState(0);
+  useEffect(() => {
+    if (!step) return;
+    setReadPct(0);
+    const start = Date.now();
+    const id = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min(100, (elapsed / (READ_SECS * 1000)) * 100);
+      setReadPct(pct);
+      if (pct >= 100) clearInterval(id);
+    }, 120);
+    return () => clearInterval(id);
+  }, [step?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     setPendingConfirm(false);
   }, [step?.id]);
@@ -223,6 +240,17 @@ export function FlightCheckPopup({
                 </ul>
               </div>
             )}
+            {/* Reading progress bar — visual timer to pace reading */}
+            <div className="mt-3" style={{ height: "2px", backgroundColor: "#0E1620", borderRadius: "1px" }}>
+              <div
+                className="h-full"
+                style={{
+                  width: `${readPct}%`,
+                  backgroundColor: readPct < 100 ? theme.accent + "80" : theme.accent,
+                  transition: "width 0.12s linear",
+                }}
+              />
+            </div>
           </div>
 
           {/* Footer */}

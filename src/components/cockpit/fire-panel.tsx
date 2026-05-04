@@ -2,7 +2,8 @@
 
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
-import type { Scenario } from "@/scenarios/types";
+import type { Scenario, SysSwState } from "@/scenarios/types";
+import { evalSysCase, SYS_COLORS } from "@/components/cockpit/system-display";
 
 // ─── FCOM ECAM color palette ─────────────────────────────────────────────────
 // Source: Airbus FCOM DSC-31-60 "ECAM display" color spec
@@ -12,14 +13,34 @@ const C = {
   green:  "#00D060",
   white:  "#E8ECF4",
   cyan:   "#00CFFF",
-  dim:    "#3A4252",
-  dimLo:  "#232A36",
+  dim:    "#6A7488",
+  dimLo:  "#3A4252",
   bg:     "#000000",
   bezel:  "#1E2430",
   btnFace:"#0E1118",
   panel:  "#080C12",
   ledOff: "#060A0E",
 } as const;
+
+// ─── DSL switch state rendering ───────────────────────────────────────────────
+const DSL_SW_COLORS: Record<SysSwState, string> = {
+  norm:  C.green,
+  fault: C.amber,
+  off:   C.dimLo,
+  auto:  C.green,
+  open:  C.amber,
+  fire:  C.red,
+  armed: C.cyan,
+};
+const DSL_SW_LABELS: Record<SysSwState, string> = {
+  norm:  "NORM",
+  fault: "FAULT",
+  off:   "OFF",
+  auto:  "AUTO",
+  open:  "OPEN",
+  fire:  "FIRE",
+  armed: "ARM",
+};
 
 // ─── SVG N1 Circular Gauge ────────────────────────────────────────────────────
 // Matches A320 ECAM upper-display N1 arc layout.
@@ -544,6 +565,83 @@ function EngineColumn({
   );
 }
 
+// ─── DSL OHP switch (fire-panel variant) ─────────────────────────────────────
+function DslOHPSwitch({ label, sub, swState }: { label: string; sub?: string; swState: SysSwState }) {
+  const ledColor = DSL_SW_COLORS[swState];
+  const ledText  = DSL_SW_LABELS[swState];
+  const isFault  = swState === "fault" || swState === "open";
+  const isAlarm  = swState === "fire" || swState === "armed";
+  const isOff    = swState === "off";
+  const ledBg = (isFault || isAlarm) ? ledColor + "50" : isOff ? "#1A1018" : ledColor + "22";
+  const ledTextColor = (isFault || isAlarm) ? ledColor : isOff ? "#886655" : ledColor;
+  const bezelBorder = (isFault || isAlarm) ? ledColor : "#3A4A5A";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", minWidth: "52px" }}>
+      <div style={{ width: "52px", backgroundColor: "#141A24", border: `1.5px solid ${bezelBorder}`, borderRadius: "3px", padding: "2px", boxShadow: (isFault || isAlarm) ? `0 0 8px ${ledColor}80, inset 0 0 4px ${ledColor}20` : "inset 0 1px 2px rgba(0,0,0,0.6)", transition: "border-color 0.2s, box-shadow 0.2s" }}>
+        <div style={{ backgroundColor: ledBg, borderRadius: "2px 2px 0 0", padding: "4px 3px", textAlign: "center", minHeight: "20px", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: `1px solid ${bezelBorder}` }}>
+          <span style={{ fontSize: "8px", fontFamily: "monospace", fontWeight: 800, letterSpacing: "0.06em", color: ledTextColor, textTransform: "uppercase", textShadow: (isFault || isAlarm) ? `0 0 6px ${ledColor}` : "none" }}>{ledText}</span>
+        </div>
+        <div style={{ backgroundColor: "#0C1018", borderRadius: "0 0 2px 2px", padding: "4px 3px", textAlign: "center" }}>
+          <div style={{ fontSize: "8px", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.05em", color: "#C8D4E0", lineHeight: 1.2, textTransform: "uppercase" }}>{label}</div>
+          {sub && <div style={{ fontSize: "7px", fontFamily: "monospace", color: C.dim, letterSpacing: "0.04em", marginTop: "2px", textTransform: "uppercase" }}>{sub}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── DSL Param row for engine display ────────────────────────────────────────
+function DslEngRow({ label, value, color, unit }: { label: string; value: string; color: string; unit?: string }) {
+  return (
+    <div className="flex items-baseline justify-between px-2 py-[3px]" style={{ borderBottom: "1px solid #1C2130" }}>
+      <span style={{ color: "#8A9AAE", fontSize: "9px", letterSpacing: "0.08em", fontFamily: "monospace" }}>{label}</span>
+      <span style={{ color, fontSize: "11px", fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em" }}>
+        {value}{unit && <span style={{ color: "#6A7A8A", fontSize: "8px", marginLeft: "3px" }}>{unit}</span>}
+      </span>
+    </div>
+  );
+}
+
+// ─── DSL tray (engine panel) ──────────────────────────────────────────────────
+function DslTray({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ padding: "6px 6px 8px", borderTop: "1px solid #1C2130", backgroundColor: "#050810", marginTop: "2px" }}>
+      <div style={{ color: "#8AABBB", fontSize: "7px", letterSpacing: "0.2em", fontFamily: "monospace", marginBottom: "6px", textTransform: "uppercase" }}>OHP — {title}</div>
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>{children}</div>
+      {note && <div style={{ marginTop: "6px", paddingTop: "4px", borderTop: "1px solid #1C2130", color: "#9AABB8", fontSize: "7px", fontFamily: "monospace", letterSpacing: "0.04em", lineHeight: 1.6 }}>{note}</div>}
+    </div>
+  );
+}
+
+// ─── DSL Engine panel column ──────────────────────────────────────────────────
+function DslEnginePanel({ engNum, panel, state, warningActive }: { engNum: 1 | 2; panel: import("@/scenarios/types").EnginePanelDef; state: ScenarioState; warningActive: boolean }) {
+  const col = warningActive ? C.amber : C.dim;
+  return (
+    <div className="flex flex-col">
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: warningActive ? C.amber : C.dim, letterSpacing: "0.2em", fontWeight: 700, padding: "4px 8px 2px" }}>
+        ENG {engNum}{warningActive && <span style={{ color: C.red, marginLeft: "4px" }}>✕</span>}
+      </span>
+      {panel.rows.map((row) => {
+        const val = evalSysCase(row.states, state);
+        return (
+          <DslEngRow key={row.label} label={row.label} value={val.v} color={SYS_COLORS[val.c]} unit={row.unit} />
+        );
+      })}
+      {panel.trays?.map((tray) => (
+        <DslTray key={tray.title} title={tray.title} note={tray.note}>
+          {tray.switches.map((sw) => {
+            const swState = evalSysCase(sw.states, state);
+            return <DslOHPSwitch key={sw.label} label={sw.label} sub={sw.sub} swState={swState} />;
+          })}
+        </DslTray>
+      ))}
+      {/* suppress unused warning */}
+      {col && null}
+    </div>
+  );
+}
+
 // ─── Main FirePanel ───────────────────────────────────────────────────────────
 
 export function FirePanel({
@@ -558,6 +656,44 @@ export function FirePanel({
   disabled?: boolean;
 }) {
   const done = (id: string) => !!state.completedSteps[id];
+
+  // Use DSL path if scenario.engineDisplay is present
+  if (scenario.engineDisplay) {
+    const ed = scenario.engineDisplay;
+    const warningActive = ed.warningTrigger ? !!state.triggersFired[ed.warningTrigger] : false;
+    return (
+      <div
+        className="border border-[var(--color-border)] font-mono select-none flex flex-col"
+        style={{ backgroundColor: C.panel, flex: "1 1 0", minHeight: 0 }}
+      >
+        <div className="flex items-center justify-between px-3 py-[5px] border-b" style={{ borderColor: "#1C2130" }}>
+          <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.25em", textTransform: "uppercase" }}>ENGINE DISPLAY</span>
+          {warningActive && (
+            <span className="animate-pulse font-bold" style={{ color: C.red, fontSize: "8px", letterSpacing: "0.2em" }}>
+              ▲ {state.alarmLabel ?? "WARNING"}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-[1fr_1px_1fr] gap-x-2 px-1 pt-2 pb-1 flex-1 overflow-y-auto" style={{ alignItems: "start" }}>
+          <DslEnginePanel engNum={1} panel={ed.eng1} state={state} warningActive={warningActive} />
+          <div style={{ backgroundColor: "#1C2130", alignSelf: "stretch" }} />
+          <DslEnginePanel engNum={2} panel={ed.eng2} state={state} warningActive={false} />
+        </div>
+        {/* MSTR CAUT indicator */}
+        <div className="px-3 py-2 border-t flex items-center gap-2" style={{ borderColor: "#1C2130" }}>
+          <span style={{ fontSize: "7px", color: C.dim, letterSpacing: "0.1em" }}>MSTR CAUT</span>
+          <div style={{ width: "40px", height: "24px", backgroundColor: C.bezel, border: `1.5px solid ${state.masterCautActive ? C.amber : C.dimLo}`, borderRadius: "3px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: state.masterCautActive ? `0 0 8px ${C.amber}60` : "none", transition: "all 0.2s" }}>
+            <span style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: state.masterCautActive ? C.amber : C.dimLo, letterSpacing: "0.06em" }}>
+              {done("cancel_master_caut") ? "CLR" : state.masterCautActive ? "CAUT" : "NORM"}
+            </span>
+          </div>
+          {!warningActive && <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.08em", fontFamily: "monospace" }}>— NORMAL —</span>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Legacy hardcoded ENG 1 FIRE mode ─────────────────────────────────────
   const fireWarn = !!state.triggersFired["fire_warn"];
 
   // ENG 1 parameters — degrade progressively as steps are completed
@@ -588,7 +724,7 @@ export function FirePanel({
   return (
     <div
       className="border border-[var(--color-border)] font-mono select-none flex flex-col"
-      style={{ backgroundColor: C.panel }}
+      style={{ backgroundColor: C.panel, flex: "1 1 0", minHeight: 0 }}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div
@@ -603,7 +739,7 @@ export function FirePanel({
             textTransform: "uppercase",
           }}
         >
-          ENG DISPLAY
+          ENGINE DISPLAY
         </span>
         {fireWarn && (
           <span

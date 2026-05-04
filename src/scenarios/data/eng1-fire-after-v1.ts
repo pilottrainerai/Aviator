@@ -107,9 +107,9 @@ export const eng1FireAfterV1: Scenario = {
       requires: ["positive_rate_gear_up"],
     },
 
-    // ── G1 ── MASTER WARN cancel — after AP is engaged (aviate sequence complete)
-    // FCTM OP-020: PF aviate first (rotation → gear up → AP1 engaged → read FMA),
-    // THEN PM cancels CRC. AP engagement confirms aircraft is stable before any distraction.
+    // ── G1 ── MASTER WARN cancel — available any time after the CRC fires
+    // FCOM: the MASTER WARN pushlight can be pressed at any time to silence the CRC.
+    // No prerequisite — the glareshield light is always pressable once it illuminates.
     {
       id: "cancel_master_warn",
       label: "MASTER WARN",
@@ -119,7 +119,7 @@ export const eng1FireAfterV1: Scenario = {
       crew: "PM",
       group: "glareshield",
       hardware: true,
-      requires: ["engage_ap_fma"],
+      requires: [],
       afterEffect: {
         delayMs: 400,
         triggerId: "mw_cancelled",
@@ -138,7 +138,7 @@ export const eng1FireAfterV1: Scenario = {
       hint: "PM: 'ECAM ACTIONS' — PF acknowledges. Aviate complete and MW cancelled first.",
       variant: "advisory",
       group: "flightcheck",
-      requires: ["cancel_master_warn", "engage_ap_fma"],
+      requires: ["engage_ap_fma"],
       crew: "PM",
     },
 
@@ -209,8 +209,8 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
 
-    // ── G2 ── MASTER CAUTION cancel — after secondary failures appear (glareshield)
-    // FCOM: PM pushes MASTER CAUTION light → silences SC chime, resets amber light.
+    // ── G2 ── MASTER CAUTION cancel — available any time after the SC chime fires
+    // FCOM: the MASTER CAUTION pushlight can be pressed at any time to silence the SC chime.
     {
       id: "cancel_master_caut",
       label: "MASTER CAUT",
@@ -220,7 +220,7 @@ export const eng1FireAfterV1: Scenario = {
       crew: "PM",
       group: "glareshield",
       hardware: true,
-      requires: ["eng1_fire_pb"],
+      requires: [],
       afterEffect: {
         delayMs: 300,
         triggerId: "mc_cancelled",
@@ -400,21 +400,22 @@ export const eng1FireAfterV1: Scenario = {
       requires: ["fordec"],
     },
 
-    // ── CR3 ── NIS briefing — cabin crew via interphone (Nature · Intentions · Special instructions)
-    // FCOM: cabin crew briefed AFTER decision is made so intentions are confirmed.
+    // ── CR3 ── NITS briefing — cabin crew via interphone (Nature · Intentions · Time · Special)
+    // FCOM: cabin crew briefed AFTER decision is made so intentions and time are confirmed.
     {
       id: "nis_brief",
-      label: "NIS BRIEF",
+      label: "NITS BRIEF",
       action: "CONFIRM",
-      hint: "Interphone — NATURE: engine fire, single engine. INTENTIONS: landing VIDP RWY 28. SPECIAL: brace for emergency, crew at stations.",
+      hint: "Interphone to SCCM — NATURE: engine fire, ENG 1 shut down. INTENTIONS: landing VIDP RWY 28. TIME: approx 15 min. SPECIAL: crew at stations, prepare for emergency landing.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
       requires: ["fordec"],
       notes: [
-        "N — NATURE: 'Engine fire, ENG 1 shut down, returning to Delhi'",
-        "I — INTENTIONS: 'Landing runway 28 VIDP, approximately 15 minutes'",
-        "S — SPECIAL: 'Crew at stations. On brace command — BRACE BRACE BRACE'",
+        "N — NATURE: 'Engine fire, ENG 1 shut down, aircraft serviceable'",
+        "I — INTENTIONS: 'Returning and landing runway 28 Delhi VIDP'",
+        "T — TIME: 'Approximately 15 minutes to landing'",
+        "S — SPECIAL: 'Crew at stations. On brace command — BRACE BRACE BRACE. Do NOT evacuate unless instructed.'",
       ],
     },
 
@@ -633,6 +634,404 @@ export const eng1FireAfterV1: Scenario = {
       description:
         "Press on to destination. Not appropriate — engine is shut down, single-engine flight to destination cannot be justified.",
       tone: "danger",
+    },
+  ],
+
+  // ── Engine Display DSL ───────────────────────────────────────────────────────
+  engineDisplay: {
+    warningTrigger: "fire_warn",
+    eng1: {
+      rows: [
+        {
+          label: "THR LVR", unit: undefined,
+          states: [
+            { when: { step: "thr_lever_idle" }, value: { v: "IDLE", c: "green" } },
+            { when: { trigger: "fire_warn" },   value: { v: "MCT/FLX", c: "amber" } },
+            { value: { v: "CLB", c: "green" } },
+          ],
+        },
+        {
+          label: "N1", unit: "%",
+          states: [
+            { when: { step: "eng1_master_off" }, value: { v: "0.0", c: "amber" } },
+            { when: { trigger: "fire_warn" },    value: { v: "- -", c: "red" } },
+            { value: { v: "84.2", c: "green" } },
+          ],
+        },
+        {
+          label: "EGT", unit: "°C",
+          states: [
+            { when: { step: "eng1_fire_pb" },  value: { v: "180", c: "amber" } },
+            { when: { trigger: "fire_warn" },  value: { v: "820", c: "red" } },
+            { value: { v: "620", c: "green" } },
+          ],
+        },
+        {
+          label: "FF", unit: "KG/H",
+          states: [
+            { when: { step: "eng1_master_off" }, value: { v: "0", c: "amber" } },
+            { when: { trigger: "fire_warn" },    value: { v: "0", c: "red" } },
+            { value: { v: "2400", c: "green" } },
+          ],
+        },
+        {
+          label: "STATUS", unit: undefined,
+          states: [
+            { when: { step: "eng1_master_off" }, value: { v: "SHUT DOWN", c: "amber" } },
+            { when: { trigger: "fire_warn" },    value: { v: "FIRE", c: "red" } },
+            { value: { v: "NORMAL", c: "green" } },
+          ],
+        },
+      ],
+      trays: [
+        {
+          title: "ENG PANEL",
+          note: "FCOM step 2 — MASTER OFF: fuel SOV + oil SOV close, FADEC de-energised",
+          switches: [
+            {
+              label: "MASTER", sub: "ENG 1",
+              states: [
+                { when: { step: "eng1_master_off" }, value: "off" },
+                { value: "norm" },
+              ],
+            },
+          ],
+        },
+        {
+          title: "FIRE PANEL",
+          note: "Step 3: FIRE PB pull → HYD/bleed/IDG SOVs + fuel shutoff. Steps 4-5: AGENT 1 → AGENT 2 if fire light persists (30 s each)",
+          switches: [
+            {
+              label: "FIRE PB", sub: "ENG 1",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: "off" },
+                { when: { trigger: "fire_warn" }, value: "fire" },
+                { value: "norm" },
+              ],
+            },
+            {
+              label: "AGENT 1", sub: "DISCH",
+              states: [
+                { when: { step: "agent1" },       value: "off" },
+                { when: { step: "eng1_fire_pb" }, value: "armed" },
+                { value: "norm" },
+              ],
+            },
+            {
+              label: "AGENT 2", sub: "DISCH",
+              states: [
+                { when: { step: "agent2" },  value: "off" },
+                { when: { step: "agent1" },  value: "armed" },
+                { value: "norm" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    eng2: {
+      rows: [
+        { label: "N1",     unit: "%",    states: [{ value: { v: "84.2", c: "green" } }] },
+        { label: "EGT",    unit: "°C",   states: [{ value: { v: "618",  c: "green" } }] },
+        { label: "FF",     unit: "KG/H", states: [{ value: { v: "2350", c: "green" } }] },
+        { label: "STATUS", unit: undefined, states: [{ value: { v: "NORMAL", c: "green" } }] },
+      ],
+    },
+  },
+
+  // ── System Display DSL (4 tabs: ENG, HYD, ELEC, AIR) ────────────────────────
+  systemTabs: [
+    // ── ENG tab ───────────────────────────────────────────────────────────────
+    {
+      id: "eng", label: "ENG",
+      alertStates: [{ when: { trigger: "fire_warn" }, value: true }, { value: false }],
+      autoSelect: { trigger: "fire_warn" },
+      sections: [
+        {
+          title: "ENG 1",
+          colorStates: [
+            { when: { trigger: "fire_warn" }, value: "red" },
+            { value: "dim" },
+          ],
+          rows: [
+            {
+              label: "THR LVR",
+              states: [
+                { when: { step: "thr_lever_idle" }, value: { v: "IDLE", c: "green" } },
+                { when: { trigger: "fire_warn" },   value: { v: "MCT/FLX", c: "amber" } },
+                { value: { v: "CLB", c: "green" } },
+              ],
+            },
+            {
+              label: "N1", unit: "%",
+              states: [
+                { when: { step: "eng1_master_off" }, value: { v: "0.0", c: "amber" } },
+                { when: { trigger: "fire_warn" },    value: { v: "- -", c: "red" } },
+                { value: { v: "84.2", c: "green" } },
+              ],
+            },
+            {
+              label: "EGT", unit: "°C",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "180", c: "amber" } },
+                { when: { trigger: "fire_warn" }, value: { v: "820", c: "red" } },
+                { value: { v: "620", c: "green" } },
+              ],
+            },
+            {
+              label: "FF", unit: "KG/H",
+              states: [
+                { when: { step: "eng1_master_off" }, value: { v: "0", c: "amber" } },
+                { when: { trigger: "fire_warn" },    value: { v: "0", c: "red" } },
+                { value: { v: "2400", c: "green" } },
+              ],
+            },
+            {
+              label: "STATUS",
+              states: [
+                { when: { step: "eng1_master_off" }, value: { v: "SHUT DOWN", c: "amber" } },
+                { when: { trigger: "fire_warn" },    value: { v: "FIRE", c: "red" } },
+                { value: { v: "NORMAL", c: "green" } },
+              ],
+            },
+          ],
+        },
+        {
+          title: "ENG 2",
+          colorStates: [{ value: "dim" }],
+          rows: [
+            { label: "N1",     unit: "%",    states: [{ value: { v: "84.2", c: "green" } }] },
+            { label: "EGT",    unit: "°C",   states: [{ value: { v: "618",  c: "green" } }] },
+            { label: "FF",     unit: "KG/H", states: [{ value: { v: "2350", c: "green" } }] },
+            { label: "STATUS",              states: [{ value: { v: "NORMAL", c: "green" } }] },
+          ],
+        },
+      ],
+      tray: {
+        title: "ENG PANEL",
+        note: "FCOM step 2 — MASTER OFF: fuel SOV + oil SOV close, FADEC de-energised",
+        switches: [
+          {
+            label: "MASTER", sub: "ENG 1",
+            states: [
+              { when: { step: "eng1_master_off" }, value: "off" as const },
+              { value: "norm" as const },
+            ],
+          },
+        ],
+      },
+    },
+
+    // ── HYD tab ───────────────────────────────────────────────────────────────
+    {
+      id: "hyd", label: "HYD",
+      alertStates: [{ when: { step: "eng1_fire_pb" }, value: true }, { value: false }],
+      autoSelect: { step: "eng1_fire_pb" },
+      sections: [
+        {
+          title: "GREEN SYS",
+          colorStates: [
+            { when: { step: "eng1_fire_pb" }, value: "amber" },
+            { value: "green" },
+          ],
+          rows: [
+            {
+              label: "ENG 1 PUMP",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "LO PR", c: "amber" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+            {
+              label: "PRESSURE", unit: "PSI",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "LO PR", c: "amber" } },
+                { value: { v: "3000", c: "green" } },
+              ],
+            },
+            { label: "RESERVOIR", states: [{ value: { v: "NORM", c: "green" } }] },
+          ],
+        },
+        {
+          title: "BLUE SYS",
+          colorStates: [{ value: "green" }],
+          rows: [
+            { label: "ELEC PUMP", states: [{ value: { v: "AUTO / ON", c: "green" } }] },
+            { label: "PRESSURE", unit: "PSI", states: [{ value: { v: "3000", c: "green" } }] },
+          ],
+        },
+        {
+          title: "YELLOW SYS",
+          colorStates: [{ value: "green" }],
+          rows: [
+            { label: "ENG 2 PUMP", states: [{ value: { v: "NORM", c: "green" } }] },
+            { label: "PRESSURE", unit: "PSI", states: [{ value: { v: "3000", c: "green" } }] },
+          ],
+        },
+      ],
+      tray: {
+        title: "HYD PANEL — AFFECTED",
+        note: "FCOM DSC-29-10: FIRE PB closes green HYD fire SOV → GRN ENG 1 pump shows LO PR (FAULT). Blue ELEC pump auto-activates → maintains brakes, NW steering, spoilers. No crew action required.",
+        switches: [
+          {
+            label: "GRN", sub: "ENG1 PMP",
+            states: [
+              { when: { step: "eng1_fire_pb" }, value: "fault" as const },
+              { value: "norm" as const },
+            ],
+          },
+          { label: "BLU", sub: "ELEC PMP", states: [{ value: "auto" as const }] },
+        ],
+      },
+    },
+
+    // ── ELEC tab ──────────────────────────────────────────────────────────────
+    {
+      id: "elec", label: "ELEC",
+      alertStates: [{ when: { step: "eng1_fire_pb" }, value: true }, { value: false }],
+      sections: [
+        {
+          title: "AC NETWORK",
+          colorStates: [
+            { when: { step: "eng1_fire_pb" }, value: "amber" },
+            { value: "green" },
+          ],
+          rows: [
+            {
+              label: "GEN 1",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "FAULT / OFF", c: "amber" } },
+                { value: { v: "ON", c: "green" } },
+              ],
+            },
+            { label: "GEN 2", states: [{ value: { v: "ON — NORM", c: "green" } }] },
+            {
+              label: "AC BUS 1",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "← GEN 2 (BTC)", c: "amber" } },
+                { value: { v: "GEN 1", c: "green" } },
+              ],
+            },
+            { label: "AC BUS 2", states: [{ value: { v: "GEN 2", c: "green" } }] },
+            {
+              label: "BUS TIE",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "CLOSED (AUTO)", c: "cyan" } },
+                { value: { v: "AUTO", c: "green" } },
+              ],
+            },
+          ],
+        },
+        {
+          title: "DC NETWORK",
+          colorStates: [{ value: "green" }],
+          rows: [
+            {
+              label: "TR 1",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "FAULT", c: "amber" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+            { label: "TR 2",   states: [{ value: { v: "NORM", c: "green" } }] },
+            {
+              label: "ESS TR",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "AUTO (ALTN)", c: "cyan" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+            { label: "BAT 1/2", states: [{ value: { v: "AUTO", c: "green" } }] },
+          ],
+        },
+      ],
+      tray: {
+        title: "ELEC PANEL — AFFECTED",
+        note: "FCOM DSC-24-10: FIRE PB disconnects IDG 1 → GEN 1 FAULT/OFF. Bus Tie Contactor (sw in AUTO) auto-closes → AC BUS 1 now fed by GEN 2. TR 1 may show FAULT; ESS TR switches to ALTN supply. No crew action required.",
+        switches: [
+          {
+            label: "GEN 1", sub: "IDG 1",
+            states: [
+              { when: { step: "eng1_fire_pb" }, value: "fault" as const },
+              { value: "norm" as const },
+            ],
+          },
+          { label: "BUS TIE", sub: "CONTCTR", states: [{ value: "auto" as const }] },
+        ],
+      },
+    },
+
+    // ── AIR tab ───────────────────────────────────────────────────────────────
+    {
+      id: "air", label: "AIR",
+      alertStates: [{ when: { step: "eng1_fire_pb" }, value: true }, { value: false }],
+      sections: [
+        {
+          title: "BLEED",
+          colorStates: [
+            { when: { step: "eng1_fire_pb" }, value: "amber" },
+            { value: "green" },
+          ],
+          rows: [
+            {
+              label: "ENG 1 BLEED",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "FAULT (SOV CL)", c: "amber" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+            { label: "ENG 2 BLEED", states: [{ value: { v: "NORM", c: "green" } }] },
+            { label: "X BLEED",     states: [{ value: { v: "AUTO", c: "green" } }] },
+            { label: "APU BLEED",   states: [{ value: { v: "OFF",  c: "dim"   } }] },
+          ],
+        },
+        {
+          title: "PACKS",
+          colorStates: [
+            { when: { step: "eng1_fire_pb" }, value: "amber" },
+            { value: "green" },
+          ],
+          rows: [
+            {
+              label: "PACK 1",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "FAULT / OFF", c: "amber" } },
+                { value: { v: "AUTO", c: "green" } },
+              ],
+            },
+            { label: "PACK 2",    states: [{ value: { v: "AUTO — NORM", c: "green" } }] },
+            { label: "CABIN ΔP",  states: [{ value: { v: "NORM",        c: "green" } }] },
+            {
+              label: "DUCT TEMP",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "PACK 2 ONLY", c: "cyan" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+          ],
+        },
+      ],
+      tray: {
+        title: "AIR PANEL — AFFECTED",
+        note: "FCOM DSC-21-10: FIRE PB closes bleed SOV → ENG 1 BLEED FAULT. PACK 1 loses bleed supply → FAULT/OFF. X BLEED stays AUTO (closed) — PACK 2 uses ENG 2 bleed only (single pack ops). Cabin ΔP maintained by PACK 2.",
+        switches: [
+          {
+            label: "ENG 1", sub: "BLEED",
+            states: [
+              { when: { step: "eng1_fire_pb" }, value: "fault" as const },
+              { value: "norm" as const },
+            ],
+          },
+          {
+            label: "PACK 1", sub: "FLOW",
+            states: [
+              { when: { step: "eng1_fire_pb" }, value: "fault" as const },
+              { value: "norm" as const },
+            ],
+          },
+          { label: "X BLEED", sub: "SEL", states: [{ value: "auto" as const }] },
+        ],
+      },
     },
   ],
 };

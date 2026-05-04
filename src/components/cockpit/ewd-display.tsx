@@ -12,7 +12,7 @@ const C = {
   green:  "#00D060",  // NORMAL / completed action / memo
   cyan:   "#00CFFF",  // ADVISORY         — informational, ATC NOTIFY
   white:  "#E6E8EC",  // STATUS page text
-  dim:    "#3A4050",  // Inactive text, borders, header labels
+  dim:    "#6A7488",  // Inactive text, borders, header labels
   border: "#1C2130",  // Internal dividers
 } as const;
 
@@ -57,7 +57,7 @@ export function EwdDisplay({
   return (
     <div
       className="border border-[var(--color-border)] font-mono select-none flex flex-col"
-      style={{ backgroundColor: "#000000" }}
+      style={{ backgroundColor: "#000000", flex: "1 1 0", minHeight: 0 }}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div
@@ -65,21 +65,12 @@ export function EwdDisplay({
         style={{ borderColor: C.border }}
       >
         <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.25em", textTransform: "uppercase" }}>
-          E/WD
+          ECAM
         </span>
 
-        {state.masterWarnActive ? (
-          <span
-            className="animate-pulse font-bold"
-            style={{ color: C.red, fontSize: "9px", letterSpacing: "0.2em" }}
-          >
-            ▲ MASTER WARN
-          </span>
-        ) : (
-          <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.15em" }}>
-            {messages.length === 0 ? "NORM" : `${messages.length} MSG`}
-          </span>
-        )}
+        <span style={{ color: state.masterWarnActive ? C.red : C.dim, fontSize: "9px", letterSpacing: "0.15em" }}>
+          {messages.length === 0 ? "NORM" : `${messages.length} MSG`}
+        </span>
 
         {/* ENG 1 N1 readout — goes to dashes during fire */}
         <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.1em" }}>

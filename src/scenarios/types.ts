@@ -139,4 +139,43 @@ export type Scenario = {
   statusItems?: readonly StatusItem[];
   /** Timed interruptions that simulate a real flying environment */
   distractions?: readonly ScenarioDistraction[];
+  /** Declarative system display tabs (if absent, SystemDisplay falls back to hardcoded ENG 1 FIRE pages) */
+  systemTabs?: readonly SysTabDef[];
+  /** Declarative engine/fire panel config (if absent, FirePanel falls back to hardcoded ENG 1 FIRE rendering) */
+  engineDisplay?: EngineDisplayDef;
+};
+
+// ─── System / Engine display DSL ─────────────────────────────────────────────
+// Declarative config for SystemDisplay + FirePanel. Pure data, no functions.
+// The component resolves each "states" array in order — first matching when wins.
+
+export type SysColor = "green" | "amber" | "red" | "cyan" | "dim";
+export type SysSwState = "norm" | "fault" | "off" | "auto" | "open" | "fire" | "armed";
+
+/** Condition: undefined = always matches (use as final/default case) */
+export type SysWhen = { step?: string; trigger?: string };
+export type SysCase<T> = { when?: SysWhen; value: T };
+export type SysVal = { v: string; c: SysColor };
+
+export type SysRowDef    = { label: string; unit?: string; states: SysCase<SysVal>[] };
+export type SysSwitchDef = { label: string; sub?: string;  states: SysCase<SysSwState>[] };
+export type SysTrayDef   = { title: string; note?: string; switches: SysSwitchDef[] };
+export type SysSectionDef = {
+  title: string;
+  colorStates: SysCase<SysColor>[];
+  rows: SysRowDef[];
+};
+export type SysTabDef = {
+  id: string; label: string;
+  alertStates: SysCase<boolean>[];
+  autoSelect?: SysWhen;
+  sections: SysSectionDef[];
+  tray?: SysTrayDef;
+};
+export type EngTrayDef     = { title: string; note?: string; switches: SysSwitchDef[] };
+export type EnginePanelDef = { rows: SysRowDef[]; trays?: EngTrayDef[] };
+export type EngineDisplayDef = {
+  eng1: EnginePanelDef;
+  eng2: EnginePanelDef;
+  warningTrigger?: string;
 };
