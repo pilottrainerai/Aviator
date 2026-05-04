@@ -141,7 +141,7 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
 
   const popupReady = Date.now() >= popupGapUntilRef.current;
 
-  // Hardware step that is currently actionable — shown in right panel idle state
+  // Hardware step that is currently actionable — confirmed via left-panel controls
   const nextHardwareStep = useMemo(() => {
     if (runner.status !== "running") return null;
     return (
@@ -149,6 +149,20 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
         (s) =>
           !s.optional &&
           s.hardware &&
+          !runner.state.completedSteps[s.id] &&
+          (s.requires ?? []).every((r) => !!runner.state.completedSteps[r]),
+      ) ?? null
+    );
+  }, [runner.state.completedSteps, runner.status, scenario.steps]);
+
+  // Next non-hardware step — if null while hardware step exists, right panel shows attention card
+  const nextSoftwareStep = useMemo(() => {
+    if (runner.status !== "running") return null;
+    return (
+      scenario.steps.find(
+        (s) =>
+          !s.optional &&
+          !s.hardware &&
           !runner.state.completedSteps[s.id] &&
           (s.requires ?? []).every((r) => !!runner.state.completedSteps[r]),
       ) ?? null
@@ -293,7 +307,7 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             </div>
 
             <div className="flex-1">
-              {runner.status === "running" && popupReady ? (
+              {runner.status === "running" && popupReady && nextSoftwareStep ? (
                 <FlightCheckPopup
                   scenario={scenario}
                   state={runner.state}
@@ -467,38 +481,74 @@ function ActionGapCard() {
   );
 }
 
+function splitHint(hint: string): string[] {
+  return hint
+    .split(/(?<=\.)\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function ProcedureIdleCard({ nextHardwareStep }: { nextHardwareStep?: ScenarioStep | null }) {
   if (nextHardwareStep) {
-    const isEcam = nextHardwareStep.group === "glareshield" || !nextHardwareStep.group;
-    const accent = isEcam ? "#FF3333" : "#FFB300";
+    const isGlareshield = nextHardwareStep.group === "glareshield";
+    const accent = isGlareshield ? "#FFB300" : "#FF3333";
+    const hintLines = splitHint(nextHardwareStep.hint ?? "");
+
     return (
-      <div className="px-4 py-4 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <span className="animate-pulse inline-block h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
-          <span className="font-mono text-[9px] uppercase tracking-[0.2em]" style={{ color: accent }}>
-            ← ACTION REQUIRED — LEFT PANEL
-          </span>
-        </div>
+      <div className="font-mono flex flex-col" style={{ borderLeft: `3px solid ${accent}`, backgroundColor: accent === "#FF3333" ? "#0F0505" : "#0A0800" }}>
+        {/* Top accent bar */}
+        <div style={{ height: "2px", background: `linear-gradient(90deg, ${accent}, ${accent}00)` }} />
+
+        {/* Attention banner */}
         <div
-          className="px-3 py-2.5 rounded-sm"
-          style={{ backgroundColor: accent + "10", border: `1px solid ${accent}40` }}
+          className="flex items-center gap-3 px-4 py-3"
+          style={{ backgroundColor: accent + "18", borderBottom: `1px solid ${accent}35` }}
         >
-          <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-[11px] font-bold tracking-wider" style={{ color: accent }}>
+          <span className="animate-pulse text-[18px]" style={{ lineHeight: 1 }}>←</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[9px] font-bold tracking-[0.25em] uppercase" style={{ color: accent }}>
+              ACTION REQUIRED — LEFT PANEL
+            </span>
+            <span className="text-[7px] tracking-[0.18em] uppercase" style={{ color: accent + "70" }}>
+              operate controls on the left display
+            </span>
+          </div>
+        </div>
+
+        {/* Step detail */}
+        <div className="px-4 py-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: accent }}>
               {nextHardwareStep.label}
             </span>
-            <span className="font-mono text-[9px] px-2 py-0.5 rounded-sm" style={{ backgroundColor: accent + "20", color: accent, border: `1px solid ${accent}40` }}>
+            <span
+              className="text-[8px] px-2 py-0.5"
+              style={{ backgroundColor: accent + "20", color: accent, border: `1px solid ${accent}40`, borderRadius: "2px" }}
+            >
               {nextHardwareStep.action}
             </span>
           </div>
-          <p className="font-mono text-[10px] leading-relaxed" style={{ color: "#8A9AAB" }}>
-            {nextHardwareStep.hint}
-          </p>
+
+          {/* Hint — line by line */}
+          {hintLines.length > 0 && (
+            <ul className="flex flex-col gap-1.5" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {hintLines.map((line, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span style={{ color: accent + "70", fontSize: "8px", marginTop: "3px", flexShrink: 0 }}>▸</span>
+                  <span style={{ color: "#8A9AAB", fontSize: "10px", lineHeight: "1.55", letterSpacing: "0.02em" }}>{line}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
+
+        {/* Footer */}
         {nextHardwareStep.crew && (
-          <span className="font-mono text-[8px]" style={{ color: "#3A4858" }}>
-            {nextHardwareStep.crew} — see fire panel / glareshield
-          </span>
+          <div className="px-4 pb-3">
+            <span className="text-[7px] tracking-[0.18em] uppercase" style={{ color: "#3A4858" }}>
+              {nextHardwareStep.crew} — {nextHardwareStep.group?.toUpperCase() ?? "PROCEDURE"}
+            </span>
+          </div>
         )}
       </div>
     );

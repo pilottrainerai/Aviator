@@ -97,6 +97,28 @@ function resolveTheme(step: ScenarioStep, executePhase: boolean): Theme {
   return THEMES.pm;
 }
 
+// ─── Hint renderer — splits on sentence boundaries for line-by-line display ───
+
+function HintLines({ hint, color, fontSize, accent }: { hint: string; color: string; fontSize: string; accent: string }) {
+  const lines = hint
+    .split(/(?<=\.)\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (lines.length <= 1) {
+    return <p style={{ color, fontSize, lineHeight: "1.6", letterSpacing: "0.02em" }}>{hint}</p>;
+  }
+  return (
+    <ul className="flex flex-col gap-1.5" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+      {lines.map((line, i) => (
+        <li key={i} className="flex items-start gap-2" style={{ fontSize, lineHeight: "1.55", letterSpacing: "0.02em" }}>
+          <span style={{ color: accent + "80", fontSize: "8px", marginTop: "3px", flexShrink: 0 }}>▸</span>
+          <span style={{ color }}>{line}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ─── Step sequencing ──────────────────────────────────────────────────────────
 
 function nextPendingStep(steps: ScenarioStep[], state: ScenarioState): ScenarioStep | null {
@@ -189,9 +211,7 @@ export function FlightCheckPopup({
 
           {/* Body */}
           <div className="px-4 py-3">
-            <p style={{ color: "#D0D8E4", fontSize: "12px", lineHeight: "1.6", letterSpacing: "0.02em" }}>
-              {step.hint}
-            </p>
+            <HintLines hint={step.hint} color="#D0D8E4" fontSize="12px" accent={theme.accent} />
             {step.notes && step.notes.length > 0 && (
               <div className="mt-3 rounded-sm px-3 py-2" style={{ backgroundColor: theme.accent + "0C", border: `1px solid ${theme.accent}20` }}>
                 <ul className="flex flex-col gap-1">
@@ -339,16 +359,7 @@ export function FlightCheckPopup({
 
         {/* ── Body ─────────────────────────────────────────────────── */}
         <div className="px-6 py-5">
-          <p
-            style={{
-              color: "#D8DCE6",
-              fontSize: "13px",
-              lineHeight: "1.65",
-              letterSpacing: "0.025em",
-            }}
-          >
-            {step.hint}
-          </p>
+          <HintLines hint={step.hint} color="#D8DCE6" fontSize="13px" accent={theme.accent} />
 
           {/* Notes (FORDEC, NIS, G/A review, checklists) */}
           {step.notes && step.notes.length > 0 && (
