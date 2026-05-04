@@ -217,7 +217,7 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             perform={runner.perform}
             disabled={runner.status !== "running"}
           />
-          <div className="grid gap-3 min-w-0" style={{ gridTemplateColumns: "minmax(0,1fr) 260px" }}>
+          <div className="grid gap-3 min-w-0" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
             <div className="min-w-0 overflow-hidden">
               <EwdDisplay state={runner.state} scenario={scenario} />
             </div>
