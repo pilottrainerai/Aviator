@@ -43,9 +43,9 @@ export const defaultAircraftState: AircraftState = {
   masterCaut:    false,
   eng1Failed:    false,
   eng2Failed:    false,
-  gs:            158,
-  tas:           162,
-  windDir:       270,
-  windSpd:       8,
+  gs:            162,
+  tas:           166,
+  windDir:       260,   // Delhi prevailing wind (WSW)
+  windSpd:       12,
   track:         281,
 };
