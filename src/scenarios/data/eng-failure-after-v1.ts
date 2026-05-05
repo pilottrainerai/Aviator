@@ -15,18 +15,21 @@ import { ENG_FAILURE_AFTER_V1_META } from "@/scenarios/registry";
 //   • ENG SHUT DOWN STATUS: TCAS → TA required
 //
 // Key FCTM technique (Engine Failure After V1 flow):
-//   PF 0-400ft: rotate 12.5° SRS, β TARGET = 0, RUDDER TRIM ~2 units, AP1 ON
+//   PF 0-400ft: memory item → MAINTAIN DIRECTION (β TARGET = 0, rudder)
+//   PF at VR: rotate 12.5° SRS, hold V2+10
 //   PM 0-400ft: "ROTATE" → "GEAR UP" → "POSITIVE CLIMB"
+//   PF: RUDDER TRIM ~2 units toward live engine (ENG 2), AP1 ON at ~100 ft
 //   400ft: PM calls "ECAM ACTIONS" → PM runs ECAM → call ENGINE SECURED
 //   Acc altitude: push OP CLB → F/S/GD flap retraction → MCT
 //   Note: for FLX takeoff, TOGA on live engine considered below F speed (VMCA margin)
+//   ATC: declare MAYDAY to TOWER before accepting frequency change; full call to Departure
 
 export const engFailureAfterV1: Scenario = {
   meta: ENG_FAILURE_AFTER_V1_META,
   brief: {
     situation:
       "Departing VIDP RWY 28 in FLEX thrust. Two seconds after passing V1 at 145 kt, a MASTER CAUTION fires with a single chime — ECAM displays ENG 1 FAIL. No fire. The engine has flamed out. Asymmetric thrust demands immediate rudder correction.",
-    job: "Maintain directional control. Follow SRS to V2+10. Run the ECAM: IGN → IDLE → wait 30 s for relight → if none, MASTER OFF. Accelerate to green dot single-engine, then FORDEC and return VIDP.",
+    job: "V1 is passed — takeoff committed. Memory item: maintain direction. Follow SRS to V2+10. Run the ECAM at 400 ft: IGN → IDLE → 30 s relight wait → if none, MASTER OFF. Accelerate clean to green dot single-engine. FORDEC, declare MAYDAY, return VIDP.",
   },
 
   triggers: [
@@ -54,36 +57,81 @@ export const engFailureAfterV1: Scenario = {
         },
       ],
     },
+    {
+      id: "four_hundred_ft",
+      atMs: 18_000,
+      description: "400 ft AGL — PM announces ECAM ACTIONS",
+      effects: [
+        {
+          type: "ADD_ECAM",
+          messages: [
+            { id: "ecam_400ft", line: "400 FT — ECAM ACTIONS", level: "advisory" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "min_accel_alt",
+      atMs: 55_000,
+      description: "Engine-out acceleration altitude ~1000 ft AGL — level off, accelerate, clean",
+      effects: [],
+    },
   ],
 
   steps: [
-    // ── AVIATE (0–400 ft) ─────────────────────────────────────────────────────
+    // ── V1 GATE (fires when after_v1 trigger fires at T+6s) ──────────────────
+    {
+      id: "v1_continue",
+      label: "V1 — CONTINUE TAKEOFF",
+      action: "COMMIT",
+      hint: "V1 passed — takeoff is committed. Airbus policy: once V1 is crossed, continue the takeoff even with an engine failure. Do NOT reduce thrust. Maintain directional control.",
+      variant: "switch",
+      crew: "PF",
+      group: "flightcheck",
+      requiresTrigger: "after_v1",
+    },
+
+    // ── MEMORY ITEMS (gates on engine_fail at T+8s) ───────────────────────────
+    {
+      id: "maintain_direction",
+      label: "MAINTAIN DIRECTION",
+      action: "RUDDER",
+      hint: "FCTM memory item: immediately apply rudder toward the live engine (ENG 2 — right pedal) to stop yaw. Target β = ZERO on the FD sideslip indicator. Maintain nose straight on the runway heading.",
+      variant: "switch",
+      crew: "PF",
+      group: "flightcheck",
+      requiresTrigger: "engine_fail",
+      requires: ["v1_continue"],
+    },
+
+    // ── AVIATE (PF continues rotation, PM calls Gear Up) ─────────────────────
     {
       id: "continue_rotation",
-      label: "CONTINUE ROTATION",
-      action: "V2+10",
-      hint: "PF maintains rotation — do NOT reduce thrust. Rotate to 12.5° pitch, follow SRS. Apply rudder into live engine (ENG 2) to maintain β = 0 on FD sideslip indicator.",
+      label: "ROTATION — VR 12.5°",
+      action: "ROTATE",
+      hint: "PF rotates at VR to 12.5° pitch, follows SRS guidance targeting V2+10 kt. Hold rotation attitude — do NOT chase pitch. β = 0 maintained with rudder throughout.",
       variant: "switch",
       crew: "PF",
       group: "flightcheck",
-    },
-    {
-      id: "rudder_trim",
-      label: "RUDDER TRIM",
-      action: "APPLY",
-      hint: "FCTM: PF applies rudder trim toward live engine (~2 units) to reduce sustained pedal force. Reduces PF workload during climb-out. Reset trim in late approach before thrust reduction.",
-      variant: "switch",
-      crew: "PF",
-      group: "flightcheck",
-      requires: ["continue_rotation"],
+      requires: ["maintain_direction"],
     },
     {
       id: "positive_rate_gear_up",
       label: "POSITIVE RATE — GEAR UP",
       action: "CALL",
-      hint: "PM calls 'POSITIVE RATE' → PF: 'GEAR UP' → PM selects gear lever UP. PM follows up: 'POSITIVE CLIMB'.",
+      hint: "PM calls 'POSITIVE RATE'. PF: 'GEAR UP'. PM selects gear lever UP. Verify GEAR UP indication. PM follows: 'POSITIVE CLIMB'.",
       variant: "switch",
       crew: "PM",
+      group: "flightcheck",
+      requires: ["continue_rotation"],
+    },
+    {
+      id: "rudder_trim",
+      label: "RUDDER TRIM",
+      action: "APPLY",
+      hint: "FCTM: PF applies rudder trim toward live engine (~2 units toward ENG 2) above 150 kt to reduce sustained pedal force during climb-out. Reset trim to ZERO before approach thrust reduction.",
+      variant: "switch",
+      crew: "PF",
       group: "flightcheck",
       requires: ["continue_rotation"],
     },
@@ -91,18 +139,20 @@ export const engFailureAfterV1: Scenario = {
       id: "engage_ap_fma",
       label: "AP1 ENGAGE — READ FMA",
       action: "CONFIRM",
-      hint: "PF engages AP1 at ~100 ft (speed stable at V2+10). Read FMA aloud: SRS — NAV — AP1 ENGAGED. AP holds SRS guidance on ENG-OUT performance.",
+      hint: "PF engages AP1 at ~100 ft once speed stable at V2+10. Read FMA aloud: SRS — NAV — AP1 ENGAGED. AP holds SRS guidance on engine-out performance.",
       variant: "switch",
       crew: "PF",
       group: "flightcheck",
       requires: ["positive_rate_gear_up"],
     },
+
+    // ── GLARESHIELD ──────────────────────────────────────────────────────────
+    // ENG FAIL is MASTER CAUTION (amber, SC chime) — NOT Master Warning
     {
-      // ENG FAIL is MASTER CAUTION (amber, SC chime) — NOT Master Warning
       id: "cancel_master_caut_initial",
       label: "MASTER CAUT",
       action: "CANCEL",
-      hint: "PM pushes amber MASTER CAUTION glareshield light — silences single-chime SC. ENG 1 FAIL remains on ECAM. This is a CAUTION, not a Warning.",
+      hint: "PM pushes amber MASTER CAUTION glareshield light — silences single SC chime. ENG 1 FAIL remains on ECAM. This is a CAUTION (amber), not a Warning (red).",
       variant: "caution",
       crew: "PM",
       group: "glareshield",
@@ -114,24 +164,24 @@ export const engFailureAfterV1: Scenario = {
       },
     },
 
-    // ── ECAM ACTIONS (400 ft+) ────────────────────────────────────────────────
+    // ── 400 FT ECAM GATE ─────────────────────────────────────────────────────
     {
       id: "four_hundred_ft_cmd",
       label: "400 FT — ECAM ACTIONS",
       action: "ANNOUNCE",
-      hint: "PM: 'ECAM ACTIONS' — PF acknowledges. Aviate complete, MASTER CAUT cancelled. PM now reads and action the ECAM procedure.",
+      hint: "PM: 'ECAM ACTIONS' — PF acknowledges. Aviate complete, MASTER CAUT cancelled. PM now reads and actions the ECAM procedure.",
       variant: "advisory",
       group: "flightcheck",
       crew: "PM",
       requires: ["engage_ap_fma"],
     },
+
+    // ── ECAM ACTIONS (FCOM: IGN → IDLE → 30s wait → MASTER OFF) ──────────────
     {
-      // FCOM FIRST step for ENG FAIL in-flight: ENG MODE SEL → IGN
-      // IGN = continuous ignition, confirms the immediate relight the FADEC is already attempting
       id: "eng_mode_sel_ign",
       label: "ENG MODE SEL",
       action: "IGN",
-      hint: "PM: ENG MODE SEL → IGN. Selects continuous ignition — confirms the FADEC relight attempt already in progress. FCOM first step for ENG 1(2) FAIL in flight.",
+      hint: "PM: ENG MODE SEL → IGN. FCOM first step for ENG 1(2) FAIL in flight. Selects continuous ignition — confirms the FADEC relight attempt already in progress.",
       variant: "switch",
       crew: "PM",
       hardware: true,
@@ -142,7 +192,7 @@ export const engFailureAfterV1: Scenario = {
       id: "thr_lever_idle",
       label: "THR LEVER 1",
       action: "IDLE",
-      hint: "PM retards ENG 1 thrust lever to IDLE detent. FCOM step 2. Reduces fuel flow and confirms lever position before relight countdown.",
+      hint: "PM retards ENG 1 thrust lever to IDLE detent. FCOM step 2. Reduces fuel flow, confirms lever position before 30 s relight countdown.",
       variant: "switch",
       crew: "PM",
       hardware: true,
@@ -150,19 +200,16 @@ export const engFailureAfterV1: Scenario = {
       requires: ["eng_mode_sel_ign"],
     },
     {
-      // FCOM: wait 30 s after ENG FAIL alert triggers for relight; if none → MASTER OFF
       id: "relight_wait",
       label: "RELIGHT — MONITOR 30 s",
       action: "MONITOR",
-      hint: "FADEC attempts relight with continuous ignition selected. Monitor N2 and EGT for positive indication. FCOM: if no relight after 30 s from alert → proceed to ENG MASTER OFF.",
+      hint: "FADEC attempts relight with continuous ignition selected. Monitor N2 and EGT for positive indication. FCOM: if no relight after 30 s from alert — proceed to ENG MASTER OFF.",
       variant: "advisory",
       crew: "PM",
       group: "flightcheck",
       requires: ["thr_lever_idle"],
     },
     {
-      // No relight confirmed — proceed to MASTER OFF
-      // afterEffect: secondary failures: HYD G ENG1 pump, GEN 1, ENG 1 BLEED (FCOM DSC-29/24/36)
       id: "eng1_master_off",
       label: "ENG 1 MASTER",
       action: "OFF",
@@ -189,11 +236,13 @@ export const engFailureAfterV1: Scenario = {
         ],
       },
     },
+
+    // Secondary failures MASTER CAUT
     {
       id: "cancel_master_caut",
       label: "MASTER CAUT",
       action: "CANCEL",
-      hint: "PM pushes MASTER CAUTION light — silences SC chime for secondary failures (HYD, ELEC, AIR BLEED). These cautions remain on ECAM for STATUS review.",
+      hint: "PM pushes MASTER CAUTION — silences SC chime for secondary failures (HYD, ELEC, AIR BLEED). Cautions remain on ECAM for STATUS review.",
       variant: "caution",
       crew: "PM",
       group: "glareshield",
@@ -204,43 +253,35 @@ export const engFailureAfterV1: Scenario = {
         effects: [{ type: "SET_MASTER_CAUT", active: false }],
       },
     },
+
+    // Engine secured call + TCAS (parallel after MASTER OFF)
     {
       id: "engine_secured_call",
       label: "ENGINE SECURED",
       action: "CALL",
-      hint: "PM→PF: 'ENGINE SECURED — ENG 1 MASTER OFF — NO FIRE.' PF: 'CHECKED, CONTINUE ECAM.' Engine is secured when ECAM actioned to ENG MASTER OFF (no damage case).",
+      hint: "PM→PF: 'ENGINE SECURED — ENG 1 MASTER OFF — NO FIRE.' PF: 'CHECKED, CONTINUE ECAM.' Engine is secured once ECAM actioned to ENG MASTER OFF (no damage, no fire).",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
       requires: ["eng1_master_off"],
     },
     {
-      id: "atc_panpan",
-      label: "ATC — PAN PAN",
-      action: "TRANSMIT",
-      hint: "PM transmits: 'MAYDAY MAYDAY MAYDAY, Delhi Departure, IFLY101, ENG 1 failure, maintaining RWY HDG 280, 3000 ft passing, request immediate return RWY 28.' FCTM: call once engine secured.",
-      variant: "advisory",
-      crew: "PM",
-      group: "comms",
-      requires: ["engine_secured_call"],
-    },
-    {
       id: "tcas_ta",
       label: "TCAS MODE SEL",
       action: "TA",
-      hint: "PM: TCAS MODE SEL → TA. FCOM ENG SHUT DOWN STATUS requirement. Prevents RA commands on single-engine which could compromise control.",
+      hint: "PM: TCAS MODE SEL → TA. FCOM ENG SHUT DOWN STATUS requirement — prevents RA commands on single-engine which could compromise control.",
       variant: "switch",
       crew: "PM",
       hardware: true,
       requires: ["eng1_master_off"],
     },
 
-    // ── CLEAN UP (Eng-Out Acc Altitude, min 1500 ft AGL) ─────────────────────
+    // ── CLEAN UP (Eng-Out Acc Altitude, min 1000 ft AGL) ─────────────────────
     {
       id: "level_off_maa",
       label: "LVL OFF — ENG OUT ACC ALT",
       action: "SELECT",
-      hint: "PF: at Eng-Out Accel Altitude (min 1500 ft AGL with engine secured), push OP CLB. SRS → CLB transition on FMA. Hold speed — do not accelerate yet.",
+      hint: "PF: at Eng-Out Accel Altitude (min 1000 ft AGL, engine secured), push OP CLB. SRS → CLB transition on FMA. Hold speed — do not accelerate until altitude reached.",
       variant: "switch",
       crew: "PF",
       requires: ["eng1_master_off"],
@@ -249,7 +290,7 @@ export const engFailureAfterV1: Scenario = {
       id: "accel_f_speed",
       label: "CONF 1 — F SPEED",
       action: "SELECT",
-      hint: "PM: 'F SPEED' call. PF selects CONF 1. Do not reduce below F until flaps moved — VMCA margin with single engine.",
+      hint: "PM: 'F SPEED' call. PF selects CONF 1. Do not retract below F speed until flaps moved — VMCA margin required on single engine.",
       variant: "switch",
       crew: "PM",
       requires: ["level_off_maa"],
@@ -267,20 +308,39 @@ export const engFailureAfterV1: Scenario = {
       id: "accel_green_dot",
       label: "MCT — GREEN DOT",
       action: "SET",
-      hint: "PF: when speed trend arrow reaches Green Dot — set MCT on live engine (ENG 2). If already in MCT gate: CL then back to MCT. Climb at Green Dot single-engine.",
+      hint: "PF: when speed reaches Green Dot — set MCT on live engine (ENG 2). Climb at Green Dot single-engine. If already in MCT gate: CL then back to MCT.",
       variant: "switch",
       crew: "PF",
       requires: ["accel_s_speed"],
     },
+
+    // ── STATUS + AFTER T/O CHECKLIST ──────────────────────────────────────────
     {
       id: "crew_crosscheck",
       label: "ECAM STATUS",
       action: "REVIEW",
-      hint: "PM continues ECAM STATUS. Review: HYD G ENG1 PUMP LO PR, GEN 1 INOP, ENG 1 BLEED FAULT, PACK 1 (monitor). No further crew actions — awareness items only.",
+      hint: "PM reads STATUS page aloud. Items: ENG 1 SHUT DOWN, HYD G ENG1 PUMP LO PR, GEN 1 INOP, ENG 1 BLEED FAULT, PACK 1 MONITOR. No further crew actions — awareness items only. PF: 'CHECKED'.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
       requires: ["accel_green_dot"],
+    },
+    {
+      id: "after_tkof_cl",
+      label: "AFTER T/O CL",
+      action: "COMPLETE",
+      hint: "PM runs after-takeoff checklist — note items already complete or N/A due to failure.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["crew_crosscheck"],
+      notes: [
+        "PACKS ............. CHECK (single pack ops — PACK 2 AUTO)",
+        "SEAT BELTS ........ ON",
+        "LANDING GEAR ...... UP / 3 OFF",
+        "ENGINE MODE SEL ... IGN (already set per ECAM)",
+        "FLAPS ............. 0 (clean / as required)",
+      ],
     },
 
     // ── CRM / COMMS ───────────────────────────────────────────────────────────
@@ -311,17 +371,27 @@ export const engFailureAfterV1: Scenario = {
       notes: [
         "F — FACTS: ENG 1 flameout — no fire. No relight. VIDP 15 min. RWY 28 LDA 4430 m. Full CFR on field. GEN 1 INOP, HYD G ENG1 pump LO PR.",
         "O — OPTIONS: ① Return VIDP RWY 28  ② Divert nearest alternate  ③ Continue destination (NOT viable — LAND ASAP STATUS)",
-        "R — RISKS & BENEFITS: VIDP = known field, full CFR, adequate LDA, familiar crew. Divert = longer single-engine exposure.",
+        "R — RISKS & BENEFITS: VIDP = known field, full CFR, adequate LDA. Divert = longer single-engine exposure.",
         "D — DECISION: LAND ASAP — return VIDP RWY 28 with full emergency declared.",
         "E — EXECUTION: ILS RWY 28, CAT 1 SE approach, Vapp = Vref+5 kt, full emergency, CFR standby.",
         "C — CHECK-BACK: PM confirms 'AGREED — LAND VIDP RWY 28, FULL EMERGENCY'",
       ],
     },
     {
+      id: "ldg_perf",
+      label: "LDG PERF",
+      action: "CHECK",
+      hint: "SE approach: Vapp = Vref+5 kt. RWY 28 VIDP LDA 4430 m / factored SE dist ~2200 m — ADEQUATE. Confirm LW and Vapp on MCDU.",
+      variant: "advisory",
+      crew: "PF",
+      group: "comms",
+      requires: ["fordec"],
+    },
+    {
       id: "fmgc_prep",
       label: "FMGC PREP",
       action: "COMPLETE",
-      hint: "PM: enter VIDP in DEST, select RWY 28, insert ILS 110.30 / CRS 282. Set Vapp = Vref+5 kt for SE approach (CONF FULL, one pack possible).",
+      hint: "PM: enter VIDP in DEST, select RWY 28, insert ILS 110.30 / CRS 282. Set Vapp = Vref+5 kt for SE approach. Check F-PLN fuel + ALTN.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
@@ -365,7 +435,7 @@ export const engFailureAfterV1: Scenario = {
       notes: [
         "GO-AROUND: TOGA on ENG 2 only — SRS engages — positive rate GEAR UP — V2+10 — clean up — MCT at Green Dot.",
         "FUEL CHECK: confirm total vs [DEST + ALTN + FINAL RESERVE 30 min]. Declare emergency to ensure priority.",
-        "NOTE: rudder trim reset before thrust reduction — anticipate increased rudder force at zero trim.",
+        "NOTE: rudder trim reset to ZERO before thrust reduction — anticipate increased rudder force.",
         "NOTE: with TOGA on one engine and VMCA consideration, do not reduce below F speed before full thrust.",
       ],
     },
@@ -393,7 +463,7 @@ export const engFailureAfterV1: Scenario = {
       id: "approach_prep",
       label: "APPROACH PREP",
       action: "COMPLETE",
-      hint: "PM: ILS RWY 28 freq 110.30 / CRS 282. BARO minima 200 ft. Autobrake MED. Spoilers ARM. Reset rudder trim to zero before final approach.",
+      hint: "PM: ILS RWY 28 freq 110.30 / CRS 282. BARO minima 200 ft / QNH set. Autobrake MED. Spoilers ARM. Reset rudder trim to zero before final approach.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
@@ -449,43 +519,88 @@ export const engFailureAfterV1: Scenario = {
     { id: "st_tcas",   line: "TCAS MODE SEL................TA", severity: "advisory" },
   ],
 
+  // ── Distractions ─────────────────────────────────────────────────────────────
+  // FCTM radio discipline: declare MAYDAY to Tower BEFORE accepting frequency change.
+  // Correct sequence: (1) MAYDAY to Tower → Tower acknowledges + hands off
+  //                   (2) Full MAYDAY call to Departure/Radar
   distractions: [
+    // ① T+90s (~4500 ft AGL) — Delhi Tower hands off to Departure
+    // Pilot MUST declare MAYDAY to Tower first, then accept frequency change.
+    // "Standby" resurfaces the call — pilot still has to declare before accepting.
     {
-      id: "atc_radar",
-      atMs: 28_000,
+      id: "tower_freq_change",
+      atMs: 90_000,
       kind: "atc",
-      from: "DELHI DEPARTURE",
-      message: "IFLY101, radar contact. Confirm maintaining runway heading 280.",
-      standbyResurfaceMs: 25_000,
-      choices: [
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine failure ENG 1, maintaining 280, passing 2000 ft, MAYDAY", correct: true },
-        { id: "b", label: "Affirm, maintaining runway heading 280, climbing", correct: false },
-      ],
-    },
-    {
-      id: "atc_intentions",
-      atMs: 45_000,
-      kind: "atc",
-      from: "DELHI DEPARTURE",
-      message: "IFLY101, state your intentions.",
-      standbyResurfaceMs: 25_000,
-      choices: [
-        { id: "a", label: "MAYDAY IFLY101, requesting immediate return, ILS runway 28, full emergency services required", correct: true },
-        { id: "b", label: "IFLY101 continuing to destination Bangalore, single engine", correct: false },
-        { id: "c", label: "IFLY101, request flight level 250 for drift down", correct: false },
-      ],
-    },
-    {
-      id: "atc_final",
-      atMs: 100_000,
-      kind: "atc",
-      from: "DELHI APPROACH",
-      message: "IFLY101, runway 28 ILS established, confirm souls on board and fuel remaining.",
+      from: "DELHI TOWER",
+      message: "IFLY101, passing 4500, contact Delhi Departure 124.3. Good day.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY101, 186 souls on board, 8.4 tonnes fuel, Category 3 emergency services required", correct: true  },
-        { id: "b", label: "IFLY101, 186 POB, 8.4 tonnes, no emergency services needed — routine landing", correct: false },
-        { id: "c", label: "IFLY101, unable confirm — stand by", correct: false },
+        {
+          id: "a",
+          label: "Delhi Tower, MAYDAY MAYDAY MAYDAY — IFLY101, ENG 1 failure, maintaining 280, climbing — request return runway 28. After your acknowledge, wilco 124.3.",
+          correct: true,
+        },
+        {
+          id: "b",
+          label: "IFLY101 Wilco, contacting Departure 124.3. Good day.",
+          correct: false,
+        },
+      ],
+    },
+
+    // ② T+145s — Delhi Departure initial call (after handoff)
+    // Pilot delivers full MAYDAY call including position, SOB, fuel, intentions.
+    // Standard Indian format: "MAYDAY × 3, [ATC], [callsign], [nature], [position/alt], [SOB], [fuel], [intentions]"
+    {
+      id: "departure_mayday",
+      atMs: 145_000,
+      kind: "atc",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, Delhi Departure, identified. Go ahead.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        {
+          id: "a",
+          label: "MAYDAY MAYDAY MAYDAY, Delhi Departure, IFLY101, ENG 1 failure — engine shut down, passing 2400 feet on runway heading 280, 186 souls on board, 8.4 tonnes fuel, request immediate return runway 28, Category 3 emergency.",
+          correct: true,
+        },
+        {
+          id: "b",
+          label: "IFLY101, single engine, request return to VIDP, runway 28.",
+          correct: false,
+        },
+        {
+          id: "c",
+          label: "IFLY101 request lower, climbing 4000.",
+          correct: false,
+        },
+      ],
+    },
+
+    // ③ T+280s — Delhi Approach vectors for ILS
+    {
+      id: "approach_ifd_confirm",
+      atMs: 280_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, radar vectors ILS runway 28. Confirm souls on board and fuel remaining.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        {
+          id: "a",
+          label: "MAYDAY IFLY101, 186 souls on board, 8.4 tonnes fuel, Category 3 emergency services required runway 28.",
+          correct: true,
+        },
+        {
+          id: "b",
+          label: "IFLY101, 186 POB, 8.4 tonnes — no emergency services needed.",
+          correct: false,
+        },
+        {
+          id: "c",
+          label: "IFLY101 unable confirm — stand by.",
+          correct: false,
+        },
       ],
     },
   ],
@@ -519,7 +634,6 @@ export const engFailureAfterV1: Scenario = {
 
   engineDisplay: {
     warningTrigger: "engine_fail",
-    // Interactive ECAM controls — rendered in the engine display panel, clickable in order
     controlPanel: [
       { stepId: "eng_mode_sel_ign", kind: "mode_sel",  label: "MODE SEL",  sub: "IGN"   },
       { stepId: "thr_lever_idle",   kind: "thr_lever", label: "THR LVR",   sub: "IDLE"  },

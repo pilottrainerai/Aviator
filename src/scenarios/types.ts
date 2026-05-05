@@ -61,6 +61,11 @@ export type ScenarioStep = {
    * FlightCheckPopup skips these — they complete when the pilot presses the hardware.
    */
   hardware?: boolean;
+  /**
+   * This step is only surfaced in the FlightCheckPopup after the named trigger has fired.
+   * Use to gate procedure cards on system events (e.g. engine failure trigger).
+   */
+  requiresTrigger?: string;
   /** Optional: side-effect that fires `delayMs` after this step is completed */
   afterEffect?: {
     delayMs: number;

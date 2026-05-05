@@ -126,6 +126,7 @@ function nextPendingStep(steps: ScenarioStep[], state: ScenarioState): ScenarioS
     if (s.optional) continue;
     if (s.hardware) continue; // completed via left-panel physical controls
     if (state.completedSteps[s.id]) continue;
+    if (s.requiresTrigger && !state.triggersFired[s.requiresTrigger]) continue;
     const met = (s.requires ?? []).every((r) => !!state.completedSteps[r]);
     if (met) return s;
   }
