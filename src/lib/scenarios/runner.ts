@@ -16,8 +16,13 @@ export type RunnerHandle = {
   events: ScenarioEvent[];
   elapsedMs: number;
   status: RunnerStatus;
+  paused: boolean;
   perform: (action: PilotAction) => void;
   end: () => void;
+  pause: () => void;
+  resume: () => void;
+  /** Manually fire a trigger by id (dev mode only). No-op if already fired. */
+  fireTrigger: (triggerId: string) => void;
 };
 
 export function useScenarioRunner(scenario: Scenario): RunnerHandle {
@@ -25,14 +30,17 @@ export function useScenarioRunner(scenario: Scenario): RunnerHandle {
   const [events, setEvents] = useState<ScenarioEvent[]>([]);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [status, setStatus] = useState<RunnerStatus>("running");
+  const [paused, setPaused] = useState(false);
 
   const startedAtRef = useRef<number>(performance.now());
+  const pausedElapsedRef = useRef<number | null>(null);
   const firedTriggersRef = useRef<Set<string>>(new Set());
   const sideEffectTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   // Tick loop — fires scenario timed triggers as wall-clock crosses thresholds.
+  // Stops when paused or ended.
   useEffect(() => {
-    if (status !== "running") return;
+    if (status !== "running" || paused) return;
     const id = setInterval(() => {
       const now = performance.now();
       const elapsed = now - startedAtRef.current;
@@ -57,7 +65,7 @@ export function useScenarioRunner(scenario: Scenario): RunnerHandle {
       }
     }, TICK_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [scenario, status]);
+  }, [scenario, status, paused]);
 
   useEffect(() => {
     if (status === "ended") {
@@ -99,11 +107,45 @@ export function useScenarioRunner(scenario: Scenario): RunnerHandle {
     [scenario, status],
   );
 
+  const pause = useCallback(() => {
+    pausedElapsedRef.current = performance.now() - startedAtRef.current;
+    setPaused(true);
+  }, []);
+
+  const resume = useCallback(() => {
+    if (pausedElapsedRef.current !== null) {
+      // Shift startedAt forward so elapsed continues from the paused snapshot
+      startedAtRef.current = performance.now() - pausedElapsedRef.current;
+    }
+    pausedElapsedRef.current = null;
+    setPaused(false);
+  }, []);
+
+  const fireTrigger = useCallback(
+    (triggerId: string) => {
+      if (firedTriggersRef.current.has(triggerId)) return;
+      const trig = scenario.triggers.find((t) => t.id === triggerId);
+      if (!trig) return;
+      firedTriggersRef.current.add(triggerId);
+      const tMs = pausedElapsedRef.current ?? (performance.now() - startedAtRef.current);
+      const evt: ScenarioEvent = {
+        kind: "TRIGGER",
+        triggerId: trig.id,
+        effects: trig.effects,
+        tMs,
+        source: "system",
+      };
+      dispatch(evt);
+      setEvents((prev) => [...prev, evt]);
+    },
+    [scenario],
+  );
+
   const end = useCallback(() => {
     setStatus("ended");
   }, []);
 
-  return { state, events, elapsedMs, status, perform, end };
+  return { state, events, elapsedMs, status, paused, perform, end, pause, resume, fireTrigger };
 }
 
 export const TICK_INTERVAL_MS_PUBLIC = TICK_INTERVAL_MS;

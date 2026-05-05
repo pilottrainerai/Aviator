@@ -57,6 +57,11 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
   const [autoEndAt, setAutoEndAt] = useState<number | null>(null);
   const [decisionOpen, setDecisionOpen] = useState(false);
 
+  // Dev/admin mode — enabled via ?dev=1 in the URL
+  const [isDevMode] = useState(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("dev"),
+  );
+
   // ── ATC state machine ──────────────────────────────────────────────────────
   const [atcPhase, setAtcPhase] = useState<AtcPhase>({ kind: "idle" });
   const [distractionQueue, setDistractionQueue] = useState<ScenarioDistraction[]>([]);
@@ -489,6 +494,11 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
 
         </div>
       </div>
+
+      {/* ── DEV PANEL — only when ?dev=1 in URL ── */}
+      {isDevMode && (
+        <DevPanel runner={runner} scenario={scenario} />
+      )}
     </main>
   );
 }
@@ -822,6 +832,160 @@ function AccordionGroupRow({
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Dev / Admin Panel ─────────────────────────────────────────────────────────
+// Shown only when URL contains ?dev=1.
+// Lets the scenario author pause time, fire triggers manually, and skip steps.
+
+import type { RunnerHandle } from "@/lib/scenarios/runner";
+
+function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenario }) {
+  const [open, setOpen] = useState(true);
+
+  const unFiredTriggers = scenario.triggers.filter(
+    (t) => !runner.state.triggersFired[t.id],
+  );
+  const pendingSteps = scenario.steps.filter(
+    (s) => !runner.state.completedSteps[s.id] && !s.optional,
+  );
+
+  return (
+    <div
+      className="fixed font-mono"
+      style={{
+        bottom: "60px",
+        left: "16px",
+        zIndex: 9999,
+        width: open ? "300px" : "auto",
+        backgroundColor: "#0A0D10",
+        border: "1px solid #FF660040",
+        borderRadius: "4px",
+        boxShadow: "0 0 20px #FF660020",
+      }}
+    >
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2"
+        style={{ borderBottom: open ? "1px solid #FF660025" : "none" }}
+      >
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: "7px", letterSpacing: "0.25em", color: "#FF6600", fontWeight: 700 }}>
+            ⚙ DEV MODE
+          </span>
+          {runner.paused && (
+            <span style={{ fontSize: "7px", letterSpacing: "0.2em", color: "#FFB300", fontWeight: 700 }}>
+              ⏸ PAUSED
+            </span>
+          )}
+        </div>
+        <span style={{ color: "#FF660060", fontSize: "9px" }}>{open ? "▾" : "▸"}</span>
+      </button>
+
+      {open && (
+        <div className="flex flex-col gap-3 p-3">
+
+          {/* Clock control */}
+          <div className="flex items-center gap-2">
+            <span style={{ color: "#4A5566", fontSize: "8px", letterSpacing: "0.15em", flex: 1 }}>
+              T+{(runner.elapsedMs / 1000).toFixed(1)}s
+            </span>
+            <button
+              type="button"
+              onClick={runner.paused ? runner.resume : runner.pause}
+              style={{
+                padding: "4px 10px",
+                fontSize: "8px",
+                letterSpacing: "0.15em",
+                fontWeight: 700,
+                backgroundColor: runner.paused ? "#00D06018" : "#FF330018",
+                color: runner.paused ? "#00D060" : "#FF3333",
+                border: `1px solid ${runner.paused ? "#00D06040" : "#FF333340"}`,
+                borderRadius: "2px",
+                cursor: "pointer",
+              }}
+            >
+              {runner.paused ? "▶ RESUME" : "⏸ PAUSE"}
+            </button>
+          </div>
+
+          {/* Triggers */}
+          {unFiredTriggers.length > 0 && (
+            <div>
+              <div style={{ color: "#3A4858", fontSize: "7px", letterSpacing: "0.2em", marginBottom: "4px" }}>
+                TRIGGERS — click to fire
+              </div>
+              <div className="flex flex-col gap-1">
+                {unFiredTriggers.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => runner.fireTrigger(t.id)}
+                    className="flex items-center justify-between px-2 py-1.5 text-left"
+                    style={{
+                      backgroundColor: "#FF660008",
+                      border: "1px solid #FF660030",
+                      borderRadius: "2px",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#FF660018"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#FF660008"; }}
+                  >
+                    <span style={{ color: "#CC8844", fontSize: "9px" }}>{t.id}</span>
+                    <span style={{ color: "#4A5566", fontSize: "7px" }}>T+{(t.atMs / 1000).toFixed(0)}s</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Steps */}
+          {pendingSteps.length > 0 && (
+            <div>
+              <div style={{ color: "#3A4858", fontSize: "7px", letterSpacing: "0.2em", marginBottom: "4px" }}>
+                STEPS — click to complete
+              </div>
+              <div className="flex flex-col gap-1" style={{ maxHeight: "220px", overflowY: "auto" }}>
+                {pendingSteps.map((s) => {
+                  const requiresMet = (s.requires ?? []).every((r) => !!runner.state.completedSteps[r]);
+                  const triggerMet = !s.requiresTrigger || !!runner.state.triggersFired[s.requiresTrigger];
+                  const ready = requiresMet && triggerMet;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => runner.perform({ kind: "STEP", stepId: s.id })}
+                      className="flex items-center justify-between px-2 py-1.5 text-left"
+                      style={{
+                        backgroundColor: ready ? "#00CFFF08" : "#1A2030",
+                        border: `1px solid ${ready ? "#00CFFF30" : "#1E2A3A"}`,
+                        borderRadius: "2px",
+                        opacity: ready ? 1 : 0.4,
+                        cursor: ready ? "pointer" : "default",
+                      }}
+                      onMouseEnter={(e) => { if (ready) (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#00CFFF14"; }}
+                      onMouseLeave={(e) => { if (ready) (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#00CFFF08"; }}
+                    >
+                      <span style={{ color: ready ? "#8ABCCC" : "#3A4858", fontSize: "9px" }}>{s.label}</span>
+                      <span style={{ color: "#3A4858", fontSize: "7px" }}>{s.action}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {pendingSteps.length === 0 && unFiredTriggers.length === 0 && (
+            <span style={{ color: "#2E3A48", fontSize: "8px", letterSpacing: "0.15em" }}>
+              ALL STEPS COMPLETE
+            </span>
+          )}
         </div>
       )}
     </div>
