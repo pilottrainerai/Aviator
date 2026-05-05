@@ -679,16 +679,6 @@ export function FirePanel({
           <div style={{ backgroundColor: "#1C2130", alignSelf: "stretch" }} />
           <DslEnginePanel engNum={2} panel={ed.eng2} state={state} warningActive={false} />
         </div>
-        {/* MSTR CAUT indicator */}
-        <div className="px-3 py-2 border-t flex items-center gap-2" style={{ borderColor: "#1C2130" }}>
-          <span style={{ fontSize: "7px", color: C.dim, letterSpacing: "0.1em" }}>MSTR CAUT</span>
-          <div style={{ width: "40px", height: "24px", backgroundColor: C.bezel, border: `1.5px solid ${state.masterCautActive ? C.amber : C.dimLo}`, borderRadius: "3px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: state.masterCautActive ? `0 0 8px ${C.amber}60` : "none", transition: "all 0.2s" }}>
-            <span style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: state.masterCautActive ? C.amber : C.dimLo, letterSpacing: "0.06em" }}>
-              {done("cancel_master_caut") ? "CLR" : state.masterCautActive ? "CAUT" : "NORM"}
-            </span>
-          </div>
-          {!warningActive && <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.08em", fontFamily: "monospace" }}>— NORMAL —</span>}
-        </div>
       </div>
     );
   }
