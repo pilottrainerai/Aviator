@@ -322,6 +322,13 @@ export const unreliableSpeed: Scenario = {
 
   engineDisplay: {
     warningTrigger: "pitot_fail",
+    controlPanel: [
+      { stepId: "ap_fd_disc",                 kind: "toggle_sw"   as const, label: "AP/FD/A-THR", sub: "OFF"   },
+      { stepId: "pitch_thrust",               kind: "monitor"     as const, label: "PITCH+THR",   sub: "TABLE" },
+      { stepId: "cancel_master_caut_initial", kind: "cancel_caut" as const, label: "MASTER",      sub: "CAUT"  },
+      { stepId: "adr_off",                    kind: "toggle_sw"   as const, label: "FAULTY ADR",  sub: "OFF"   },
+      { stepId: "probe_heat_on",              kind: "toggle_sw"   as const, label: "PROBE HEAT",  sub: "ON"    },
+    ],
     eng1: {
       rows: [
         { label: "N1",     unit: "%",    states: [{ value: { v: "84.2",  c: "green" } }] },

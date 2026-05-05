@@ -346,6 +346,12 @@ export const smokeCabin: Scenario = {
 
   engineDisplay: {
     warningTrigger: "smoke_detect",
+    controlPanel: [
+      { stepId: "masks_on",           kind: "o2_mask"     as const, label: "O2 MASK",  sub: "100%"  },
+      { stepId: "cancel_master_caut", kind: "cancel_caut" as const, label: "MASTER",   sub: "CAUT"  },
+      { stepId: "recirc_fans_off",    kind: "toggle_sw"   as const, label: "RECIRC",   sub: "OFF"   },
+      { stepId: "signs_on",           kind: "toggle_sw"   as const, label: "SEATBELT", sub: "ON"    },
+    ],
     eng1: {
       rows: [
         { label: "N1",     unit: "%",    states: [{ value: { v: "84.2",  c: "green" } }] },

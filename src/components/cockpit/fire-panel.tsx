@@ -706,6 +706,118 @@ function DslMonitorCtrl({ done, active, clickable, onClick, label, sub }: { done
   );
 }
 
+// ─── DSL interactive control: MASTER WARN cancel ────────────────────────────
+function DslCancelWarnCtrl({ done, active, clickable, onClick }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void }) {
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.dim : active ? C.red : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>MASTER</span>
+      <div
+        style={{ width: "48px", height: "22px", backgroundColor: done ? C.dimLo : active ? C.red : "#3A1010", border: `1.5px solid ${done ? C.dimLo : active ? C.red : "#6A2020"}`, borderRadius: "3px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: active ? `0 0 12px ${C.red}80` : "none", transition: "all 0.2s", cursor: clickable ? "pointer" : "default" }}
+      >
+        <span style={{ fontSize: "8px", fontFamily: "monospace", fontWeight: 800, color: done ? C.dimLo : active ? C.white : "#8A3030", letterSpacing: "0.08em" }}>{done ? "CLR" : "WARN"}</span>
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.dim : active ? C.red : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "CLR ✓" : active ? "CANCEL" : "WAIT"}</span>
+    </div>
+  );
+}
+
+// ─── DSL interactive control: MASTER CAUT cancel ────────────────────────────
+function DslCancelCautCtrl({ done, active, clickable, onClick }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void }) {
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.dim : active ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>MASTER</span>
+      <div
+        style={{ width: "48px", height: "22px", backgroundColor: done ? C.dimLo : active ? C.amber : "#3A2A00", border: `1.5px solid ${done ? C.dimLo : active ? C.amber : "#6A4A00"}`, borderRadius: "3px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: active ? `0 0 10px ${C.amber}70` : "none", transition: "all 0.2s", cursor: clickable ? "pointer" : "default" }}
+      >
+        <span style={{ fontSize: "8px", fontFamily: "monospace", fontWeight: 800, color: done ? C.dimLo : active ? "#0A0800" : "#8A6000", letterSpacing: "0.08em" }}>{done ? "CLR" : "CAUT"}</span>
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.dim : active ? C.amber : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "CLR ✓" : active ? "CANCEL" : "WAIT"}</span>
+    </div>
+  );
+}
+
+// ─── DSL interactive control: O2 MASK ───────────────────────────────────────
+function DslO2MaskCtrl({ done, active, clickable, onClick, label, sub }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string; sub?: string }) {
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.white : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+      <div style={{ width: "44px", height: "44px", backgroundColor: C.bezel, border: `2px solid ${done ? C.green : active ? C.white : C.dimLo}`, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: active ? `0 0 10px ${C.white}40` : done ? `0 0 8px ${C.green}40` : "none", transition: "all 0.2s" }}>
+        <span style={{ fontSize: "13px", lineHeight: 1 }}>😷</span>
+        <span style={{ fontSize: "6px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.white : C.dimLo, letterSpacing: "0.04em" }}>{done ? "ON ✓" : sub ?? "100%"}</span>
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.white : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "DONNED" : active ? "DON NOW" : "WAIT"}</span>
+    </div>
+  );
+}
+
+// ─── DSL interactive control: overhead toggle switch ────────────────────────
+function DslToggleSwCtrl({ done, active, clickable, onClick, label, sub }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string; sub?: string }) {
+  const isOn = sub?.toUpperCase() === "ON" || sub?.toUpperCase() === "IGN" || sub?.toUpperCase() === "AUTO" || sub?.toUpperCase() === "RESET" || sub?.toUpperCase() === "CHECK";
+  const col = isOn ? C.green : C.amber;
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? col : C.dim, letterSpacing: "0.08em", textTransform: "uppercase", textAlign: "center", maxWidth: "52px", lineHeight: 1.2 }}>{label}</span>
+      <div style={{ width: "36px", height: "48px", backgroundColor: C.bezel, border: `1.5px solid ${done ? col : active ? col : C.dimLo}`, borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "4px 3px", boxShadow: active ? `0 0 8px ${col}50` : done ? `0 0 6px ${col}40` : "none", transition: "all 0.2s" }}>
+        <div style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: done ? (isOn ? col : C.dimLo) : (isOn ? C.dimLo : col), letterSpacing: "0.08em" }}>{isOn ? sub : "NORM"}</div>
+        <div style={{ width: "20px", height: "12px", backgroundColor: done ? (isOn ? col + "40" : C.dimLo) : C.dimLo, border: `1px solid ${done ? col : C.dim}`, borderRadius: "2px", transform: done ? (isOn ? "translateY(-3px)" : "translateY(3px)") : "translateY(3px)", transition: "transform 0.2s, background-color 0.2s" }} />
+        <div style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: done ? (isOn ? C.dimLo : col) : C.dimLo, letterSpacing: "0.08em" }}>{isOn ? "NORM" : sub}</div>
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? col : active ? col : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? `${sub} ✓` : active ? `→ ${sub}` : "WAIT"}</span>
+    </div>
+  );
+}
+
+// ─── DSL interactive control: emergency pushbutton (guarded) ────────────────
+function DslEmerPbCtrl({ done, active, clickable, onClick, label, sub }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string; sub?: string }) {
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.white : C.dim, letterSpacing: "0.08em", textTransform: "uppercase", textAlign: "center", maxWidth: "52px", lineHeight: 1.2 }}>{label}</span>
+      {/* Guard frame */}
+      <div style={{ padding: "2px", border: `1px dashed ${done ? C.green : active ? C.white : C.dimLo}`, borderRadius: "4px", backgroundColor: done ? "#001A08" : active ? "#101A10" : "transparent", transition: "all 0.2s" }}>
+        <div style={{ width: "40px", height: "36px", backgroundColor: done ? C.green + "30" : active ? "#1A2A1A" : C.bezel, border: `1.5px solid ${done ? C.green : active ? C.green : C.dimLo}`, borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: active ? `0 0 10px ${C.green}50` : done ? `0 0 8px ${C.green}40` : "none", transition: "all 0.2s" }}>
+          <span style={{ fontSize: done ? "10px" : "11px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.green : C.dimLo }}>{done ? "✓" : "▶"}</span>
+          {sub && <span style={{ fontSize: "6px", fontFamily: "monospace", color: done ? C.green : active ? C.green : C.dimLo, letterSpacing: "0.05em", textAlign: "center", textTransform: "uppercase", lineHeight: 1.2 }}>{sub}</span>}
+        </div>
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.green : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "DONE" : active ? "PUSH" : "WAIT"}</span>
+    </div>
+  );
+}
+
+// ─── DSL interactive control: speed brake lever ─────────────────────────────
+function DslSpdBrkCtrl({ done, active, clickable, onClick }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void }) {
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>SPD BRK</span>
+      <div style={{ width: "24px", height: "54px", backgroundColor: C.bezel, border: `1.5px solid ${active ? C.amber : done ? C.green : C.dimLo}`, borderRadius: "3px", position: "relative", boxShadow: active ? `0 0 8px ${C.amber}60` : done ? `0 0 6px ${C.green}40` : "none", transition: "all 0.2s" }}>
+        {["RET","½","FULL"].map((pos, i) => (
+          <div key={pos} style={{ position: "absolute", right: "-22px", top: `${6 + i * 15}px`, fontSize: "6px", fontFamily: "monospace", color: C.dimLo, letterSpacing: "0.04em" }}>{pos}</div>
+        ))}
+        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: done ? "32px" : active ? "16px" : "6px", width: "12px", height: "10px", backgroundColor: done ? `${C.green}CC` : active ? `${C.amber}CC` : "#3A4252", border: `1px solid ${done ? C.green : active ? C.amber : C.dim}`, borderRadius: "2px", transition: "top 0.3s ease" }} />
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.amber : C.dim, letterSpacing: "0.1em", fontWeight: 700 }}>{done ? "FULL ✓" : "RET"}</span>
+    </div>
+  );
+}
+
 // ─── DSL interactive ECAM control panel ──────────────────────────────────────
 function DslControlPanel({
   controls, scenario, state, perform, disabled, warningActive,
@@ -751,7 +863,13 @@ function DslControlPanel({
               <AirbusPB key={ctrl.stepId} topText={done ? "DISCH" : active ? "SQUIB ARM" : "SQUIB"} topColor={done ? C.green : active ? C.white : C.dim}
                 label={ctrl.label} sublabel={ctrl.sub} state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
             );
-            default:          return <DslMonitorCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+            case "cancel_warn": return <DslCancelWarnCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+            case "cancel_caut": return <DslCancelCautCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+            case "o2_mask":     return <DslO2MaskCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+            case "toggle_sw":   return <DslToggleSwCtrl   key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+            case "emer_pb":     return <DslEmerPbCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+            case "spd_brk":     return <DslSpdBrkCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+            default:            return <DslMonitorCtrl    key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
           }
         })}
       </div>
@@ -759,7 +877,7 @@ function DslControlPanel({
       {/* Status memo line */}
       <div style={{ marginTop: "6px", minHeight: "14px", textAlign: "center" }}>
         {allDone ? (
-          <span style={{ color: C.green, fontSize: "9px", fontFamily: "monospace", letterSpacing: "0.1em" }}>✓ ENGINE SECURED</span>
+          <span style={{ color: C.green, fontSize: "9px", fontFamily: "monospace", letterSpacing: "0.1em" }}>✓ ACTIONS COMPLETE</span>
         ) : warningActive ? (
           <span style={{ color: C.amber, fontSize: "8px", fontFamily: "monospace", letterSpacing: "0.08em" }}>
             {(() => {

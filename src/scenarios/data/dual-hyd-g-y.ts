@@ -414,6 +414,12 @@ export const dualHydGY: Scenario = {
 
   engineDisplay: {
     warningTrigger: "structural_fail",
+    controlPanel: [
+      { stepId: "cancel_master_warn", kind: "cancel_warn" as const, label: "MASTER",   sub: "WARN"  },
+      { stepId: "hyd_check_cb",       kind: "monitor"     as const, label: "HYD ECAM", sub: "RUN"   },
+      { stepId: "cancel_master_caut", kind: "cancel_caut" as const, label: "MASTER",   sub: "CAUT"  },
+      { stepId: "flap_check",         kind: "toggle_sw"   as const, label: "FLAPS",    sub: "CHECK" },
+    ],
     eng1: {
       rows: [
         { label: "N1",     unit: "%",    states: [{ value: { v: "84.2",  c: "green" } }] },

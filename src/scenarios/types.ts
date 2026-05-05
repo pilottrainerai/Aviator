@@ -183,7 +183,8 @@ export type EngTrayDef     = { title: string; note?: string; switches: SysSwitch
 export type EnginePanelDef = { rows: SysRowDef[]; trays?: EngTrayDef[] };
 
 /** Interactive hardware control shown in the engine display ECAM panel */
-export type EngControlKind = "thr_lever" | "mode_sel" | "master" | "fire_pb" | "agent" | "monitor";
+export type EngControlKind = "thr_lever" | "mode_sel" | "master" | "fire_pb" | "agent" | "monitor"
+  | "o2_mask" | "toggle_sw" | "emer_pb" | "spd_brk" | "cancel_warn" | "cancel_caut";
 export type EngControlDef  = { stepId: string; kind: EngControlKind; label: string; sub?: string };
 
 export type EngineDisplayDef = {

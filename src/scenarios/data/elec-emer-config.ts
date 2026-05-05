@@ -362,6 +362,13 @@ export const elecEmerConfig: Scenario = {
 
   engineDisplay: {
     warningTrigger: "gen_loss",
+    controlPanel: [
+      { stepId: "cancel_master_warn", kind: "cancel_warn" as const, label: "MASTER",    sub: "WARN"   },
+      { stepId: "gen_reset",          kind: "toggle_sw"   as const, label: "GEN 1+2",   sub: "RESET"  },
+      { stepId: "emer_elec_pwr",      kind: "emer_pb"     as const, label: "EMER ELEC", sub: "MAN ON" },
+      { stepId: "eng_mode_ign",       kind: "toggle_sw"   as const, label: "ENG MODE",  sub: "IGN"    },
+      { stepId: "cancel_master_caut", kind: "cancel_caut" as const, label: "MASTER",    sub: "CAUT"   },
+    ],
     eng1: {
       rows: [
         { label: "N1",     unit: "%",    states: [{ value: { v: "84.2",  c: "green" } }] },
