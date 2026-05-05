@@ -647,6 +647,13 @@ export const eng1FireAfterV1: Scenario = {
   // ── Engine Display DSL ───────────────────────────────────────────────────────
   engineDisplay: {
     warningTrigger: "fire_warn",
+    controlPanel: [
+      { stepId: "thr_lever_idle",  kind: "thr_lever", label: "THR LVR",  sub: "IDLE"    },
+      { stepId: "eng1_master_off", kind: "master",    label: "MASTER",   sub: "ENG 1"   },
+      { stepId: "eng1_fire_pb",    kind: "fire_pb",   label: "ENG 1",    sub: "FIRE PB" },
+      { stepId: "agent1",          kind: "agent",     label: "AGENT 1",  sub: "DISCH"   },
+      { stepId: "agent2",          kind: "agent",     label: "AGENT 2",  sub: "DISCH"   },
+    ],
     eng1: {
       rows: [
         {
