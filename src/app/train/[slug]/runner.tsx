@@ -177,10 +177,11 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
           !s.optional &&
           s.hardware &&
           !runner.state.completedSteps[s.id] &&
+          (!s.requiresTrigger || !!runner.state.triggersFired[s.requiresTrigger]) &&
           (s.requires ?? []).every((r) => !!runner.state.completedSteps[r]),
       ) ?? null
     );
-  }, [runner.state.completedSteps, runner.status, scenario.steps]);
+  }, [runner.state.completedSteps, runner.state.triggersFired, runner.status, scenario.steps]);
 
   // Next non-hardware step — if null while hardware step exists, right panel shows attention card
   const nextSoftwareStep = useMemo(() => {
@@ -191,10 +192,11 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
           !s.optional &&
           !s.hardware &&
           !runner.state.completedSteps[s.id] &&
+          (!s.requiresTrigger || !!runner.state.triggersFired[s.requiresTrigger]) &&
           (s.requires ?? []).every((r) => !!runner.state.completedSteps[r]),
       ) ?? null
     );
-  }, [runner.state.completedSteps, runner.status, scenario.steps]);
+  }, [runner.state.completedSteps, runner.state.triggersFired, runner.status, scenario.steps]);
 
   // Auto-open decision drawer when it first unlocks (agent1 completed)
   const agent1Done = !!runner.state.completedSteps["agent1"];
@@ -323,40 +325,42 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             )}
           </div>
 
-          {/* ── COMMS SECTION — fixed height, no layout shift ── */}
+          {/* ── COMMS SECTION — fixed reservation, content scrolls if overflow ── */}
           <div
-            className="shrink-0"
-            style={{ borderBottom: "1px solid var(--color-border)", height: "290px", overflow: "hidden" }}
+            className="shrink-0 flex flex-col"
+            style={{ borderBottom: "1px solid var(--color-border)", height: "420px" }}
           >
             <div
-              className="px-4 py-1.5"
+              className="px-4 py-1.5 shrink-0"
               style={{ borderBottom: "1px solid var(--color-border)" }}
             >
               <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-muted)]">
                 ▸ COMMS
               </span>
             </div>
-
-            {atcPhase.kind === "active" ? (
-              <DistractionModal
-                distraction={atcPhase.d}
-                onRespond={handleAtcRespond}
-                onStandby={handleAtcStandby}
-                inline
-              />
-            ) : atcPhase.kind === "standby" ? (
-              <AtcStandbyCard
-                d={atcPhase.d}
-                resumesAt={atcPhase.resumesAt}
-                onRespond={handleAtcManualActivate}
-              />
-            ) : (
-              <CommsClearCard />
-            )}
+            {/* Inner scroll container — comms modal is always fully visible */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {atcPhase.kind === "active" ? (
+                <DistractionModal
+                  distraction={atcPhase.d}
+                  onRespond={handleAtcRespond}
+                  onStandby={handleAtcStandby}
+                  inline
+                />
+              ) : atcPhase.kind === "standby" ? (
+                <AtcStandbyCard
+                  d={atcPhase.d}
+                  resumesAt={atcPhase.resumesAt}
+                  onRespond={handleAtcManualActivate}
+                />
+              ) : (
+                <CommsClearCard />
+              )}
+            </div>
           </div>
 
-          {/* ── PROCEDURE SECTION — full active-step card, no internal scroll ── */}
-          <div className="flex-1 min-h-0 flex flex-col">
+          {/* ── PROCEDURE SECTION — stable reserved space, never shifts ── */}
+          <div className="flex-1 min-h-0 flex flex-col" style={{ minHeight: "180px" }}>
             {/* Header */}
             <div
               className="px-4 py-1.5 shrink-0"
@@ -366,8 +370,8 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
                 ▸ PROCEDURE
               </span>
             </div>
-            {/* Body — single active step card; progress tracker is on the left panel */}
-            <div className="flex-1 overflow-y-auto">
+            {/* Body — single active step card; scrolls internally if card is tall */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
               {runner.status === "running" && !popupReady ? (
                 <ActionGapCard />
               ) : runner.status === "running" && nextSoftwareStep ? (
@@ -673,10 +677,13 @@ function ScenarioProgress({ scenario, state }: { scenario: Scenario; state: Scen
   const allRequired = scenario.steps.filter((s) => !s.optional);
   const doneCount = allRequired.filter((s) => state.completedSteps[s.id]).length;
 
-  // Active group = first group that has a step whose requires are all met but not yet done
+  // Active group = first group with a step whose trigger + requires are all met but not yet done
   const activeGroup = GROUP_ORDER.find((g) =>
     grouped[g]?.some(
-      (s) => !state.completedSteps[s.id] && (s.requires ?? []).every((r) => !!state.completedSteps[r]),
+      (s) =>
+        !state.completedSteps[s.id] &&
+        (!s.requiresTrigger || !!state.triggersFired[s.requiresTrigger]) &&
+        (s.requires ?? []).every((r) => !!state.completedSteps[r]),
     ),
   );
 
@@ -759,7 +766,8 @@ function AccordionGroupRow({
         <div className="flex items-center gap-1 flex-1 flex-wrap">
           {steps.map((s) => {
             const done = !!state.completedSteps[s.id];
-            const cur = !done && (s.requires ?? []).every((r) => !!state.completedSteps[r]);
+            const triggerMet = !s.requiresTrigger || !!state.triggersFired[s.requiresTrigger];
+            const cur = !done && triggerMet && (s.requires ?? []).every((r) => !!state.completedSteps[r]);
             return (
               <div
                 key={s.id}
@@ -780,7 +788,8 @@ function AccordionGroupRow({
         <div className="divide-y" style={{ borderTop: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)", borderLeft: "2px solid var(--color-border)" }}>
           {steps.map((s) => {
             const done = !!state.completedSteps[s.id];
-            const cur = !done && (s.requires ?? []).every((r) => !!state.completedSteps[r]);
+            const triggerMet = !s.requiresTrigger || !!state.triggersFired[s.requiresTrigger];
+            const cur = !done && triggerMet && (s.requires ?? []).every((r) => !!state.completedSteps[r]);
             const stepAccent = done ? "var(--color-text-faint)" : cur ? "var(--color-text)" : "var(--color-text-faint)";
             return (
               <div key={s.id} className="flex items-center gap-2.5 px-5 py-2" style={{ borderColor: "var(--color-border)", opacity: done ? 0.45 : 1 }}>
