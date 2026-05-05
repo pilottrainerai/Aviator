@@ -369,38 +369,6 @@ export const elecEmerConfig: Scenario = {
         { label: "FF",     unit: "KG/H", states: [{ value: { v: "2400",  c: "green" } }] },
         { label: "STATUS",              states: [{ value: { v: "NORMAL", c: "green" } }] },
       ],
-      trays: [
-        {
-          title: "ELEC PANEL",
-          note: "FCOM DSC-24: Total generator loss → battery-only. RAT restores AC ESS bus.",
-          switches: [
-            {
-              label: "GEN 1",
-              states: [
-                { when: { trigger: "gen_loss" }, value: "fault" as const },
-                { value: "norm" as const },
-              ],
-            },
-            {
-              label: "GEN 2",
-              states: [
-                { when: { trigger: "gen_loss" }, value: "fault" as const },
-                { value: "norm" as const },
-              ],
-            },
-            { label: "BAT 1", states: [{ value: "auto" as const }] },
-            { label: "BAT 2", states: [{ value: "auto" as const }] },
-            {
-              label: "AC ESS",
-              states: [
-                { when: { step: "rat_deploy" }, value: "auto" as const },
-                { when: { trigger: "gen_loss" }, value: "fault" as const },
-                { value: "auto" as const },
-              ],
-            },
-          ],
-        },
-      ],
     },
     eng2: {
       rows: [

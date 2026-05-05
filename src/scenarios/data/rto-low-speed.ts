@@ -267,38 +267,6 @@ export const rtoLowSpeed: Scenario = {
           ],
         },
       ],
-      trays: [
-        {
-          title: "GROUND PANEL",
-          note: "FCOM PRO-ABN-ENG: RTO → stop → ENG MASTER OFF → FIRE PB → AGENT 1 if fire persists",
-          switches: [
-            {
-              label: "THR LVR", sub: "ENG 1",
-              states: [
-                { when: { step: "thr_levers_close" }, value: "off" as const },
-                { when: { trigger: "fire_warn_ground" }, value: "fault" as const },
-                { value: "norm" as const },
-              ],
-            },
-            {
-              label: "FIRE PB", sub: "ENG 1",
-              states: [
-                { when: { step: "fire_pb_gnd" }, value: "off" as const },
-                { when: { trigger: "fire_warn_ground" }, value: "fire" as const },
-                { value: "norm" as const },
-              ],
-            },
-            {
-              label: "AGENT 1", sub: "DISCH",
-              states: [
-                { when: { step: "agent1_gnd" }, value: "off" as const },
-                { when: { step: "fire_pb_gnd" }, value: "armed" as const },
-                { value: "norm" as const },
-              ],
-            },
-          ],
-        },
-      ],
     },
     eng2: {
       rows: [

@@ -787,28 +787,6 @@ export const engFailureAfterV1: Scenario = {
           ],
         },
       ],
-      trays: [
-        {
-          title: "ENG PANEL",
-          note: "MASTER OFF: fuel SOV + HP SOV close, FADEC de-energised — no FIRE pb, no agent",
-          switches: [
-            {
-              label: "MASTER", sub: "ENG 1",
-              states: [
-                { when: { step: "eng1_master_off" }, value: "off" as const },
-                { value: "norm" as const },
-              ],
-            },
-            {
-              label: "ENG MODE", sub: "SEL",
-              states: [
-                { when: { step: "eng_mode_sel_ign" }, value: "auto" as const },
-                { value: "norm" as const },
-              ],
-            },
-          ],
-        },
-      ],
     },
     eng2: {
       rows: [

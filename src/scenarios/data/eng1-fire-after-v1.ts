@@ -697,51 +697,6 @@ export const eng1FireAfterV1: Scenario = {
           ],
         },
       ],
-      trays: [
-        {
-          title: "ENG PANEL",
-          note: "FCOM step 2 — MASTER OFF: fuel SOV + oil SOV close, FADEC de-energised",
-          switches: [
-            {
-              label: "MASTER", sub: "ENG 1",
-              states: [
-                { when: { step: "eng1_master_off" }, value: "off" },
-                { value: "norm" },
-              ],
-            },
-          ],
-        },
-        {
-          title: "FIRE PANEL",
-          note: "Step 3: FIRE PB pull → HYD/bleed/IDG SOVs + fuel shutoff. Steps 4-5: AGENT 1 → AGENT 2 if fire light persists (30 s each)",
-          switches: [
-            {
-              label: "FIRE PB", sub: "ENG 1",
-              states: [
-                { when: { step: "eng1_fire_pb" }, value: "off" },
-                { when: { trigger: "fire_warn" }, value: "fire" },
-                { value: "norm" },
-              ],
-            },
-            {
-              label: "AGENT 1", sub: "DISCH",
-              states: [
-                { when: { step: "agent1" },       value: "off" },
-                { when: { step: "eng1_fire_pb" }, value: "armed" },
-                { value: "norm" },
-              ],
-            },
-            {
-              label: "AGENT 2", sub: "DISCH",
-              states: [
-                { when: { step: "agent2" },  value: "off" },
-                { when: { step: "agent1" },  value: "armed" },
-                { value: "norm" },
-              ],
-            },
-          ],
-        },
-      ],
     },
     eng2: {
       rows: [
