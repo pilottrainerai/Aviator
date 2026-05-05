@@ -58,14 +58,24 @@ export const elecEmerConfig: Scenario = {
       },
     },
     {
-      id: "gen_reset",
-      label: "GEN 1+2 RESET",
-      action: "OFF THEN ON",
-      hint: "PM: FCOM first step — GEN 1 and GEN 2 pb-sw: OFF then ON to attempt reset. If unsuccessful: BUS TIE OFF, then try GEN 1+2 OFF then ON again. If still no joy → EMER ELEC PWR MAN ON.",
+      id: "gen1_reset",
+      label: "GEN 1",
+      action: "RESET",
+      hint: "PM: GEN 1 pb-sw → OFF then ON. Attempt to reset Generator 1.",
       variant: "switch",
       crew: "PM",
       hardware: true,
       requires: ["cancel_master_warn"],
+    },
+    {
+      id: "gen2_reset",
+      label: "GEN 2",
+      action: "RESET",
+      hint: "PM: GEN 2 pb-sw → OFF then ON. Attempt to reset Generator 2. If both GEN 1+2 reset unsuccessful → EMER ELEC PWR MAN ON.",
+      variant: "switch",
+      crew: "PM",
+      hardware: true,
+      requires: ["gen1_reset"],
     },
     {
       id: "emer_elec_pwr",
@@ -76,7 +86,7 @@ export const elecEmerConfig: Scenario = {
       crew: "PM",
       hardware: true,
       ecamRef: "rat_arm",
-      requires: ["gen_reset"],
+      requires: ["gen2_reset"],
       afterEffect: {
         delayMs: 3_000,
         triggerId: "emer_gen_online",
@@ -363,9 +373,10 @@ export const elecEmerConfig: Scenario = {
   engineDisplay: {
     warningTrigger: "gen_loss",
     controlPanel: [
-      { stepId: "gen_reset",          kind: "toggle_sw"   as const, label: "GEN 1+2",   sub: "RESET"  },
-      { stepId: "emer_elec_pwr",      kind: "emer_pb"     as const, label: "EMER ELEC", sub: "MAN ON" },
-      { stepId: "eng_mode_ign",       kind: "toggle_sw"   as const, label: "ENG MODE",  sub: "IGN"    },
+      { stepId: "gen1_reset",    kind: "toggle_sw" as const, label: "GEN 1",     sub: "RESET"  },
+      { stepId: "gen2_reset",    kind: "toggle_sw" as const, label: "GEN 2",     sub: "RESET"  },
+      { stepId: "emer_elec_pwr", kind: "emer_pb"   as const, label: "EMER ELEC", sub: "MAN ON" },
+      { stepId: "eng_mode_ign",  kind: "toggle_sw" as const, label: "ENG MODE",  sub: "IGN"    },
     ],
     eng1: {
       rows: [

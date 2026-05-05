@@ -761,33 +761,83 @@ function DslO2MaskCtrl({ done, active, clickable, onClick, label, sub }: { done:
   );
 }
 
-// ─── DSL interactive control: overhead pushbutton switch (FCOM style) ────────
-// Modelled on A320 overhead panel annunciator pushbuttons (e.g. RECIRC FANS, PROBE HEAT)
-// Top window = state LED; bottom face = label
+// ─── DSL interactive control: overhead pushbutton-light (FCOM style) ─────────
+// A320 FCOM: pushbutton-lights have a light legend window at top (shows FAULT/OFF/ON)
+// that is DARK in normal state. Light illuminates only when action is needed or done.
+// Button face = system label (black background, white text).
 function DslToggleSwCtrl({ done, active, clickable, onClick, label, sub }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string; sub?: string }) {
-  const isOff  = sub?.toUpperCase() === "OFF";
-  const ledCol = isOff ? C.amber : C.green;
-  const ledText = done ? (sub ?? "ACT") : "NORM";
-  const ledBg  = done ? ledCol + "30" : "#0A0C10";
+  const subUp = sub?.toUpperCase() ?? "";
+  const isOffAction  = subUp === "OFF";
+  const isIgn        = subUp === "IGN";
+  const isReset      = subUp === "RESET";
+
+  // LED window: dark when idle; FAULT (amber) when action needed; result state when done
+  let ledText  = "";
+  let ledColor: string = C.dim;
+  let ledBg: string    = C.ledOff;
+  let bezelCol: string = C.dimLo;
+  let glow     = "none";
+
+  if (!done && active) {
+    ledText  = isOffAction ? "FAULT" : isIgn ? "NORM" : isReset ? "FAULT" : "FAULT";
+    ledColor = C.amber;
+    ledBg    = C.amber + "28";
+    bezelCol = C.amber;
+    glow     = `0 0 10px ${C.amber}50`;
+  } else if (done) {
+    if (isOffAction) {
+      ledText  = "OFF";
+      ledColor = C.white;
+      ledBg    = "#FFFFFF14";
+      bezelCol = C.white;
+      glow     = `0 0 8px ${C.white}30`;
+    } else if (isIgn) {
+      ledText  = "IGN";
+      ledColor = C.green;
+      ledBg    = C.green + "20";
+      bezelCol = C.green;
+      glow     = `0 0 8px ${C.green}40`;
+    } else if (isReset) {
+      ledText  = "NORM";
+      ledColor = C.green;
+      ledBg    = C.green + "18";
+      bezelCol = C.green;
+      glow     = `0 0 8px ${C.green}30`;
+    } else {
+      ledText  = sub ?? "ON";
+      ledColor = C.green;
+      ledBg    = C.green + "18";
+      bezelCol = C.green;
+      glow     = `0 0 8px ${C.green}30`;
+    }
+  }
+
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.35 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? ledCol : C.dim, letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center", maxWidth: "68px", lineHeight: 1.2 }}>{label}</span>
-      {/* Pushbutton body */}
-      <div style={{ width: "64px", backgroundColor: C.bezel, border: `2px solid ${done ? ledCol : active ? ledCol : C.dimLo}`, borderRadius: "4px", padding: "2px", boxShadow: done ? `0 0 10px ${ledCol}50` : active ? `0 0 8px ${ledCol}40` : "none", transition: "all 0.2s" }}>
-        {/* LED annunciator window */}
-        <div style={{ backgroundColor: ledBg, borderRadius: "2px 2px 0 0", padding: "5px 4px", textAlign: "center", minHeight: "28px", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: `1px solid ${done ? ledCol + "60" : "#1C2130"}` }}>
-          <span style={{ fontSize: "9px", fontFamily: "monospace", fontWeight: 800, color: done ? ledCol : C.dimLo, letterSpacing: "0.1em", textTransform: "uppercase", textShadow: done ? `0 0 6px ${ledCol}` : "none" }}>{ledText}</span>
+      {/* Pushbutton housing — matches FCOM overhead panel width */}
+      <div style={{ width: "68px", backgroundColor: C.bezel, border: `2px solid ${bezelCol}`, borderRadius: "4px", padding: "2px", boxShadow: glow, transition: "all 0.2s" }}>
+        {/* LED legend window (top) — dark = normal, illuminated = abnormal */}
+        <div style={{ height: "30px", backgroundColor: ledBg, borderRadius: "2px 2px 0 0", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: `1px solid ${done || active ? bezelCol + "50" : "#1C2130"}`, transition: "background-color 0.2s" }}>
+          {ledText ? (
+            <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 900, color: ledColor, letterSpacing: "0.1em", textTransform: "uppercase", textShadow: (done || active) ? `0 0 8px ${ledColor}` : "none" }}>
+              {ledText}
+            </span>
+          ) : (
+            <span style={{ fontSize: "7px", fontFamily: "monospace", color: C.dimLo, letterSpacing: "0.08em" }}>●</span>
+          )}
         </div>
-        {/* Button face */}
-        <div style={{ backgroundColor: C.btnFace, borderRadius: "0 0 2px 2px", padding: "5px 4px", textAlign: "center" }}>
-          <span style={{ fontSize: "8px", fontFamily: "monospace", fontWeight: 700, color: C.white, letterSpacing: "0.06em", textTransform: "uppercase", lineHeight: 1.3, display: "block" }}>{label}</span>
-          {sub && <span style={{ fontSize: "7px", fontFamily: "monospace", color: C.dim, letterSpacing: "0.06em", textTransform: "uppercase" }}>{sub}</span>}
+        {/* Button face (bottom) — black with white label */}
+        <div style={{ backgroundColor: C.btnFace, borderRadius: "0 0 2px 2px", padding: "8px 4px 7px", textAlign: "center" }}>
+          <div style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 800, color: C.white, letterSpacing: "0.05em", textTransform: "uppercase", lineHeight: 1.25 }}>{label}</div>
+          {sub && <div style={{ fontSize: "7px", fontFamily: "monospace", color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>{sub}</div>}
         </div>
       </div>
-      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? ledCol : active ? ledCol : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? `${sub} ✓` : active ? `→ ${sub}` : "NORM"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? ledColor : active ? ledColor : C.dimLo, letterSpacing: "0.08em", fontWeight: 700, minHeight: "12px" }}>
+        {done ? "✓" : active ? "▶ PUSH" : ""}
+      </span>
     </div>
   );
 }
@@ -905,9 +955,7 @@ function DslControlPanel({
               return reqsMet ? `▸ ${next.label}${next.sub ? " → " + next.sub : ""}` : "◈ COMPLETE PRIOR STEPS FIRST";
             })()}
           </span>
-        ) : (
-          <span style={{ color: C.dim, fontSize: "8px", fontFamily: "monospace", letterSpacing: "0.08em" }}>— STANDBY —</span>
-        )}
+        ) : null}
       </div>
     </div>
   );
