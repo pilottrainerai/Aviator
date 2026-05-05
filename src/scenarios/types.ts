@@ -132,6 +132,8 @@ export type StatusItem = {
   line: string;
   /** caution = amber, advisory = cyan, memo = green */
   severity: "caution" | "advisory" | "memo";
+  /** If true, item appears in the right-hand INOP SYS column (FCOM STATUS layout) */
+  inopSys?: boolean;
 };
 
 export type Scenario = {

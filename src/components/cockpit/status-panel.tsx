@@ -1,8 +1,8 @@
 "use client";
 
 // A320 ECAM STATUS page — FCOM PRO-ABN-ENG p.39-42
+// Two-column layout: left = status/limitations, right = INOP SYS.
 // Appears after all required ECAM actions are complete.
-// Mirrors real A320 STATUS page: advisory=cyan, caution=amber, memo=green.
 
 import type { Scenario } from "@/scenarios/types";
 import type { ScenarioState } from "@/engine/state";
@@ -32,11 +32,14 @@ export function StatusPanel({
   scenario: Scenario;
   state: ScenarioState;
 }) {
-  const requiredDone = scenario.steps
-    .filter((s) => !s.optional)
+  const ecamActionsDone = scenario.steps
+    .filter((s) => !!s.ecamRef)
     .every((s) => !!state.completedSteps[s.id]);
 
-  if (!requiredDone || !scenario.statusItems?.length) return null;
+  if (!ecamActionsDone || !scenario.statusItems?.length) return null;
+
+  const leftItems  = scenario.statusItems.filter((i) => !i.inopSys);
+  const rightItems = scenario.statusItems.filter((i) =>  i.inopSys);
 
   return (
     <div
@@ -46,11 +49,11 @@ export function StatusPanel({
         marginTop: "4px",
         backgroundColor: "#000000",
         borderColor: C.border,
-        maxHeight: "220px",
+        maxHeight: "240px",
         overflowY: "auto",
       }}
     >
-      {/* STATUS header — FCOM style: white label + separator */}
+      {/* STATUS header */}
       <div
         className="flex items-center gap-2 px-3 py-[5px] border-b"
         style={{ borderColor: C.border }}
@@ -64,21 +67,51 @@ export function StatusPanel({
         </span>
       </div>
 
-      {/* Status items — each on its own line, left-padded like real STATUS page */}
-      <div className="px-4 py-2 flex flex-col gap-[4px]">
-        {scenario.statusItems.map((item) => (
+      {/* Two-column body */}
+      <div className="flex" style={{ minHeight: 0 }}>
+
+        {/* LEFT — status / limitations */}
+        <div className="flex flex-col gap-[4px]" style={{ flex: "1 1 0", padding: "8px 8px 8px 14px" }}>
+          {leftItems.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-baseline gap-2"
+              style={{ color: statusColor(item.severity), fontSize: "11px", letterSpacing: "0.05em", lineHeight: "1.5", fontWeight: 500 }}
+            >
+              <span style={{ color: C.dim, fontSize: "7px", lineHeight: 1, flexShrink: 0 }}>◈</span>
+              {item.line}
+            </div>
+          ))}
+        </div>
+
+        {/* RIGHT — INOP SYS (only when items exist) */}
+        {rightItems.length > 0 && (
           <div
-            key={item.id}
-            className="flex items-baseline gap-2"
-            style={{ color: statusColor(item.severity), fontSize: "11px", letterSpacing: "0.05em", lineHeight: "1.5", fontWeight: 500 }}
+            className="flex flex-col gap-[4px]"
+            style={{
+              width: "130px",
+              flexShrink: 0,
+              borderLeft: `1px solid ${C.border}`,
+              padding: "8px 10px 8px 10px",
+            }}
           >
-            <span style={{ color: C.dim, fontSize: "8px", lineHeight: 1, flexShrink: 0 }}>◈</span>
-            {item.line}
+            {/* INOP SYS header */}
+            <div style={{ color: C.white, fontSize: "8px", letterSpacing: "0.2em", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: "3px", marginBottom: "4px" }}>
+              INOP SYS
+            </div>
+            {rightItems.map((item) => (
+              <div
+                key={item.id}
+                style={{ color: statusColor(item.severity), fontSize: "10px", letterSpacing: "0.05em", lineHeight: "1.5", fontWeight: 500 }}
+              >
+                {item.line}
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
-      {/* FCOM procedure reminder */}
+      {/* FCOM reminder footer */}
       <div
         className="px-3 py-[5px] border-t"
         style={{ borderColor: C.border }}

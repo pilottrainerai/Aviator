@@ -290,11 +290,11 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             <div style={{ flex: "1 1 0", minHeight: 0, marginTop: "4px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
               <EwdDisplay state={runner.state} scenario={scenario} />
             </div>
-            {/* STATUS page — appears below ECAM once all required steps done */}
+            {/* STATUS page — below ECAM, same left sub-column */}
             <StatusPanel scenario={scenario} state={runner.state} />
           </div>
 
-          {/* Right sub-column: Engine Display (top) + System Display (bottom) */}
+          {/* Right sub-column: Fire/Engine (top) + System Display (mid) */}
           <div style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: "6px", padding: "10px 10px 8px 4px" }}>
             <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <FirePanel
