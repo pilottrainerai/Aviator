@@ -241,12 +241,17 @@ export const unreliableSpeed: Scenario = {
   ],
 
   statusItems: [
-    // FCOM PRO-ABN-NAV: STATUS after ADR 1 isolation
-    { id: "st_adr",   line: "NAV ADR 1 FAULT",                    severity: "caution"  },
-    { id: "st_ias",   line: "NAV IAS DISCREPANCY",                 severity: "caution"  },
-    { id: "st_rvsm",  line: "RVSM INOP",                          severity: "memo"     },
-    { id: "st_isis",  line: "STBY ISIS IN USE",                    severity: "memo"     },
-    { id: "st_appr",  line: "APPR RAW DATA",                       severity: "advisory" },
+    // ── Left column: FCOM PRO-ABN-NAV NAV ADR 1 FAULT STATUS ─────────────────
+    { id: "st_adr",   line: "NAV ADR 1 FAULT",       severity: "caution"  },
+    { id: "st_ias",   line: "NAV IAS DISCREPANCY",    severity: "caution"  },
+    { id: "st_rvsm",  line: "RVSM INOP",             severity: "memo"     },
+    { id: "st_isis",  line: "STBY ISIS IN USE",       severity: "memo"     },
+    { id: "st_appr",  line: "APPR RAW DATA",          severity: "advisory" },
+    // ── Right column: INOP SYS (FCOM NAV ADR 1 FAULT STATUS right column) ────
+    { id: "st_inop_adr",   line: "ADR 1",          severity: "caution",  inopSys: true },
+    { id: "st_inop_gpws",  line: "GPWS",           severity: "caution",  inopSys: true },
+    { id: "st_inop_cat3s", line: "CAT 3 SINGLE",   severity: "advisory", inopSys: true },
+    { id: "st_inop_cat3d", line: "CAT 3 DUAL",     severity: "advisory", inopSys: true },
   ],
 
   distractions: [

@@ -598,18 +598,21 @@ export const engFailureAfterV1: Scenario = {
   ],
 
   statusItems: [
-    // ── Left column: STATUS limitations & directives ──────────────────────────
-    { id: "st_land_asap", line: "LAND ASAP",             severity: "caution"  },
-    { id: "st_eng1",      line: "ENG 1 SHUT DOWN",       severity: "caution"  },
-    { id: "st_appr",      line: "APPR CAT . . . . CAT 1", severity: "advisory" },
-    { id: "st_maxfl",     line: "MAX FL . . . . . FL250", severity: "memo"     },
-    { id: "st_tcas",      line: "TCAS . . . . . . TA",   severity: "advisory" },
-    // ── Right column: INOP SYS ───────────────────────────────────────────────
-    { id: "st_bleed",  line: "ENG 1 BLEED",     severity: "caution",  inopSys: true },
-    { id: "st_gen1",   line: "GEN 1",            severity: "caution",  inopSys: true },
-    { id: "st_hyd",    line: "G ENG 1 PUMP",     severity: "caution",  inopSys: true },
-    { id: "st_pack",   line: "PACK 1 (MONITOR)", severity: "advisory", inopSys: true },
-    { id: "st_galley", line: "MAIN GALLEY",       severity: "memo",     inopSys: true },
+    // ── Left column: STATUS limitations & directives (FCOM PRO-ABN-ENG ENG SHUT DOWN) ──
+    { id: "st_land_asap",  line: "LAND ASAP",                    severity: "caution"  },
+    { id: "st_eng1",       line: "ENG 1 SHUT DOWN",               severity: "caution"  },
+    { id: "st_appr",       line: "APPR CAT . . . . CAT 1",       severity: "advisory" },
+    { id: "st_ldg_dist",   line: "LDG DIST PROC . . . . APPLY",  severity: "caution"  },
+    { id: "st_fuel_incr",  line: "FUEL CONSUMPT INCRSD",          severity: "advisory" },
+    { id: "st_fms",        line: "FMS PRED UNRELIABLE",            severity: "advisory" },
+    // ── Right column: INOP SYS (FCOM STATUS page right column) ──────────────
+    { id: "st_bleed",      line: "ENG 1 BLEED",     severity: "caution",  inopSys: true },
+    { id: "st_gen1",       line: "GEN 1",            severity: "caution",  inopSys: true },
+    { id: "st_hyd",        line: "G ENG 1 PUMP",     severity: "caution",  inopSys: true },
+    { id: "st_pack",       line: "PACK 1",           severity: "caution",  inopSys: true },
+    { id: "st_galley",     line: "MAIN GALLEY",       severity: "memo",     inopSys: true },
+    { id: "st_cat3",       line: "CAT 3 DUAL",       severity: "advisory", inopSys: true },
+    { id: "st_steep",      line: "STEEP APPR",       severity: "advisory", inopSys: true },
   ],
 
   // ── Distractions ─────────────────────────────────────────────────────────────

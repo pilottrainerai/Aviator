@@ -25,12 +25,15 @@ export const elecEmerConfig: Scenario = {
         {
           type: "ADD_ECAM",
           messages: [
+            // Left column — primary procedure
             { id: "ac_bus1",     line: "ELEC AC BUS 1 FAULT",              level: "warning" },
             { id: "ac_bus2",     line: "ELEC AC BUS 2 FAULT",              level: "warning" },
             { id: "emer_config", line: "ELEC EMER CONFIG",                  level: "warning" },
             { id: "bat_only",    line: "BATTERIES ONLY — 30 MIN",           level: "caution" },
             { id: "rat_arm",     line: "RAT — DEPLOY MAN IF NEEDED",       level: "caution" },
             { id: "ac_ess_shed", line: "AC ESS BUS SHED",                   level: "caution" },
+            // Right column — LAND ASAP (no SECONDARY FAILURES: inhibited per FCOM DSC-31-15)
+            { id: "land_asap",   line: "LAND ASAP",                         level: "warning" },
           ],
         },
       ],
@@ -256,19 +259,39 @@ export const elecEmerConfig: Scenario = {
   ],
 
   statusItems: [
-    // FCOM PRO-ABN-ELEC ELEC EMER CONFIG STATUS page
-    { id: "st_rat_spd", line: "MIN RAT SPEED.......140 KT",   severity: "caution"  },
-    { id: "st_max_spd", line: "MAX SPEED...........320 KT",   severity: "caution"  },
-    { id: "st_max_brk", line: "MAX BRK PR......1 000 PSI",    severity: "caution"  },
-    { id: "st_grvty",   line: "FUEL GRVTY FEED",               severity: "caution"  },
-    { id: "st_neg_g",   line: "AVOID NEGATIVE G FACTOR",       severity: "caution"  },
-    { id: "st_appr",    line: "FOR LDG........USE FLAP 3",     severity: "advisory" },
-    { id: "st_vapp",    line: "APPR SPD...VREF+10/140 KT",     severity: "advisory" },
-    { id: "st_fctl",    line: "ALTN LAW: PROT LOST",           severity: "caution"  },
-    { id: "st_dir_law", line: "WHEN L/G DN: DIRECT LAW",       severity: "caution"  },
-    { id: "st_anti_sk", line: "ANTI SKID..........INOP",       severity: "caution"  },
-    { id: "st_nw_strg", line: "N/W STRG............INOP",      severity: "caution"  },
-    { id: "st_ldg",     line: "LDG DIST PROC: APPLY",          severity: "memo"     },
+    // ── Left column: FCOM PRO-ABN-ELEC ELEC EMER CONFIG STATUS ───────────────
+    { id: "st_rat_spd",   line: "MIN RAT SPEED . . . 140 KT",      severity: "caution"  },
+    { id: "st_max_spd",   line: "MAX SPEED . . . . . 320 KT",      severity: "caution"  },
+    { id: "st_max_brk",   line: "MAX BRK PR . . 1 000 PSI",        severity: "caution"  },
+    { id: "st_grvty",     line: "FUEL GRVTY FEED",                   severity: "caution"  },
+    { id: "st_neg_g",     line: "AVOID NEGATIVE G FACTOR",           severity: "caution"  },
+    { id: "st_fctl",      line: "ALTN LAW: PROT LOST",               severity: "caution"  },
+    { id: "st_dir_law",   line: "WHEN L/G DN: DIRECT LAW",          severity: "caution"  },
+    { id: "st_anti_sk",   line: "ANTI SKID . . . . . . INOP",       severity: "caution"  },
+    { id: "st_nw_strg",   line: "N/W STRG . . . . . . INOP",        severity: "caution"  },
+    { id: "st_slats",     line: "SLATS/FLAPS SLOW",                  severity: "caution"  },
+    { id: "st_ctr_fuel",  line: "CTR TK FUEL UNUSABLE",              severity: "caution"  },
+    { id: "st_appr",      line: "FOR LDG . . . . USE FLAP 3",       severity: "advisory" },
+    { id: "st_vapp",      line: "APPR SPD . VREF+10/140 KT",        severity: "advisory" },
+    { id: "st_ldg",       line: "LDG DIST PROC . . . . APPLY",      severity: "memo"     },
+    { id: "st_fuel_incr", line: "FUEL CONSUMPT INCRSD",               severity: "advisory" },
+    { id: "st_fms",       line: "FMS PRED UNRELIABLE",                severity: "advisory" },
+    // ── Right column: INOP SYS (FCOM ELEC EMER CONFIG SYS REMAINING) ─────────
+    { id: "st_inop_fctl",  line: "F/CTL PROT",      severity: "caution",  inopSys: true },
+    { id: "st_inop_rev",   line: "REVERSER 1+2",     severity: "caution",  inopSys: true },
+    { id: "st_inop_adr",   line: "ADR 2+3",          severity: "caution",  inopSys: true },
+    { id: "st_inop_ir",    line: "IR 2",             severity: "caution",  inopSys: true },
+    { id: "st_inop_ra",    line: "RA 1+2",           severity: "caution",  inopSys: true },
+    { id: "st_inop_splr",  line: "SPLR 1+2+5",      severity: "caution",  inopSys: true },
+    { id: "st_inop_elac",  line: "ELAC 2",           severity: "caution",  inopSys: true },
+    { id: "st_inop_sec",   line: "SEC 2+3",          severity: "caution",  inopSys: true },
+    { id: "st_inop_ap",    line: "AP 1+2",           severity: "caution",  inopSys: true },
+    { id: "st_inop_athr",  line: "A/THR",            severity: "caution",  inopSys: true },
+    { id: "st_inop_fuel",  line: "FUEL PUMPS",       severity: "caution",  inopSys: true },
+    { id: "st_inop_ask",   line: "ANTI SKID",        severity: "caution",  inopSys: true },
+    { id: "st_inop_nws",   line: "N/W STRG",         severity: "caution",  inopSys: true },
+    { id: "st_inop_cat2",  line: "CAT 2",            severity: "advisory", inopSys: true },
+    { id: "st_inop_steep", line: "STEEP APPR",       severity: "advisory", inopSys: true },
   ],
 
   distractions: [

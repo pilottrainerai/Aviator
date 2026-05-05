@@ -189,21 +189,19 @@ export const eng1FireAfterV1: Scenario = {
       confirmRequired: true,
       afterEffect: {
         // 2 s delay: secondary systems respond to FIRE PB isolation
+        // FCOM DSC-31-15: secondary failures appear on E/WD right column with * prefix
         delayMs: 2_000,
         triggerId: "secondary_failures",
         effects: [
           {
             type: "ADD_ECAM",
             messages: [
-              // FCOM DSC-29: Green HYD engine pump lost (fire SOV closed)
-              { id: "hyd_g_pump",      line: "HYD G ENG1 PUMP......LO PR",  level: "caution"  },
-              // FCOM DSC-21: Pack 1 bleed air lost → single pack operation
-              { id: "air_single_pack", line: "AIR SINGLE PACK OPER",         level: "advisory" },
-              // FCOM DSC-24: IDG 1 deactivated → GEN 1 offline
-              { id: "elec_gen1",       line: "ELEC GEN 1............OFF",    level: "caution"  },
+              { id: "sec_fail_hdr",  line: "SECONDARY FAILURES",  level: "advisory" },
+              { id: "sec_hyd",       line: "* HYD",               level: "caution"  },
+              { id: "sec_elec",      line: "* ELEC",              level: "caution"  },
+              { id: "sec_air_bleed", line: "* AIR BLEED",         level: "caution"  },
             ],
           },
-          // Secondary cautions re-illuminate MASTER CAUTION (amber)
           { type: "SET_MASTER_CAUT", active: true },
         ],
       },
@@ -542,15 +540,24 @@ export const eng1FireAfterV1: Scenario = {
   ],
 
   // ── Status page ─────────────────────────────────────────────────────────────
-  // Shown after all required ECAM actions are complete (FCOM STATUS page logic).
-  // Reflects systems degraded by ENG 1 shutdown + FIRE PB isolation.
+  // FCOM PRO-ABN-ENG p.39-42: ENG SHUT DOWN STATUS page after ENG FIRE PB pushed.
   statusItems: [
-    { id: "st_eng1",    line: "ENG 1....................INOP",      severity: "caution"  },
-    { id: "st_hyd",     line: "HYD GRN ENG1 PUMP.....LO PR",       severity: "caution"  },
-    { id: "st_air",     line: "AIR SINGLE PACK OPER",               severity: "advisory" },
-    { id: "st_elec",    line: "ELEC GEN 1...............INOP",      severity: "caution"  },
-    { id: "st_appr",    line: "APPR CAT.................CAT 1",     severity: "advisory" },
-    { id: "st_maxfl",   line: "MAX FL.....................FL250",    severity: "memo"     },
+    // ── Left column: limitations & directives ────────────────────────────────
+    { id: "st_eng1",       line: "ENG 1 SHUT DOWN",                severity: "caution"  },
+    { id: "st_avoid_ice",  line: "AVOID ICING CONDITIONS",          severity: "caution"  },
+    { id: "st_appr",       line: "APPR CAT . . . . CAT 1",         severity: "advisory" },
+    { id: "st_ldg_dist",   line: "LDG DIST PROC . . . . APPLY",    severity: "caution"  },
+    { id: "st_fuel_incr",  line: "FUEL CONSUMPT INCRSD",            severity: "advisory" },
+    { id: "st_fms",        line: "FMS PRED UNRELIABLE",              severity: "advisory" },
+    // ── Right column: INOP SYS ───────────────────────────────────────────────
+    { id: "st_inop_cat3",  line: "CAT 3 DUAL",     severity: "advisory", inopSys: true },
+    { id: "st_inop_bleed", line: "ENG 1 BLEED",    severity: "caution",  inopSys: true },
+    { id: "st_inop_pack",  line: "PACK 1",          severity: "caution",  inopSys: true },
+    { id: "st_inop_galley",line: "MAIN GALLEY",     severity: "memo",     inopSys: true },
+    { id: "st_inop_gen",   line: "GEN 1",           severity: "caution",  inopSys: true },
+    { id: "st_inop_pump",  line: "G ENG 1 PUMP",    severity: "caution",  inopSys: true },
+    { id: "st_inop_ice",   line: "WING A. ICE",     severity: "caution",  inopSys: true },
+    { id: "st_inop_steep", line: "STEEP APPR",      severity: "advisory", inopSys: true },
   ],
 
   // ── Distractions — ATC only ─────────────────────────────────────────────────

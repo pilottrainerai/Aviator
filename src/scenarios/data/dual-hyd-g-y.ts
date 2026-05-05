@@ -18,23 +18,24 @@ export const dualHydGY: Scenario = {
     {
       id: "structural_fail",
       atMs: 4_000,
-      description: "HYD G+Y LO PR — dual hydraulic loss",
+      description: "HYD G+Y LO PR — dual hydraulic loss, Level 3 WARNING, LAND ASAP",
       effects: [
-        // FCOM PRO-ABN-HYD: HYD G+Y SYS LO PR = L2 = CAUTION (amber MASTER CAUTION + SC chime)
-        // NOT a Level 3 Warning — hydraulic failures are cautions even when dual
-        { type: "SET_MASTER_CAUT", active: true },
+        // FCOM PRO-ABN-HYD: HYD G+Y SYS LO PR = Level 3 = RED WARNING (MASTER WARN + CRC)
+        // Dual hydraulic loss is an extreme emergency requiring immediate action
+        { type: "SET_MASTER_WARN", active: true },
         { type: "SET_ALARM_LABEL", label: "HYD G+Y LO PR" },
         {
           type: "ADD_ECAM",
           messages: [
-            { id: "hyd_g_lo",       line: "HYD G+Y SYS LO PR",          level: "caution"  },
-            { id: "hyd_g_sep",      line: "HYD G SYS LO PR",            level: "caution"  },
-            { id: "hyd_y_lo",       line: "HYD Y SYS LO PR",            level: "caution"  },
-            { id: "fctl_elac",      line: "FCTL ELAC 1+2 FAULT",        level: "caution"  },
-            { id: "fctl_sec",       line: "FCTL SEC 1+2+3 FAULT",       level: "caution"  },
-            { id: "fctl_fac",       line: "FCTL FAC 1+2 FAULT",         level: "caution"  },
-            { id: "gear_grvty",     line: "L/G GRVTY EXTN ONLY",        level: "caution"  },
-            { id: "no_autobrake",   line: "BRK Y ACCU PR ONLY",         level: "caution"  },
+            // Left column — primary procedure
+            { id: "hyd_g_lo",      line: "HYD G+Y SYS LO PR",   level: "warning"  },
+            { id: "hyd_g_sep",     line: "HYD G SYS LO PR",     level: "caution"  },
+            { id: "hyd_y_lo",      line: "HYD Y SYS LO PR",     level: "caution"  },
+            // Right column — LAND ASAP + SECONDARY FAILURES (FCOM DSC-31-15)
+            { id: "land_asap",     line: "LAND ASAP",            level: "warning"  },
+            { id: "sec_fail_hdr",  line: "SECONDARY FAILURES",   level: "advisory" },
+            { id: "sec_fctl",      line: "* F/CTL",              level: "caution"  },
+            { id: "sec_wheel",     line: "* WHEEL",              level: "caution"  },
           ],
         },
       ],
@@ -67,17 +68,17 @@ export const dualHydGY: Scenario = {
     },
     {
       id: "cancel_master_warn",
-      label: "MASTER CAUT",
+      label: "MASTER WARN",
       action: "CANCEL",
-      hint: "PM: cancel MASTER CAUTION — silences SC chime. HYD G+Y SYS LO PR is L2 CAUTION (amber), not a Warning. ECAM procedure remains displayed.",
-      variant: "caution",
+      hint: "PM: cancel MASTER WARNING — silences CRC. HYD G+Y SYS LO PR is Level 3 RED WARNING. ECAM procedure remains displayed.",
+      variant: "warning",
       crew: "PM",
       group: "glareshield",
       hardware: true,
       afterEffect: {
         delayMs: 400,
-        triggerId: "mc_hyd_cancelled",
-        effects: [{ type: "SET_MASTER_CAUT", active: false }],
+        triggerId: "mw_hyd_cancelled",
+        effects: [{ type: "SET_MASTER_WARN", active: false }],
       },
     },
     {
@@ -309,21 +310,40 @@ export const dualHydGY: Scenario = {
   ],
 
   statusItems: [
-    // FCOM PRO-ABN-HYD HYD G+Y SYS LO PR STATUS page
-    { id: "st_hyd_g",    line: "HYD G+Y SYS..............INOP",  severity: "caution"  },
-    { id: "st_max_spd",  line: "MAX SPEED..............320/0.77", severity: "caution"  },
-    { id: "st_max_brk",  line: "MAX BRK PR..........1 000 PSI",   severity: "caution"  },
-    { id: "st_manv",     line: "MANEUVER WITH CARE",               severity: "caution"  },
-    { id: "st_fctl",     line: "FCTL ALTN LAW (PROT LOST)",        severity: "caution"  },
-    { id: "st_stab",     line: "STABILIZER..............INOP",    severity: "caution"  },
-    { id: "st_gear",     line: "L/G GRVTY EXTN ONLY",             severity: "caution"  },
-    { id: "st_brakes",   line: "BRK Y ACCU PR ONLY",               severity: "caution"  },
-    { id: "st_noskid",   line: "ANTI SKID..............INOP",     severity: "caution"  },
-    { id: "st_nosteer",  line: "N/W STRG...............INOP",     severity: "caution"  },
-    { id: "st_gpws",     line: "GPWS FLAP MODE..........OFF",     severity: "caution"  },
-    { id: "st_appr",     line: "DUAL HYD LO PR APPR PROC",        severity: "advisory" },
-    { id: "st_vapp",     line: "APPR SPD............VREF+25 KT",  severity: "memo"     },
-    { id: "st_ldg3",     line: "FOR LDG.............USE FLAP 3",  severity: "memo"     },
+    // ── Left column: FCOM PRO-ABN-HYD HYD G+Y SYS LO PR STATUS ──────────────
+    { id: "st_max_spd",   line: "MAX SPEED . . . . . . 320/0.77",  severity: "caution"  },
+    { id: "st_max_brk",   line: "MAX BRK PR . . . . 1 000 PSI",    severity: "caution"  },
+    { id: "st_manv",      line: "MANEUVER WITH CARE",                severity: "caution"  },
+    { id: "st_fctl",      line: "FCTL ALTN LAW (PROT LOST)",         severity: "caution"  },
+    { id: "st_dir_law",   line: "WHEN L/G DN: DIRECT LAW",          severity: "caution"  },
+    { id: "st_stab",      line: "STABILIZER . . . . . . . INOP",    severity: "caution"  },
+    { id: "st_gear",      line: "L/G GRVTY EXTN ONLY",              severity: "caution"  },
+    { id: "st_brakes",    line: "BRK Y ACCU PR ONLY",                severity: "caution"  },
+    { id: "st_noskid",    line: "ANTI SKID . . . . . . . INOP",     severity: "caution"  },
+    { id: "st_nosteer",   line: "N/W STRG . . . . . . . INOP",      severity: "caution"  },
+    { id: "st_gpws",      line: "GPWS FLAP MODE . . . . . OFF",     severity: "caution"  },
+    { id: "st_appr",      line: "DUAL HYD LO PR APPR PROC",         severity: "advisory" },
+    { id: "st_vapp",      line: "APPR SPD . . . . VREF+25 KT",      severity: "memo"     },
+    { id: "st_ldg3",      line: "FOR LDG . . . . USE FLAP 3",       severity: "memo"     },
+    { id: "st_ldg_dist",  line: "LDG DIST PROC . . . . APPLY",      severity: "memo"     },
+    { id: "st_fuel_incr", line: "FUEL CONSUMPT INCRSD",               severity: "advisory" },
+    { id: "st_fms",       line: "FMS PRED UNRELIABLE",                severity: "advisory" },
+    // ── Right column: INOP SYS (FCOM STATUS right column) ────────────────────
+    { id: "st_inop_hyd",  line: "G+Y HYD",           severity: "caution",  inopSys: true },
+    { id: "st_inop_fctl", line: "F/CTL PROT",         severity: "caution",  inopSys: true },
+    { id: "st_inop_stab", line: "STABILIZER",          severity: "caution",  inopSys: true },
+    { id: "st_inop_rev",  line: "REVERSER 1+2",        severity: "caution",  inopSys: true },
+    { id: "st_inop_splr", line: "SPLR 1+2+4+5",       severity: "caution",  inopSys: true },
+    { id: "st_inop_yaw",  line: "YAW DAMPER",          severity: "caution",  inopSys: true },
+    { id: "st_inop_ap",   line: "AP 1+2",              severity: "caution",  inopSys: true },
+    { id: "st_inop_ask",  line: "ANTI SKID",           severity: "caution",  inopSys: true },
+    { id: "st_inop_nws",  line: "N/W STRG",            severity: "caution",  inopSys: true },
+    { id: "st_inop_nbrk", line: "NORM BRK",            severity: "caution",  inopSys: true },
+    { id: "st_inop_abrk", line: "AUTO BRK",            severity: "caution",  inopSys: true },
+    { id: "st_inop_lgr",  line: "L/G RETRACT",         severity: "caution",  inopSys: true },
+    { id: "st_inop_cat2", line: "CAT 2",               severity: "advisory", inopSys: true },
+    { id: "st_inop_gls",  line: "GLS AUTOLAND",        severity: "advisory", inopSys: true },
+    { id: "st_inop_steep",line: "STEEP APPR",          severity: "advisory", inopSys: true },
   ],
 
   distractions: [
