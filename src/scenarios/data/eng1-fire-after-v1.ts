@@ -777,13 +777,37 @@ export const eng1FireAfterV1: Scenario = {
         },
       ],
       tray: {
-        title: "ENG PANEL",
-        note: "FCOM step 2 — MASTER OFF: fuel SOV + oil SOV close, FADEC de-energised",
+        title: "ENG + FIRE PANEL",
+        note: "Step 2: MASTER OFF (fuel SOV + oil SOV close). Step 3: FIRE PB → HYD/bleed/IDG SOVs + fuel shutoff. Steps 4-5: AGENT 1 → AGENT 2 if fire persists (30 s each)",
         switches: [
           {
             label: "MASTER", sub: "ENG 1",
             states: [
               { when: { step: "eng1_master_off" }, value: "off" as const },
+              { value: "norm" as const },
+            ],
+          },
+          {
+            label: "FIRE PB", sub: "ENG 1",
+            states: [
+              { when: { step: "eng1_fire_pb" },   value: "off"  as const },
+              { when: { trigger: "fire_warn" },    value: "fire" as const },
+              { value: "norm" as const },
+            ],
+          },
+          {
+            label: "AGENT 1", sub: "DISCH",
+            states: [
+              { when: { step: "agent1" },          value: "off"   as const },
+              { when: { step: "eng1_fire_pb" },    value: "armed" as const },
+              { value: "norm" as const },
+            ],
+          },
+          {
+            label: "AGENT 2", sub: "DISCH",
+            states: [
+              { when: { step: "agent2" },          value: "off"   as const },
+              { when: { step: "agent1" },          value: "armed" as const },
               { value: "norm" as const },
             ],
           },
