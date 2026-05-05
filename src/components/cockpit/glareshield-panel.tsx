@@ -66,7 +66,7 @@ export function GlareshieldPanel({
             disabled={disabled || mwDone || !state.masterWarnActive || !mwReqsMet || !mwStep}
             crew="PM"
             activeLabel={mwAviatePending ? "AVIATE FIRST" : "CRC ACTIVE"}
-            doneLabel="CANCELLED"
+            doneLabel=""
             onClick={() => mwStep && perform({ kind: "STEP", stepId: mwStep.id })}
           />
         )}
@@ -89,7 +89,7 @@ export function GlareshieldPanel({
             disabled={disabled || mcDone || !state.masterCautActive || !mcReqsMet || !mcStep}
             crew="PM"
             activeLabel="SC ACTIVE"
-            doneLabel="CANCELLED"
+            doneLabel=""
             onClick={() => mcStep && perform({ kind: "STEP", stepId: mcStep.id })}
           />
         )}

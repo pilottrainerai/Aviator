@@ -400,12 +400,11 @@ export const rapidDepress: Scenario = {
   engineDisplay: {
     warningTrigger: "depress",
     controlPanel: [
-      { stepId: "masks_on",           kind: "o2_mask"     as const, label: "O2 MASK",      sub: "USE"      },
-      { stepId: "cancel_master_warn", kind: "cancel_warn" as const, label: "MASTER",        sub: "WARN"     },
-      { stepId: "emer_descent_init",  kind: "emer_pb"     as const, label: "EMER DESCENT",  sub: "INITIATE" },
-      { stepId: "spd_brakes_ext",     kind: "spd_brk"     as const, label: "SPD BRK",       sub: "FULL"     },
-      { stepId: "eng_mode_sel",       kind: "toggle_sw"   as const, label: "ENG MODE",      sub: "IGN"      },
-      { stepId: "pax_oxy_man",        kind: "emer_pb"     as const, label: "PAX OXY",       sub: "MAN ON"   },
+      { stepId: "masks_on",          kind: "o2_mask"  as const, label: "O2 MASK",      sub: "USE"      },
+      { stepId: "emer_descent_init", kind: "emer_pb"  as const, label: "EMER DESCENT", sub: "INITIATE" },
+      { stepId: "spd_brakes_ext",    kind: "spd_brk"  as const, label: "SPD BRK",      sub: "FULL"     },
+      { stepId: "eng_mode_sel",      kind: "toggle_sw" as const, label: "ENG MODE",    sub: "IGN"      },
+      { stepId: "pax_oxy_man",       kind: "emer_pb"  as const, label: "PAX OXY",      sub: "MAN ON"   },
     ],
     eng1: {
       rows: [

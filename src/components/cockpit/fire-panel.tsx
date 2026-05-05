@@ -250,7 +250,7 @@ function AirbusPB({
       onClick={isClickable ? onClick : undefined}
       style={{
         cursor: isClickable ? "pointer" : "default",
-        width: large ? "80px" : wide ? "68px" : "56px",
+        width: large ? "96px" : wide ? "80px" : "68px",
         userSelect: "none",
         filter: btnState === "disabled" ? "brightness(0.4)" : "none",
       }}
@@ -282,9 +282,9 @@ function AirbusPB({
               : btnState === "done"  ? `${C.green}25`
               : C.ledOff,
             borderRadius: "2px 2px 0 0",
-            padding: large ? "5px 6px 4px" : "3px 4px",
+            padding: large ? "7px 6px 5px" : "4px 5px",
             textAlign: "center",
-            minHeight: large ? "26px" : "20px",
+            minHeight: large ? "34px" : "24px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -293,7 +293,7 @@ function AirbusPB({
         >
           <span
             style={{
-              fontSize: large ? "9px" : "7px",
+              fontSize: large ? "10px" : "8px",
               fontFamily: "monospace",
               fontWeight: 700,
               letterSpacing: "0.08em",
@@ -315,13 +315,13 @@ function AirbusPB({
           style={{
             backgroundColor: C.btnFace,
             borderRadius: "0 0 2px 2px",
-            padding: large ? "6px 6px 5px" : "4px 4px 3px",
+            padding: large ? "8px 6px 6px" : "5px 5px 4px",
             textAlign: "center",
           }}
         >
           <div
             style={{
-              fontSize: large ? "10px" : "8px",
+              fontSize: large ? "11px" : "9px",
               fontFamily: "monospace",
               fontWeight: 700,
               letterSpacing: "0.06em",
@@ -636,16 +636,16 @@ function DslThrLeverCtrl({ done, active, clickable, onClick }: { done: boolean; 
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>THR LVR 1</span>
-      <div style={{ width: "26px", height: "54px", backgroundColor: C.bezel, border: `1.5px solid ${active ? C.amber : done ? C.amber : C.dimLo}`, borderRadius: "3px", position: "relative", boxShadow: active ? `0 0 8px ${C.amber}60` : "none", transition: "all 0.2s" }}>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>THR LVR 1</span>
+      <div style={{ width: "36px", height: "76px", backgroundColor: C.bezel, border: `2px solid ${active ? C.amber : done ? C.amber : C.dimLo}`, borderRadius: "4px", position: "relative", boxShadow: active ? `0 0 10px ${C.amber}60` : done ? `0 0 8px ${C.amber}40` : "none", transition: "all 0.2s" }}>
         {["CLB","MCT","IDLE"].map((pos, i) => (
-          <div key={pos} style={{ position: "absolute", right: "-20px", top: `${6 + i * 15}px`, fontSize: "6px", fontFamily: "monospace", color: C.dimLo, letterSpacing: "0.06em" }}>{pos}</div>
+          <div key={pos} style={{ position: "absolute", right: "-26px", top: `${8 + i * 20}px`, fontSize: "7px", fontFamily: "monospace", color: C.dimLo, letterSpacing: "0.06em" }}>{pos}</div>
         ))}
-        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: done ? "32px" : "6px", width: "14px", height: "12px", backgroundColor: done ? `${C.amber}CC` : "#3A4252", border: `1px solid ${done ? C.amber : C.dim}`, borderRadius: "2px", transition: "top 0.3s ease", boxShadow: done ? `0 0 5px ${C.amber}60` : "none" }} />
+        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: done ? "46px" : "8px", width: "22px", height: "16px", backgroundColor: done ? `${C.amber}CC` : "#3A4252", border: `1.5px solid ${done ? C.amber : C.dim}`, borderRadius: "3px", transition: "top 0.35s ease", boxShadow: done ? `0 0 6px ${C.amber}60` : "none" }} />
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.amber : C.green, letterSpacing: "0.1em", fontWeight: 700 }}>{done ? "IDLE" : "CLB"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.amber : C.green, letterSpacing: "0.1em", fontWeight: 700 }}>{done ? "IDLE ✓" : "CLB"}</span>
     </div>
   );
 }
@@ -655,18 +655,17 @@ function DslModeSelCtrl({ done, active, clickable, onClick }: { done: boolean; a
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>MODE SEL</span>
-      <div style={{ width: "44px", height: "44px", backgroundColor: C.bezel, border: `1.5px solid ${active ? C.green : done ? C.green : C.dimLo}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: active ? `0 0 10px ${C.green}50` : done ? `0 0 8px ${C.green}40` : "none", transition: "all 0.2s", position: "relative" }}>
-        <span style={{ fontSize: "9px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.green : C.dim, letterSpacing: "0.06em", textTransform: "uppercase" }}>{done ? "IGN" : "NORM"}</span>
-        {/* Tick marks */}
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>MODE SEL</span>
+      <div style={{ width: "62px", height: "62px", backgroundColor: C.bezel, border: `2px solid ${active ? C.green : done ? C.green : C.dimLo}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: active ? `0 0 12px ${C.green}50` : done ? `0 0 10px ${C.green}40` : "none", transition: "all 0.2s", position: "relative" }}>
+        <span style={{ fontSize: "11px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.green : C.dim, letterSpacing: "0.06em", textTransform: "uppercase" }}>{done ? "IGN" : "NORM"}</span>
         {[0, 90, 180, 270].map(a => {
-          const r = 20, rad = (a * Math.PI) / 180;
-          return <div key={a} style={{ position: "absolute", width: "2px", height: "5px", backgroundColor: C.dimLo, top: `${22 - r * Math.cos(rad) - 2.5}px`, left: `${22 + r * Math.sin(rad) - 1}px`, transform: `rotate(${a}deg)`, transformOrigin: "center" }} />;
+          const r = 28, rad = (a * Math.PI) / 180;
+          return <div key={a} style={{ position: "absolute", width: "2px", height: "6px", backgroundColor: C.dimLo, top: `${31 - r * Math.cos(rad) - 3}px`, left: `${31 + r * Math.sin(rad) - 1}px`, transform: `rotate(${a}deg)`, transformOrigin: "center" }} />;
         })}
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "IGN ✓" : "— SEL →"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "IGN ✓" : "SEL →"}</span>
     </div>
   );
 }
@@ -676,15 +675,15 @@ function DslMasterSwCtrl({ done, active, clickable, onClick, label }: { done: bo
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
-      <div style={{ width: "38px", height: "48px", backgroundColor: C.bezel, border: `1.5px solid ${active ? C.amber : done ? C.amber : C.dimLo}`, borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "4px", boxShadow: active ? `0 0 10px ${C.amber}60` : done ? `0 0 8px ${C.amber}40` : "none", transition: "all 0.2s" }}>
-        <div style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: done ? C.dimLo : C.green, letterSpacing: "0.1em" }}>ON</div>
-        <div style={{ width: "22px", height: "14px", backgroundColor: done ? "#1A1E28" : "#2E3A28", border: `1px solid ${done ? C.dim : C.green}`, borderRadius: "2px", transform: done ? "translateY(4px)" : "translateY(-4px)", transition: "transform 0.2s, background-color 0.2s" }} />
-        <div style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: done ? C.amber : C.dimLo, letterSpacing: "0.1em" }}>OFF</div>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+      <div style={{ width: "52px", height: "68px", backgroundColor: C.bezel, border: `2px solid ${active ? C.amber : done ? C.amber : C.dimLo}`, borderRadius: "4px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "6px 5px", boxShadow: active ? `0 0 12px ${C.amber}60` : done ? `0 0 10px ${C.amber}40` : "none", transition: "all 0.2s" }}>
+        <div style={{ fontSize: "9px", fontFamily: "monospace", fontWeight: 800, color: done ? C.dimLo : C.green, letterSpacing: "0.12em" }}>ON</div>
+        <div style={{ width: "28px", height: "18px", backgroundColor: done ? "#1A1E28" : "#2E3A28", border: `1.5px solid ${done ? C.dim : C.green}`, borderRadius: "3px", transform: done ? "translateY(6px)" : "translateY(-6px)", transition: "transform 0.25s, background-color 0.2s", boxShadow: done ? "none" : `0 0 4px ${C.green}40` }} />
+        <div style={{ fontSize: "9px", fontFamily: "monospace", fontWeight: 800, color: done ? C.amber : C.dimLo, letterSpacing: "0.12em" }}>OFF</div>
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.amber : C.green, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "OFF ✓" : "ON"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.amber : C.green, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "OFF ✓" : "ON"}</span>
     </div>
   );
 }
@@ -694,14 +693,14 @@ function DslMonitorCtrl({ done, active, clickable, onClick, label, sub }: { done
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.35 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.35 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
-      <div style={{ width: "44px", height: "48px", backgroundColor: C.bezel, border: `1.5px solid ${done ? C.green : active ? C.cyan : C.dimLo}`, borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", boxShadow: active ? `0 0 8px ${C.cyan}40` : done ? `0 0 6px ${C.green}40` : "none", transition: "all 0.2s" }}>
-        <span style={{ fontSize: active ? "11px" : "9px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.cyan : C.dimLo, lineHeight: 1 }}>{done ? "✓" : active ? "…" : "—"}</span>
-        {sub && <span style={{ fontSize: "6px", fontFamily: "monospace", color: done ? C.green : active ? C.cyan : C.dimLo, letterSpacing: "0.06em", textAlign: "center", lineHeight: 1.3, textTransform: "uppercase" }}>{sub}</span>}
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.1em", textTransform: "uppercase", textAlign: "center", maxWidth: "60px", lineHeight: 1.2 }}>{label}</span>
+      <div style={{ width: "60px", height: "64px", backgroundColor: C.bezel, border: `2px solid ${done ? C.green : active ? C.cyan : C.dimLo}`, borderRadius: "4px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "3px", boxShadow: active ? `0 0 10px ${C.cyan}40` : done ? `0 0 8px ${C.green}40` : "none", transition: "all 0.2s" }}>
+        <span style={{ fontSize: active ? "16px" : "13px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.cyan : C.dimLo, lineHeight: 1 }}>{done ? "✓" : active ? "…" : "—"}</span>
+        {sub && <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.cyan : C.dimLo, letterSpacing: "0.06em", textAlign: "center", lineHeight: 1.3, textTransform: "uppercase" }}>{sub}</span>}
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.cyan : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "DONE" : active ? "ACTIVE" : "WAIT"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.green : active ? C.cyan : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "DONE" : active ? "ACTIVE" : "WAIT"}</span>
     </div>
   );
 }
@@ -711,15 +710,13 @@ function DslCancelWarnCtrl({ done, active, clickable, onClick }: { done: boolean
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.dim : active ? C.red : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>MASTER</span>
-      <div
-        style={{ width: "48px", height: "22px", backgroundColor: done ? C.dimLo : active ? C.red : "#3A1010", border: `1.5px solid ${done ? C.dimLo : active ? C.red : "#6A2020"}`, borderRadius: "3px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: active ? `0 0 12px ${C.red}80` : "none", transition: "all 0.2s", cursor: clickable ? "pointer" : "default" }}
-      >
-        <span style={{ fontSize: "8px", fontFamily: "monospace", fontWeight: 800, color: done ? C.dimLo : active ? C.white : "#8A3030", letterSpacing: "0.08em" }}>{done ? "CLR" : "WARN"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.dim : active ? C.red : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>MASTER</span>
+      <div style={{ width: "64px", height: "32px", backgroundColor: done ? "#1A1A1A" : active ? C.red : "#3A1010", border: `2px solid ${done ? C.dimLo : active ? C.red : "#6A2020"}`, borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: active ? `0 0 14px ${C.red}80` : "none", transition: "all 0.2s" }}>
+        <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 800, color: done ? C.dimLo : active ? C.white : "#8A3030", letterSpacing: "0.1em" }}>{done ? "CLR" : "WARN"}</span>
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.dim : active ? C.red : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "CLR ✓" : active ? "CANCEL" : "WAIT"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.dim : active ? C.red : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{active ? "PUSH" : "WAIT"}</span>
     </div>
   );
 }
@@ -729,72 +726,92 @@ function DslCancelCautCtrl({ done, active, clickable, onClick }: { done: boolean
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.dim : active ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>MASTER</span>
-      <div
-        style={{ width: "48px", height: "22px", backgroundColor: done ? C.dimLo : active ? C.amber : "#3A2A00", border: `1.5px solid ${done ? C.dimLo : active ? C.amber : "#6A4A00"}`, borderRadius: "3px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: active ? `0 0 10px ${C.amber}70` : "none", transition: "all 0.2s", cursor: clickable ? "pointer" : "default" }}
-      >
-        <span style={{ fontSize: "8px", fontFamily: "monospace", fontWeight: 800, color: done ? C.dimLo : active ? "#0A0800" : "#8A6000", letterSpacing: "0.08em" }}>{done ? "CLR" : "CAUT"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.dim : active ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>MASTER</span>
+      <div style={{ width: "64px", height: "32px", backgroundColor: done ? "#1A1A1A" : active ? C.amber : "#3A2A00", border: `2px solid ${done ? C.dimLo : active ? C.amber : "#6A4A00"}`, borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: active ? `0 0 12px ${C.amber}70` : "none", transition: "all 0.2s" }}>
+        <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 800, color: done ? C.dimLo : active ? "#0A0800" : "#8A6000", letterSpacing: "0.1em" }}>{done ? "CLR" : "CAUT"}</span>
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.dim : active ? C.amber : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "CLR ✓" : active ? "CANCEL" : "WAIT"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.dim : active ? C.amber : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{active ? "PUSH" : "WAIT"}</span>
     </div>
   );
 }
 
 // ─── DSL interactive control: O2 MASK ───────────────────────────────────────
 function DslO2MaskCtrl({ done, active, clickable, onClick, label, sub }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string; sub?: string }) {
+  const col = done ? C.green : active ? C.white : C.dimLo;
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.white : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
-      <div style={{ width: "44px", height: "44px", backgroundColor: C.bezel, border: `2px solid ${done ? C.green : active ? C.white : C.dimLo}`, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: active ? `0 0 10px ${C.white}40` : done ? `0 0 8px ${C.green}40` : "none", transition: "all 0.2s" }}>
-        <span style={{ fontSize: "13px", lineHeight: 1 }}>😷</span>
-        <span style={{ fontSize: "6px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.white : C.dimLo, letterSpacing: "0.04em" }}>{done ? "ON ✓" : sub ?? "100%"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.green : active ? C.white : C.dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
+      {/* Mask body — circular with O2 legend */}
+      <div style={{ width: "64px", height: "64px", backgroundColor: C.bezel, border: `2px solid ${col}`, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", boxShadow: active ? `0 0 14px ${C.white}40` : done ? `0 0 10px ${C.green}40` : "none", transition: "all 0.2s", position: "relative" }}>
+        {/* O2 symbol */}
+        <span style={{ fontSize: "18px", fontFamily: "monospace", fontWeight: 900, color: col, lineHeight: 1, letterSpacing: "-1px" }}>O₂</span>
+        <span style={{ fontSize: "8px", fontFamily: "monospace", fontWeight: 800, color: col, letterSpacing: "0.06em" }}>{done ? "ON ✓" : sub ?? "100%"}</span>
+        {/* Mask strap indicators */}
+        {["-18px", "18px"].map((t) => (
+          <div key={t} style={{ position: "absolute", top: t, left: "50%", transform: "translateX(-50%)", width: "20px", height: "4px", backgroundColor: col + "60", borderRadius: "2px" }} />
+        ))}
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.white : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "DONNED" : active ? "DON NOW" : "WAIT"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: col, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "DONNED" : active ? "DON NOW" : "WAIT"}</span>
     </div>
   );
 }
 
-// ─── DSL interactive control: overhead toggle switch ────────────────────────
+// ─── DSL interactive control: overhead pushbutton switch (FCOM style) ────────
+// Modelled on A320 overhead panel annunciator pushbuttons (e.g. RECIRC FANS, PROBE HEAT)
+// Top window = state LED; bottom face = label
 function DslToggleSwCtrl({ done, active, clickable, onClick, label, sub }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string; sub?: string }) {
-  const isOn = sub?.toUpperCase() === "ON" || sub?.toUpperCase() === "IGN" || sub?.toUpperCase() === "AUTO" || sub?.toUpperCase() === "RESET" || sub?.toUpperCase() === "CHECK";
-  const col = isOn ? C.green : C.amber;
+  const isOff  = sub?.toUpperCase() === "OFF";
+  const ledCol = isOff ? C.amber : C.green;
+  const ledText = done ? (sub ?? "ACT") : "NORM";
+  const ledBg  = done ? ledCol + "30" : "#0A0C10";
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? col : C.dim, letterSpacing: "0.08em", textTransform: "uppercase", textAlign: "center", maxWidth: "52px", lineHeight: 1.2 }}>{label}</span>
-      <div style={{ width: "36px", height: "48px", backgroundColor: C.bezel, border: `1.5px solid ${done ? col : active ? col : C.dimLo}`, borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "4px 3px", boxShadow: active ? `0 0 8px ${col}50` : done ? `0 0 6px ${col}40` : "none", transition: "all 0.2s" }}>
-        <div style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: done ? (isOn ? col : C.dimLo) : (isOn ? C.dimLo : col), letterSpacing: "0.08em" }}>{isOn ? sub : "NORM"}</div>
-        <div style={{ width: "20px", height: "12px", backgroundColor: done ? (isOn ? col + "40" : C.dimLo) : C.dimLo, border: `1px solid ${done ? col : C.dim}`, borderRadius: "2px", transform: done ? (isOn ? "translateY(-3px)" : "translateY(3px)") : "translateY(3px)", transition: "transform 0.2s, background-color 0.2s" }} />
-        <div style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: done ? (isOn ? C.dimLo : col) : C.dimLo, letterSpacing: "0.08em" }}>{isOn ? "NORM" : sub}</div>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? ledCol : C.dim, letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center", maxWidth: "68px", lineHeight: 1.2 }}>{label}</span>
+      {/* Pushbutton body */}
+      <div style={{ width: "64px", backgroundColor: C.bezel, border: `2px solid ${done ? ledCol : active ? ledCol : C.dimLo}`, borderRadius: "4px", padding: "2px", boxShadow: done ? `0 0 10px ${ledCol}50` : active ? `0 0 8px ${ledCol}40` : "none", transition: "all 0.2s" }}>
+        {/* LED annunciator window */}
+        <div style={{ backgroundColor: ledBg, borderRadius: "2px 2px 0 0", padding: "5px 4px", textAlign: "center", minHeight: "28px", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: `1px solid ${done ? ledCol + "60" : "#1C2130"}` }}>
+          <span style={{ fontSize: "9px", fontFamily: "monospace", fontWeight: 800, color: done ? ledCol : C.dimLo, letterSpacing: "0.1em", textTransform: "uppercase", textShadow: done ? `0 0 6px ${ledCol}` : "none" }}>{ledText}</span>
+        </div>
+        {/* Button face */}
+        <div style={{ backgroundColor: C.btnFace, borderRadius: "0 0 2px 2px", padding: "5px 4px", textAlign: "center" }}>
+          <span style={{ fontSize: "8px", fontFamily: "monospace", fontWeight: 700, color: C.white, letterSpacing: "0.06em", textTransform: "uppercase", lineHeight: 1.3, display: "block" }}>{label}</span>
+          {sub && <span style={{ fontSize: "7px", fontFamily: "monospace", color: C.dim, letterSpacing: "0.06em", textTransform: "uppercase" }}>{sub}</span>}
+        </div>
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? col : active ? col : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? `${sub} ✓` : active ? `→ ${sub}` : "WAIT"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? ledCol : active ? ledCol : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? `${sub} ✓` : active ? `→ ${sub}` : "NORM"}</span>
     </div>
   );
 }
 
-// ─── DSL interactive control: emergency pushbutton (guarded) ────────────────
+// ─── DSL interactive control: guarded emergency pushbutton ───────────────────
+// Modelled on A320 guarded pushbuttons (RAT MAN ON, EMER ELEC, PAX OXY)
 function DslEmerPbCtrl({ done, active, clickable, onClick, label, sub }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string; sub?: string }) {
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.white : C.dim, letterSpacing: "0.08em", textTransform: "uppercase", textAlign: "center", maxWidth: "52px", lineHeight: 1.2 }}>{label}</span>
-      {/* Guard frame */}
-      <div style={{ padding: "2px", border: `1px dashed ${done ? C.green : active ? C.white : C.dimLo}`, borderRadius: "4px", backgroundColor: done ? "#001A08" : active ? "#101A10" : "transparent", transition: "all 0.2s" }}>
-        <div style={{ width: "40px", height: "36px", backgroundColor: done ? C.green + "30" : active ? "#1A2A1A" : C.bezel, border: `1.5px solid ${done ? C.green : active ? C.green : C.dimLo}`, borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: active ? `0 0 10px ${C.green}50` : done ? `0 0 8px ${C.green}40` : "none", transition: "all 0.2s" }}>
-          <span style={{ fontSize: done ? "10px" : "11px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.green : C.dimLo }}>{done ? "✓" : "▶"}</span>
-          {sub && <span style={{ fontSize: "6px", fontFamily: "monospace", color: done ? C.green : active ? C.green : C.dimLo, letterSpacing: "0.05em", textAlign: "center", textTransform: "uppercase", lineHeight: 1.2 }}>{sub}</span>}
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.green : active ? C.white : C.dim, letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center", maxWidth: "70px", lineHeight: 1.2 }}>{label}</span>
+      {/* Guard housing */}
+      <div style={{ padding: "3px", border: `1.5px solid ${done ? C.green : active ? "#8AABBB" : C.dimLo}`, borderRadius: "5px", backgroundColor: done ? "#001A08" : active ? "#0A1410" : "#060A0E", transition: "all 0.2s" }}>
+        {/* Guard cap indicator */}
+        <div style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? "#8AABBB" : C.dimLo, textAlign: "center", letterSpacing: "0.1em", marginBottom: "2px", textTransform: "uppercase" }}>{done ? "ACTD" : "GUARD"}</div>
+        {/* Button */}
+        <div style={{ width: "56px", height: "48px", backgroundColor: done ? C.green + "20" : active ? "#152015" : C.bezel, border: `2px solid ${done ? C.green : active ? C.green : C.dimLo}`, borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", boxShadow: active ? `0 0 12px ${C.green}50` : done ? `0 0 10px ${C.green}40` : "none", transition: "all 0.2s" }}>
+          <span style={{ fontSize: done ? "14px" : "16px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.green : C.dimLo, lineHeight: 1 }}>{done ? "✓" : "▶"}</span>
+          {sub && <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.green : C.dimLo, letterSpacing: "0.05em", textAlign: "center", textTransform: "uppercase", lineHeight: 1.2 }}>{sub}</span>}
         </div>
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.green : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "DONE" : active ? "PUSH" : "WAIT"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.green : active ? C.green : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "ACTD ✓" : active ? "PUSH" : "WAIT"}</span>
     </div>
   );
 }
@@ -804,16 +821,16 @@ function DslSpdBrkCtrl({ done, active, clickable, onClick }: { done: boolean; ac
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>SPD BRK</span>
-      <div style={{ width: "24px", height: "54px", backgroundColor: C.bezel, border: `1.5px solid ${active ? C.amber : done ? C.green : C.dimLo}`, borderRadius: "3px", position: "relative", boxShadow: active ? `0 0 8px ${C.amber}60` : done ? `0 0 6px ${C.green}40` : "none", transition: "all 0.2s" }}>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>SPD BRK</span>
+      <div style={{ width: "34px", height: "76px", backgroundColor: C.bezel, border: `2px solid ${active ? C.amber : done ? C.green : C.dimLo}`, borderRadius: "4px", position: "relative", boxShadow: active ? `0 0 10px ${C.amber}60` : done ? `0 0 8px ${C.green}40` : "none", transition: "all 0.2s" }}>
         {["RET","½","FULL"].map((pos, i) => (
-          <div key={pos} style={{ position: "absolute", right: "-22px", top: `${6 + i * 15}px`, fontSize: "6px", fontFamily: "monospace", color: C.dimLo, letterSpacing: "0.04em" }}>{pos}</div>
+          <div key={pos} style={{ position: "absolute", right: "-28px", top: `${8 + i * 20}px`, fontSize: "7px", fontFamily: "monospace", color: C.dimLo, letterSpacing: "0.04em" }}>{pos}</div>
         ))}
-        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: done ? "32px" : active ? "16px" : "6px", width: "12px", height: "10px", backgroundColor: done ? `${C.green}CC` : active ? `${C.amber}CC` : "#3A4252", border: `1px solid ${done ? C.green : active ? C.amber : C.dim}`, borderRadius: "2px", transition: "top 0.3s ease" }} />
+        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: done ? "46px" : active ? "22px" : "8px", width: "18px", height: "14px", backgroundColor: done ? `${C.green}CC` : active ? `${C.amber}CC` : "#3A4252", border: `1.5px solid ${done ? C.green : active ? C.amber : C.dim}`, borderRadius: "3px", transition: "top 0.35s ease", boxShadow: done ? `0 0 5px ${C.green}60` : active ? `0 0 5px ${C.amber}60` : "none" }} />
       </div>
-      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.amber : C.dim, letterSpacing: "0.1em", fontWeight: 700 }}>{done ? "FULL ✓" : "RET"}</span>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.green : active ? C.amber : C.dim, letterSpacing: "0.1em", fontWeight: 700 }}>{done ? "FULL ✓" : "RET"}</span>
     </div>
   );
 }
@@ -837,12 +854,12 @@ function DslControlPanel({
       {/* Section header */}
       <div className="flex items-center gap-2 mb-2">
         <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
-        <span style={{ fontSize: "7px", fontFamily: "monospace", letterSpacing: "0.25em", color: warningActive ? C.amber : C.dim, textTransform: "uppercase" }}>ECAM ACTIONS</span>
+        <span style={{ fontSize: "7px", fontFamily: "monospace", letterSpacing: "0.25em", color: warningActive ? C.amber : C.dim, textTransform: "uppercase" }}>ACTION PANEL</span>
         <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
       </div>
 
       {/* Controls row */}
-      <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "flex-end", paddingLeft: "8px", paddingRight: "8px" }}>
+      <div style={{ display: "flex", gap: "12px", justifyContent: "center", alignItems: "flex-end", flexWrap: "wrap", paddingLeft: "6px", paddingRight: "6px" }}>
         {controls.map((ctrl) => {
           const done    = isDone(ctrl.stepId);
           const step    = scenario.steps.find(s => s.id === ctrl.stepId);
@@ -861,7 +878,7 @@ function DslControlPanel({
             );
             case "agent":     return (
               <AirbusPB key={ctrl.stepId} topText={done ? "DISCH" : active ? "SQUIB ARM" : "SQUIB"} topColor={done ? C.green : active ? C.white : C.dim}
-                label={ctrl.label} sublabel={ctrl.sub} state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
+                label={ctrl.label} sublabel={ctrl.sub} large state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
             );
             case "cancel_warn": return <DslCancelWarnCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
             case "cancel_caut": return <DslCancelCautCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;

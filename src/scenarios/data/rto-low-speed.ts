@@ -241,10 +241,9 @@ export const rtoLowSpeed: Scenario = {
   engineDisplay: {
     warningTrigger: "fire_warn_ground",
     controlPanel: [
-      { stepId: "thr_levers_close",   kind: "thr_lever"   as const, label: "THR LVR",  sub: "IDLE"   },
-      { stepId: "cancel_master_warn", kind: "cancel_warn" as const, label: "MASTER",    sub: "WARN"   },
-      { stepId: "fire_pb_gnd",        kind: "fire_pb"     as const, label: "ENG 1",     sub: "FIRE PB"},
-      { stepId: "agent1_gnd",         kind: "agent"       as const, label: "AGENT 1",   sub: "DISCH"  },
+      { stepId: "thr_levers_close", kind: "thr_lever" as const, label: "THR LVR",  sub: "IDLE"   },
+      { stepId: "fire_pb_gnd",      kind: "fire_pb"   as const, label: "ENG 1",    sub: "FIRE PB"},
+      { stepId: "agent1_gnd",       kind: "agent"     as const, label: "AGENT 1",  sub: "DISCH"  },
     ],
     eng1: {
       rows: [
