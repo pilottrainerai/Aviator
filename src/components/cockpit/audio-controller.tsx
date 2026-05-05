@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { playMasterWarn } from "@/lib/audio/cockpit-audio";
+import { playMasterWarn, playMasterCaut } from "@/lib/audio/cockpit-audio";
 import { Volume2, VolumeX } from "lucide-react";
 
-export function AudioController({ active }: { active: boolean }) {
+export function AudioController({ active, cautActive }: { active: boolean; cautActive?: boolean }) {
   const [muted, setMuted] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
+  const prevCautRef = useRef(false);
 
+  // CRC / repetitive chime for MASTER WARNING
   useEffect(() => {
     if (active && !muted) {
       const handle = playMasterWarn();
@@ -18,6 +20,14 @@ export function AudioController({ active }: { active: boolean }) {
       stopRef.current = null;
     }
   }, [active, muted]);
+
+  // Single chime (SC) on rising edge of MASTER CAUTION
+  useEffect(() => {
+    if (cautActive && !prevCautRef.current && !muted) {
+      playMasterCaut();
+    }
+    prevCautRef.current = cautActive ?? false;
+  }, [cautActive, muted]);
 
   return (
     <button

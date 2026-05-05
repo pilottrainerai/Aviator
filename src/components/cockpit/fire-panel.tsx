@@ -614,9 +614,8 @@ function DslTray({ title, note, children }: { title: string; note?: string; chil
   );
 }
 
-// ─── DSL Engine panel column ──────────────────────────────────────────────────
+// ─── DSL Engine parameter column (rows only, no trays) ───────────────────────
 function DslEnginePanel({ engNum, panel, state, warningActive }: { engNum: 1 | 2; panel: import("@/scenarios/types").EnginePanelDef; state: ScenarioState; warningActive: boolean }) {
-  const col = warningActive ? C.amber : C.dim;
   return (
     <div className="flex flex-col">
       <span style={{ fontSize: "8px", fontFamily: "monospace", color: warningActive ? C.amber : C.dim, letterSpacing: "0.2em", fontWeight: 700, padding: "4px 8px 2px" }}>
@@ -628,16 +627,153 @@ function DslEnginePanel({ engNum, panel, state, warningActive }: { engNum: 1 | 2
           <DslEngRow key={row.label} label={row.label} value={val.v} color={SYS_COLORS[val.c]} unit={row.unit} />
         );
       })}
-      {panel.trays?.map((tray) => (
-        <DslTray key={tray.title} title={tray.title} note={tray.note}>
-          {tray.switches.map((sw) => {
-            const swState = evalSysCase(sw.states, state);
-            return <DslOHPSwitch key={sw.label} label={sw.label} sub={sw.sub} swState={swState} />;
-          })}
-        </DslTray>
-      ))}
-      {/* suppress unused warning */}
-      {col && null}
+    </div>
+  );
+}
+
+// ─── DSL interactive control: THR LEVER ──────────────────────────────────────
+function DslThrLeverCtrl({ done, active, clickable, onClick }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void }) {
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>THR LVR 1</span>
+      <div style={{ width: "26px", height: "54px", backgroundColor: C.bezel, border: `1.5px solid ${active ? C.amber : done ? C.amber : C.dimLo}`, borderRadius: "3px", position: "relative", boxShadow: active ? `0 0 8px ${C.amber}60` : "none", transition: "all 0.2s" }}>
+        {["CLB","MCT","IDLE"].map((pos, i) => (
+          <div key={pos} style={{ position: "absolute", right: "-20px", top: `${6 + i * 15}px`, fontSize: "6px", fontFamily: "monospace", color: C.dimLo, letterSpacing: "0.06em" }}>{pos}</div>
+        ))}
+        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: done ? "32px" : "6px", width: "14px", height: "12px", backgroundColor: done ? `${C.amber}CC` : "#3A4252", border: `1px solid ${done ? C.amber : C.dim}`, borderRadius: "2px", transition: "top 0.3s ease", boxShadow: done ? `0 0 5px ${C.amber}60` : "none" }} />
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.amber : C.green, letterSpacing: "0.1em", fontWeight: 700 }}>{done ? "IDLE" : "CLB"}</span>
+    </div>
+  );
+}
+
+// ─── DSL interactive control: ENG MODE SEL ───────────────────────────────────
+function DslModeSelCtrl({ done, active, clickable, onClick }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void }) {
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>MODE SEL</span>
+      <div style={{ width: "44px", height: "44px", backgroundColor: C.bezel, border: `1.5px solid ${active ? C.green : done ? C.green : C.dimLo}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: active ? `0 0 10px ${C.green}50` : done ? `0 0 8px ${C.green}40` : "none", transition: "all 0.2s", position: "relative" }}>
+        <span style={{ fontSize: "9px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.green : C.dim, letterSpacing: "0.06em", textTransform: "uppercase" }}>{done ? "IGN" : "NORM"}</span>
+        {/* Tick marks */}
+        {[0, 90, 180, 270].map(a => {
+          const r = 20, rad = (a * Math.PI) / 180;
+          return <div key={a} style={{ position: "absolute", width: "2px", height: "5px", backgroundColor: C.dimLo, top: `${22 - r * Math.cos(rad) - 2.5}px`, left: `${22 + r * Math.sin(rad) - 1}px`, transform: `rotate(${a}deg)`, transformOrigin: "center" }} />;
+        })}
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "IGN ✓" : "— SEL →"}</span>
+    </div>
+  );
+}
+
+// ─── DSL interactive control: ENG MASTER ─────────────────────────────────────
+function DslMasterSwCtrl({ done, active, clickable, onClick, label }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string }) {
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+      <div style={{ width: "38px", height: "48px", backgroundColor: C.bezel, border: `1.5px solid ${active ? C.amber : done ? C.amber : C.dimLo}`, borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "4px", boxShadow: active ? `0 0 10px ${C.amber}60` : done ? `0 0 8px ${C.amber}40` : "none", transition: "all 0.2s" }}>
+        <div style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: done ? C.dimLo : C.green, letterSpacing: "0.1em" }}>ON</div>
+        <div style={{ width: "22px", height: "14px", backgroundColor: done ? "#1A1E28" : "#2E3A28", border: `1px solid ${done ? C.dim : C.green}`, borderRadius: "2px", transform: done ? "translateY(4px)" : "translateY(-4px)", transition: "transform 0.2s, background-color 0.2s" }} />
+        <div style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: done ? C.amber : C.dimLo, letterSpacing: "0.1em" }}>OFF</div>
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.amber : C.green, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "OFF ✓" : "ON"}</span>
+    </div>
+  );
+}
+
+// ─── DSL interactive control: monitor/advisory ───────────────────────────────
+function DslMonitorCtrl({ done, active, clickable, onClick, label, sub }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string; sub?: string }) {
+  return (
+    <div
+      onClick={clickable ? onClick : undefined}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.35 : 1, transition: "opacity 0.2s" }}
+    >
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+      <div style={{ width: "44px", height: "48px", backgroundColor: C.bezel, border: `1.5px solid ${done ? C.green : active ? C.cyan : C.dimLo}`, borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", boxShadow: active ? `0 0 8px ${C.cyan}40` : done ? `0 0 6px ${C.green}40` : "none", transition: "all 0.2s" }}>
+        <span style={{ fontSize: active ? "11px" : "9px", fontFamily: "monospace", fontWeight: 800, color: done ? C.green : active ? C.cyan : C.dimLo, lineHeight: 1 }}>{done ? "✓" : active ? "…" : "—"}</span>
+        {sub && <span style={{ fontSize: "6px", fontFamily: "monospace", color: done ? C.green : active ? C.cyan : C.dimLo, letterSpacing: "0.06em", textAlign: "center", lineHeight: 1.3, textTransform: "uppercase" }}>{sub}</span>}
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.green : active ? C.cyan : C.dimLo, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "DONE" : active ? "ACTIVE" : "WAIT"}</span>
+    </div>
+  );
+}
+
+// ─── DSL interactive ECAM control panel ──────────────────────────────────────
+function DslControlPanel({
+  controls, scenario, state, perform, disabled, warningActive,
+}: {
+  controls: import("@/scenarios/types").EngControlDef[];
+  scenario: Scenario;
+  state: ScenarioState;
+  perform: (a: PilotAction) => void;
+  disabled?: boolean;
+  warningActive: boolean;
+}) {
+  const isDone   = (id: string) => !!state.completedSteps[id];
+  const allDone  = controls.every(c => isDone(c.stepId));
+
+  return (
+    <div style={{ borderTop: "1px solid #1C2130", backgroundColor: warningActive ? "#060A12" : "#050709", padding: "6px 10px 8px" }}>
+      {/* Section header */}
+      <div className="flex items-center gap-2 mb-2">
+        <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
+        <span style={{ fontSize: "7px", fontFamily: "monospace", letterSpacing: "0.25em", color: warningActive ? C.amber : C.dim, textTransform: "uppercase" }}>ECAM ACTIONS</span>
+        <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
+      </div>
+
+      {/* Controls row */}
+      <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "flex-end", paddingLeft: "8px", paddingRight: "8px" }}>
+        {controls.map((ctrl) => {
+          const done    = isDone(ctrl.stepId);
+          const step    = scenario.steps.find(s => s.id === ctrl.stepId);
+          const reqsMet = (step?.requires ?? []).every(r => !!state.completedSteps[r]);
+          const active  = !done && reqsMet && warningActive;
+          const clickable = !done && reqsMet && warningActive && !disabled;
+          const onClick = () => { if (clickable) perform({ kind: "STEP", stepId: ctrl.stepId }); };
+
+          switch (ctrl.kind) {
+            case "thr_lever": return <DslThrLeverCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+            case "mode_sel":  return <DslModeSelCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+            case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} />;
+            case "fire_pb":   return (
+              <AirbusPB key={ctrl.stepId} topText={done ? "ARMED" : active ? "FIRE" : "FIRE"} topColor={C.red} label={ctrl.label} sublabel={ctrl.sub} large
+                state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
+            );
+            case "agent":     return (
+              <AirbusPB key={ctrl.stepId} topText={done ? "DISCH" : active ? "SQUIB ARM" : "SQUIB"} topColor={done ? C.green : active ? C.white : C.dim}
+                label={ctrl.label} sublabel={ctrl.sub} state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
+            );
+            default:          return <DslMonitorCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+          }
+        })}
+      </div>
+
+      {/* Status memo line */}
+      <div style={{ marginTop: "6px", minHeight: "14px", textAlign: "center" }}>
+        {allDone ? (
+          <span style={{ color: C.green, fontSize: "9px", fontFamily: "monospace", letterSpacing: "0.1em" }}>✓ ENGINE SECURED</span>
+        ) : warningActive ? (
+          <span style={{ color: C.amber, fontSize: "8px", fontFamily: "monospace", letterSpacing: "0.08em" }}>
+            {(() => {
+              const next = controls.find(c => !isDone(c.stepId));
+              const nextStep = scenario.steps.find(s => s.id === next?.stepId);
+              const reqsMet = (nextStep?.requires ?? []).every(r => !!state.completedSteps[r]);
+              if (!next) return null;
+              return reqsMet ? `▸ ${next.label}${next.sub ? " → " + next.sub : ""}` : "◈ COMPLETE PRIOR STEPS FIRST";
+            })()}
+          </span>
+        ) : (
+          <span style={{ color: C.dim, fontSize: "8px", fontFamily: "monospace", letterSpacing: "0.08em" }}>— STANDBY —</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -661,24 +797,62 @@ export function FirePanel({
   if (scenario.engineDisplay) {
     const ed = scenario.engineDisplay;
     const warningActive = ed.warningTrigger ? !!state.triggersFired[ed.warningTrigger] : false;
+
+    // Collect trays from both panels (full-width below grid)
+    const allTrays = [...(ed.eng1.trays ?? []), ...(ed.eng2.trays ?? [])];
+
     return (
       <div
         className="border border-[var(--color-border)] font-mono select-none flex flex-col"
-        style={{ backgroundColor: C.panel, flex: "1 1 0", minHeight: 0 }}
+        style={{ backgroundColor: C.panel, flex: "1 1 0", minHeight: 0, overflowY: "auto" }}
       >
+        {/* Header */}
         <div className="flex items-center justify-between px-3 py-[5px] border-b" style={{ borderColor: "#1C2130" }}>
           <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.25em", textTransform: "uppercase" }}>ENGINE DISPLAY</span>
           {warningActive && (
-            <span className="animate-pulse font-bold" style={{ color: C.red, fontSize: "8px", letterSpacing: "0.2em" }}>
-              ▲ {state.alarmLabel ?? "WARNING"}
+            <span className="animate-pulse font-bold" style={{ color: C.amber, fontSize: "8px", letterSpacing: "0.2em" }}>
+              ▲ {state.alarmLabel ?? "CAUTION"}
             </span>
           )}
         </div>
-        <div className="grid grid-cols-[1fr_1px_1fr] gap-x-2 px-1 pt-2 pb-1 flex-1 overflow-y-auto" style={{ alignItems: "start" }}>
+
+        {/* Engine parameter grid — equal-height columns, no trays here */}
+        <div className="grid grid-cols-[1fr_1px_1fr] gap-x-2 px-1 pt-2 pb-1" style={{ alignItems: "start" }}>
           <DslEnginePanel engNum={1} panel={ed.eng1} state={state} warningActive={warningActive} />
           <div style={{ backgroundColor: "#1C2130", alignSelf: "stretch" }} />
           <DslEnginePanel engNum={2} panel={ed.eng2} state={state} warningActive={false} />
         </div>
+
+        {/* Interactive ECAM control panel — only when controlPanel defined */}
+        {ed.controlPanel && (
+          <DslControlPanel
+            controls={ed.controlPanel}
+            scenario={scenario}
+            state={state}
+            perform={perform}
+            disabled={disabled}
+            warningActive={warningActive}
+          />
+        )}
+
+        {/* OHP indicator trays — full width, below controls */}
+        {allTrays.map(tray => (
+          <DslTray key={tray.title} title={tray.title} note={tray.note}>
+            {tray.switches.map(sw => {
+              const swState = evalSysCase(sw.states, state);
+              return <DslOHPSwitch key={sw.label} label={sw.label} sub={sw.sub} swState={swState} />;
+            })}
+          </DslTray>
+        ))}
+
+        {/* Memo footer when no control panel */}
+        {!ed.controlPanel && (
+          <div className="px-3 py-2 border-t" style={{ borderColor: "#1C2130" }}>
+            <span style={{ color: C.dim, fontSize: "9px", fontFamily: "monospace", letterSpacing: "0.08em" }}>
+              {warningActive ? `▲ ${state.alarmLabel ?? "CAUTION"}` : "— NORMAL —"}
+            </span>
+          </div>
+        )}
       </div>
     );
   }

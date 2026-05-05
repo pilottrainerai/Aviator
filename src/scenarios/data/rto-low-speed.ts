@@ -26,15 +26,20 @@ export const rtoLowSpeed: Scenario = {
       atMs: 6_000,
       description: "ENG 1 FIRE warning on ground — below V1",
       effects: [
+        // FCOM: ENG 1 FIRE = Level 3 WARNING (red + CRC) — same on ground and in flight
+        // On ground below V1 there is NO "BELOW V1 — RTO" ECAM message — that is a crew call-out
+        // RTO is a crew decision, not an ECAM action. ECAM will show the ENG FIRE procedure.
         { type: "SET_MASTER_WARN", active: true },
         { type: "SET_ALARM_LABEL", label: "ENG 1 FIRE" },
         {
           type: "ADD_ECAM",
           messages: [
-            { id: "eng1_fire_gnd", line: "ENG 1 FIRE",                    level: "warning" },
-            { id: "rto_call",      line: "BELOW V1 — RTO",                 level: "warning" },
-            { id: "ecam_idle",     line: "THR LEVERS......IDLE / REVERSE", level: "caution" },
-            { id: "ecam_brakes",   line: "BRAKES..............MAX",        level: "caution" },
+            { id: "eng1_fire_gnd", line: "ENG 1 FIRE",                     level: "warning" },
+            // On ground the ECAM shows the fire procedure (not IDLE/REVERSE — that's the crew's memory item for RTO)
+            { id: "ecam_thr",      line: "THR LEVER 1........IDLE",         level: "caution" },
+            { id: "ecam_master",   line: "ENG 1 MASTER.......OFF",          level: "caution" },
+            { id: "ecam_fire_pb",  line: "ENG 1 FIRE P/B.....PUSH",        level: "caution" },
+            { id: "ecam_agent1",   line: "AGENT 1 AFTER 10 S..DISCH",      level: "caution" },
           ],
         },
       ],
@@ -57,11 +62,10 @@ export const rtoLowSpeed: Scenario = {
       id: "thr_levers_close",
       label: "THR LEVERS",
       action: "IDLE",
-      hint: "PF: thrust levers to idle immediately on rejection. FCOM step 1 of RTO.",
+      hint: "PF: thrust levers to idle immediately on rejection — MEMORY ITEM. FCOM: immediate action on RTO decision.",
       variant: "switch",
       crew: "PF",
       hardware: true,
-      ecamRef: "ecam_idle",
       requires: ["rto_call"],
     },
     {
@@ -72,7 +76,6 @@ export const rtoLowSpeed: Scenario = {
       variant: "switch",
       crew: "PF",
       hardware: true,
-      ecamRef: "ecam_brakes",
       requires: ["rto_call"],
     },
     {

@@ -18,18 +18,25 @@ export const rapidDepress: Scenario = {
     {
       id: "depress",
       atMs: 4_000,
-      description: "Structural failure — CABIN ALT HI, rapid decompression",
+      description: "Structural failure — CAB PR EXCESS CAB ALT warning, rapid decompression",
       effects: [
+        // FCOM PRO-ABN-CAB_PR: CAB PR EXCESS CAB ALT = L2 = WARNING (Master Warning + CRC)
+        // Triggers when cabin altitude > 9550 ft in cruise
         { type: "SET_MASTER_WARN", active: true },
-        { type: "SET_ALARM_LABEL", label: "CABIN ALT HI" },
+        { type: "SET_ALARM_LABEL", label: "CAB PR EXCESS CAB ALT" },
         {
           type: "ADD_ECAM",
           messages: [
-            { id: "cabin_alt",        line: "CABIN ALT HI",                level: "warning" },
-            { id: "excess_cab",       line: "EXCESS CABIN ALT",             level: "caution" },
-            { id: "pax_masks",        line: "PAX OXY MASKS ON",             level: "advisory" },
-            { id: "outflow_open",     line: "OUTFLOW VALVE..OPEN",          level: "caution" },
-            { id: "emer_descent_ecam",line: "EMER DESCENT INITIATE",        level: "caution" },
+            { id: "cabin_alt",        line: "CAB PR EXCESS CAB ALT",        level: "warning"  },
+            // FCOM procedure above FL160: EMER DESCENT + crew OXY masks + ATC + PA
+            { id: "crew_masks",       line: "CREW OXY MASKS..........USE",  level: "caution"  },
+            { id: "emer_descent_ecam",line: "EMER DESCENT...........INITIATE", level: "caution" },
+            { id: "spd_brk_ecam",     line: "SPD BRK....................FULL", level: "caution" },
+            { id: "eng_ign_ecam",     line: "ENG MODE SEL..............IGN", level: "caution" },
+            { id: "atc_ecam",         line: "ATC.....................NOTIFY", level: "caution" },
+            { id: "pa_ecam",          line: "EMER DESCENT(PA)..ANNOUNCE",   level: "caution"  },
+            // IF CAB ALT > 14 000 FT:
+            { id: "pax_masks",        line: "PAX OXY MASKS..........MAN ON", level: "caution" },
           ],
         },
       ],
@@ -38,11 +45,12 @@ export const rapidDepress: Scenario = {
 
   steps: [
     // ── IMMEDIATE — MEMORY ITEMS ──────────────────────────────────────────────
+    // FCOM PRO-ABN-CAB_PR: CREW OXY MASKS USE is step 1 (before descent)
     {
       id: "masks_on",
-      label: "OXYGEN MASKS",
-      action: "ON / 100%",
-      hint: "BOTH CREW: don oxygen masks IMMEDIATELY at 100%. Mic ON interphone. TUC at FL350 = 15–30 s. Do NOT wait — don first, then act.",
+      label: "CREW OXY MASKS",
+      action: "USE / 100%",
+      hint: "BOTH CREW: don oxygen masks IMMEDIATELY at 100%. Mic ON interphone. TUC at FL350 = 15–30 s. This is the FIRST action per FCOM — don masks BEFORE everything else.",
       variant: "warning",
       crew: "PF",
       group: "flightcheck",
@@ -59,20 +67,10 @@ export const rapidDepress: Scenario = {
       requires: ["masks_on"],
     },
     {
-      id: "pa_pax",
-      label: "PA — MASKS ON",
-      action: "PUSH",
-      hint: "Push PA (on mask boom mic): 'CABIN CREW AND PASSENGERS — OXYGEN MASKS ON NOW, OXYGEN MASKS ON NOW.'",
-      variant: "caution",
-      crew: "PM",
-      hardware: true,
-      requires: ["masks_confirm"],
-    },
-    {
       id: "cancel_master_warn",
       label: "MASTER WARN",
       action: "CANCEL",
-      hint: "PM: cancel MASTER WARN. Proceed with ECAM.",
+      hint: "PM: cancel MASTER WARN. Proceed with ECAM procedure.",
       variant: "warning",
       crew: "PM",
       group: "glareshield",
@@ -88,7 +86,7 @@ export const rapidDepress: Scenario = {
       id: "emer_descent_init",
       label: "EMER DESCENT",
       action: "INITIATE",
-      hint: "PF: MAX SPEED — select OPEN DES or override FCU. Select FL100 (or MEA if higher). Speed: 340 kt / M0.82. Bank 45° if needed to clear traffic. Monitor cabin altitude.",
+      hint: "PF: FCOM — if above FL160: initiate EMER DESCENT. If A/THR not active: THR LEVERS → IDLE. Select OPEN DES, set FL100 or MEA/MORA (whichever higher). Allow speed to increase before extending speedbrakes (prevents AoA protection activation).",
       variant: "warning",
       crew: "PF",
       hardware: true,
@@ -103,41 +101,75 @@ export const rapidDepress: Scenario = {
               { id: "emer_in_prog", line: "EMER DESCENT IN PROGRESS", level: "advisory" },
             ],
           },
-          { type: "CLEAR_ECAM", ids: ["excess_cab", "emer_descent_ecam"] },
+          { type: "CLEAR_ECAM", ids: ["emer_descent_ecam"] },
         ],
       },
     },
     {
       id: "spd_brakes_ext",
-      label: "SPEED BRAKES",
+      label: "SPD BRK",
       action: "FULL",
-      hint: "PF: SPEED BRAKES → FULL EXTENSION (override detent). Accelerates descent rate significantly.",
+      hint: "PF: FCOM — SPD BRK → FULL. Allow speed to increase FIRST before extending speedbrakes to avoid AoA protection triggering AP disconnect and speedbrake auto-retraction.",
       variant: "switch",
       crew: "PF",
       hardware: true,
+      ecamRef: "spd_brk_ecam",
       requires: ["emer_descent_init"],
+    },
+    {
+      id: "spd_max",
+      label: "SPEED",
+      action: "MAX / APPROPRIATE",
+      hint: "PF: accelerate to max appropriate speed for descent. If structural damage suspected, fly with care and reduce speed as appropriate. Landing gear may be extended — then limit to VLO/VLE.",
+      variant: "switch",
+      crew: "PF",
+      requires: ["spd_brakes_ext"],
     },
     {
       id: "eng_mode_sel",
-      label: "ENG MODE SELECTOR",
-      action: "IGN / START",
-      hint: "PF: ENG MODE selectors → IGN/START. Protects engines during high-altitude cold rapid descent.",
+      label: "ENG MODE SEL",
+      action: "IGN",
+      hint: "PF: FCOM — ENG MODE SEL → IGN. Protects engines during high-altitude cold rapid descent.",
       variant: "switch",
       crew: "PF",
       hardware: true,
+      ecamRef: "eng_ign_ecam",
+      requires: ["emer_descent_init"],
+    },
+    {
+      id: "pax_oxy_man",
+      label: "PAX OXY MASKS",
+      action: "MAN ON",
+      hint: "PM: FCOM — IF CAB ALT > 14,000 FT: PAX OXY MASKS MAN ON. Confirms passenger oxygen masks are released. If auto-deployed already, confirm deployment.",
+      variant: "caution",
+      crew: "PM",
+      hardware: true,
+      ecamRef: "pax_masks",
       requires: ["emer_descent_init"],
     },
 
-    // ── COMMS ─────────────────────────────────────────────────────────────────
+    // ── COMMS — FCOM: ATC NOTIFY + EMER DESCENT PA are both ECAM actions ────────
+    {
+      id: "pa_emer_descent",
+      label: "EMER DESCENT (PA)",
+      action: "ANNOUNCE",
+      hint: "PM: PA (on mask mic): 'CABIN CREW AND PASSENGERS — EMERGENCY DESCENT. REMAIN SEATED. FASTEN SEATBELTS.' FCOM step — inform cabin before squawk.",
+      variant: "caution",
+      crew: "PM",
+      hardware: true,
+      ecamRef: "pa_ecam",
+      requires: ["emer_descent_init"],
+    },
     {
       id: "atc_squawk",
-      label: "SQUAWK 7700",
-      action: "SET",
-      hint: "PM: set 7700. Call ATC: 'MAYDAY MAYDAY MAYDAY, IFLY202, emergency descent from FL350, CABIN DEPRESS, leaving FL350 for FL100.'",
+      label: "XPDR 7700 / ATC",
+      action: "SET / MAYDAY",
+      hint: "PM: XPDR → 7700 (FCOM: CONSIDER — unless otherwise specified by ATC). Call ATC: 'MAYDAY MAYDAY MAYDAY, IFLY202, emergency descent from FL350, CABIN DEPRESS, leaving FL350 for FL100.'",
       variant: "caution",
       crew: "PM",
       group: "comms",
       hardware: true,
+      ecamRef: "atc_ecam",
       requires: ["emer_descent_init"],
     },
     {
@@ -290,8 +322,10 @@ export const rapidDepress: Scenario = {
   ],
 
   statusItems: [
+    // FCOM PRO-ABN-CAB_PR CAB PR EXCESS CAB ALT STATUS page
+    { id: "st_maxfl",  line: "MAX FL.........100/MEA-MORA",  severity: "caution"  },
+    // Scenario-specific items (structural damage scenario):
     { id: "st_press",  line: "PRESS SYS DEGRADED",          severity: "caution"  },
-    { id: "st_maxfl",  line: "MAX FL 100",                    severity: "memo"     },
     { id: "st_struct", line: "STRUCTURAL CHECK REQUIRED",     severity: "caution"  },
     { id: "st_appr",   line: "APPR NORMAL",                   severity: "advisory" },
     { id: "st_med",    line: "MEDICAL ON STANDBY",            severity: "memo"     },

@@ -174,8 +174,15 @@ export type SysTabDef = {
 };
 export type EngTrayDef     = { title: string; note?: string; switches: SysSwitchDef[] };
 export type EnginePanelDef = { rows: SysRowDef[]; trays?: EngTrayDef[] };
+
+/** Interactive hardware control shown in the engine display ECAM panel */
+export type EngControlKind = "thr_lever" | "mode_sel" | "master" | "fire_pb" | "agent" | "monitor";
+export type EngControlDef  = { stepId: string; kind: EngControlKind; label: string; sub?: string };
+
 export type EngineDisplayDef = {
   eng1: EnginePanelDef;
   eng2: EnginePanelDef;
   warningTrigger?: string;
+  /** Interactive ECAM procedure controls rendered below engine gauges */
+  controlPanel?: EngControlDef[];
 };

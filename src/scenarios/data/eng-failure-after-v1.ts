@@ -519,6 +519,13 @@ export const engFailureAfterV1: Scenario = {
 
   engineDisplay: {
     warningTrigger: "engine_fail",
+    // Interactive ECAM controls — rendered in the engine display panel, clickable in order
+    controlPanel: [
+      { stepId: "eng_mode_sel_ign", kind: "mode_sel",  label: "MODE SEL",  sub: "IGN"   },
+      { stepId: "thr_lever_idle",   kind: "thr_lever", label: "THR LVR",   sub: "IDLE"  },
+      { stepId: "relight_wait",     kind: "monitor",   label: "RELIGHT",   sub: "30s"   },
+      { stepId: "eng1_master_off",  kind: "master",    label: "MASTER",    sub: "ENG 1" },
+    ],
     eng1: {
       rows: [
         {

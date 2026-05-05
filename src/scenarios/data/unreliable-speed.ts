@@ -10,26 +10,28 @@ export const unreliableSpeed: Scenario = {
   meta: UNRELIABLE_SPEED_META,
   brief: {
     situation:
-      "Shortly after takeoff through FL150. ECAM displays SPEED UNRELIABLE and IAS DISAGREE. Two ADRs are showing different airspeeds. The autopilot has disconnected.",
-    job: "Stop chasing airspeed. Apply the QRH 2.10 pitch+thrust table IMMEDIATELY. Identify and isolate the faulty ADR. Use ISIS as backup. Plan diversion.",
+      "Shortly after takeoff passing FL150. ECAM displays NAV ADR 1 FAULT and NAV IAS DISCREPANCY — amber MASTER CAUTION and single chime. Two PFDs show conflicting airspeeds. The autopilot has disconnected. 'UNRELIABLE SPEED' is a memory item call-out.",
+    job: "Immediately disconnect AP/FD/A-THR. Apply FCOM pitch+thrust table (15°/TOGA below thrust red alt). Identify and isolate the faulty ADR. Check probe/window heat ON. Use STBY ISIS as backup speed reference.",
   },
 
   triggers: [
     {
       id: "pitot_fail",
       atMs: 5_000,
-      description: "ADR 1 failure — speed unreliable, IAS disagree",
+      description: "ADR 1 failure — NAV ADR 1 FAULT, IAS disagree, speed unreliable",
       effects: [
-        { type: "SET_MASTER_WARN", active: true },
+        // FCOM PRO-ABN-NAV: ADR single failure = CAUTION (L2), amber MASTER CAUTION, SC chime
+        // "SPEED UNRELIABLE" is a MEMORY ITEM call-out — not an ECAM message
+        // The ECAM shows NAV ADR 1 FAULT (caution) + NAV IAS DISCREPANCY (caution)
+        { type: "SET_MASTER_CAUT", active: true },
         { type: "SET_ALARM_LABEL", label: "SPEED UNRELIABLE" },
         {
           type: "ADD_ECAM",
           messages: [
-            { id: "speed_unreliable", line: "SPEED UNRELIABLE",            level: "warning"  },
-            { id: "ias_disagree",     line: "IAS DISCREPANCY",              level: "caution"  },
-            { id: "adr_fault",        line: "ADR 1 FAULT",                  level: "caution"  },
-            { id: "autopilot_off",    line: "A/THR DISCONNECTED",           level: "advisory" },
-            { id: "fmgc_warn",        line: "FMGC UNRELIABLE DATA",         level: "advisory" },
+            { id: "adr_fault",        line: "NAV ADR 1 FAULT",              level: "caution"  },
+            { id: "ias_disagree",     line: "NAV IAS DISCREPANCY",           level: "caution"  },
+            { id: "autopilot_off",    line: "AP DISCONNECTED",               level: "advisory" },
+            { id: "fmgc_warn",        line: "FMGC UNRELIABLE DATA",          level: "advisory" },
           ],
         },
       ],
@@ -38,31 +40,33 @@ export const unreliableSpeed: Scenario = {
 
   steps: [
     // ── IMMEDIATE — MEMORY ITEMS ──────────────────────────────────────────────
+    // FCOM PRO-ABN-NAV: Memory items: AP OFF, A/THR OFF, FD OFF, then pitch+thrust table
     {
-      id: "pitch_thrust",
-      label: "PITCH + THRUST TABLE",
-      action: "APPLY",
-      hint: "PF: IMMEDIATELY apply QRH 2.10 pitch/thrust table. CLIMB: 5° nose up + TOGA/MCT. Do NOT chase the speed indications. Fly ATTITUDE.",
+      id: "ap_fd_disc",
+      label: "AP / FD / A-THR",
+      action: "ALL OFF",
+      hint: "PF: IMMEDIATELY disconnect AP, A/THR, and both FDs. Call 'UNRELIABLE SPEED'. Fly raw data. Do NOT chase speed indications. This is a MEMORY ITEM.",
       variant: "warning",
       crew: "PF",
       group: "flightcheck",
       hardware: true,
     },
     {
-      id: "ap_disc",
-      label: "AP / A-THR",
-      action: "DISC",
-      hint: "PF: AP and A-THR disconnect if spurious inputs. FD may be unreliable — use raw data. Fly manually on attitude + power.",
-      variant: "switch",
+      id: "pitch_thrust",
+      label: "PITCH + THRUST TABLE",
+      action: "APPLY",
+      hint: "PF: IMMEDIATELY apply FCOM pitch/thrust table. CLIMB below thrust red alt: 15° nose up + TOGA. Above thrust red alt below FL100: 10°/CLB. Above FL100: 5°/CLB. Fly ATTITUDE — do NOT chase speed.",
+      variant: "warning",
       crew: "PF",
+      group: "flightcheck",
       hardware: true,
-      requires: ["pitch_thrust"],
+      requires: ["ap_fd_disc"],
     },
     {
       id: "adr_disagree",
       label: "ADR DISAGREE CHECK",
       action: "IDENTIFY",
-      hint: "PM: compare ADR 1, ADR 2, ADR 3 — use ISIS as reference (gravity-operated, independent). Identify the faulty ADR.",
+      hint: "PM: compare ADR 1, ADR 2, ADR 3 on both PFDs — use STBY ISIS as backup reference (independent pitot). Identify the faulty ADR. ADR3 and STBY speeds use the same probe.",
       variant: "switch",
       crew: "PM",
       requires: ["pitch_thrust"],
@@ -80,25 +84,25 @@ export const unreliableSpeed: Scenario = {
       },
     },
     {
-      id: "cancel_master_warn",
-      label: "MASTER WARN",
+      id: "cancel_master_caut_initial",
+      label: "MASTER CAUT",
       action: "CANCEL",
-      hint: "PM: cancel MASTER WARN after pitch/thrust applied.",
-      variant: "warning",
+      hint: "PM: cancel MASTER CAUTION (ADR 1 FAULT is a CAUTION, not Warning). Silences SC chime. ECAM procedure remains displayed.",
+      variant: "caution",
       crew: "PM",
       group: "glareshield",
       hardware: true,
       afterEffect: {
         delayMs: 400,
-        triggerId: "mw_cancelled",
-        effects: [{ type: "SET_MASTER_WARN", active: false }],
+        triggerId: "mc_cancelled",
+        effects: [{ type: "SET_MASTER_CAUT", active: false }],
       },
     },
     {
       id: "adr_off",
       label: "FAULTY ADR — OFF",
       action: "SWITCH OFF",
-      hint: "PM: switch off faulty ADR pushbutton (ADIRS panel). Monitor remaining 2 ADRs — they should agree.",
+      hint: "PM: switch off faulty ADR pushbutton (ADIRS panel). FCOM: if at least one ADR confirmed reliable — switch unreliable ADR(s) OFF. Monitor remaining 2 ADRs — they should agree. If above FL250 with all ADRs suspect: keep ONE ADR ON, switch other two OFF.",
       variant: "switch",
       crew: "PM",
       hardware: true,
@@ -114,19 +118,14 @@ export const unreliableSpeed: Scenario = {
       requires: ["adr_off"],
     },
     {
-      id: "cancel_master_caut",
-      label: "MASTER CAUT",
-      action: "CANCEL",
-      hint: "PM: cancel MASTER CAUTION once ADR isolation confirmed.",
-      variant: "caution",
+      id: "probe_heat_on",
+      label: "PROBE / WINDOW HEAT",
+      action: "ON",
+      hint: "PM: FCOM step after ADR disagree check — ensure ALL probe and window heat is ON. Ice accretion is the most common cause of ADR disagreement.",
+      variant: "switch",
       crew: "PM",
-      group: "glareshield",
       hardware: true,
-      afterEffect: {
-        delayMs: 300,
-        triggerId: "mc_cancelled",
-        effects: [{ type: "SET_MASTER_CAUT", active: false }],
-      },
+      requires: ["adr_disagree"],
     },
 
     // ── CRM / COMMS ───────────────────────────────────────────────────────────
@@ -242,10 +241,11 @@ export const unreliableSpeed: Scenario = {
   ],
 
   statusItems: [
-    { id: "st_adr",   line: "ADR 1 FAULT",                       severity: "caution"  },
-    { id: "st_ias",   line: "IAS UNRELIABLE",                     severity: "caution"  },
+    // FCOM PRO-ABN-NAV: STATUS after ADR 1 isolation
+    { id: "st_adr",   line: "NAV ADR 1 FAULT",                    severity: "caution"  },
+    { id: "st_ias",   line: "NAV IAS DISCREPANCY",                 severity: "caution"  },
     { id: "st_rvsm",  line: "RVSM INOP",                          severity: "memo"     },
-    { id: "st_isis",  line: "ISIS IN USE",                         severity: "memo"     },
+    { id: "st_isis",  line: "STBY ISIS IN USE",                    severity: "memo"     },
     { id: "st_appr",  line: "APPR RAW DATA",                       severity: "advisory" },
   ],
 

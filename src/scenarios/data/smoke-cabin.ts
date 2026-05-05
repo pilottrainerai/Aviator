@@ -9,25 +9,28 @@ export const smokeCabin: Scenario = {
   meta: SMOKE_CABIN_META,
   brief: {
     situation:
-      "Cruise FL320. SCCM calls the flight deck: thick smoke in the mid-cabin, source unknown. ECAM shows SMOKE CABIN. Smoke can be fatal within minutes if recirculated.",
-    job: "Don O2 masks immediately. Stop smoke recirculation. Identify source methodically. Assess: if source NOT 100% isolated — land immediately. No compromise.",
+      "Cruise FL320. SCCM calls the flight deck: thick smoke in the mid-cabin, source unknown. MASTER CAUTION with single chime. Smoke can be fatal within minutes if recirculated. This scenario uses the QRH SMOKE/FUMES procedure.",
+    job: "Don O2 masks immediately. Stop smoke recirculation (RECIRC FANS OFF). Identify source methodically. Assess: if source NOT 100% isolated — land immediately. No compromise.",
   },
 
   triggers: [
     {
       id: "smoke_detect",
       atMs: 4_000,
-      description: "SMOKE CABIN — source unknown",
+      description: "SMOKE/FUMES — cabin smoke reported, source unknown",
       effects: [
-        { type: "SET_MASTER_WARN", active: true },
-        { type: "SET_ALARM_LABEL", label: "SMOKE CABIN" },
+        // Per FCOM: cabin/galley/lavatory smoke → QRH procedure (no specific ECAM for non-avionics smoke).
+        // AVIONICS SMOKE is L2 WARNING. Cabin fumes/smoke without avionics detection = CAUTION level.
+        // Scenario uses a simplified ECAM to represent crew workflow. Alert = CAUTION (amber).
+        { type: "SET_MASTER_CAUT", active: true },
+        { type: "SET_ALARM_LABEL", label: "SMOKE / FUMES CABIN" },
         {
           type: "ADD_ECAM",
           messages: [
-            { id: "smoke_warn",   line: "SMOKE CABIN",               level: "warning"  },
-            { id: "smoke_src",    line: "SOURCE — INVESTIGATE",       level: "caution"  },
-            { id: "recirc_off",   line: "RECIRC FAN..........OFF",    level: "caution"  },
-            { id: "pack_isol",    line: "PACK 1 ISOLATION — CHECK",   level: "advisory" },
+            { id: "smoke_warn",   line: "SMOKE / FUMES",              level: "caution"  },
+            { id: "smoke_src",    line: "SOURCE — INVESTIGATE",        level: "caution"  },
+            { id: "recirc_off",   line: "RECIRC FANS..........OFF",    level: "caution"  },
+            { id: "pack_isol",    line: "PACK ISOLATION — CHECK",      level: "advisory" },
           ],
         },
       ],
@@ -57,19 +60,19 @@ export const smokeCabin: Scenario = {
       requires: ["masks_on"],
     },
     {
-      id: "cancel_master_warn",
-      label: "MASTER WARN",
+      id: "cancel_master_caut",
+      label: "MASTER CAUT",
       action: "CANCEL",
-      hint: "PM: cancel MASTER WARN — silences CRC. Proceed with ECAM.",
-      variant: "warning",
+      hint: "PM: cancel MASTER CAUTION — silences SC chime. Cabin/galley smoke = CAUTION level (no CRC). Proceed with QRH SMOKE/FUMES procedure.",
+      variant: "caution",
       crew: "PM",
       group: "glareshield",
       hardware: true,
       requires: ["masks_confirm"],
       afterEffect: {
         delayMs: 400,
-        triggerId: "mw_cancelled",
-        effects: [{ type: "SET_MASTER_WARN", active: false }],
+        triggerId: "mc_cancelled",
+        effects: [{ type: "SET_MASTER_CAUT", active: false }],
       },
     },
     {
@@ -267,10 +270,11 @@ export const smokeCabin: Scenario = {
   ],
 
   statusItems: [
-    { id: "st_smoke",   line: "CABIN SMOKE",                       severity: "caution"  },
-    { id: "st_recirc",  line: "RECIRC FANS OFF",                    severity: "memo"     },
-    { id: "st_src",     line: "SOURCE [ELECTRICAL]",                severity: "caution"  },
-    { id: "st_land",    line: "LAND ASAP",                          severity: "caution"  },
+    // Per FCOM/QRH SMOKE/FUMES procedure: smoke not isolated = LAND ASAP (amber)
+    { id: "st_smoke",   line: "SMOKE / FUMES",                     severity: "caution"  },
+    { id: "st_recirc",  line: "RECIRC FANS........OFF",             severity: "memo"     },
+    { id: "st_src",     line: "SOURCE [ELECTRICAL/UNKNOWN]",        severity: "caution"  },
+    { id: "st_land",    line: "LAND ASAP (AMBER)",                  severity: "caution"  },
     { id: "st_appr",    line: "APPR NORMAL",                        severity: "advisory" },
   ],
 

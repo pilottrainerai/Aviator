@@ -250,7 +250,7 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
       {/* ── ABOVE FOLD — fills one full viewport; no scroll needed ── */}
       <div className="flex flex-col" style={{ height: "100vh", overflow: "hidden" }}>
       <FireBanner state={runner.state} />
-      <AudioController active={runner.state.masterWarnActive} />
+      <AudioController active={runner.state.masterWarnActive} cautActive={runner.state.masterCautActive} />
       <ScenarioClock elapsedMs={runner.elapsedMs} state={runner.state} scenario={scenario} />
 
       <div className="flex flex-1 min-h-0">
