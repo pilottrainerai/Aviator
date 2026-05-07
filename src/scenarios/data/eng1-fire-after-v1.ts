@@ -561,145 +561,152 @@ export const eng1FireAfterV1: Scenario = {
     { id: "st_inop_steep", line: "STEEP APPR",      severity: "advisory", inopSys: true },
   ],
 
-  // ── Distractions — full ATC sequence (departure → approach → tower → land) ─
-  // Calls fire one after another with the gap defined by the runner (9 s after a
-  // correct response, 8 s after a wrong response, escalating after STAND BY).
-  // Each call has a STAND BY button rendered automatically by the modal at the
-  // bottom — picking it re-surfaces the same call (escalating delay 20→12→6→3 s).
-  // If the pilot doesn't answer at all, auto-standby fires and the call repeats.
+  // ── Distractions — FCOM-realistic ATC sequence ─────────────────────────────
+  // Realism rule: during the high-workload phase (initial MAYDAY through ECAM
+  // completion) the crew sticks to "STANDBY / CONTINUING CHECKLIST" responses.
+  // ATC reciprocally avoids POB/fuel/intent questions until the workload eases.
+  // Only AFTER checklists + performance + decision making does the crew advise
+  // intentions and accept the operational interrogation.
+  //
+  // Use of STANDBY: most calls during the early phase have STANDBY (system pb)
+  // as a *correct* discipline.  A correct = "standby" run still scores well —
+  // resurface delays simulate ATC giving the crew room.
   distractions: [
-    // ① TOWER hands off to DEPARTURE radar
+    // ① Tower → Departure handoff (low workload, just before fire)
     {
       id: "atc_handoff_to_departure",
       atMs: 25_000,
       kind: "atc",
       from: "DELHI TOWER",
-      message:
-        "IFLY101, contact Delhi Departure 124.85.",
+      message: "IFLY101, contact Delhi Departure 124.85.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "Delhi Departure 124.85, IFLY101",                                                                          correct: true  },
-        { id: "b", label: "Roger, IFLY101",                                                                                           correct: false },
+        { id: "a", label: "Delhi Departure 124.85, IFLY101",                                 correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                  correct: false },
       ],
     },
 
-    // ② First call to DEPARTURE — declare MAYDAY, state intentions
+    // ② Initial MAYDAY — BRIEF, essential info only.  No runway, no intentions.
     {
       id: "atc_radar_contact_mayday",
       atMs: 42_000,
       kind: "atc",
       from: "DELHI DEPARTURE",
-      message:
-        "IFLY101, Delhi Departure, radar contact at 1 500 feet.",
+      message: "IFLY101, Delhi Departure, radar contact.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, maintaining runway heading 280, climbing 3 000 feet, will hold, standby for further instructions", correct: true  },
-        { id: "b", label: "Climbing 3 000, maintaining heading 280, IFLY101",                                                                                              correct: false },
+        // Correct — short, no premature commitments
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, standby", correct: true  },
+        // Wrong — over-committal during high workload
+        { id: "b", label: "MAYDAY IFLY101, engine fire, returning immediate, request runway 28 ILS, full emergency",                     correct: false },
+        // Wrong — under-informative (no MAYDAY)
+        { id: "c", label: "Maintaining runway track, climbing 3 000, IFLY101",                                                            correct: false },
       ],
     },
 
-    // ③ ATC asks souls on board and fuel endurance
+    // ③ ATC acknowledges + provides vectors/altitude — NO questions during workload
     {
-      id: "atc_pob_fuel",
+      id: "atc_vectors_climb",
       atMs: 70_000,
       kind: "atc",
       from: "DELHI DEPARTURE",
-      message:
-        "IFLY101, MAYDAY copied. Confirm souls on board and fuel endurance.",
-      standbyResurfaceMs: 30_000,
+      message: "IFLY101, roger MAYDAY, radar contact, continue runway track, climb 4 000 feet, standing by for your call.",
+      standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "IFLY101, 186 persons on board, 8.4 tonnes fuel, endurance 3 hours",                                        correct: true  },
-        { id: "b", label: "Continuing departure, IFLY101",                                                                            correct: false },
+        { id: "a", label: "Continuing runway track, climbing 4 000, IFLY101",                correct: true  },
+        // Wrong — pilot offering intentions/info before workload eased
+        { id: "b", label: "IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel", correct: false },
       ],
     },
 
-    // ④ ATC asks intentions → pilot requests weather, runway, approach type
+    // ④ ATC offers vectors when ready — pilot should STANDBY (still ECAM-busy)
+    //    Correct response = STANDBY pb (system-provided), or "Continuing checklist".
     {
-      id: "atc_request_wx_rwy_apch",
-      atMs: 100_000,
+      id: "atc_vectors_when_ready",
+      atMs: 105_000,
       kind: "atc",
       from: "DELHI DEPARTURE",
-      message:
-        "IFLY101, state your intentions.",
+      message: "IFLY101, vectors available when ready, no reported traffic.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "IFLY101, request latest weather, runway in use, and type of approach for return to Delhi",                  correct: true  },
-        { id: "b", label: "IFLY101 continuing to destination",                                                                         correct: false },
+        // Correct — concise discipline phrase during high workload
+        { id: "a", label: "Continuing checklist, will advise, IFLY101",                       correct: true  },
+        // Also valid — but the system STANDBY button is the cleaner response here
+        { id: "b", label: "Unable at this time, IFLY101",                                     correct: true  },
+        // Wrong — premature commitment
+        { id: "c", label: "IFLY101 returning Delhi, request runway 28 ILS",                   correct: false },
       ],
     },
 
-    // ⑤ ATC provides wx + rwy + approach → pilot states intention to return + emergency services
+    // ⑤ Workload eased — ATC asks for ready (post-ECAM, post-decision)
     {
-      id: "atc_state_intention_return",
-      atMs: 130_000,
+      id: "atc_advise_when_ready",
+      atMs: 150_000,
       kind: "atc",
       from: "DELHI DEPARTURE",
-      message:
-        "IFLY101, wind 280 at 8, QNH 1013, runway 28 in use, ILS approach available, CFR standing by.",
+      message: "IFLY101, advise when ready.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Roger, IFLY101 — returning Delhi, request ILS approach runway 28, request full emergency services on the runway", correct: true  },
-        { id: "b", label: "Acknowledged, IFLY101",                                                                                            correct: false },
+        // Correct — pilot now informs INTENTION (no POB yet — ATC will ask)
+        { id: "a", label: "IFLY101, fire extinguished, returning Delhi, request vectors for ILS runway 28", correct: true  },
+        // Wrong — too narrow, doesn't include decision context
+        { id: "b", label: "IFLY101 ready",                                                     correct: false },
       ],
     },
 
-    // ⑥ ATC asks when ready for the approach
+    // ⑥ NOW ATC asks the operational questions (POB / fuel / services)
     {
-      id: "atc_ready_for_approach",
-      atMs: 165_000,
+      id: "atc_pob_fuel_services",
+      atMs: 180_000,
       kind: "atc",
       from: "DELHI APPROACH",
-      message:
-        "IFLY101, advise when ready for the approach.",
+      message: "IFLY101, roger, vectors runway 28 ILS, say persons on board, fuel endurance, and assistance required.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "IFLY101 ready for the approach",                                                                            correct: true  },
-        { id: "b", label: "Continuing checklist, IFLY101",                                                                             correct: false },
+        { id: "a", label: "IFLY101, 186 persons on board, 8.4 tonnes fuel, endurance 3 hours, request full emergency services on the runway", correct: true  },
+        { id: "b", label: "Standby IFLY101",                                                                                                   correct: false },
       ],
     },
 
-    // ⑦ ATC clears for the approach → readback + tower handoff
+    // ⑦ ATC clears for approach + tower handoff
     {
       id: "atc_cleared_approach",
-      atMs: 190_000,
+      atMs: 210_000,
       kind: "atc",
       from: "DELHI APPROACH",
-      message:
-        "IFLY101, cleared for the ILS approach runway 28, contact Delhi Tower 118.10 when established.",
+      message: "IFLY101, cleared for the ILS approach runway 28, contact Delhi Tower 118.10 when established.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Cleared for the ILS runway 28, contact Tower 118.10 when established, IFLY101",                              correct: true  },
-        { id: "b", label: "Roger, IFLY101",                                                                                              correct: false },
+        { id: "a", label: "Cleared for the ILS runway 28, contact Tower 118.10 when established, IFLY101", correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                                  correct: false },
       ],
     },
 
-    // ⑧ Tower contact — last-minute call
+    // ⑧ Tower contact
     {
       id: "atc_tower_contact",
-      atMs: 215_000,
+      atMs: 235_000,
       kind: "atc",
       from: "DELHI TOWER",
-      message:
-        "IFLY101, Delhi Tower, continue ILS approach runway 28, report established.",
+      message: "IFLY101, Delhi Tower, continue ILS approach runway 28, report established.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Continuing ILS runway 28, will report established, IFLY101",                                                  correct: true  },
-        { id: "b", label: "Switching, IFLY101",                                                                                          correct: false },
+        { id: "a", label: "Continuing ILS runway 28, will report established, IFLY101",      correct: true  },
+        { id: "b", label: "Switching, IFLY101",                                                correct: false },
       ],
     },
 
     // ⑨ Landing clearance — readback required
     {
       id: "atc_cleared_to_land",
-      atMs: 240_000,
+      atMs: 260_000,
       kind: "atc",
       from: "DELHI TOWER",
-      message:
-        "IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.",
+      message: "IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Cleared to land runway 28, IFLY101",                                                                          correct: true  },
-        { id: "b", label: "Roger, IFLY101",                                                                                              correct: false },
+        { id: "a", label: "Cleared to land runway 28, IFLY101",                                correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                    correct: false },
       ],
     },
   ],
