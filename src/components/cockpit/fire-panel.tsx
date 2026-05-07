@@ -1474,7 +1474,7 @@ function DslSpdBrkCtrl({ done, active, clickable, onClick }: { done: boolean; ac
 
 // ─── DSL interactive ECAM control panel ──────────────────────────────────────
 function DslControlPanel({
-  controls, scenario, state, perform, disabled, warningActive,
+  controls, scenario, state, perform, disabled, warningActive, fireLit,
 }: {
   controls: import("@/scenarios/types").EngControlDef[];
   scenario: Scenario;
@@ -1482,6 +1482,7 @@ function DslControlPanel({
   perform: (a: PilotAction) => void;
   disabled?: boolean;
   warningActive: boolean;
+  fireLit: boolean;
 }) {
   const isDone   = (id: string) => !!state.completedSteps[id];
   const allDone  = controls.every(c => isDone(c.stepId));
@@ -1511,7 +1512,7 @@ function DslControlPanel({
             case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={warningActive} />;
             case "fire_pb":   return (
               <AirbusPB key={ctrl.stepId} topText="FIRE" topColor={C.red} label={ctrl.label} sublabel={ctrl.sub} large
-                legendLit={warningActive}
+                legendLit={fireLit}
                 state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
             );
             case "agent":     return (
@@ -1568,6 +1569,13 @@ export function FirePanel({
   if (scenario.engineDisplay) {
     const ed = scenario.engineDisplay;
     const warningActive = ed.warningTrigger ? !!state.triggersFired[ed.warningTrigger] : false;
+    // FIRE visuals (red FIRE pb, engine-panel fire indicator, header CAUTION
+    // badge) extinguish once the `fire_extinguished` trigger fires — the
+    // engine is still INOP, but the fire itself is out.  Action clickability
+    // stays on `warningActive` so post-fire steps (level off, accel/clean)
+    // remain available.
+    const fireExtinguished = !!state.triggersFired["fire_extinguished"];
+    const fireLit = warningActive && !fireExtinguished;
 
     // Collect trays from both panels (full-width below grid)
     const allTrays = [...(ed.eng1.trays ?? []), ...(ed.eng2.trays ?? [])];
@@ -1581,7 +1589,7 @@ export function FirePanel({
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-[5px] border-b" style={{ borderColor: "#1C2130" }}>
           <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.25em", textTransform: "uppercase" }}>ENGINE DISPLAY</span>
-          {warningActive && (
+          {fireLit && (
             <span className="animate-pulse font-bold" style={{ color: C.amber, fontSize: "8px", letterSpacing: "0.2em" }}>
               ▲ {state.alarmLabel ?? "CAUTION"}
             </span>
@@ -1590,7 +1598,7 @@ export function FirePanel({
 
         {/* Engine parameter grid — equal-height columns, no trays here */}
         <div className="grid grid-cols-[1fr_1px_1fr] gap-x-2 px-1 pt-2 pb-1" style={{ alignItems: "start" }}>
-          <DslEnginePanel engNum={1} panel={ed.eng1} state={state} warningActive={warningActive} />
+          <DslEnginePanel engNum={1} panel={ed.eng1} state={state} warningActive={fireLit} />
           <div style={{ backgroundColor: "#1C2130", alignSelf: "stretch" }} />
           <DslEnginePanel engNum={2} panel={ed.eng2} state={state} warningActive={false} />
         </div>
@@ -1604,6 +1612,7 @@ export function FirePanel({
             perform={perform}
             disabled={disabled}
             warningActive={warningActive}
+            fireLit={fireLit}
           />
         )}
 

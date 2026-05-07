@@ -75,13 +75,14 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
 
     const d: PfdData = {
       pitch: 2, roll: 0, sideslipG: 0,
-      speed: 145, selSpd: 147, mgtSpd: 148,
-      vmin: 130, vmax: 185,
-      vls: 138, vfe: 200, vapp: 142,
-      trend: 6,
+      // 165 kt accelerating — VLS / VFE / VAPP all sit inside the visible tape range
+      speed: 165, selSpd: 175, mgtSpd: 175,
+      vmin: 130, vmax: 220,
+      vls: 142, vfe: 200, vapp: 148,
+      trend: 12,                                  // +12 kt over 10 s — clearly visible arrow
       mach: 0.42,
       alt: 3740, selAlt: 5000, qnh: 1013,
-      vs: -500,                                   // demo: descent → pointer slants top-left to bottom-right
+      vs: -500,                                   // demo descent → VS pointer slants top-left to bottom-right
       hdg: 258, selHdg: 260, track: 258,
       ils: { id: "IMNW", freq: "108.70", dist: 7.4 },
       gsPos: 0.25, locPos: 0.1,
@@ -246,15 +247,17 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.save(); ctx.translate(cx, cy); ctx.rotate(-d.roll * Math.PI / 180);
       ctx.fillStyle = "#ff0";
       ctx.beginPath(); ctx.moveTo(0, -r + 10); ctx.lineTo(-7, -r + 24); ctx.lineTo(7, -r + 24); ctx.closePath(); ctx.fill();
-      // Sideslip trapezoid — narrow top, wider bottom, just below the roll triangle
-      const slipG = Math.max(-0.3, Math.min(0.3, d.sideslipG ?? 0));
-      const slipDx = (slipG / 0.2) * 18;             // ~18 px per 0.2 g (≈ "one centimeter")
-      const sy = -r + 26;
+      // Sideslip trapezoid — narrow top edge (touching the roll triangle base),
+      // wider bottom edge.  Per FCOM (DSC-31-40): one centimetre of displacement
+      // = 0.2 g lateral acceleration, hard stop at 0.3 g.
+      const slipG  = Math.max(-0.3, Math.min(0.3, d.sideslipG ?? 0));
+      const slipDx = (slipG / 0.2) * 18;             // ~18 px per 0.2 g
+      const sy = -r + 25;
       ctx.beginPath();
-      ctx.moveTo(slipDx - 5, sy);
-      ctx.lineTo(slipDx + 5, sy);
-      ctx.lineTo(slipDx + 7, sy + 5);
-      ctx.lineTo(slipDx - 7, sy + 5);
+      ctx.moveTo(slipDx - 4, sy);                    // narrow top (8 wide)
+      ctx.lineTo(slipDx + 4, sy);
+      ctx.lineTo(slipDx + 8, sy + 6);                // wider bottom (16 wide)
+      ctx.lineTo(slipDx - 8, sy + 6);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
@@ -374,19 +377,23 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       }
       ctx.restore();
 
-      // Speed trend arrow (yellow) — projects current speed forward by `trend` kt
+      // Speed trend arrow (yellow) — projects current speed forward by `trend` kt.
+      // Drawn at the inner edge of the tape, starting OUTSIDE the speed value
+      // box so the line is fully visible.
       if (d.trend !== undefined && Math.abs(d.trend) >= 1) {
-        const trendY = yFor(spd + d.trend);
-        const trendX = x + w - 18;
+        const trendY  = yFor(spd + d.trend);
+        const trendX  = x + w + 1;                       // just outside the tape
+        const startY  = d.trend > 0 ? mid - 18 : mid + 18; // edge of speed box
         ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(trendX, mid); ctx.lineTo(trendX, trendY); ctx.stroke();
-        // arrowhead
+        ctx.beginPath(); ctx.moveTo(trendX, startY); ctx.lineTo(trendX, trendY); ctx.stroke();
+        // arrowhead (open V, pointing in direction of motion)
         const dir = d.trend >= 0 ? -1 : 1;
         ctx.beginPath();
         ctx.moveTo(trendX, trendY);
-        ctx.lineTo(trendX - 4, trendY + dir * 7);
-        ctx.lineTo(trendX + 4, trendY + dir * 7);
-        ctx.closePath(); ctx.fillStyle = "#ffff00"; ctx.fill();
+        ctx.lineTo(trendX - 5, trendY + dir * 8);
+        ctx.moveTo(trendX, trendY);
+        ctx.lineTo(trendX + 5, trendY + dir * 8);
+        ctx.stroke();
       }
 
       // VAPP magenta target triangle on the right edge of the tape
@@ -537,15 +544,16 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(x + 2, mid);
-      ctx.lineTo(xTip - 18, yTip);                     // stop short of the digit box
+      ctx.lineTo(xTip - 1, yTip);                      // tip touches the digit box
       ctx.stroke();
 
-      // Boxed digit at the pointer tip — tens of fpm (e.g. "5" = 500 fpm)
+      // Boxed digit at the pointer tip — tens of fpm (e.g. "5" = 500 fpm).
+      // FCOM photo: box sits OUTSIDE the curved scale edge, attached at the tip.
       if (Math.abs(d.vs) > 50) {
         const vsHundreds = Math.round(Math.abs(d.vs) / 100);
         const digit = String(vsHundreds <= 9 ? vsHundreds : Math.floor(vsHundreds / 10));
-        const boxW = 18, boxH = 16;
-        const boxX = xTip - boxW;
+        const boxW = 16, boxH = 14;
+        const boxX = xTip - 1;                       // left edge on the curve, box extends outward
         const boxY = yTip - boxH / 2;
         ctx.fillStyle = "#000000";
         ctx.fillRect(boxX, boxY, boxW, boxH);
