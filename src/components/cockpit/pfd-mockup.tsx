@@ -21,6 +21,9 @@ type PfdData = {
   pitch: number; roll: number;
   speed: number; selSpd: number; mgtSpd: number;
   vmin: number;  vmax: number;
+  vls?: number;  vfe?: number; vapp?: number;   // FCOM speed bands
+  trend?: number;                                // 10-s speed projection (kt)
+  mach?: number;                                 // 0..1 e.g. 0.67
   alt: number;   selAlt: number; qnh: number;
   vs: number;
   hdg: number;   selHdg: number; track: number;
@@ -73,8 +76,11 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       pitch: 2, roll: 0,
       speed: 145, selSpd: 147, mgtSpd: 148,
       vmin: 130, vmax: 185,
+      vls: 138, vfe: 200, vapp: 142,
+      trend: 6,
+      mach: 0.42,
       alt: 3740, selAlt: 5000, qnh: 1013,
-      vs: 800,
+      vs: -500,                                   // demo: descent → pointer slants top-left to bottom-right
       hdg: 258, selHdg: 260, track: 258,
       ils: { id: "IMNW", freq: "108.70", dist: 7.4 },
       gsPos: 0.25, locPos: 0.1,
@@ -305,40 +311,91 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.save(); ctx.beginPath(); ctx.rect(x, top, w, h); ctx.clip();
 
       const mid = top + h / 2;
-      const vmaxY = mid - (d.vmax - spd) * PPK;
+      const yFor = (v: number) => mid - (v - spd) * PPK;
+
+      // VMAX (red/black checker strip at the top)
+      const vmaxY = yFor(d.vmax);
       if (vmaxY > top) {
         ctx.fillStyle = "#880000";
         ctx.fillRect(x, top, w - 2, Math.max(0, vmaxY - top));
+        // Red+black hatching to match FCOM strip
+        ctx.fillStyle = "#000000";
+        for (let yy = top; yy < vmaxY - 3; yy += 8) {
+          ctx.fillRect(x + w - 6, yy, 4, 4);
+        }
       }
-      const vminY = mid - (d.vmin - spd) * PPK;
-      if (vminY < top + h) {
-        ctx.fillStyle = "#7a4a00";
-        ctx.fillRect(x, vminY, w - 2, Math.max(0, top + h - vminY));
-      }
-      line(x, vminY, x + w - 2, vminY, "#ffa500", 2);
 
+      // VLS (lowest selectable speed) — amber line + amber strip below
+      const vlsRef = d.vls ?? d.vmin;
+      const vlsY   = yFor(vlsRef);
+      if (vlsY < top + h) {
+        ctx.fillStyle = "#7a4a00";
+        ctx.fillRect(x, vlsY, w - 2, Math.max(0, top + h - vlsY));
+      }
+      line(x, vlsY, x + w - 2, vlsY, "#ffa500", 2);
+
+      // VFE (max flap extended) — yellow "=" stack on the inner edge of the tape
+      if (d.vfe !== undefined) {
+        const vfeY = yFor(d.vfe);
+        if (vfeY > top && vfeY < top + h) {
+          ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.moveTo(x + w - 12, vfeY - 3); ctx.lineTo(x + w - 2, vfeY - 3); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x + w - 12, vfeY + 3); ctx.lineTo(x + w - 2, vfeY + 3); ctx.stroke();
+          txt("F", x + w - 18, vfeY, 11, "#ffff00", "right", true);
+        }
+      }
+
+      // Tape ticks
       for (let v = Math.floor((spd - 60) / 10) * 10; v <= spd + 60; v += 10) {
-        const y = mid - (v - spd) * PPK;
+        const y = yFor(v);
         if (y < top || y > top + h) continue;
         ctx.strokeStyle = "#bbb"; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(x + w - 14, y); ctx.lineTo(x + w - 2, y); ctx.stroke();
         if (v % 20 === 0) txt(v, x + w - 16, y, 13, "#eee", "right");
-        const y5 = mid - (v + 5 - spd) * PPK;
+        const y5 = yFor(v + 5);
         if (y5 >= top && y5 <= top + h) {
           ctx.beginPath(); ctx.moveTo(x + w - 8, y5); ctx.lineTo(x + w - 2, y5); ctx.stroke();
         }
       }
       ctx.restore();
 
+      // Speed trend arrow (yellow) — projects current speed forward by `trend` kt
+      if (d.trend !== undefined && Math.abs(d.trend) >= 1) {
+        const trendY = yFor(spd + d.trend);
+        const trendX = x + w - 18;
+        ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(trendX, mid); ctx.lineTo(trendX, trendY); ctx.stroke();
+        // arrowhead
+        const dir = d.trend >= 0 ? -1 : 1;
+        ctx.beginPath();
+        ctx.moveTo(trendX, trendY);
+        ctx.lineTo(trendX - 4, trendY + dir * 7);
+        ctx.lineTo(trendX + 4, trendY + dir * 7);
+        ctx.closePath(); ctx.fillStyle = "#ffff00"; ctx.fill();
+      }
+
+      // VAPP magenta target triangle on the right edge of the tape
+      if (d.vapp !== undefined) {
+        const vappY = yFor(d.vapp);
+        if (vappY > top && vappY < top + h) {
+          ctx.fillStyle = "#ff00ff";
+          ctx.beginPath();
+          ctx.moveTo(x + w + 2, vappY);
+          ctx.lineTo(x + w + 12, vappY - 7);
+          ctx.lineTo(x + w + 12, vappY + 7);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+
       // Selected speed bug (cyan arrow at left)
-      const selY = mid - (d.selSpd - spd) * PPK;
+      const selY = yFor(d.selSpd);
       ctx.fillStyle = "#00cfff";
       ctx.beginPath();
       ctx.moveTo(x + 2, selY); ctx.lineTo(x + 18, selY - 9); ctx.lineTo(x + 18, selY + 9);
       ctx.closePath(); ctx.fill();
 
       // Managed speed line
-      const mgtY = mid - (d.mgtSpd - spd) * PPK;
+      const mgtY = yFor(d.mgtSpd);
       line(x, mgtY, x + w, mgtY, "#ffff00", 2);
 
       // Current speed box
@@ -348,8 +405,14 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.strokeRect(x - 3, mid - 17, w + 6, 34);
       txt(Math.round(spd), cx2, mid, 20, "#fff", "center", true);
 
-      // Selected speed top
+      // Selected speed at top
       txt(Math.round(d.selSpd), cx2, top - 16, 15, "#00cfff", "center", true);
+
+      // Mach readout below the tape (FCOM: shown when M ≥ 0.50, else hidden)
+      if (d.mach !== undefined && d.mach >= 0.50) {
+        const machStr = "." + Math.round(d.mach * 1000).toString().padStart(3, "0");
+        txt(machStr, cx2, top + h + 18, 14, "#00ff00", "center", true);
+      }
     };
 
     // ── ALT TAPE ───────────────────────────────────────────────────────────
@@ -413,7 +476,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
 
     // ── VS TAPE ────────────────────────────────────────────────────────────
     const drawVS = () => {
-      const x = VX, w = VW, top = VT, h = VH, cx2 = x + w / 2;
+      const x = VX, w = VW, top = VT, h = VH;
       ctx.fillStyle = "#1e1e1e"; ctx.fillRect(x, top, w, h);
       ctx.strokeStyle = "#444"; ctx.lineWidth = 1; ctx.strokeRect(x, top, w, h);
 
@@ -431,14 +494,25 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       const vc = Math.max(-2000, Math.min(2000, d.vs));
       const ny = mid - (vc / 2000) * (h / 2 - 22);
       ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 3;
-      // Pivot from LEFT edge of VS strip → tip at value position on RIGHT
+      // Pivot from LEFT edge of VS strip → tip at value position on RIGHT.
+      // For descent (vs < 0) this slants top-left to bottom-right.
       ctx.beginPath();
       ctx.moveTo(x + 2, mid);
       ctx.lineTo(x + w - 4, ny);
       ctx.stroke();
 
+      // Boxed digit at the pointer tip (FCOM-style) — tens of fpm e.g. "5" = 500 fpm
       if (Math.abs(d.vs) > 50) {
-        txt(Math.abs(Math.round(d.vs / 100) * 100), cx2, ny - 14, 11, "#00cc00", "center", true);
+        const vsHundreds = Math.round(Math.abs(d.vs) / 100);
+        const digit = String(vsHundreds <= 9 ? vsHundreds : Math.floor(vsHundreds / 10));
+        const boxW = 18, boxH = 16;
+        const boxX = x + w - 2 - boxW;
+        const boxY = ny - boxH / 2;
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(boxX, boxY, boxW, boxH);
+        ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 1.2;
+        ctx.strokeRect(boxX, boxY, boxW, boxH);
+        txt(digit, boxX + boxW / 2, boxY + boxH / 2, 12, "#00cc00", "center", true);
       }
     };
 
