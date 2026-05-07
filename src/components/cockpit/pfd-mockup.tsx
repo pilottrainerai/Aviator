@@ -490,39 +490,63 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     };
 
     // ── VS TAPE ────────────────────────────────────────────────────────────
+    // FCOM "banana" shape: scale's right edge bulges outward at zero VS and
+    // pulls inward at the ±2000 fpm ends, making the strip look like a `)`.
     const drawVS = () => {
       const x = VX, w = VW, top = VT, h = VH;
       ctx.fillStyle = "#1e1e1e"; ctx.fillRect(x, top, w, h);
-      ctx.strokeStyle = "#444"; ctx.lineWidth = 1; ctx.strokeRect(x, top, w, h);
 
       const mid = top + h / 2;
+      const halfH = h / 2 - 22;
+      const BULGE = 14;                                  // px the ends pull inward
+
+      // yFrac in [-1..+1], -1 at top of scale (climb), +1 at bottom (descent)
+      const xForYFrac = (yFrac: number) => (x + w - 2) - BULGE * yFrac * yFrac;
+      const yForVs    = (vs: number) => mid - (vs / 2000) * halfH;
+
+      // Curved right edge of the scale
+      ctx.strokeStyle = "#666"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i <= 30; i++) {
+        const yFrac = -1 + (2 * i) / 30;
+        const yy = mid + yFrac * halfH;
+        const xx = xForYFrac(yFrac);
+        if (i === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+      }
+      ctx.stroke();
+
+      // Tick marks (1, 2, 6 above and below mid)
       const marks: [number, string][] = [[2000, "6"], [1000, "2"], [500, "1"]];
       marks.forEach(([r, lbl]) => {
         [-1, 1].forEach(s => {
-          const y = mid - s * (r / 2000) * (h / 2 - 22);
+          const yFrac = -s * (r / 2000);              // climb (s=+1) → yFrac negative (above)
+          const yy = mid + yFrac * halfH;
+          const xx = xForYFrac(yFrac);
           ctx.strokeStyle = "#999"; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(x + 2, y); ctx.lineTo(x + 12, y); ctx.stroke();
-          txt(lbl, x + 14, y, 11, "#999", "left");
+          ctx.beginPath(); ctx.moveTo(xx - 8, yy); ctx.lineTo(xx, yy); ctx.stroke();
+          txt(lbl, xx - 10, yy, 11, "#999", "right");
         });
       });
 
-      const vc = Math.max(-2000, Math.min(2000, d.vs));
-      const ny = mid - (vc / 2000) * (h / 2 - 22);
+      // Pointer — pivots at left edge mid, tip on the curved right edge at
+      // the current VS value.  For descent (vs < 0) it slants top-left to bottom-right.
+      const vc      = Math.max(-2000, Math.min(2000, d.vs));
+      const yFracTip = -(vc / 2000);
+      const xTip    = xForYFrac(yFracTip);
+      const yTip    = yForVs(vc);
       ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 3;
-      // Pivot from LEFT edge of VS strip → tip at value position on RIGHT.
-      // For descent (vs < 0) this slants top-left to bottom-right.
       ctx.beginPath();
       ctx.moveTo(x + 2, mid);
-      ctx.lineTo(x + w - 4, ny);
+      ctx.lineTo(xTip - 18, yTip);                     // stop short of the digit box
       ctx.stroke();
 
-      // Boxed digit at the pointer tip (FCOM-style) — tens of fpm e.g. "5" = 500 fpm
+      // Boxed digit at the pointer tip — tens of fpm (e.g. "5" = 500 fpm)
       if (Math.abs(d.vs) > 50) {
         const vsHundreds = Math.round(Math.abs(d.vs) / 100);
         const digit = String(vsHundreds <= 9 ? vsHundreds : Math.floor(vsHundreds / 10));
         const boxW = 18, boxH = 16;
-        const boxX = x + w - 2 - boxW;
-        const boxY = ny - boxH / 2;
+        const boxX = xTip - boxW;
+        const boxY = yTip - boxH / 2;
         ctx.fillStyle = "#000000";
         ctx.fillRect(boxX, boxY, boxW, boxH);
         ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 1.2;
