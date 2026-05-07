@@ -82,7 +82,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       trend: 12,                                  // +12 kt over 10 s — clearly visible arrow
       mach: 0.42,
       alt: 3740, selAlt: 5000, qnh: 1013,
-      vs: -500,                                   // demo descent → VS pointer slants top-left to bottom-right
+      vs: 1000,                                   // demo climb → pointer from center-left UP to right; box at tip shows "1"
       hdg: 258, selHdg: 260, track: 258,
       ils: { id: "IMNW", freq: "108.70", dist: 7.4 },
       gsPos: 0.25, locPos: 0.1,
@@ -221,18 +221,47 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       }
       ctx.restore();
 
-      // Bank arc ticks
+      // Bank arc ticks — top quarter, white at small angles + yellow accents
+      // at the deeper ones (per FCOM DSC-31-40 ROLL SCALE).  No digits — the
+      // angles are inferred from tick spacing.  ±45° gets an inverted triangle.
       ctx.save(); ctx.translate(cx, cy);
-      [10, 20, 30, 45, 60].forEach(a => {
-        [-a, a].forEach(ang => {
+      const bankTicks: { angle: number; len: number; color: string; tri?: boolean }[] = [
+        { angle: 10, len:  6, color: "#ffffff" },
+        { angle: 20, len:  6, color: "#ffffff" },
+        { angle: 30, len: 12, color: "#ffffff" },
+        { angle: 45, len: 14, color: "#ffff00", tri: true },
+        { angle: 60, len: 14, color: "#ffffff" },
+      ];
+      bankTicks.forEach(({ angle, len, color, tri }) => {
+        [-angle, angle].forEach(ang => {
           const rad = (ang - 90) * Math.PI / 180;
-          ctx.strokeStyle = "#ccc"; ctx.lineWidth = 1.5;
+          const r1  = r - 2 - len, r2 = r - 2;
+          ctx.strokeStyle = color; ctx.lineWidth = 1.6;
           ctx.beginPath();
-          ctx.moveTo(Math.cos(rad) * (r - 14), Math.sin(rad) * (r - 14));
-          ctx.lineTo(Math.cos(rad) * (r - 2),  Math.sin(rad) * (r - 2));
+          ctx.moveTo(Math.cos(rad) * r1, Math.sin(rad) * r1);
+          ctx.lineTo(Math.cos(rad) * r2, Math.sin(rad) * r2);
           ctx.stroke();
+          if (tri) {
+            // small inverted triangle pointing INWARD on the arc at ±45°
+            const tipR = r1 - 4;
+            const baseR = r1;
+            const px = Math.cos(rad), py = Math.sin(rad);
+            const perpX = -py,  perpY = px;
+            const tip   = { x: px * tipR,  y: py * tipR  };
+            const baseL = { x: px * baseR + perpX * 4, y: py * baseR + perpY * 4 };
+            const baseR2= { x: px * baseR - perpX * 4, y: py * baseR - perpY * 4 };
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(tip.x, tip.y);
+            ctx.lineTo(baseL.x, baseL.y);
+            ctx.lineTo(baseR2.x, baseR2.y);
+            ctx.closePath(); ctx.fill();
+          }
         });
       });
+      // Fixed lubber reference at top centre (small white horizontal mark)
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(-5, -r + 4); ctx.lineTo(5, -r + 4); ctx.stroke();
       ctx.restore();
 
       // Roll index triangle (fixed top)
@@ -645,7 +674,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         d.pitch = 2    + Math.sin(t) * 0.4;
         d.speed = 145;
         d.alt   = 3740;
-        d.vs    = -500;                               // demo descent for VS pointer slant
+        d.vs    = 1000;                               // demo climb (digit "1", pointer goes upper-right)
       }
 
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
