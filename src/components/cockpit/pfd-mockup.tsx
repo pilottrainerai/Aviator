@@ -19,6 +19,7 @@ import { buildAircraftState } from "@/components/cockpit/pfd-nd";
 
 type PfdData = {
   pitch: number; roll: number;
+  sideslipG?: number;                            // lateral acceleration / sideslip in g
   speed: number; selSpd: number; mgtSpd: number;
   vmin: number;  vmax: number;
   vls?: number;  vfe?: number; vapp?: number;   // FCOM speed bands
@@ -73,7 +74,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     const FONT_FEATURES = '"tnum" 1, "ss01" 1';
 
     const d: PfdData = {
-      pitch: 2, roll: 0,
+      pitch: 2, roll: 0, sideslipG: 0,
       speed: 145, selSpd: 147, mgtSpd: 148,
       vmin: 130, vmax: 185,
       vls: 138, vfe: 200, vapp: 142,
@@ -239,10 +240,23 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(-9, 3); ctx.lineTo(9, 3); ctx.closePath(); ctx.stroke();
       ctx.restore();
 
-      // Roll pointer
+      // Roll pointer + sideslip index (yellow trapezoid beneath roll pointer).
+      // Sideslip displaces the trapezoid laterally: ~1 cm = 0.2 g, hard stop at
+      // 0.3 g.  Both rotate with bank so they stay tangent to the bank scale.
       ctx.save(); ctx.translate(cx, cy); ctx.rotate(-d.roll * Math.PI / 180);
       ctx.fillStyle = "#ff0";
       ctx.beginPath(); ctx.moveTo(0, -r + 10); ctx.lineTo(-7, -r + 24); ctx.lineTo(7, -r + 24); ctx.closePath(); ctx.fill();
+      // Sideslip trapezoid — narrow top, wider bottom, just below the roll triangle
+      const slipG = Math.max(-0.3, Math.min(0.3, d.sideslipG ?? 0));
+      const slipDx = (slipG / 0.2) * 18;             // ~18 px per 0.2 g (≈ "one centimeter")
+      const sy = -r + 26;
+      ctx.beginPath();
+      ctx.moveTo(slipDx - 5, sy);
+      ctx.lineTo(slipDx + 5, sy);
+      ctx.lineTo(slipDx + 7, sy + 5);
+      ctx.lineTo(slipDx - 7, sy + 5);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
 
       // Fixed aircraft symbol
@@ -334,14 +348,15 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       }
       line(x, vlsY, x + w - 2, vlsY, "#ffa500", 2);
 
-      // VFE (max flap extended) — yellow "=" stack on the inner edge of the tape
+      // VFE (max flap extended) — yellow "=" stack on the OUTER edge of the
+      // tape (FCOM photo: VFE/F marker sits opposite the speed labels).
       if (d.vfe !== undefined) {
         const vfeY = yFor(d.vfe);
         if (vfeY > top && vfeY < top + h) {
-          ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 1.6;
-          ctx.beginPath(); ctx.moveTo(x + w - 12, vfeY - 3); ctx.lineTo(x + w - 2, vfeY - 3); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(x + w - 12, vfeY + 3); ctx.lineTo(x + w - 2, vfeY + 3); ctx.stroke();
-          txt("F", x + w - 18, vfeY, 11, "#ffff00", "right", true);
+          ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 1.0;
+          ctx.beginPath(); ctx.moveTo(x + 2, vfeY - 3); ctx.lineTo(x + 12, vfeY - 3); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x + 2, vfeY + 3); ctx.lineTo(x + 12, vfeY + 3); ctx.stroke();
+          txt("F", x + 16, vfeY, 11, "#ffff00", "left", true);
         }
       }
 
@@ -576,27 +591,29 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       t += 0.004;
       const live = stateRef.current ? buildAircraftState(stateRef.current) : null;
       if (live) {
-        // Wired to scenario — use derived AircraftState directly + tiny live
-        // jitter so the instruments feel alive instead of frozen.
+        // Wired to scenario — use derived AircraftState directly.  Pitch and
+        // roll get a tiny live shimmer so the attitude indicator feels alive;
+        // digital readouts (alt, vs, speed) stay quantised to avoid digit jitter.
         d.pitch  = live.pitch  + Math.sin(t)       * 0.15;
         d.roll   = live.bank;
-        d.speed  = live.speed  + Math.sin(t * 0.6) * 0.4;
+        d.speed  = Math.round(live.speed);
         d.selSpd = live.selectedSpeed;
         d.mgtSpd = live.selectedSpeed;
-        d.alt    = live.altitude + Math.sin(t * 0.3) * 1.5;
+        d.alt    = Math.round(live.altitude);
         d.selAlt = live.selectedAlt;
-        d.vs     = live.vs + Math.sin(t * 0.5) * 15;
+        d.vs     = Math.round(live.vs / 10) * 10;     // round to 10 fpm — no jitter
         d.hdg    = live.heading;
         d.selHdg = live.selectedHdg;
         d.track  = live.track;
         // RA roughly tracks altitude until 2500 ft AGL
         d.ra = Math.max(0, Math.round(Math.min(2500, live.altitude)));
       } else {
-        // Demo / standalone mode — gentle oscillation
-        d.pitch = 2    + Math.sin(t)       * 0.4;
-        d.speed = 145  + Math.sin(t * 0.6) * 0.8;
-        d.alt   = 3740 + Math.sin(t * 0.3) * 3;
-        d.vs    = 800  + Math.sin(t * 0.5) * 30;
+        // Demo / standalone mode — only the attitude indicator shimmers.
+        // Digital readouts (alt, vs, speed) stay frozen to keep digits stable.
+        d.pitch = 2    + Math.sin(t) * 0.4;
+        d.speed = 145;
+        d.alt   = 3740;
+        d.vs    = -500;                               // demo descent for VS pointer slant
       }
 
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
