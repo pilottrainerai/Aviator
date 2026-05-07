@@ -13,7 +13,8 @@ import { PreflightBrief } from "@/components/cockpit/preflight-brief";
 import { FireBanner } from "@/components/cockpit/fire-banner";
 import { GuidancePanel } from "@/components/cockpit/guidance-panel";
 import { AudioController } from "@/components/cockpit/audio-controller";
-import { PfdCanvas, NdCanvas } from "@/components/cockpit/pfd-nd";
+import { NdCanvas } from "@/components/cockpit/pfd-nd";
+import PfdMockup from "@/components/cockpit/pfd-mockup";
 import { DistractionModal } from "@/components/cockpit/distraction-modal";
 import { GlareshieldPanel } from "@/components/cockpit/glareshield-panel";
 import { FlightCheckPopup } from "@/components/cockpit/flight-check-popup";
@@ -270,8 +271,8 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
           <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", padding: "10px 4px 8px 10px", overflow: "hidden" }}>
             {/* PFD + ND */}
             <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-              <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
-                <PfdCanvas state={runner.state} />
+              <div style={{ width: "330px", height: "405px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
+                <PfdMockup state={runner.state} />
               </div>
               <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
                 <NdCanvas state={runner.state} />

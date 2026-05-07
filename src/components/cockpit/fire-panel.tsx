@@ -1,9 +1,26 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
 import type { Scenario, SysSwState } from "@/scenarios/types";
 import { evalSysCase, SYS_COLORS } from "@/components/cockpit/system-display";
+
+// ─── CSS keyframes (AGENT arming pulse, TEST pulse) ─────────────────────────
+// Injected once via <style> in the panel root.
+const FIRE_PANEL_CSS = `
+@keyframes agent-arming-pulse {
+  0%, 100% { background-color: rgba(255, 179, 0, 0.12); box-shadow: inset 0 0 2px rgba(255,179,0,0.30); }
+  50%      { background-color: rgba(255, 179, 0, 0.55); box-shadow: 0 0 6px rgba(255,179,0,0.65); }
+}
+@keyframes fire-light-pulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
+}
+`;
+
+// FCOM "AGENT 1 AFTER 10 S → DISCH" arming delay
+const AGENT_ARM_DELAY_MS = 10_000;
 
 // ─── FCOM ECAM color palette ─────────────────────────────────────────────────
 // Source: Airbus FCOM DSC-31-60 "ECAM display" color spec
@@ -218,6 +235,16 @@ function Param({
 
 type BtnState = "normal" | "active" | "done" | "armed" | "disabled";
 
+// Map the legend text to FCOM-correct color semantics.
+// FCOM DSC-26-20-20: FIRE = red, SQUIB = white, DISCH = amber.
+function legendColor(text: string, fallback: string): string {
+  const u = text.trim().toUpperCase();
+  if (u === "FIRE") return C.red;
+  if (u.startsWith("SQUIB") || u === "ARMED") return C.white;
+  if (u === "DISCH") return C.amber;
+  return fallback;
+}
+
 function AirbusPB({
   topText,
   topColor,
@@ -227,6 +254,7 @@ function AirbusPB({
   onClick,
   wide = false,
   large = false,
+  legendLit = false,
 }: {
   topText: string;
   topColor: string;
@@ -236,55 +264,216 @@ function AirbusPB({
   onClick?: () => void;
   wide?: boolean;
   large?: boolean;
+  /** Force the top-legend cell to display lit (e.g. FIRE light red) even when
+   *  the pb is otherwise disabled or in a non-actionable state.  FCOM
+   *  DSC-26-20-20: "ENG 1(2) FIRE light comes on red whenever the engine fire
+   *  warning for the corresponding engine is active, regardless of pushbutton
+   *  position." */
+  legendLit?: boolean;
 }) {
   const isClickable = onClick && btnState !== "disabled" && btnState !== "done";
+  const legendCol = legendColor(topText, topColor);
+  const pbOut = btnState === "done";
 
-  const glowColor =
-    btnState === "active"  ? C.red
-    : btnState === "armed" ? C.white
-    : btnState === "done"  ? C.green
-    : "transparent";
+  // FCOM DSC-26-20-20: ENG 1(2) FIRE pb is a guarded rectangular pushbutton.
+  // The guard is a thin metal wireframe cage hinged at the top — visible above
+  // the pb when stowed; flips up and back when the crew lifts it before the
+  // push.  Pb face shows "FIRE" (red legend) + "PUSH" beneath.
+  const guardLifted = large && (btnState === "active" || btnState === "armed" || btnState === "done" || legendLit);
+
+  const bezelBorder =
+    btnState === "active" ? legendCol :
+    btnState === "armed"  ? C.white :
+    btnState === "done"   ? C.amber :
+    legendLit             ? legendCol :
+    "#2A303C";
+
+  // ledBg / ledTextColor: lit whenever btnState is active/armed/done OR the
+  // caller explicitly says legendLit (fire-light-on-pb-not-yet-pushed case).
+  const lit = btnState === "active" || legendLit;
+  const ledBg =
+    lit                    ? `${legendCol}CC` :
+    btnState === "armed"   ? `${C.white}28` :
+    btnState === "done"    ? `${legendCol}25` :
+    C.ledOff;
+
+  const ledTextColor =
+    lit                    ? "#FFFFFF" :
+    btnState === "armed"   ? C.white :
+    btnState === "done"    ? legendCol :
+    C.dimLo;
+
+  const containerShadow =
+    lit                    ? `0 0 14px ${legendCol}90, inset 0 0 6px ${legendCol}20` :
+    btnState === "armed"   ? `0 0 10px ${C.white}50` :
+    btnState === "done"    ? `0 0 8px ${legendCol}40` :
+    "none";
 
   return (
     <div
-      onClick={isClickable ? onClick : undefined}
       style={{
         cursor: isClickable ? "pointer" : "default",
-        width: large ? "96px" : wide ? "80px" : "68px",
+        width: large ? "108px" : wide ? "80px" : "68px",
         userSelect: "none",
         filter: btnState === "disabled" ? "brightness(0.4)" : "none",
+        position: "relative",
       }}
     >
-      {/* Outer bezel */}
-      <div
-        style={{
-          backgroundColor: C.bezel,
-          border: `2px solid ${btnState === "active" ? C.red : btnState === "armed" ? C.amber : "#2A303C"}`,
-          borderRadius: "3px",
-          padding: "2px",
-          boxShadow:
-            btnState === "active"
-              ? `0 0 14px ${C.red}80, inset 0 0 6px ${C.red}20`
-              : btnState === "armed"
-              ? `0 0 10px ${C.amber}60`
-              : btnState === "done"
-              ? `0 0 8px ${C.green}40`
-              : "none",
-          transition: "box-shadow 0.2s, border-color 0.2s",
-        }}
-      >
-        {/* LED indicator area */}
+      {/* Recessed metal frame around the pb — gives the "in the panel" look. */}
+      {large && (
         <div
           style={{
-            backgroundColor:
-              btnState === "active"  ? `${C.red}CC`
-              : btnState === "armed" ? `${C.white}20`
-              : btnState === "done"  ? `${C.green}25`
-              : C.ledOff,
-            borderRadius: "2px 2px 0 0",
-            padding: large ? "7px 6px 5px" : "4px 5px",
+            position: "absolute",
+            top: "-4px", left: "-4px", right: "-4px", bottom: "-4px",
+            background: "linear-gradient(135deg, #5A6470 0%, #2E3440 60%, #1A1E28 100%)",
+            border: "1px solid #14181F",
+            borderRadius: "3px",
+            boxShadow: "inset 0 1px 1px rgba(255,255,255,0.10), inset 0 -1px 1px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.55)",
+            zIndex: 0,
+          }}
+        />
+      )}
+
+      {/* Wireframe metal guard — only on FIRE pb (large).  Hinged at the top of
+          the pb body, lifts up and back when the pb becomes actionable.
+          Drawn as a thin metal frame with two diagonal wires forming an X. */}
+      {large && (
+        <div style={{
+          position: "absolute", top: "-2px", left: "-2px", right: "-2px",
+          height: "0", perspective: "260px", zIndex: 4,
+          pointerEvents: guardLifted ? "none" : "auto",
+        }}>
+          {/* Hinge knuckles at top corners — small metal pivots */}
+          {[ "left", "right" ].map(side => (
+            <div key={side} style={{
+              position: "absolute", top: "-2px",
+              [side]: "-1px",
+              width: "5px", height: "5px",
+              background: "radial-gradient(circle at 30% 30%, #B0B8C0 0%, #5A6470 50%, #1A1E28 100%)",
+              borderRadius: "50%",
+              border: "1px solid #14181F",
+              zIndex: 6,
+              boxShadow: "0 1px 1px rgba(0,0,0,0.55)",
+            } as React.CSSProperties} />
+          ))}
+          {/* The wireframe guard frame, hinged at top */}
+          <div style={{
+            position: "absolute",
+            top: "0", left: "0", right: "0",
+            height: "20px",
+            transformOrigin: "50% 0%",
+            transform: guardLifted
+              ? "rotateX(-115deg) translateZ(0)"
+              : "rotateX(0deg) translateZ(0)",
+            transition: "transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)",
+            backfaceVisibility: "hidden",
+          }}>
+            {/* Outer frame — thin metal outline */}
+            <div style={{
+              position: "absolute", inset: 0,
+              border: "1.5px solid #6A7488",
+              borderRadius: "2px",
+              backgroundColor: "rgba(40, 46, 56, 0.10)",
+              boxShadow: guardLifted
+                ? "none"
+                : "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.4)",
+            }} />
+            {/* Diagonal wire 1 (top-left → bottom-right) */}
+            <div style={{
+              position: "absolute",
+              top: "50%", left: "0",
+              width: "100%", height: "1.2px",
+              transformOrigin: "50% 50%",
+              transform: "rotate(28deg)",
+              background: "linear-gradient(90deg, #4A5260 0%, #B0B8C0 50%, #4A5260 100%)",
+              boxShadow: "0 1px 0 rgba(0,0,0,0.45)",
+              opacity: guardLifted ? 0.4 : 1,
+            }} />
+            {/* Diagonal wire 2 (top-right → bottom-left) */}
+            <div style={{
+              position: "absolute",
+              top: "50%", left: "0",
+              width: "100%", height: "1.2px",
+              transformOrigin: "50% 50%",
+              transform: "rotate(-28deg)",
+              background: "linear-gradient(90deg, #4A5260 0%, #B0B8C0 50%, #4A5260 100%)",
+              boxShadow: "0 1px 0 rgba(0,0,0,0.45)",
+              opacity: guardLifted ? 0.4 : 1,
+            }} />
+            {/* Center pivot dot — where the two wires cross */}
+            <div style={{
+              position: "absolute",
+              top: "50%", left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: "3px", height: "3px",
+              background: "radial-gradient(circle at 30% 30%, #C8D0D8 0%, #5A6470 100%)",
+              borderRadius: "50%",
+              opacity: guardLifted ? 0.5 : 1,
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* Outer bezel — pops up slightly when pushed (out) */}
+      <div
+        onClick={isClickable ? onClick : undefined}
+        style={{
+          backgroundColor: C.bezel,
+          border: `2px solid ${bezelBorder}`,
+          borderRadius: "2px",
+          padding: "2px",
+          boxShadow: containerShadow,
+          transition: "box-shadow 0.2s, border-color 0.2s, transform 0.25s",
+          transform: pbOut ? "translateY(-3px)" : "translateY(0)",
+          cursor: isClickable ? "pointer" : "default",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {/* "OUT" indicator — small amber dot when pb has been pushed AND fire
+            is no longer detected (so the user can see the pb is mechanically
+            out even with the FIRE light off) */}
+        {pbOut && !lit && (
+          <div style={{
+            position: "absolute", top: "-1px", right: "-1px",
+            width: "6px", height: "6px",
+            backgroundColor: C.amber, borderRadius: "50%",
+            boxShadow: `0 0 4px ${C.amber}`,
+            zIndex: 3,
+          }} />
+        )}
+
+        {/* Four corner red FIRE indicator dots — lit independently of pb position
+            per FCOM (red lights come on whenever fire warning is active). */}
+        {lit && large && (
+          <>
+            {[
+              { top: 3, left: 3 },
+              { top: 3, right: 3 },
+              { bottom: 3, left: 3 },
+              { bottom: 3, right: 3 },
+            ].map((pos, i) => (
+              <div key={i}
+                style={{
+                  position: "absolute", ...pos,
+                  width: 4, height: 4, borderRadius: "50%",
+                  background: legendCol,
+                  boxShadow: `0 0 5px ${legendCol}`,
+                  zIndex: 2,
+                }}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Top legend cell — "FIRE" (red) for the FIRE pb */}
+        <div
+          style={{
+            backgroundColor: ledBg,
+            borderRadius: "1px 1px 0 0",
+            padding: large ? "8px 6px 6px" : "4px 5px",
             textAlign: "center",
-            minHeight: large ? "34px" : "24px",
+            minHeight: large ? "26px" : "24px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -293,38 +482,35 @@ function AirbusPB({
         >
           <span
             style={{
-              fontSize: large ? "10px" : "8px",
+              fontSize: large ? "16px" : "8px",
               fontFamily: "monospace",
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              color:
-                btnState === "active"  ? "#FFFFFF"
-                : btnState === "armed" ? C.white
-                : btnState === "done"  ? C.green
-                : C.dimLo,
+              fontWeight: 800,
+              letterSpacing: "0.12em",
+              color: ledTextColor,
               textTransform: "uppercase",
-              textShadow: btnState === "active" ? `0 0 8px ${C.red}` : "none",
+              textShadow: lit ? `0 0 10px ${legendCol}, 0 0 4px #fff` : btnState === "done" ? `0 0 6px ${legendCol}80` : "none",
             }}
           >
             {topText}
           </span>
         </div>
 
-        {/* Button face / label area */}
+        {/* Bottom face — the engine label and "PUSH" instruction */}
         <div
           style={{
             backgroundColor: C.btnFace,
-            borderRadius: "0 0 2px 2px",
-            padding: large ? "8px 6px 6px" : "5px 5px 4px",
+            borderRadius: "0 0 1px 1px",
+            padding: large ? "5px 6px 7px" : "5px 5px 4px",
             textAlign: "center",
+            borderTop: `1px solid ${bezelBorder}40`,
           }}
         >
           <div
             style={{
-              fontSize: large ? "11px" : "9px",
+              fontSize: large ? "10px" : "9px",
               fontFamily: "monospace",
               fontWeight: 700,
-              letterSpacing: "0.06em",
+              letterSpacing: "0.08em",
               color: C.white,
               lineHeight: 1.2,
               textTransform: "uppercase",
@@ -332,7 +518,24 @@ function AirbusPB({
           >
             {label}
           </div>
-          {sublabel && (
+          {/* "PUSH" sub-legend — appears only on large pbs (the FIRE pb) */}
+          {large && (
+            <div
+              style={{
+                fontSize: "8px",
+                fontFamily: "monospace",
+                color: btnState === "active" ? legendCol : C.dim,
+                fontWeight: 700,
+                letterSpacing: "0.18em",
+                marginTop: "3px",
+                textTransform: "uppercase",
+                transition: "color 0.2s",
+              }}
+            >
+              PUSH
+            </div>
+          )}
+          {sublabel && !large && (
             <div
               style={{
                 fontSize: "7px",
@@ -348,18 +551,173 @@ function AirbusPB({
           )}
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Guard frame indicator for FIRE pb */}
-      {btnState === "active" && large && (
-        <div
-          style={{
-            height: "2px",
-            backgroundColor: C.red,
-            borderRadius: "0 0 2px 2px",
-            marginTop: "1px",
-            boxShadow: `0 0 6px ${C.red}`,
-          }}
-        />
+// ─── DSL interactive control: AGENT 1 / AGENT 2 pb-sw (FCOM-accurate) ────────
+// Source: FCOM DSC-26-20-20 — "FIRE PANEL"
+// Shape: small rectangular pb-sw with TWO stacked indicator cells:
+//   • SQUIB cell (top)  — lights white when squib is armed (after FIRE pb pushed,
+//                          before agent fired)
+//   • DISCH cell (bottom) — lights amber when agent has discharged
+// Label below: "AGENT 1" / "AGENT 2".  No flip-up guard — bare pb on the panel.
+function AgentPb({
+  done, active, clickable, onClick, label, sub,
+}: {
+  done: boolean; active: boolean; clickable: boolean; onClick: () => void;
+  label: string; sub?: string;
+}) {
+  // Track when this agent step first became active so we can run the FCOM
+  // 10-second arming countdown ("AGENT 1 AFTER 10 S → DISCH").
+  const [activeAt, setActiveAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (active && activeAt === null) setActiveAt(Date.now());
+    else if (!active && activeAt !== null) setActiveAt(null);
+  }, [active, activeAt]);
+
+  // Re-render every 100 ms during the 10-s arming window so the SQUIB pulse
+  // and countdown badge stay live.
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!activeAt || done) return;
+    const elapsed = Date.now() - activeAt;
+    if (elapsed >= AGENT_ARM_DELAY_MS) return;
+    const t = setInterval(() => tick(n => n + 1), 100);
+    return () => clearInterval(t);
+  }, [activeAt, done]);
+
+  const elapsed = activeAt ? Date.now() - activeAt : 0;
+  const arming    = active && !done && elapsed < AGENT_ARM_DELAY_MS;
+  const isArmed   = active && !done && elapsed >= AGENT_ARM_DELAY_MS;
+  const isClickable = clickable && isArmed;
+  const countdownSec = arming ? Math.max(0, Math.ceil((AGENT_ARM_DELAY_MS - elapsed) / 1000)) : 0;
+
+  const squibLit = isArmed;                // armed, ready to fire (solid white)
+  const dischLit = done;                   // agent fired (solid amber)
+  const accent =
+    dischLit ? C.amber :
+    squibLit ? C.white :
+    arming   ? `${C.amber}80` :
+    C.dimLo;
+
+  return (
+    <div
+      style={{
+        userSelect: "none",
+        width: "52px",
+        opacity: (!active && !done) ? 0.45 : 1,
+        transition: "opacity 0.2s",
+        display: "flex", flexDirection: "column", alignItems: "center",
+      }}
+    >
+      <div
+        onClick={isClickable ? onClick : undefined}
+        style={{
+          cursor: isClickable ? "pointer" : "default",
+          width: "52px", height: "52px",
+          position: "relative",
+        }}
+      >
+        {/* Recessed frame around the pb */}
+        <div style={{
+          position: "absolute",
+          top: "-3px", left: "-3px", right: "-3px", bottom: "-3px",
+          background: "linear-gradient(135deg, #5A6470 0%, #2E3440 60%, #1A1E28 100%)",
+          border: "1px solid #14181F",
+          borderRadius: "2px",
+          boxShadow: "inset 0 1px 1px rgba(255,255,255,0.10), inset 0 -1px 1px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.55)",
+          zIndex: 0,
+        }} />
+
+        {/* Square pb body — equal width and height per FCOM AGENT pb proportions */}
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: C.bezel,
+          border: `1.5px solid ${accent}`,
+          borderRadius: "2px",
+          padding: "3px",
+          display: "flex", flexDirection: "column",
+          gap: "2px",
+          boxShadow:
+            dischLit ? `0 0 8px ${C.amber}50` :
+            squibLit ? `0 0 6px ${C.white}40` :
+            arming   ? `0 0 4px ${C.amber}45` :
+            "none",
+          transition: "all 0.2s",
+          zIndex: 1,
+        }}>
+          {/* SQUIB cell — pulses amber during arming, solid white when armed */}
+          <div style={{
+            flex: 1,
+            backgroundColor: arming ? undefined : (squibLit ? `${C.white}30` : C.ledOff),
+            animation: arming ? "agent-arming-pulse 1s ease-in-out infinite" : undefined,
+            borderRadius: "1px",
+            display: "flex",
+            alignItems: "center", justifyContent: "center",
+            transition: "background-color 0.2s",
+          }}>
+            <span style={{
+              fontSize: "9px", fontFamily: "monospace", fontWeight: 800,
+              color: squibLit ? C.white : arming ? C.amber : C.dimLo,
+              letterSpacing: "0.08em",
+              textShadow: squibLit ? `0 0 4px ${C.white}` : arming ? `0 0 3px ${C.amber}` : "none",
+            }}>SQUIB</span>
+          </div>
+
+          {/* DISCH cell (bottom half) */}
+          <div style={{
+            flex: 1,
+            backgroundColor: dischLit ? `${C.amber}30` : C.ledOff,
+            borderRadius: "1px",
+            display: "flex",
+            alignItems: "center", justifyContent: "center",
+            transition: "background-color 0.2s",
+          }}>
+            <span style={{
+              fontSize: "9px", fontFamily: "monospace", fontWeight: 800,
+              color: dischLit ? C.amber : C.dimLo,
+              letterSpacing: "0.08em",
+              textShadow: dischLit ? `0 0 4px ${C.amber}` : "none",
+            }}>DISCH</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Label below the pb body */}
+      <div style={{
+        marginTop: "6px",
+        textAlign: "center",
+        fontSize: "8px", fontFamily: "monospace", fontWeight: 700,
+        color: dischLit ? C.amber : squibLit ? C.white : arming ? C.amber : C.dim,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        transition: "color 0.2s",
+      }}>
+        {label}
+        {sub && (
+          <span style={{ display: "block", fontSize: "7px", color: C.dim, marginTop: "1px", letterSpacing: "0.08em" }}>
+            {sub}
+          </span>
+        )}
+      </div>
+
+      {/* Countdown badge during the FCOM 10-s arming window */}
+      {arming && countdownSec > 0 && (
+        <div style={{
+          marginTop: "3px",
+          padding: "1px 6px",
+          backgroundColor: `${C.amber}20`,
+          border: `1px solid ${C.amber}80`,
+          borderRadius: "2px",
+          fontSize: "8px", fontFamily: "monospace", fontWeight: 800,
+          color: C.amber,
+          letterSpacing: "0.08em",
+          animation: "fire-light-pulse 1s ease-in-out infinite",
+        }}>
+          IN {countdownSec}S
+        </div>
       )}
     </div>
   );
@@ -631,21 +989,123 @@ function DslEnginePanel({ engNum, panel, state, warningActive }: { engNum: 1 | 2
   );
 }
 
-// ─── DSL interactive control: THR LEVER ──────────────────────────────────────
-function DslThrLeverCtrl({ done, active, clickable, onClick }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void }) {
+// ─── DSL interactive control: THR LEVERS (twin, FCOM-realistic) ──────────────
+// FCOM DSC-22_10-40-30 / DSC-70-90-20-40: thrust levers have 5 detents.
+// Pedestal layout: ENG 1 left, ENG 2 right. Lever clicks into each detent.
+// Detent positions (top → bottom): TOGA · FLX/MCT · CL · IDLE
+// (FLX and MCT share a detent — distinguished by flight phase)
+type Detent = "TOGA" | "FLX/MCT" | "CL" | "IDLE";
+const DETENTS: Detent[] = ["TOGA", "FLX/MCT", "CL", "IDLE"];
+const DETENT_TOP_PX: Record<Detent, number> = { "TOGA": 6, "FLX/MCT": 32, "CL": 58, "IDLE": 84 };
+const DETENT_COLOR: Record<Detent, string> = { "TOGA": C.white, "FLX/MCT": C.white, "CL": C.green, "IDLE": C.amber };
+
+function ThrLever({ engNum, detent, isAffected, isClickable, onClick }: {
+  engNum: 1 | 2; detent: Detent; isAffected: boolean; isClickable: boolean; onClick?: () => void;
+}) {
+  const leverColor = DETENT_COLOR[detent];
   return (
-    <div
-      onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
-    >
-      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>THR LVR 1</span>
-      <div style={{ width: "36px", height: "76px", backgroundColor: C.bezel, border: `2px solid ${active ? C.amber : done ? C.amber : C.dimLo}`, borderRadius: "4px", position: "relative", boxShadow: active ? `0 0 10px ${C.amber}60` : done ? `0 0 8px ${C.amber}40` : "none", transition: "all 0.2s" }}>
-        {["CLB","MCT","IDLE"].map((pos, i) => (
-          <div key={pos} style={{ position: "absolute", right: "-26px", top: `${8 + i * 20}px`, fontSize: "7px", fontFamily: "monospace", color: C.dimLo, letterSpacing: "0.06em" }}>{pos}</div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: isClickable ? "pointer" : "default" }}
+         onClick={isClickable ? onClick : undefined}>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: C.dim, letterSpacing: "0.12em" }}>
+        ENG {engNum}
+      </span>
+      {/* Lever track with detent gates (notches only — labels live in the
+          shared center placard rendered by DslThrLeverCtrl, not on each lever) */}
+      <div style={{
+        width: "30px", height: "112px", backgroundColor: C.bezel,
+        border: `1.5px solid ${isAffected ? C.amber : C.dimLo}`,
+        borderRadius: "3px", position: "relative",
+        boxShadow: isAffected ? `0 0 8px ${C.amber}50` : "none",
+        transition: "all 0.2s",
+      }}>
+        {DETENTS.map((d) => (
+          <div key={d} style={{
+            position: "absolute",
+            left: engNum === 1 ? "auto" : "-3px",
+            right: engNum === 1 ? "-3px" : "auto",
+            top: `${DETENT_TOP_PX[d] + 6}px`,
+            width: "5px", height: "2px",
+            backgroundColor: detent === d ? leverColor : C.dim,
+            borderRadius: "1px",
+            transition: "background-color 0.2s",
+          }} />
         ))}
-        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: done ? "46px" : "8px", width: "22px", height: "16px", backgroundColor: done ? `${C.amber}CC` : "#3A4252", border: `1.5px solid ${done ? C.amber : C.dim}`, borderRadius: "3px", transition: "top 0.35s ease", boxShadow: done ? `0 0 6px ${C.amber}60` : "none" }} />
+        {/* Lever knob — snaps to detent (no smooth between-detent state) */}
+        <div style={{
+          position: "absolute", left: "50%", transform: "translateX(-50%)",
+          top: `${DETENT_TOP_PX[detent]}px`,
+          width: "20px", height: "14px",
+          backgroundColor: leverColor === C.green ? `${C.green}40` : leverColor === C.amber ? `${C.amber}50` : "#2A303C",
+          border: `1.5px solid ${leverColor}`, borderRadius: "2px",
+          transition: "top 0.25s cubic-bezier(0.4, 1.6, 0.6, 1)",
+          boxShadow: `0 0 4px ${leverColor}80`,
+        }} />
       </div>
-      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.amber : C.green, letterSpacing: "0.1em", fontWeight: 700 }}>{done ? "IDLE ✓" : "CLB"}</span>
+      {/* Current detent label below each lever */}
+      <span style={{ fontSize: "7px", fontFamily: "monospace", fontWeight: 700, color: leverColor, letterSpacing: "0.08em" }}>
+        {detent}
+      </span>
+    </div>
+  );
+}
+
+function DslThrLeverCtrl({ done, active, clickable, onClick }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void }) {
+  // ENG 1 = the affected engine in the scenario step. ENG 2 = static reference at CL.
+  const eng1Detent: Detent = done ? "IDLE" : "CL";
+  const eng2Detent: Detent = "CL";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", opacity: (!active && !done) ? 0.45 : 1, transition: "opacity 0.2s" }}>
+      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.amber : C.dim, letterSpacing: "0.15em", textTransform: "uppercase" }}>
+        THRUST LEVERS
+      </span>
+      <div style={{
+        display: "flex", gap: "10px", alignItems: "flex-start",
+        padding: "8px 10px",
+        backgroundColor: "#0A0E16",
+        border: `1px solid ${active ? `${C.amber}60` : "#1C2130"}`,
+        borderRadius: "4px",
+        transition: "border-color 0.2s",
+      }}>
+        <ThrLever engNum={1} detent={eng1Detent} isAffected={active || done} isClickable={clickable} onClick={onClick} />
+
+        {/* Shared detent placard between the two levers (FCOM-realistic — the
+            detent labels are printed on the pedestal, not on each lever) */}
+        <div style={{
+          position: "relative",
+          paddingTop: "12px",  // align with top of lever track (matches "ENG N" header above the lever)
+          height: "112px",
+          minWidth: "48px",
+        }}>
+          {DETENTS.map((d) => {
+            const eng1Active = eng1Detent === d;
+            const eng2Active = eng2Detent === d;
+            const labelColor =
+              eng1Active && (active || done) ? DETENT_COLOR[d] :
+              eng2Active                      ? DETENT_COLOR[d] :
+                                                C.dim;
+            return (
+              <div key={d} style={{
+                position: "absolute",
+                top: `${DETENT_TOP_PX[d] + 14}px`, // +14 = 12 (paddingTop) + 2 (visually align to notch midpoint)
+                left: 0, right: 0,
+                fontSize: "7px", fontFamily: "monospace",
+                color: labelColor,
+                fontWeight: eng1Active || eng2Active ? 700 : 400,
+                letterSpacing: "0.04em",
+                transition: "color 0.2s",
+                textAlign: "center",
+              }}>
+                {d}
+              </div>
+            );
+          })}
+        </div>
+
+        <ThrLever engNum={2} detent={eng2Detent} isAffected={false} isClickable={false} />
+      </div>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: done ? C.amber : active ? C.amber : C.dimLo, letterSpacing: "0.1em", fontWeight: 700, minHeight: "10px" }}>
+        {done ? "ENG 1 → IDLE ✓" : active ? "▸ RETARD ENG 1 → IDLE" : ""}
+      </span>
     </div>
   );
 }
@@ -670,20 +1130,147 @@ function DslModeSelCtrl({ done, active, clickable, onClick }: { done: boolean; a
   );
 }
 
-// ─── DSL interactive control: ENG MASTER ─────────────────────────────────────
-function DslMasterSwCtrl({ done, active, clickable, onClick, label }: { done: boolean; active: boolean; clickable: boolean; onClick: () => void; label: string }) {
+// ─── DSL interactive control: ENG MASTER lever (FCOM-accurate) ───────────────
+// Source: FCOM DSC-70-90-20 — "ENG MODE Selector and ENG MASTER Levers"
+// Layout (per FCOM photo on the pedestal):
+//   • Square lever knob with "ENG 1" / "ENG 2" embossed on its face.
+//   • Lever travels vertically inside a small housing.
+//     ON detent at top, OFF detent at bottom. ON / OFF text labels are placed
+//     to the RIGHT of the slot, not above/below.
+//   • A separate small FIRE / FAULT indicator box sits BELOW the lever housing
+//     (not on the lever itself).  FIRE = red, FAULT = amber.
+function DslMasterSwCtrl({ done, active, clickable, onClick, label, warningActive }: {
+  done: boolean; active: boolean; clickable: boolean; onClick: () => void;
+  label: string; warningActive?: boolean;
+}) {
+  // Lever position: ON (top) by default → OFF (bottom) once the step is done.
+  const position: "ON" | "OFF" = done ? "OFF" : "ON";
+  const fireLight = !!warningActive;   // red while fire detected for this engine
+  const faultLight = false;            // not modeled in this scenario
+  const accent = active ? C.amber : done ? C.amber : C.dimLo;
+  const engNum = label.includes("2") ? "2" : "1";
+
   return (
     <div
       onClick={clickable ? onClick : undefined}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.4 : 1, transition: "opacity 0.2s" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", cursor: clickable ? "pointer" : "default", opacity: (!active && !done) ? 0.45 : 1, transition: "opacity 0.2s" }}
     >
-      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.amber : C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
-      <div style={{ width: "52px", height: "68px", backgroundColor: C.bezel, border: `2px solid ${active ? C.amber : done ? C.amber : C.dimLo}`, borderRadius: "4px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "6px 5px", boxShadow: active ? `0 0 12px ${C.amber}60` : done ? `0 0 10px ${C.amber}40` : "none", transition: "all 0.2s" }}>
-        <div style={{ fontSize: "9px", fontFamily: "monospace", fontWeight: 800, color: done ? C.dimLo : C.green, letterSpacing: "0.12em" }}>ON</div>
-        <div style={{ width: "28px", height: "18px", backgroundColor: done ? "#1A1E28" : "#2E3A28", border: `1.5px solid ${done ? C.dim : C.green}`, borderRadius: "3px", transform: done ? "translateY(6px)" : "translateY(-6px)", transition: "transform 0.25s, background-color 0.2s", boxShadow: done ? "none" : `0 0 4px ${C.green}40` }} />
-        <div style={{ fontSize: "9px", fontFamily: "monospace", fontWeight: 800, color: done ? C.amber : C.dimLo, letterSpacing: "0.12em" }}>OFF</div>
+      {/* "MASTER 1/2" panel label above the lever housing */}
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: C.dim, letterSpacing: "0.18em", textTransform: "uppercase" }}>
+        MASTER {engNum}
+      </span>
+
+      {/* Lever housing — narrow vertical slot with ON/OFF labels on the right.
+          The slot + FIRE/FAULT box are wrapped in their own column so the
+          FIRE/FAULT sits inline (same vertical axis) directly below the slot,
+          per FCOM photo. */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "4px" }}>
+       {/* Column: slot above, FIRE/FAULT directly below — both 30px wide,
+           horizontally centered as a stack */}
+       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+        {/* The slot the square lever knob rides in */}
+        <div style={{
+          position: "relative",
+          width: "30px", height: "62px",
+          backgroundColor: "#040608",
+          border: `2px solid ${active ? `${C.amber}90` : done ? `${C.amber}70` : "#1C2130"}`,
+          borderRadius: "3px",
+          boxShadow:
+            active ? `0 0 8px ${C.amber}50, inset 0 1px 2px rgba(0,0,0,0.6)` :
+            done   ? `0 0 6px ${C.amber}30, inset 0 1px 2px rgba(0,0,0,0.6)` :
+                     "inset 0 1px 2px rgba(0,0,0,0.6)",
+          transition: "all 0.2s",
+        }}>
+          {/* Lever knob — square with ENG number embossed */}
+          <div style={{
+            position: "absolute",
+            top: position === "ON" ? "3px" : "31px",
+            left: "50%",
+            transform: `translateX(-50%) rotateX(${position === "OFF" ? "-12deg" : "0deg"})`,
+            transformOrigin: "50% 100%",
+            transition: "top 0.42s cubic-bezier(0.2, 1.55, 0.5, 1), transform 0.42s cubic-bezier(0.2, 1.55, 0.5, 1)",
+            width: "26px", height: "26px",
+            background: "linear-gradient(180deg, #2E3440 0%, #181C24 100%)",
+            border: `1.5px solid ${accent}`,
+            borderRadius: "2px",
+            boxShadow:
+              position === "OFF"
+                ? `0 2px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.10)`
+                : `0 -1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12)`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <span style={{
+              fontSize: "10px", fontFamily: "monospace", fontWeight: 800,
+              color: "#D8DCE4",
+              letterSpacing: "0.04em",
+              textShadow: "0 1px 0 rgba(0,0,0,0.7), 0 -1px 0 rgba(255,255,255,0.10)",
+              lineHeight: 1, textAlign: "center",
+            }}>
+              ENG<br />{engNum}
+            </span>
+          </div>
+        </div>
+
+        {/* Square FIRE / FAULT indicator INLINE below the slot (same column,
+            same horizontal centerline as the lever knob).  FCOM photo shows
+            this directly in line with the master switch. */}
+        <div style={{
+          width: "30px", height: "30px",
+          backgroundColor: "#0A0E16",
+          border: `1.5px solid ${fireLight || faultLight ? "#5A6470" : "#1C2130"}`,
+          borderRadius: "2px",
+          padding: "2px",
+          boxShadow: fireLight ? `0 0 5px ${C.red}50` : "none",
+          transition: "all 0.2s",
+          display: "flex", flexDirection: "column", gap: "1px",
+        }}>
+          <div style={{
+            flex: 1,
+            backgroundColor: fireLight ? C.red : "#06080C",
+            borderRadius: "1px",
+            boxShadow: fireLight ? `0 0 4px ${C.red}, inset 0 0 2px #FFB0B0` : "inset 0 1px 1px rgba(0,0,0,0.7)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "6px", fontFamily: "monospace", fontWeight: 900,
+            color: fireLight ? "#FFFFFF" : "#1A1E28",
+            letterSpacing: "0.06em",
+            textShadow: fireLight ? `0 0 3px ${C.red}` : "none",
+          }}>FIRE</div>
+          <div style={{
+            flex: 1,
+            backgroundColor: faultLight ? C.amber : "#06080C",
+            borderRadius: "1px",
+            boxShadow: faultLight ? `0 0 3px ${C.amber}` : "inset 0 1px 1px rgba(0,0,0,0.7)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "6px", fontFamily: "monospace", fontWeight: 900,
+            color: faultLight ? "#000000" : "#1A1E28",
+            letterSpacing: "0.06em",
+          }}>FAULT</div>
+        </div>
+       </div>
+
+        {/* ON / OFF labels stacked to the right of the slot column */}
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: "62px", paddingTop: "1px", paddingBottom: "1px" }}>
+          <span style={{
+            fontSize: "8px", fontFamily: "monospace", fontWeight: 700,
+            color: position === "ON" ? C.green : "#3A4252",
+            letterSpacing: "0.1em",
+            transition: "color 0.2s",
+          }}>ON</span>
+          <span style={{
+            fontSize: "8px", fontFamily: "monospace", fontWeight: 700,
+            color: position === "OFF" ? C.amber : "#3A4252",
+            letterSpacing: "0.1em",
+            transition: "color 0.2s",
+          }}>OFF</span>
+        </div>
       </div>
-      <span style={{ fontSize: "8px", fontFamily: "monospace", color: done ? C.amber : C.green, letterSpacing: "0.08em", fontWeight: 700 }}>{done ? "OFF ✓" : "ON"}</span>
+
+      <span style={{ fontSize: "8px", fontFamily: "monospace",
+        color: done ? C.amber : active ? C.green : C.dimLo,
+        letterSpacing: "0.08em", fontWeight: 700, minHeight: "10px",
+      }}>
+        {done ? "OFF ✓" : active ? "▸ CONFIRM → OFF" : ""}
+      </span>
     </div>
   );
 }
@@ -921,14 +1508,15 @@ function DslControlPanel({
           switch (ctrl.kind) {
             case "thr_lever": return <DslThrLeverCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
             case "mode_sel":  return <DslModeSelCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} />;
+            case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={warningActive} />;
             case "fire_pb":   return (
-              <AirbusPB key={ctrl.stepId} topText={done ? "ARMED" : active ? "FIRE" : "FIRE"} topColor={C.red} label={ctrl.label} sublabel={ctrl.sub} large
+              <AirbusPB key={ctrl.stepId} topText="FIRE" topColor={C.red} label={ctrl.label} sublabel={ctrl.sub} large
+                legendLit={warningActive}
                 state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
             );
             case "agent":     return (
-              <AirbusPB key={ctrl.stepId} topText={done ? "DISCH" : active ? "SQUIB ARM" : "SQUIB"} topColor={done ? C.green : active ? C.white : C.dim}
-                label={ctrl.label} sublabel={ctrl.sub} large state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
+              <AgentPb key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick}
+                label={ctrl.label} sub={ctrl.sub} />
             );
             case "cancel_warn": return <DslCancelWarnCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
             case "cancel_caut": return <DslCancelCautCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
@@ -989,6 +1577,7 @@ export function FirePanel({
         className="border border-[var(--color-border)] font-mono select-none flex flex-col"
         style={{ backgroundColor: C.panel, flex: "1 1 0", minHeight: 0, overflowY: "auto" }}
       >
+        <style>{FIRE_PANEL_CSS}</style>
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-[5px] border-b" style={{ borderColor: "#1C2130" }}>
           <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.25em", textTransform: "uppercase" }}>ENGINE DISPLAY</span>

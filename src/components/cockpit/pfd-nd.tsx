@@ -7,7 +7,7 @@ import { defaultAircraftState, type AircraftState } from "@/avionics/core/aircra
 // ENG 1 FIRE after V1 — scenario-phase flight model
 // Each completed step advances the aircraft to a physically accurate snapshot.
 // Values match FCTM OP-020 technique and FCOM SRS/CLB performance data for VIDP ISA.
-function buildAircraftState(s?: ScenarioState): AircraftState {
+export function buildAircraftState(s?: ScenarioState): AircraftState {
   const step  = (id: string) => !!(s?.completedSteps?.[id]);
   const fired = (id: string) => !!(s?.triggersFired?.[id]);
 
