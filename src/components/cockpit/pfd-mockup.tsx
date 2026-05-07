@@ -130,44 +130,33 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       const thrMode  = live?.thrMode  ?? "MAN TOGA";
       const vertMode = live?.vertMode ?? "SRS";
       const latMode  = live?.latMode  ?? "RWY TRK";
-      const apEngaged  = !!live?.apEngaged;
-      const athrActive = live?.athrActive ?? true;
-      const eng1Fail   = !!live?.eng1Failed;
 
       const C_ACTIVE = "#00ff00";
       const C_ARMED  = "#00bfff";  // FCOM blue for armed modes
       const C_WHITE  = "#ffffff";
-      const C_AMBER  = "#ffb000";
 
+      // Solid black background, uniform across rows — no gradient on active row,
+      // no horizontal divider between active and armed rows.
       ctx.fillStyle = "#000000"; ctx.fillRect(0, 0, W, FH);
+
+      // Vertical column dividers only (FCOM-correct).
       ctx.strokeStyle = "#555"; ctx.lineWidth = 1;
       [105, 210, 312, 418].forEach(x => line(x, 2, x, FH - 2, "#555", 1));
-      line(0, FH - 1, W, FH - 1, "#555", 1);
-
-      const activeBox = (x: number, w: number) => {
-        const g = ctx.createLinearGradient(0, 2, 0, 30);
-        g.addColorStop(0, "#003300");
-        g.addColorStop(1, "#001a00");
-        ctx.fillStyle = g; ctx.fillRect(x, 2, w, 28);
-      };
-      activeBox(2, 102); activeBox(107, 102); activeBox(213, 98);
 
       // Row 1 — ACTIVE modes (GREEN)
       txt(thrMode,  52,  16, 14, C_ACTIVE, "center", true, 5);
       txt(vertMode, 156, 16, 14, C_ACTIVE, "center", true, 5);
       txt(latMode,  260, 16, 14, C_ACTIVE, "center", true, 5);
-      if (apEngaged)  txt("AP1",    466, 13, 11, C_WHITE, "center", true);
+
+      // Engagement column — AP / FD / A/THR always visible (full column).
+      txt("AP1",    466, 13, 11, C_WHITE, "center", true);
       txt("1 FD 2", 466, 30, 11, C_WHITE, "center", true);
-      if (athrActive) txt("A/THR",  466, 47, 11, C_WHITE, "center", true);
+      txt("A/THR",  466, 47, 11, C_WHITE, "center", true);
 
-      // Row 2 — ARMED modes (BLUE)
-      ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 30, W, 28);
-      txt("CLB", 156, 44, 12, C_ARMED, "center", true, 3);
-      txt("NAV", 260, 44, 12, C_ARMED, "center", true, 3);
-      if (eng1Fail) txt("ENG OUT", 362, 44, 11, C_AMBER, "center", true, 3);
-
-      ctx.fillStyle = "#111"; ctx.fillRect(0, 58, W, FH - 58);
-      line(0, 58, W, 58, "#444", 1);
+      // Row 2 — ARMED modes (BLUE).  Per FCOM: a mode that has already engaged
+      // is no longer shown as armed.  No ENG OUT badge on the FMA.
+      if (vertMode !== "CLB") txt("CLB", 156, 44, 12, C_ARMED, "center", true, 3);
+      if (latMode  !== "NAV") txt("NAV", 260, 44, 12, C_ARMED, "center", true, 3);
     };
 
     // ── ADI ────────────────────────────────────────────────────────────────
@@ -262,15 +251,17 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(0, -35); ctx.stroke();
       ctx.restore();
 
-      // Flight Director — symmetric crossed bars, centred on aircraft
+      // Flight Director — symmetric crossed bars, equal length horizontally
+      // and vertically, centred on aircraft.
       const fdPitchOffset = -12;   // climb command (above center)
       const fdRollOffset  = 0;     // wings level (centred)
+      const FD_HALF = 45;          // half-length, same for both bars
       ctx.save(); ctx.translate(cx, cy);
       ctx.shadowColor = "#00dd00";
       ctx.shadowBlur = 6;
       ctx.strokeStyle = "#00dd00"; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(-55, fdPitchOffset); ctx.lineTo(55, fdPitchOffset); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(fdRollOffset, -45); ctx.lineTo(fdRollOffset,  45); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-FD_HALF, fdPitchOffset); ctx.lineTo(FD_HALF, fdPitchOffset); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fdRollOffset, -FD_HALF); ctx.lineTo(fdRollOffset, FD_HALF); ctx.stroke();
       ctx.shadowColor = "transparent";
       ctx.shadowBlur = 0;
       ctx.restore();
