@@ -251,23 +251,20 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         { angle: 30, len: 12, color: "#ffffff" },
         { angle: 45, len: 14, color: "#ffff00", tri: true },
       ];
-      // Bank scale lives OUTSIDE the attitude indicator (above the top arc).
-      // r1 (inner end of tick) sits just outside the top-arc edge; r2 (outer)
-      // is further out.  The 45° accent triangle points INWARD with its tip
-      // at the top-arc edge.
+      // Bank scale ticks INSIDE the top curve of the ADI (per user's FCOM
+      // photo).  r2 (outer end) just inside the top-arc edge; r1 (inner)
+      // closer to ADI centre.  45° accent triangle points INWARD.
       bankTicks.forEach(({ angle, len, color, tri }) => {
         [-angle, angle].forEach(ang => {
           const rad = (ang - 90) * Math.PI / 180;
-          const r1  = r + 4, r2 = r + 4 + len;
+          const r1  = r - 2 - len, r2 = r - 2;
           ctx.strokeStyle = color; ctx.lineWidth = 1.6;
           ctx.beginPath();
           ctx.moveTo(Math.cos(rad) * r1, Math.sin(rad) * r1);
           ctx.lineTo(Math.cos(rad) * r2, Math.sin(rad) * r2);
           ctx.stroke();
           if (tri) {
-            // Small filled triangle pointing INWARD (toward the ADI), tip at
-            // the top-arc edge.
-            const tipR = r;
+            const tipR = r1 - 4;
             const baseR = r1;
             const px = Math.cos(rad), py = Math.sin(rad);
             const perpX = -py,  perpY = px;
@@ -286,25 +283,21 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.restore();
 
       // Roll index ▽ + sideslip index (FCOM DSC-31-40).  The roll INDEX is a
-      // single yellow OUTLINE triangle pointing DOWN, sitting OUTSIDE the
-      // top arc (between the bank ticks and the ADI), tracking bank angle
-      // as it rotates around the top-arc centre.  The sideslip trapezoid
-      // sits just inside the top arc.
+      // single yellow OUTLINE triangle pointing DOWN at the top of the bank
+      // arc — INSIDE the top portion of the ADI per the FCOM photo.  Tracks
+      // the current bank angle as it rotates around the top-arc centre.
       ctx.save(); ctx.translate(cx, topArcCY); ctx.rotate(-d.roll * Math.PI / 180);
-      // Down-pointing triangle: apex CLOSER to ADI top arc (smaller magnitude),
-      // base further out (larger magnitude).
       ctx.strokeStyle = "#ff0"; ctx.lineWidth = 2; ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.moveTo(0, -(r + 2));                       // apex (bottom — points down at ADI)
-      ctx.lineTo(-8, -(r + 18));                     // top-left
-      ctx.lineTo(8, -(r + 18));                      // top-right
+      ctx.moveTo(0, -r + 22);                        // apex (bottom — points down)
+      ctx.lineTo(-7, -r + 8);                        // top-left
+      ctx.lineTo(7, -r + 8);                         // top-right
       ctx.closePath();
       ctx.stroke();
-      // Sideslip trapezoid — INSIDE the top arc, just below the roll index
-      // tip.  1 cm = 0.2 g, hard stop at 0.3 g.
+      // Sideslip trapezoid — beneath the roll index.  1 cm = 0.2 g, hard stop at 0.3 g.
       const slipG  = Math.max(-0.3, Math.min(0.3, d.sideslipG ?? 0));
       const slipDx = (slipG / 0.2) * 18;
-      const sy = -r + 6;
+      const sy = -r + 26;
       ctx.fillStyle = "#ff0";
       ctx.beginPath();
       ctx.moveTo(slipDx - 4, sy);                    // narrow top (8 wide)
@@ -332,18 +325,20 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       };
 
-      // Wings (left + right, with downward "tips")
-      drawWingSegment(-65, 0, -20, 0);
-      drawWingSegment(-65, 0, -65, 12);
-      drawWingSegment( 20, 0,  65, 0);
-      drawWingSegment( 65, 0,  65, 12);
+      // Wings — narrow per FCOM reference (was ±65, now ±35).  Each wing is
+      // a short horizontal segment with a small downward "L" tip at the
+      // outboard end.
+      drawWingSegment(-35, 0, -14, 0);
+      drawWingSegment(-35, 0, -35, 8);
+      drawWingSegment( 14, 0,  35, 0);
+      drawWingSegment( 35, 0,  35, 8);
 
-      // Centre square — smaller per user feedback (was 18×18, now 12×12).
-      // Black fill, yellow border.
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(-6, -6, 12, 12);
+      // Centre marker — small donut (black fill, yellow outline) per FCOM
+      // reference (was a 12 × 12 square).
+      ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#000000"; ctx.fill();
       ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 2;
-      ctx.strokeRect(-6, -6, 12, 12);
+      ctx.stroke();
 
       ctx.lineCap = "butt";
       ctx.restore();
@@ -353,7 +348,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       // commanded path, bars cross at the aircraft symbol centre.
       const fdPitchOffset = 0;     // centred on aircraft (no climb offset in demo)
       const fdRollOffset  = 0;     // wings level
-      const FD_HALF = 58;          // half-length — bigger crosshair per user feedback
+      const FD_HALF = 85;          // big crosshair per user FCOM reference — extends across most of ADI
       ctx.save(); ctx.translate(cx, cy);
       ctx.shadowColor = "#00dd00";
       ctx.shadowBlur = 6;
