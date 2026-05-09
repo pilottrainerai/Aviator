@@ -16,16 +16,26 @@ This repo is **Crosscheck**, an A320 abnormal-procedure training platform. MVP s
 - **Procedure content** (ECAM trees, callouts, scoring criteria) requires **SME pilot review** before user-visible release. Flag changes that need this pass.
 - **No payments, no multi-tenancy, no offline, no mobile** in MVP. If a task drifts toward those, push back.
 
-## Manual-first rule for Airbus content (FCOM brain)
+## Manual-first rule for Airbus content (two brains)
 
-For ANY work involving Airbus procedures, ECAM/EWD logic, system behaviour
-(ENG, HYD, ELEC, FIRE, FUEL, BLEED, APU, F/CTL, NAV…), abnormal/emergency
-content, callouts, tasksharing, or new scenario authoring — invoke the
-`a320-fcom-trainer` skill BEFORE writing or modifying code. The skill enforces
-a manual-first, READ-ONLY workflow: extract from FCOM/FCTM/QRH/SOP first,
-classify findings, produce an assessment, and gate code changes behind the
-trigger phrases listed in `.claude/skills/a320-fcom-trainer/SKILL.md` §7.
+Two skills enforce FCOM fidelity. Use whichever fits — or both — BEFORE
+modifying code:
 
-Pure UI/styling/layout changes (colour, font size, position, animation, copy
-edits, dev tooling) do NOT need the skill — just edit. When uncertain whether
-a change is "UI" or "procedure", default to invoking the skill.
+- **`a320-fcom-trainer`** — for **procedures**, ECAM/EWD logic, system
+  behaviour (ENG, HYD, ELEC, FIRE, FUEL, BLEED, APU, F/CTL, NAV…),
+  abnormal/emergency content, callouts, tasksharing, scenario authoring.
+
+- **`cockpit-ui`** — for **visual rendering** of any cockpit element: PFD,
+  ND, ECAM/EWD/SD layout, FMA, attitude indicator, speed/altitude/VS tapes,
+  bank scale, sideslip, FIRE pushbuttons, master switches, glareshield
+  lights, AGENT pb, OHP indicators, pedestal controls. The skill maps each
+  element to its FCOM `DSC-XX-YY` section, greps the manual dump, extracts
+  the visual spec (geometry/colors/behaviour), and classifies divergences.
+
+Both enforce a manual-first, READ-ONLY workflow. Code is gated behind the
+trigger phrases listed in each `SKILL.md` §6 / §7.
+
+If a request touches both layers (e.g. "fire light goes off after agent 2"),
+both assessments merge into one report. Pure dev-tooling / build-config /
+copy edits don't need either skill — just edit. When uncertain, invoke the
+skill that's closer to the change.
