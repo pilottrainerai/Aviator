@@ -99,7 +99,7 @@ export function DistractionModal({
         style={{ borderTop: "1px solid #111820", padding: compact ? "8px 16px 8px" : "0 16px 12px", gap: compact ? "6px" : "6px" }}
       >
         <div style={{ color: "#3A4858", fontSize: "8px", letterSpacing: "0.2em", paddingTop: compact ? "0" : "10px", paddingBottom: "4px" }}>SELECT RESPONSE:</div>
-        {distraction.choices.map((choice) => (
+        {distraction.choices.map((choice, idx) => (
           <button
             key={choice.id}
             type="button"
@@ -117,6 +117,22 @@ export function DistractionModal({
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "1C"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent + "40"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "0A"; }}
           >
+            {/* Reference tag (A1/A2/A3...) — for change requests, no functional effect */}
+            <span style={{
+              display: "inline-block",
+              minWidth: "18px",
+              marginRight: "8px",
+              padding: "1px 4px",
+              backgroundColor: style.accent + "33",
+              color: style.accent,
+              fontSize: "8px",
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              borderRadius: "2px",
+              textAlign: "center",
+              verticalAlign: "1px",
+              fontFamily: "monospace",
+            }}>A{idx + 1}</span>
             {choice.label}
           </button>
         ))}

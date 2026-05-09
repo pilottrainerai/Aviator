@@ -1496,9 +1496,10 @@ function DslControlPanel({
         <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
       </div>
 
-      {/* Controls row */}
+      {/* Controls row — each control wrapped with a P1/P2/P3 reference tag
+          for change requests (no functional effect). */}
       <div style={{ display: "flex", gap: "12px", justifyContent: "center", alignItems: "flex-end", flexWrap: "wrap", paddingLeft: "6px", paddingRight: "6px" }}>
-        {controls.map((ctrl) => {
+        {controls.map((ctrl, idx) => {
           const done    = isDone(ctrl.stepId);
           const step    = scenario.steps.find(s => s.id === ctrl.stepId);
           const reqsMet = (step?.requires ?? []).every(r => !!state.completedSteps[r]);
@@ -1506,27 +1507,47 @@ function DslControlPanel({
           const clickable = !done && reqsMet && warningActive && !disabled;
           const onClick = () => { if (clickable) perform({ kind: "STEP", stepId: ctrl.stepId }); };
 
+          let inner: React.ReactNode;
           switch (ctrl.kind) {
-            case "thr_lever": return <DslThrLeverCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "mode_sel":  return <DslModeSelCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={warningActive} />;
-            case "fire_pb":   return (
-              <AirbusPB key={ctrl.stepId} topText="FIRE" topColor={C.red} label={ctrl.label} sublabel={ctrl.sub} large
+            case "thr_lever":   inner = <DslThrLeverCtrl   done={done} active={active} clickable={clickable} onClick={onClick} />; break;
+            case "mode_sel":    inner = <DslModeSelCtrl    done={done} active={active} clickable={clickable} onClick={onClick} />; break;
+            case "master":      inner = <DslMasterSwCtrl   done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={warningActive} />; break;
+            case "fire_pb":     inner = (
+              <AirbusPB topText="FIRE" topColor={C.red} label={ctrl.label} sublabel={ctrl.sub} large
                 legendLit={fireLit}
                 state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
-            );
-            case "agent":     return (
-              <AgentPb key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick}
-                label={ctrl.label} sub={ctrl.sub} />
-            );
-            case "cancel_warn": return <DslCancelWarnCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "cancel_caut": return <DslCancelCautCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "o2_mask":     return <DslO2MaskCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-            case "toggle_sw":   return <DslToggleSwCtrl   key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-            case "emer_pb":     return <DslEmerPbCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-            case "spd_brk":     return <DslSpdBrkCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            default:            return <DslMonitorCtrl    key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+            ); break;
+            case "agent":       inner = <AgentPb done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />; break;
+            case "cancel_warn": inner = <DslCancelWarnCtrl done={done} active={active} clickable={clickable} onClick={onClick} />; break;
+            case "cancel_caut": inner = <DslCancelCautCtrl done={done} active={active} clickable={clickable} onClick={onClick} />; break;
+            case "o2_mask":     inner = <DslO2MaskCtrl     done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />; break;
+            case "toggle_sw":   inner = <DslToggleSwCtrl   done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />; break;
+            case "emer_pb":     inner = <DslEmerPbCtrl     done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />; break;
+            case "spd_brk":     inner = <DslSpdBrkCtrl     done={done} active={active} clickable={clickable} onClick={onClick} />; break;
+            default:            inner = <DslMonitorCtrl    done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
           }
+
+          return (
+            <div key={ctrl.stepId} style={{ position: "relative" }}>
+              <span style={{
+                position: "absolute",
+                top: "-7px",
+                left: "-2px",
+                padding: "1px 4px",
+                backgroundColor: "#1C2130",
+                color: "#9AA1AC",
+                fontSize: "8px",
+                fontWeight: 700,
+                fontFamily: "monospace",
+                letterSpacing: "0.05em",
+                borderRadius: "2px",
+                border: "1px solid #2A3142",
+                pointerEvents: "none",
+                zIndex: 5,
+              }}>P{idx + 1}</span>
+              {inner}
+            </div>
+          );
         })}
       </div>
 
