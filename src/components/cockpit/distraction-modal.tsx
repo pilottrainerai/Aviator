@@ -61,7 +61,12 @@ export function DistractionModal({
   const resurfaceSec = Math.round((distraction.standbyResurfaceMs ?? 25_000) / 1000);
 
   // Dev mode (?dev=1) — gates the A1/A2/A3 reference tags on choices.
-  const isDevMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("dev");
+  // Computed in useEffect so SSR and first client render agree (no hydration
+  // mismatch); the tags appear right after mount.
+  const [isDevMode, setIsDevMode] = useState(false);
+  useEffect(() => {
+    setIsDevMode(new URLSearchParams(window.location.search).has("dev"));
+  }, []);
 
   // Full-size card content — used in overlay mode
   const cardContent = (compact: boolean) => (

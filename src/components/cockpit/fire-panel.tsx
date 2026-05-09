@@ -1487,7 +1487,12 @@ function DslControlPanel({
   const isDone   = (id: string) => !!state.completedSteps[id];
   const allDone  = controls.every(c => isDone(c.stepId));
   // Dev mode (?dev=1) — gates the P1/P2/P3 reference tags on procedure controls.
-  const isDevMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("dev");
+  // Computed in useEffect so SSR and first client render agree (no hydration
+  // mismatch); the tags appear right after mount.
+  const [isDevMode, setIsDevMode] = useState(false);
+  useEffect(() => {
+    setIsDevMode(new URLSearchParams(window.location.search).has("dev"));
+  }, []);
 
   return (
     <div style={{ borderTop: "1px solid #1C2130", backgroundColor: warningActive ? "#060A12" : "#050709", padding: "6px 10px 8px" }}>
