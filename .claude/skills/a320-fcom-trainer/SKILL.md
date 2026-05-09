@@ -42,6 +42,7 @@ Located at `~/.claude/manuals/a320/`:
 | `abnormal-notes.txt` | 13 KB | A320 Abnormal Notes (13 pp) | Curated gap analysis: what ECAM vs QRH vs FCOM each say differently |
 | `tasksharing.txt` | 71 KB | Tasksharing Dec 2020 (23 pp) | CM1/CM2 split for normal procedures |
 | `eng-malfunctions.txt` | 38 KB | Handling Engine Malfunctions (17 pp) | Ops briefing — engine identification, recommendations |
+| `callouts.txt` | 30 KB | A319/320/321 Simulator Callouts (24 pp) | Verbatim PF/PM call-and-response for normal + abnormal phases (TO, climb, approach, GA, EO-GA, windshear escape, EGPWS escape, nose-low/high recovery, wake, stall, emergency descent, TCAS, ECAM challenge-response). **Use this when authoring scenario callouts and PF/PM tasksharing — preserves exact phraseology.** |
 
 ### Source PDFs
 

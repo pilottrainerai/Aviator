@@ -33,6 +33,7 @@ Located at `~/.claude/manuals/a320/`:
 | `fcom-full.txt` | DSC-31 (PFD/ND/ECAM rendering), DSC-22 (FMA modes), DSC-26 (fire panel) — visual specs live here |
 | `fctm-full.txt` | Technique nuances — when an indicator changes color, what triggers a flash, etc. |
 | `eng-malfunctions.txt` | Engine-display behaviours during malfunctions |
+| `cockpit-fam.txt` | A320 cockpit familiarization — element-by-element layout index for the GLARESHIELD, MAIN PANEL, PFD, ND, ISIS, EFIS, FCU, E/WD, OHP, MCDU, ECAM SD pages, and PEDESTAL. **First grep this file when a UI ask names an element ("ND mode knob", "GEN 1 indication on ELEC page"). It gives the canonical name + which panel/screen the element lives on, so you can then jump to the right FCOM DSC chapter.** |
 
 PDFs in `~/Desktop/snap avia/` are the source of truth if the text dump is unclear (e.g., a diagram). Re-extract via `pdftotext -layout`.
 
