@@ -90,7 +90,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     };
 
     // Layout constants
-    const ATX = 260, ATY = 315, ATR = 152;
+    const ATX = 260, ATY = 315, ATR = 110;
     const SX = 28,  SW = 62, ST = 125, SH = 345;
     const AX = 392, AW = 72, AT = 125, AH = 345;
     const VX = 468, VW = 30, VT = 125, VH = 345;
@@ -174,7 +174,11 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     // top-arc centre so its apex always tracks the bank-angle position.
     const drawADI = () => {
       const cx = ATX, cy = ATY, r = ATR;       // r = arc radius (also bank arc)
-      const VEXT = 18;                          // half-height of straight middle
+      // Stadium proportions (FCOM-style): top arc ≈ 30 % of total height,
+      // straight middle ≈ 40 %, bottom arc ≈ 30 %.
+      // For r = 110 → straight half-height = 4r/3 ÷ 2 = 73 → middle = 146,
+      // total H = 366, total W = 220.  W/H ≈ 0.6.
+      const VEXT = 73;                          // half-height of straight middle
       const PPD = 9.5;
       const topArcCY = cy - VEXT;               // centre of the top arc
       const botArcCY = cy + VEXT;               // centre of the bottom arc
@@ -216,21 +220,22 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         const py = -deg * PPD;
         const isDec  = Number.isInteger(deg / 10);
         const isFive = Number.isInteger(deg / 5) && !isDec;
-        const len = isDec ? 80 : isFive ? 48 : 24;
-        ctx.strokeStyle = "#fff"; ctx.lineWidth = isDec ? 2 : 1;
+        // Wider, more-visible pitch ticks (was 80 / 48 / 24).
+        const len = isDec ? 100 : isFive ? 60 : 32;
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = isDec ? 2.4 : 1.2;
         ctx.beginPath(); ctx.moveTo(-len / 2, py); ctx.lineTo(len / 2, py); ctx.stroke();
         if (isDec) {
-          ctx.font = '13px "Courier New"'; ctx.fillStyle = "#fff";
+          ctx.font = 'bold 14px "Courier New"'; ctx.fillStyle = "#fff";
           ctx.textAlign = "right"; ctx.textBaseline = "middle";
-          ctx.fillText(String(Math.abs(deg)), -len / 2 - 5, py);
+          ctx.fillText(String(Math.abs(deg)), -len / 2 - 6, py);
           ctx.textAlign = "left";
-          ctx.fillText(String(Math.abs(deg)),  len / 2 + 5, py);
+          ctx.fillText(String(Math.abs(deg)),  len / 2 + 6, py);
         }
         if (Math.abs(deg) === 20) {
           const dir = deg > 0 ? 1 : -1;
-          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.moveTo(-len / 2, py); ctx.lineTo(-len / 2, py + dir * 10); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo( len / 2, py); ctx.lineTo( len / 2, py + dir * 10); ctx.stroke();
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.4;
+          ctx.beginPath(); ctx.moveTo(-len / 2, py); ctx.lineTo(-len / 2, py + dir * 12); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo( len / 2, py); ctx.lineTo( len / 2, py + dir * 12); ctx.stroke();
         }
       }
       ctx.restore();
@@ -247,18 +252,23 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         { angle: 30, len: 12, color: "#ffffff" },
         { angle: 45, len: 14, color: "#ffff00", tri: true },
       ];
+      // Bank scale lives OUTSIDE the attitude indicator (above the top arc).
+      // r1 (inner end of tick) sits just outside the top-arc edge; r2 (outer)
+      // is further out.  The 45° accent triangle points INWARD with its tip
+      // at the top-arc edge.
       bankTicks.forEach(({ angle, len, color, tri }) => {
         [-angle, angle].forEach(ang => {
           const rad = (ang - 90) * Math.PI / 180;
-          const r1  = r - 2 - len, r2 = r - 2;
+          const r1  = r + 4, r2 = r + 4 + len;
           ctx.strokeStyle = color; ctx.lineWidth = 1.6;
           ctx.beginPath();
           ctx.moveTo(Math.cos(rad) * r1, Math.sin(rad) * r1);
           ctx.lineTo(Math.cos(rad) * r2, Math.sin(rad) * r2);
           ctx.stroke();
           if (tri) {
-            // small inverted triangle pointing INWARD on the arc at ±45°
-            const tipR = r1 - 4;
+            // Small filled triangle pointing INWARD (toward the ADI), tip at
+            // the top-arc edge.
+            const tipR = r;
             const baseR = r1;
             const px = Math.cos(rad), py = Math.sin(rad);
             const perpX = -py,  perpY = px;
@@ -274,28 +284,28 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
           }
         });
       });
-      // Fixed lubber reference at top centre (small white horizontal mark)
-      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(-5, -r + 4); ctx.lineTo(5, -r + 4); ctx.stroke();
       ctx.restore();
 
       // Roll index ▽ + sideslip index (FCOM DSC-31-40).  The roll INDEX is a
-      // single yellow OUTLINE triangle pointing DOWN at the top of the bank
-      // arc — its apex tracks the current bank angle as it rotates around the
-      // top-arc centre.  The sideslip trapezoid sits just beneath it.
+      // single yellow OUTLINE triangle pointing DOWN, sitting OUTSIDE the
+      // top arc (between the bank ticks and the ADI), tracking bank angle
+      // as it rotates around the top-arc centre.  The sideslip trapezoid
+      // sits just inside the top arc.
       ctx.save(); ctx.translate(cx, topArcCY); ctx.rotate(-d.roll * Math.PI / 180);
-      // Down-pointing triangle: apex BELOW (closer to ADI centre), base ABOVE
+      // Down-pointing triangle: apex CLOSER to ADI top arc (smaller magnitude),
+      // base further out (larger magnitude).
       ctx.strokeStyle = "#ff0"; ctx.lineWidth = 2; ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.moveTo(0, -r + 22);                        // apex (bottom — points down)
-      ctx.lineTo(-7, -r + 8);                        // top-left
-      ctx.lineTo(7, -r + 8);                         // top-right
+      ctx.moveTo(0, -(r + 2));                       // apex (bottom — points down at ADI)
+      ctx.lineTo(-8, -(r + 18));                     // top-left
+      ctx.lineTo(8, -(r + 18));                      // top-right
       ctx.closePath();
       ctx.stroke();
-      // Sideslip trapezoid — beneath the roll index.  1 cm = 0.2 g, hard stop at 0.3 g.
+      // Sideslip trapezoid — INSIDE the top arc, just below the roll index
+      // tip.  1 cm = 0.2 g, hard stop at 0.3 g.
       const slipG  = Math.max(-0.3, Math.min(0.3, d.sideslipG ?? 0));
       const slipDx = (slipG / 0.2) * 18;
-      const sy = -r + 26;
+      const sy = -r + 6;
       ctx.fillStyle = "#ff0";
       ctx.beginPath();
       ctx.moveTo(slipDx - 4, sy);                    // narrow top (8 wide)
@@ -329,11 +339,12 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       drawWingSegment( 20, 0,  65, 0);
       drawWingSegment( 65, 0,  65, 12);
 
-      // Centre square — black fill, yellow border
+      // Centre square — smaller per user feedback (was 18×18, now 12×12).
+      // Black fill, yellow border.
       ctx.fillStyle = "#000000";
-      ctx.fillRect(-9, -9, 18, 18);
-      ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 2.2;
-      ctx.strokeRect(-9, -9, 18, 18);
+      ctx.fillRect(-6, -6, 12, 12);
+      ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 2;
+      ctx.strokeRect(-6, -6, 12, 12);
 
       ctx.lineCap = "butt";
       ctx.restore();
@@ -343,7 +354,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       // commanded path, bars cross at the aircraft symbol centre.
       const fdPitchOffset = 0;     // centred on aircraft (no climb offset in demo)
       const fdRollOffset  = 0;     // wings level
-      const FD_HALF = 45;          // half-length, same for both bars
+      const FD_HALF = 58;          // half-length — bigger crosshair per user feedback
       ctx.save(); ctx.translate(cx, cy);
       ctx.shadowColor = "#00dd00";
       ctx.shadowBlur = 6;
