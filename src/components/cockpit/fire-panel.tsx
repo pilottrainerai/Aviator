@@ -1539,19 +1539,19 @@ function DslControlPanel({
               {isDevMode && (
                 <span style={{
                   position: "absolute",
-                  top: "-7px",
-                  left: "-2px",
-                  padding: "1px 4px",
-                  backgroundColor: "#1C2130",
-                  color: "#9AA1AC",
-                  fontSize: "8px",
-                  fontWeight: 700,
+                  top: "-9px",
+                  left: "-4px",
+                  padding: "2px 6px",
+                  backgroundColor: "#FFEB3B",   // bright yellow — high contrast, dev-only
+                  color: "#000",
+                  fontSize: "11px",
+                  fontWeight: 800,
                   fontFamily: "monospace",
                   letterSpacing: "0.05em",
-                  borderRadius: "2px",
-                  border: "1px solid #2A3142",
+                  borderRadius: "3px",
+                  boxShadow: "0 0 0 1px #000, 0 1px 3px rgba(0,0,0,0.6)",
                   pointerEvents: "none",
-                  zIndex: 5,
+                  zIndex: 10,
                 }}>P{idx + 1}</span>
               )}
               {inner}
