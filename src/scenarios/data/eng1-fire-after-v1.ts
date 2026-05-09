@@ -443,23 +443,18 @@ export const eng1FireAfterV1: Scenario = {
       optional: true,
     },
 
-    // ── CR5b ── Go-around review + fuel status — before approach phase
+    // ── CR5b ── Approach preparation — set up MCDU / radios / autobrake
+    // (FCOM SOP: prep BEFORE the briefing, so the briefing can reference
+    // the configured PERF / approach data.)
     {
-      id: "go_around_review",
-      label: "GO-AROUND REVIEW",
-      action: "CONFIRM",
-      hint: "PF briefs go-around plan and confirms fuel state is adequate for alternate if approach is missed.",
+      id: "approach_prep",
+      label: "APPROACH PREP",
+      action: "COMPLETE",
+      hint: "PM: set ILS RWY 28 freq 110.30 / CRS 282. BARO minima 200 ft / QNH set. Autobrake MED. Spoilers ARM. Landing lights ON. Confirm seat belts.",
       variant: "advisory",
-      crew: "PF",
+      crew: "PM",
       group: "comms",
       requires: ["fmgc_prep"],
-      notes: [
-        "GO-AROUND: TOGA (ENG 2 only) — SRS engages — positive rate GEAR UP — maintain V2+10",
-        "FMA: TOGA → SRS / NAV / AP1 — monitor and call FMA at each transition",
-        "FUEL CHECK: confirm total fuel vs [DEST + ALTN + FINAL RESERVE]. If marginal — LAND VIDP.",
-        "RUNWAY VACATION: vacate via first available exit (Golf / Foxtrot). Brake to stop if needed.",
-        "Emergency services attend runway — do NOT delay evacuation call if required.",
-      ],
     },
 
     // ── CR5c ── Advise ATC of emergency services required
@@ -471,10 +466,12 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["go_around_review"],
+      requires: ["approach_prep"],
     },
 
-    // ── CR6 ── Approach briefing — normal + non-normal, using STATUS page items
+    // ── CR6 ── Approach briefing — normal + non-normal, using STATUS page items.
+    // Go-around plan is briefed as PART of this step (see go_around_review below
+    // which is a continuation of the briefing flow).
     {
       id: "approach_brief",
       label: "APPROACH BRIEF",
@@ -486,16 +483,25 @@ export const eng1FireAfterV1: Scenario = {
       requires: ["atc_emergency_services"],
     },
 
-    // ── CR7 ── Approach preparation — MCDU, radio, checklist
+    // ── CR6b ── Go-around review — DURING the approach briefing.
+    // FCOM SOP: GA plan + fuel cross-check is briefed as part of approach
+    // brief, not as a separate pre-briefing item.
     {
-      id: "approach_prep",
-      label: "APPROACH PREP",
-      action: "COMPLETE",
-      hint: "PM: set ILS RWY 28 freq 110.30 / CRS 282. BARO minima 200 ft / QNH set. Autobrake MED. Spoilers ARM. Landing lights ON. Confirm seat belts.",
+      id: "go_around_review",
+      label: "GO-AROUND REVIEW",
+      action: "CONFIRM",
+      hint: "PF briefs go-around plan and confirms fuel state is adequate for alternate if approach is missed.",
       variant: "advisory",
-      crew: "PM",
+      crew: "PF",
       group: "comms",
       requires: ["approach_brief"],
+      notes: [
+        "GO-AROUND: TOGA (ENG 2 only) — SRS engages — positive rate GEAR UP — maintain V2+10",
+        "FMA: TOGA → SRS / NAV / AP1 — monitor and call FMA at each transition",
+        "FUEL CHECK: confirm total fuel vs [DEST + ALTN + FINAL RESERVE]. If marginal — LAND VIDP.",
+        "RUNWAY VACATION: vacate via first available exit (Golf / Foxtrot). Brake to stop if needed.",
+        "Emergency services attend runway — do NOT delay evacuation call if required.",
+      ],
     },
 
     // ── APPROACH CHECKLIST ──────────────────────────────────────────────────
@@ -507,7 +513,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["approach_prep"],
+      requires: ["go_around_review"],
       notes: [
         "BARO ................. QNH SET",
         "MDA/DH ............... 200 ft SET",
