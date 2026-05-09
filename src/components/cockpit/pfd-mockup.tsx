@@ -82,7 +82,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       trend: 12,                                  // +12 kt over 10 s — clearly visible arrow
       mach: 0.42,
       alt: 3740, selAlt: 5000, qnh: 1013,
-      vs: 1000,                                   // demo climb → pointer from center-left UP to right; box at tip shows "1"
+      vs: 500,                                    // demo climb 500 fpm → pointer up-right to digit "5" (matches FCOM photo)
       hdg: 258, selHdg: 260, track: 258,
       ils: { id: "IMNW", freq: "108.70", dist: 7.4 },
       gsPos: 0.25, locPos: 0.1,
@@ -564,16 +564,20 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         });
       });
 
-      // Pointer — pivots at left edge mid, tip on the curved right edge at
-      // the current VS value.  For descent (vs < 0) it slants top-left to bottom-right.
-      const vc      = Math.max(-2000, Math.min(2000, d.vs));
+      // Pointer — pivots at the ALTITUDE REFERENCE (right edge of altitude
+      // tape at current altitude), extends right + up/down to the curved scale
+      // at the VS value.  Climb → bottom-left to upper-right; descent → flips.
+      // FCOM DSC-31-40: the pointer originates at the altitude reading, NOT at
+      // the VS scale's left edge.
+      const vc       = Math.max(-2000, Math.min(2000, d.vs));
       const yFracTip = -(vc / 2000);
-      const xTip    = xForYFrac(yFracTip);
-      const yTip    = yForVs(vc);
+      const xTip     = xForYFrac(yFracTip);
+      const yTip     = yForVs(vc);
+      const pivotX   = AX + AW;                        // alt tape right edge
       ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(x + 2, mid);
-      ctx.lineTo(xTip - 1, yTip);                      // tip touches the digit box
+      ctx.moveTo(pivotX, mid);
+      ctx.lineTo(xTip - 1, yTip);
       ctx.stroke();
 
       // Boxed digit at the pointer tip — tens of fpm (e.g. "5" = 500 fpm).
@@ -674,7 +678,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         d.pitch = 2    + Math.sin(t) * 0.4;
         d.speed = 145;
         d.alt   = 3740;
-        d.vs    = 1000;                               // demo climb (digit "1", pointer goes upper-right)
+        d.vs    = 500;                                // demo climb (digit "5", pointer goes upper-right) — matches FCOM photo
       }
 
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
