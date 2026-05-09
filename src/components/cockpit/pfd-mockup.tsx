@@ -566,21 +566,23 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         });
       });
 
-      // Pointer — pivots at the ZERO CENTER on the right (curve apex at
-      // VS=0).  Pivot itself is invisible.  Tip sweeps elliptically:
-      //   VS=0      → tip points LEFT (horizontal, baseline)
-      //   VS=+2000  → tip points UP (clockwise rotation = climb)
-      //   VS=-2000  → tip points DOWN (anticlockwise = descent)
-      // Vertical sweep is longer than horizontal so the needle stays within
-      // the narrow VS strip while the climb/descent extreme points are clear.
+      // Pointer — clock-hand sweeping around the zero-VS pivot on the right.
+      //   VS = 0      → 9 o'clock (horizontal LEFT)
+      //   VS = +500   → ~9:45     (slight rotation up)
+      //   VS = +1000  → ~10 o'clock
+      //   VS = +2000  → ~11 o'clock (max climb)
+      //   VS = -2000  → ~7 o'clock (max descent, mirror)
+      // Equal-radius sweep so the visual angle is linear with VS — no steep
+      // jump at low values.  Max angle capped at 60° from horizontal (11 / 7
+      // o'clock) — going further would overflow the narrow VS strip.
       const vc       = Math.max(-2000, Math.min(2000, d.vs));
       const pivotX   = xForYFrac(0);                   // curve apex = zero VS center
       const pivotY   = mid;
-      const HORIZ_LEN = 24;                            // horizontal reach (zero VS)
-      const VERT_LEN  = 110;                           // vertical reach (max VS)
-      const sweep    = (vc / 2000) * (Math.PI / 2);    // 0 at VS=0, ±π/2 at extremes
-      const tipX     = pivotX - HORIZ_LEN * Math.cos(sweep);
-      const tipY     = pivotY - VERT_LEN  * Math.sin(sweep);
+      const NEEDLE_LEN = 26;                           // fits within the strip
+      const MAX_ANGLE  = Math.PI / 3;                  // 60° = 11 o'clock cap
+      const sweep    = (vc / 2000) * MAX_ANGLE;        // 0 at VS=0, ±60° at extremes
+      const tipX     = pivotX - NEEDLE_LEN * Math.cos(sweep);
+      const tipY     = pivotY - NEEDLE_LEN * Math.sin(sweep);
       ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(pivotX, pivotY);
