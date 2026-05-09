@@ -82,7 +82,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       trend: 12,                                  // +12 kt over 10 s — clearly visible arrow
       mach: 0.42,
       alt: 3740, selAlt: 5000, qnh: 1013,
-      vs: -500,                                   // demo descent 500 fpm → pointer top-left to bottom-right, digit "5" at lower-right
+      vs: 500,                                    // demo climb 500 fpm → pivot at right-mid, tip rotates clockwise UP-LEFT, digit "5" at upper-left
       hdg: 258, selHdg: 260, track: 258,
       ils: { id: "IMNW", freq: "108.70", dist: 7.4 },
       gsPos: 0.25, locPos: 0.1,
@@ -541,7 +541,6 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
 
       // yFrac in [-1..+1], -1 at top of scale (climb), +1 at bottom (descent)
       const xForYFrac = (yFrac: number) => (x + w - 2) - BULGE * yFrac * yFrac;
-      const yForVs    = (vs: number) => mid - (vs / 2000) * halfH;
 
       // Curved right edge of the scale
       ctx.strokeStyle = "#666"; ctx.lineWidth = 1;
@@ -567,30 +566,35 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         });
       });
 
-      // Pointer — pivots at the ALTITUDE REFERENCE (right edge of altitude
-      // tape at current altitude), extends right + up/down to the curved scale
-      // at the VS value.  Climb → bottom-left to upper-right; descent → flips.
-      // FCOM DSC-31-40: the pointer originates at the altitude reading, NOT at
-      // the VS scale's left edge.
+      // Pointer — pivots at the ZERO CENTER on the right (curve apex at
+      // VS=0).  Pivot itself is invisible.  Tip sweeps elliptically:
+      //   VS=0      → tip points LEFT (horizontal, baseline)
+      //   VS=+2000  → tip points UP (clockwise rotation = climb)
+      //   VS=-2000  → tip points DOWN (anticlockwise = descent)
+      // Vertical sweep is longer than horizontal so the needle stays within
+      // the narrow VS strip while the climb/descent extreme points are clear.
       const vc       = Math.max(-2000, Math.min(2000, d.vs));
-      const yFracTip = -(vc / 2000);
-      const xTip     = xForYFrac(yFracTip);
-      const yTip     = yForVs(vc);
-      const pivotX   = AX + AW;                        // alt tape right edge
+      const pivotX   = xForYFrac(0);                   // curve apex = zero VS center
+      const pivotY   = mid;
+      const HORIZ_LEN = 24;                            // horizontal reach (zero VS)
+      const VERT_LEN  = 110;                           // vertical reach (max VS)
+      const sweep    = (vc / 2000) * (Math.PI / 2);    // 0 at VS=0, ±π/2 at extremes
+      const tipX     = pivotX - HORIZ_LEN * Math.cos(sweep);
+      const tipY     = pivotY - VERT_LEN  * Math.sin(sweep);
       ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(pivotX, mid);
-      ctx.lineTo(xTip - 1, yTip);
+      ctx.moveTo(pivotX, pivotY);
+      ctx.lineTo(tipX, tipY);
       ctx.stroke();
 
       // Boxed digit at the pointer tip — tens of fpm (e.g. "5" = 500 fpm).
-      // FCOM photo: box sits OUTSIDE the curved scale edge, attached at the tip.
+      // Box centred on the rotating tip.
       if (Math.abs(d.vs) > 50) {
         const vsHundreds = Math.round(Math.abs(d.vs) / 100);
         const digit = String(vsHundreds <= 9 ? vsHundreds : Math.floor(vsHundreds / 10));
         const boxW = 16, boxH = 14;
-        const boxX = xTip - 1;                       // left edge on the curve, box extends outward
-        const boxY = yTip - boxH / 2;
+        const boxX = tipX - boxW / 2;
+        const boxY = tipY - boxH / 2;
         ctx.fillStyle = "#000000";
         ctx.fillRect(boxX, boxY, boxW, boxH);
         ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 1.2;
@@ -681,7 +685,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         d.pitch = 2    + Math.sin(t) * 0.4;
         d.speed = 145;
         d.alt   = 3740;
-        d.vs    = -500;                               // demo descent (digit "5", pointer goes top-left to bottom-right)
+        d.vs    = 500;                                // demo climb (digit "5", pointer rotates clockwise UP from right-mid pivot)
       }
 
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
