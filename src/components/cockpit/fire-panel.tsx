@@ -13,6 +13,10 @@ const FIRE_PANEL_CSS = `
   0%, 100% { background-color: rgba(255, 179, 0, 0.12); box-shadow: inset 0 0 2px rgba(255,179,0,0.30); }
   50%      { background-color: rgba(255, 179, 0, 0.55); box-shadow: 0 0 6px rgba(255,179,0,0.65); }
 }
+@keyframes agent-arming-edge-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255, 179, 0, 0.45), 0 0 4px rgba(255, 179, 0, 0.30); }
+  50%      { box-shadow: 0 0 0 1.5px rgba(255, 179, 0, 0.95), 0 0 8px rgba(255, 179, 0, 0.70); }
+}
 @keyframes fire-light-pulse {
   0%, 100% { opacity: 0.85; }
   50%      { opacity: 1; }
@@ -648,11 +652,14 @@ function AgentPb({
           transition: "all 0.2s",
           zIndex: 1,
         }}>
-          {/* SQUIB cell — pulses amber during arming, solid white when armed */}
+          {/* SQUIB cell — outer EDGE pulses amber during the 10-s arming
+              countdown; INSIDE follows Airbus FCOM convention (white when
+              armed, off otherwise). DSC-26-20-20: SQUIB white when AGENT pb
+              becomes active. */}
           <div style={{
             flex: 1,
-            backgroundColor: arming ? undefined : (squibLit ? `${C.white}30` : C.ledOff),
-            animation: arming ? "agent-arming-pulse 1s ease-in-out infinite" : undefined,
+            backgroundColor: squibLit ? `${C.white}30` : C.ledOff,
+            animation: arming ? "agent-arming-edge-pulse 1s ease-in-out infinite" : undefined,
             borderRadius: "1px",
             display: "flex",
             alignItems: "center", justifyContent: "center",
@@ -660,9 +667,9 @@ function AgentPb({
           }}>
             <span style={{
               fontSize: "9px", fontFamily: "monospace", fontWeight: 800,
-              color: squibLit ? C.white : arming ? C.amber : C.dimLo,
+              color: squibLit ? C.white : C.dimLo,
               letterSpacing: "0.08em",
-              textShadow: squibLit ? `0 0 4px ${C.white}` : arming ? `0 0 3px ${C.amber}` : "none",
+              textShadow: squibLit ? `0 0 4px ${C.white}` : "none",
             }}>SQUIB</span>
           </div>
 
