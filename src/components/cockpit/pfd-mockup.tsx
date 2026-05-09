@@ -82,7 +82,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       trend: 12,                                  // +12 kt over 10 s — clearly visible arrow
       mach: 0.42,
       alt: 3740, selAlt: 5000, qnh: 1013,
-      vs: 500,                                    // demo climb 500 fpm → pointer up-right to digit "5" (matches FCOM photo)
+      vs: -500,                                   // demo descent 500 fpm → pointer top-left to bottom-right, digit "5" at lower-right
       hdg: 258, selHdg: 260, track: 258,
       ils: { id: "IMNW", freq: "108.70", dist: 7.4 },
       gsPos: 0.25, locPos: 0.1,
@@ -406,17 +406,20 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       }
       ctx.restore();
 
-      // Speed trend arrow (yellow) — projects current speed forward by `trend` kt.
-      // Drawn at the inner edge of the tape, starting OUTSIDE the speed value
-      // box so the line is fully visible.
+      // Speed trend arrow (yellow) — projects current speed forward by `trend`
+      // kt over 10 s.  Arrow points TOWARD where the speed is heading: up for
+      // acceleration, down for deceleration.
       if (d.trend !== undefined && Math.abs(d.trend) >= 1) {
         const trendY  = yFor(spd + d.trend);
         const trendX  = x + w + 1;                       // just outside the tape
         const startY  = d.trend > 0 ? mid - 18 : mid + 18; // edge of speed box
         ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(trendX, startY); ctx.lineTo(trendX, trendY); ctx.stroke();
-        // arrowhead (open V, pointing in direction of motion)
-        const dir = d.trend >= 0 ? -1 : 1;
+        // Arrowhead (open V) — wings on the trailing side of the tip so the
+        // arrow points in the direction of motion.  For accel (trend>0) the
+        // tip is HIGHER on canvas (smaller y), so wings extend DOWN (+y).
+        // For decel (trend<0) the tip is LOWER, so wings extend UP (-y).
+        const dir = d.trend >= 0 ? 1 : -1;
         ctx.beginPath();
         ctx.moveTo(trendX, trendY);
         ctx.lineTo(trendX - 5, trendY + dir * 8);
@@ -678,7 +681,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
         d.pitch = 2    + Math.sin(t) * 0.4;
         d.speed = 145;
         d.alt   = 3740;
-        d.vs    = 500;                                // demo climb (digit "5", pointer goes upper-right) — matches FCOM photo
+        d.vs    = -500;                               // demo descent (digit "5", pointer goes top-left to bottom-right)
       }
 
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
