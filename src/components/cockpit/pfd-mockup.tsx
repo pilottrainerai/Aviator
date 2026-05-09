@@ -221,16 +221,17 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       }
       ctx.restore();
 
-      // Bank arc ticks — top quarter, white at small angles + yellow accents
-      // at the deeper ones (per FCOM DSC-31-40 ROLL SCALE).  No digits — the
-      // angles are inferred from tick spacing.  ±45° gets an inverted triangle.
+      // Bank arc ticks per FCOM DSC-31-40: white roll scale with markers at
+      // 0°, 10°, 20°, 30°, and 45°.  0° is the white lubber line at top centre
+      // (drawn separately).  No digits.  ±45° gets a yellow inverted triangle
+      // accent.  (Bank > 45° declutters the PFD per FCOM — modelled in trainer
+      // logic, not in this visual layer.)
       ctx.save(); ctx.translate(cx, cy);
       const bankTicks: { angle: number; len: number; color: string; tri?: boolean }[] = [
         { angle: 10, len:  6, color: "#ffffff" },
         { angle: 20, len:  6, color: "#ffffff" },
         { angle: 30, len: 12, color: "#ffffff" },
         { angle: 45, len: 14, color: "#ffff00", tri: true },
-        { angle: 60, len: 14, color: "#ffffff" },
       ];
       bankTicks.forEach(({ angle, len, color, tri }) => {
         [-angle, angle].forEach(ang => {
@@ -291,16 +292,35 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.fill();
       ctx.restore();
 
-      // Fixed aircraft symbol
+      // Fixed aircraft symbol — FCOM DSC-31-40: "in black, and outlined in
+      // yellow."  Implemented as a thick yellow underlay (the outline) with
+      // a thinner black overlay on top for each line segment, plus a black-
+      // filled, yellow-bordered centre square.
       ctx.save(); ctx.translate(cx, cy);
-      ctx.strokeStyle = "#ff0"; ctx.lineWidth = 4.5;
-      ctx.beginPath(); ctx.moveTo(-65, 0); ctx.lineTo(-20, 0); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-65, 0); ctx.lineTo(-65, 12); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo( 20, 0); ctx.lineTo( 65, 0); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo( 65, 0); ctx.lineTo( 65, 12); ctx.stroke();
-      ctx.strokeStyle = "#ff0"; ctx.lineWidth = 2.5;
+
+      const drawWingSegment = (x1: number, y1: number, x2: number, y2: number) => {
+        ctx.lineCap = "round";
+        // Yellow outline (thicker)
+        ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        // Black core (thinner)
+        ctx.strokeStyle = "#000000"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      };
+
+      // Wings (left + right, with downward "tips")
+      drawWingSegment(-65, 0, -20, 0);
+      drawWingSegment(-65, 0, -65, 12);
+      drawWingSegment( 20, 0,  65, 0);
+      drawWingSegment( 65, 0,  65, 12);
+
+      // Centre square — black fill, yellow border
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(-9, -9, 18, 18);
+      ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 2.2;
       ctx.strokeRect(-9, -9, 18, 18);
-      ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(0, -35); ctx.stroke();
+
+      ctx.lineCap = "butt";
       ctx.restore();
 
       // Flight Director — symmetric crossed bars, equal length horizontally
