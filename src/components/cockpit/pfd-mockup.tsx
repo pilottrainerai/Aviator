@@ -168,12 +168,26 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     };
 
     // ── ADI ────────────────────────────────────────────────────────────────
+    // FCOM DSC-31-40 ATTITUDE DATA — outer shape is a STADIUM: top arc + bottom
+    // arc + straight vertical sides in the middle (NOT a circle).  The bank
+    // (roll) scale lies on the top arc; the roll index ▽ rotates around the
+    // top-arc centre so its apex always tracks the bank-angle position.
     const drawADI = () => {
-      const cx = ATX, cy = ATY, r = ATR;
+      const cx = ATX, cy = ATY, r = ATR;       // r = arc radius (also bank arc)
+      const VEXT = 18;                          // half-height of straight middle
       const PPD = 9.5;
+      const topArcCY = cy - VEXT;               // centre of the top arc
+      const botArcCY = cy + VEXT;               // centre of the bottom arc
 
       ctx.save();
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
+      // Stadium clip path: top semicircle → right straight → bottom semicircle → left straight
+      ctx.beginPath();
+      ctx.arc(cx, topArcCY, r, Math.PI, 2 * Math.PI);
+      ctx.lineTo(cx + r, botArcCY);
+      ctx.arc(cx, botArcCY, r, 0, Math.PI);
+      ctx.lineTo(cx - r, topArcCY);
+      ctx.closePath();
+      ctx.clip();
       ctx.translate(cx, cy);
       ctx.rotate(-d.roll * Math.PI / 180);
       ctx.translate(0, d.pitch * PPD);
@@ -226,7 +240,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       // (drawn separately).  No digits.  ±45° gets a yellow inverted triangle
       // accent.  (Bank > 45° declutters the PFD per FCOM — modelled in trainer
       // logic, not in this visual layer.)
-      ctx.save(); ctx.translate(cx, cy);
+      ctx.save(); ctx.translate(cx, topArcCY);
       const bankTicks: { angle: number; len: number; color: string; tri?: boolean }[] = [
         { angle: 10, len:  6, color: "#ffffff" },
         { angle: 20, len:  6, color: "#ffffff" },
@@ -265,24 +279,24 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.beginPath(); ctx.moveTo(-5, -r + 4); ctx.lineTo(5, -r + 4); ctx.stroke();
       ctx.restore();
 
-      // Roll index triangle (fixed top)
-      ctx.save(); ctx.translate(cx, cy - r + 6);
-      ctx.strokeStyle = "#ff0"; ctx.lineWidth = 2; ctx.fillStyle = "transparent";
-      ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(-9, 3); ctx.lineTo(9, 3); ctx.closePath(); ctx.stroke();
-      ctx.restore();
-
-      // Roll pointer + sideslip index (yellow trapezoid beneath roll pointer).
-      // Sideslip displaces the trapezoid laterally: ~1 cm = 0.2 g, hard stop at
-      // 0.3 g.  Both rotate with bank so they stay tangent to the bank scale.
-      ctx.save(); ctx.translate(cx, cy); ctx.rotate(-d.roll * Math.PI / 180);
-      ctx.fillStyle = "#ff0";
-      ctx.beginPath(); ctx.moveTo(0, -r + 10); ctx.lineTo(-7, -r + 24); ctx.lineTo(7, -r + 24); ctx.closePath(); ctx.fill();
-      // Sideslip trapezoid — narrow top edge (touching the roll triangle base),
-      // wider bottom edge.  Per FCOM (DSC-31-40): one centimetre of displacement
-      // = 0.2 g lateral acceleration, hard stop at 0.3 g.
+      // Roll index ▽ + sideslip index (FCOM DSC-31-40).  The roll INDEX is a
+      // single yellow OUTLINE triangle pointing DOWN at the top of the bank
+      // arc — its apex tracks the current bank angle as it rotates around the
+      // top-arc centre.  The sideslip trapezoid sits just beneath it.
+      ctx.save(); ctx.translate(cx, topArcCY); ctx.rotate(-d.roll * Math.PI / 180);
+      // Down-pointing triangle: apex BELOW (closer to ADI centre), base ABOVE
+      ctx.strokeStyle = "#ff0"; ctx.lineWidth = 2; ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(0, -r + 22);                        // apex (bottom — points down)
+      ctx.lineTo(-7, -r + 8);                        // top-left
+      ctx.lineTo(7, -r + 8);                         // top-right
+      ctx.closePath();
+      ctx.stroke();
+      // Sideslip trapezoid — beneath the roll index.  1 cm = 0.2 g, hard stop at 0.3 g.
       const slipG  = Math.max(-0.3, Math.min(0.3, d.sideslipG ?? 0));
-      const slipDx = (slipG / 0.2) * 18;             // ~18 px per 0.2 g
-      const sy = -r + 25;
+      const slipDx = (slipG / 0.2) * 18;
+      const sy = -r + 26;
+      ctx.fillStyle = "#ff0";
       ctx.beginPath();
       ctx.moveTo(slipDx - 4, sy);                    // narrow top (8 wide)
       ctx.lineTo(slipDx + 4, sy);
@@ -290,6 +304,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.lineTo(slipDx - 8, sy + 6);
       ctx.closePath();
       ctx.fill();
+      ctx.lineJoin = "miter";
       ctx.restore();
 
       // Fixed aircraft symbol — FCOM DSC-31-40: "in black, and outlined in
@@ -323,10 +338,11 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.lineCap = "butt";
       ctx.restore();
 
-      // Flight Director — symmetric crossed bars, equal length horizontally
-      // and vertically, centred on aircraft.
-      const fdPitchOffset = -12;   // climb command (above center)
-      const fdRollOffset  = 0;     // wings level (centred)
+      // Flight Director — green crossed bars, centred ON the aircraft symbol
+      // (DSC-22_30-20: pitch + roll guidance commands).  When aircraft is on
+      // commanded path, bars cross at the aircraft symbol centre.
+      const fdPitchOffset = 0;     // centred on aircraft (no climb offset in demo)
+      const fdRollOffset  = 0;     // wings level
       const FD_HALF = 45;          // half-length, same for both bars
       ctx.save(); ctx.translate(cx, cy);
       ctx.shadowColor = "#00dd00";
