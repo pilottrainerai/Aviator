@@ -337,12 +337,31 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             style={{ borderBottom: "1px solid var(--color-border)", height: "420px" }}
           >
             <div
-              className="px-4 py-1.5 shrink-0"
+              className="px-4 py-1.5 shrink-0 flex items-center justify-between"
               style={{ borderBottom: "1px solid var(--color-border)" }}
             >
               <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-muted)]">
                 ▸ COMMS
               </span>
+              {/* A{N} tag — only in ?dev=1 mode, shows which ATC call is active */}
+              {isDevMode && (() => {
+                const activeD = atcPhase.kind === "active" ? atcPhase.d : atcPhase.kind === "standby" ? atcPhase.d : null;
+                if (!activeD || !scenario.distractions) return null;
+                const idx = scenario.distractions.findIndex(d => d.id === activeD.id);
+                if (idx < 0) return null;
+                return (
+                  <span style={{
+                    padding: "2px 8px",
+                    backgroundColor: "#FFEB3B",
+                    color: "#000",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    fontFamily: "monospace",
+                    letterSpacing: "0.05em",
+                    borderRadius: "3px",
+                  }}>A{idx + 1}</span>
+                );
+              })()}
             </div>
             {/* Inner scroll container — comms modal is always fully visible */}
             <div className="flex-1 min-h-0 overflow-y-auto">
@@ -369,12 +388,30 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
           <div className="flex-1 min-h-0 flex flex-col" style={{ minHeight: "180px" }}>
             {/* Header */}
             <div
-              className="px-4 py-1.5 shrink-0"
+              className="px-4 py-1.5 shrink-0 flex items-center justify-between"
               style={{ borderBottom: "1px solid var(--color-border)" }}
             >
               <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-muted)]">
                 ▸ PROCEDURE
               </span>
+              {/* P{N} tag — only in ?dev=1 mode, shows which procedure step is active */}
+              {isDevMode && nextSoftwareStep && (() => {
+                const swSteps = scenario.steps.filter(s => !s.hardware && !s.optional);
+                const idx = swSteps.findIndex(s => s.id === nextSoftwareStep.id);
+                if (idx < 0) return null;
+                return (
+                  <span style={{
+                    padding: "2px 8px",
+                    backgroundColor: "#FFEB3B",
+                    color: "#000",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    fontFamily: "monospace",
+                    letterSpacing: "0.05em",
+                    borderRadius: "3px",
+                  }}>P{idx + 1}</span>
+                );
+              })()}
             </div>
             {/* Body — single active step card; scrolls internally if card is tall */}
             <div className="flex-1 min-h-0 overflow-y-auto">

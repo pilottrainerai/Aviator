@@ -60,14 +60,6 @@ export function DistractionModal({
   const secLeft = Math.ceil(remainingMs / 1000);
   const resurfaceSec = Math.round((distraction.standbyResurfaceMs ?? 25_000) / 1000);
 
-  // Dev mode (?dev=1) — gates the A1/A2/A3 reference tags on choices.
-  // Computed in useEffect so SSR and first client render agree (no hydration
-  // mismatch); the tags appear right after mount.
-  const [isDevMode, setIsDevMode] = useState(false);
-  useEffect(() => {
-    setIsDevMode(new URLSearchParams(window.location.search).has("dev"));
-  }, []);
-
   // Full-size card content — used in overlay mode
   const cardContent = (compact: boolean) => (
     <>
@@ -107,7 +99,7 @@ export function DistractionModal({
         style={{ borderTop: "1px solid #111820", padding: compact ? "8px 16px 8px" : "0 16px 12px", gap: compact ? "6px" : "6px" }}
       >
         <div style={{ color: "#3A4858", fontSize: "8px", letterSpacing: "0.2em", paddingTop: compact ? "0" : "10px", paddingBottom: "4px" }}>SELECT RESPONSE:</div>
-        {distraction.choices.map((choice, idx) => (
+        {distraction.choices.map((choice) => (
           <button
             key={choice.id}
             type="button"
@@ -125,24 +117,6 @@ export function DistractionModal({
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "1C"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent + "40"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "0A"; }}
           >
-            {/* Reference tag (A1/A2/A3...) — only visible in ?dev=1 mode */}
-            {isDevMode && (
-              <span style={{
-                display: "inline-block",
-                minWidth: "26px",
-                marginRight: "10px",
-                padding: "2px 6px",
-                backgroundColor: "#FFEB3B",   // bright yellow — high contrast, dev-only
-                color: "#000",
-                fontSize: "11px",
-                fontWeight: 800,
-                letterSpacing: "0.05em",
-                borderRadius: "3px",
-                textAlign: "center",
-                verticalAlign: "1px",
-                fontFamily: "monospace",
-              }}>A{idx + 1}</span>
-            )}
             {choice.label}
           </button>
         ))}
