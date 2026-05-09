@@ -33,10 +33,6 @@ export function DistractionModal({
   inline?: boolean;
 }) {
   const autoDismissMs = distraction.autoDismissMs ?? AUTO_DISMISS_DEFAULT;
-  // Dev mode — gates the A1/A2/A3 reference tags on choices.
-  const [isDevMode] = useState(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("dev"),
-  );
   const [remainingMs, setRemainingMs] = useState(autoDismissMs);
   const startedAt = useRef(performance.now());
 
@@ -63,6 +59,9 @@ export function DistractionModal({
   const pct = Math.max(0, (remainingMs / autoDismissMs) * 100);
   const secLeft = Math.ceil(remainingMs / 1000);
   const resurfaceSec = Math.round((distraction.standbyResurfaceMs ?? 25_000) / 1000);
+
+  // Dev mode (?dev=1) — gates the A1/A2/A3 reference tags on choices.
+  const isDevMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("dev");
 
   // Full-size card content — used in overlay mode
   const cardContent = (compact: boolean) => (
