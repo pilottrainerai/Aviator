@@ -597,8 +597,13 @@ function AgentPb({
   const isClickable = clickable && isArmed;
   const countdownSec = arming ? Math.max(0, Math.ceil((AGENT_ARM_DELAY_MS - elapsed) / 1000)) : 0;
 
-  const squibLit = isArmed;                // armed, ready to fire (solid white)
-  const dischLit = done;                   // agent fired (solid amber)
+  // FCOM DSC-26-20-20: SQUIB comes on white when the flight crew releases the
+  // FIRE pb (i.e., the AGENT pb-sw becomes active). It stays white until the
+  // agent is discharged. The 10-s arming countdown is procedural (waiting for
+  // N1 to decay) — it does NOT delay the SQUIB white indication.
+  // DISCH comes on amber when the corresponding fire bottle has lost pressure.
+  const squibLit = active && !done;        // armed (white) — strict Airbus
+  const dischLit = done;                   // agent fired (amber)
   const accent =
     dischLit ? C.amber :
     squibLit ? C.white :
@@ -634,7 +639,11 @@ function AgentPb({
           zIndex: 0,
         }} />
 
-        {/* Square pb body — equal width and height per FCOM AGENT pb proportions */}
+        {/* Square pb body — equal width and height per FCOM AGENT pb proportions.
+            Outer boundary GLOWS by state:
+              - arming (10-s wait): amber pulse on the outer ring
+              - armed (squibLit):   solid white halo
+              - discharged:         solid amber halo */}
         <div style={{
           position: "absolute",
           inset: 0,
@@ -644,22 +653,22 @@ function AgentPb({
           padding: "3px",
           display: "flex", flexDirection: "column",
           gap: "2px",
+          animation: arming ? "agent-arming-edge-pulse 1s ease-in-out infinite" : undefined,
           boxShadow:
-            dischLit ? `0 0 8px ${C.amber}50` :
-            squibLit ? `0 0 6px ${C.white}40` :
-            arming   ? `0 0 4px ${C.amber}45` :
+            arming   ? undefined :  // animation drives the box-shadow during arming
+            dischLit ? `0 0 0 1.5px ${C.amber}, 0 0 12px ${C.amber}90, 0 0 20px ${C.amber}40` :
+            squibLit ? `0 0 0 1.5px ${C.white}, 0 0 10px ${C.white}80, 0 0 18px ${C.white}40` :
             "none",
-          transition: "all 0.2s",
+          transition: arming ? undefined : "all 0.2s",
           zIndex: 1,
         }}>
-          {/* SQUIB cell — outer EDGE pulses amber during the 10-s arming
-              countdown; INSIDE follows Airbus FCOM convention (white when
-              armed, off otherwise). DSC-26-20-20: SQUIB white when AGENT pb
-              becomes active. */}
+          {/* SQUIB cell — strict Airbus FCOM (DSC-26-20-20): white when AGENT
+              pb-sw is active (after FIRE pb pushed), off otherwise. The
+              pulsing arming indicator lives on the OUTER BOUNDARY of the
+              AGENT pb, not on this inner cell. */}
           <div style={{
             flex: 1,
             backgroundColor: squibLit ? `${C.white}30` : C.ledOff,
-            animation: arming ? "agent-arming-edge-pulse 1s ease-in-out infinite" : undefined,
             borderRadius: "1px",
             display: "flex",
             alignItems: "center", justifyContent: "center",

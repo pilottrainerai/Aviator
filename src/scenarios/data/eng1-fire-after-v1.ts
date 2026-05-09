@@ -242,9 +242,13 @@ export const eng1FireAfterV1: Scenario = {
       hardware: true,
       ecamRef: "ecam_agent1",
       afterEffect: {
-        // 25 s: nominal fire extinction (within the 30 s Agent 2 decision window)
+        // 25 s after Agent 1: silence the warning + clear the primary procedure
+        // lines so the crew can proceed with the rest of the procedure. The
+        // fire visual indicators (FIRE pb red, FIRE light on master, ENG ✕)
+        // STAY LIT until both agents are discharged (training-driven choice —
+        // FCOM behaviour would extinguish here in the typical case).
         delayMs: 25_000,
-        triggerId: "fire_extinguished",
+        triggerId: "primary_ecam_cleared",
         effects: [
           { type: "SET_MASTER_WARN", active: false },
           { type: "SET_ALARM_LABEL", label: null },
@@ -258,16 +262,26 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
 
-    // ── 5 ── FCOM: "IF FIRE AFTER 30 S → AGENT 2 → DISCH" (conditional, optional)
+    // ── 5 ── Both-agent rule: fire only extinguishes after AGENT 2 is also
+    // discharged (training simplification — forces the crew to complete the
+    // full bottle sequence). Per strict FCOM, Agent 2 is optional and only
+    // used if fire persists 30 s after Agent 1.
     {
       id: "agent2",
       label: "AGENT 2",
       action: "DISCH",
-      hint: "PM: only if FIRE light still on 30 s after Agent 1. Last bottle — no restart possible after.",
+      hint: "PM: discharge AGENT 2 to fully extinguish the fire. Last bottle — no restart possible after.",
       variant: "caution",
       requires: ["agent1"],
       crew: "PM",
-      optional: true,
+      hardware: true,
+      afterEffect: {
+        // 5 s: bottle discharges, fire dies out, FIRE pb red light goes off,
+        // FIRE light on master panel goes off, ENG ✕ marker clears.
+        delayMs: 5_000,
+        triggerId: "fire_extinguished",
+        effects: [],
+      },
     },
 
     // ── 6 ── FCTM: Level off at Minimum Acceleration Altitude (~1500 ft)
