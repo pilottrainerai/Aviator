@@ -271,7 +271,7 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
           <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", padding: "10px 4px 8px 10px", overflow: "hidden" }}>
             {/* PFD + ND */}
             <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-              <div style={{ width: "370px", height: "455px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
+              <div style={{ width: "380px", height: "380px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
                 <PfdMockup state={runner.state} />
               </div>
               <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>

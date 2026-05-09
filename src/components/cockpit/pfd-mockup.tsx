@@ -90,7 +90,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     };
 
     // Layout constants
-    const ATX = 260, ATY = 315, ATR = 110;
+    const ATX = 260, ATY = 315, ATR = 130;
     const SX = 28,  SW = 62, ST = 125, SH = 345;
     const AX = 392, AW = 72, AT = 125, AH = 345;
     const VX = 468, VW = 30, VT = 125, VH = 345;
@@ -174,11 +174,10 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     // top-arc centre so its apex always tracks the bank-angle position.
     const drawADI = () => {
       const cx = ATX, cy = ATY, r = ATR;       // r = arc radius (also bank arc)
-      // Stadium proportions (FCOM-style): top arc ≈ 30 % of total height,
-      // straight middle ≈ 40 %, bottom arc ≈ 30 %.
-      // For r = 110 → straight half-height = 4r/3 ÷ 2 = 73 → middle = 146,
-      // total H = 366, total W = 220.  W/H ≈ 0.6.
-      const VEXT = 73;                          // half-height of straight middle
+      // Stadium with WIDER arcs and a SHORT straight middle, so the ADI
+      // appears squarish (W ≈ H) rather than tall.  W = 2r = 260,
+      // H = 2r + 2·VEXT = 300 → W/H ≈ 0.87.
+      const VEXT = 20;                          // half-height of straight middle
       const PPD = 9.5;
       const topArcCY = cy - VEXT;               // centre of the top arc
       const botArcCY = cy + VEXT;               // centre of the bottom arc
@@ -365,8 +364,13 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       ctx.shadowBlur = 0;
       ctx.restore();
 
-      // Circle border
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      // Stadium border — matches the clip path (no more circle around ADI).
+      ctx.beginPath();
+      ctx.arc(cx, topArcCY, r, Math.PI, 2 * Math.PI);
+      ctx.lineTo(cx + r, botArcCY);
+      ctx.arc(cx, botArcCY, r, 0, Math.PI);
+      ctx.lineTo(cx - r, topArcCY);
+      ctx.closePath();
       ctx.strokeStyle = "#2a2a2a"; ctx.lineWidth = 4; ctx.stroke();
 
       // GS scale (right of ADI)
