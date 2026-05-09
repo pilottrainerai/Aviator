@@ -33,6 +33,10 @@ export function DistractionModal({
   inline?: boolean;
 }) {
   const autoDismissMs = distraction.autoDismissMs ?? AUTO_DISMISS_DEFAULT;
+  // Dev mode — gates the A1/A2/A3 reference tags on choices.
+  const [isDevMode] = useState(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("dev"),
+  );
   const [remainingMs, setRemainingMs] = useState(autoDismissMs);
   const startedAt = useRef(performance.now());
 
@@ -117,22 +121,24 @@ export function DistractionModal({
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "1C"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent + "40"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "0A"; }}
           >
-            {/* Reference tag (A1/A2/A3...) — for change requests, no functional effect */}
-            <span style={{
-              display: "inline-block",
-              minWidth: "18px",
-              marginRight: "8px",
-              padding: "1px 4px",
-              backgroundColor: style.accent + "33",
-              color: style.accent,
-              fontSize: "8px",
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              borderRadius: "2px",
-              textAlign: "center",
-              verticalAlign: "1px",
-              fontFamily: "monospace",
-            }}>A{idx + 1}</span>
+            {/* Reference tag (A1/A2/A3...) — only visible in ?dev=1 mode */}
+            {isDevMode && (
+              <span style={{
+                display: "inline-block",
+                minWidth: "18px",
+                marginRight: "8px",
+                padding: "1px 4px",
+                backgroundColor: style.accent + "33",
+                color: style.accent,
+                fontSize: "8px",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                borderRadius: "2px",
+                textAlign: "center",
+                verticalAlign: "1px",
+                fontFamily: "monospace",
+              }}>A{idx + 1}</span>
+            )}
             {choice.label}
           </button>
         ))}

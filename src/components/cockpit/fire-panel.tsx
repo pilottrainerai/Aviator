@@ -1486,6 +1486,10 @@ function DslControlPanel({
 }) {
   const isDone   = (id: string) => !!state.completedSteps[id];
   const allDone  = controls.every(c => isDone(c.stepId));
+  // Dev mode — gates the P1/P2/P3 reference tags on procedure controls.
+  const [isDevMode] = useState(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("dev"),
+  );
 
   return (
     <div style={{ borderTop: "1px solid #1C2130", backgroundColor: warningActive ? "#060A12" : "#050709", padding: "6px 10px 8px" }}>
@@ -1529,22 +1533,24 @@ function DslControlPanel({
 
           return (
             <div key={ctrl.stepId} style={{ position: "relative" }}>
-              <span style={{
-                position: "absolute",
-                top: "-7px",
-                left: "-2px",
-                padding: "1px 4px",
-                backgroundColor: "#1C2130",
-                color: "#9AA1AC",
-                fontSize: "8px",
-                fontWeight: 700,
-                fontFamily: "monospace",
-                letterSpacing: "0.05em",
-                borderRadius: "2px",
-                border: "1px solid #2A3142",
-                pointerEvents: "none",
-                zIndex: 5,
-              }}>P{idx + 1}</span>
+              {isDevMode && (
+                <span style={{
+                  position: "absolute",
+                  top: "-7px",
+                  left: "-2px",
+                  padding: "1px 4px",
+                  backgroundColor: "#1C2130",
+                  color: "#9AA1AC",
+                  fontSize: "8px",
+                  fontWeight: 700,
+                  fontFamily: "monospace",
+                  letterSpacing: "0.05em",
+                  borderRadius: "2px",
+                  border: "1px solid #2A3142",
+                  pointerEvents: "none",
+                  zIndex: 5,
+                }}>P{idx + 1}</span>
+              )}
               {inner}
             </div>
           );
