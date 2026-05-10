@@ -327,12 +327,12 @@ export const eng1FireAfterV1: Scenario = {
     // We model this as a chain of steps gated on the previous one so the
     // crew goes through them in order.
 
-    // ── 1 ── Announce secondary failures
+    // ── 1 ── Announce secondary failures (just what the ECAM shows)
     {
       id: "announce_sec_failures",
       label: "SEC FAIL ANNOUNCE",
       action: "ANNOUNCE",
-      hint: "PM announces secondary failures: 'HYD G+Y AFFECTED, ELEC GEN 1 LOST, AIR BLEED 1 LOST.' PF acknowledges. These are consequences of FIRE pb push.",
+      hint: "PM reads what's affected on the ECAM secondary failures column and announces: 'HYD …, ELEC …, AIR BLEED …'. PF acknowledges.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
@@ -356,7 +356,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "stop_ecam",
       label: "STOP ECAM",
       action: "ORDER",
-      hint: "PF: 'STOP ECAM' — PM stops ECAM actions. Required by FCTM so the crew can perform the After Takeoff CL, system resets, and OEB review BEFORE reading STATUS.",
+      hint: "PF: 'STOP ECAM' — PM stops ECAM actions. PF asks for After Takeoff Checklist, any computer resets, and any OEB review before reading STATUS.",
       variant: "advisory",
       crew: "PF",
       group: "chclm",
