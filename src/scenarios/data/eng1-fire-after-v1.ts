@@ -337,6 +337,13 @@ export const eng1FireAfterV1: Scenario = {
       crew: "PM",
       group: "chclm",
       requires: ["agent1"],
+      notes: [
+        // Affected systems after ENG 1 FIRE pb push + AGENT 1 — draft list,
+        // refine as scenario logic is firmed up.
+        "HYD — GREEN system LO PR. ENG 1 pump SOV closed by FIRE pb. PTU may transfer YELLOW → GREEN.",
+        "ELEC — GEN 1 LOST. IDG 1 deactivated by FIRE pb. AC BUS 1 powered via BUS TIE from GEN 2 (or APU GEN if started).",
+        "AIR BLEED — BLEED 1 LOST. ENG 1 bleed SOV closed by FIRE pb. PACK 1 SHUT DOWN; X-BLEED may auto-open to feed PACK 1 from BLEED 2.",
+      ],
     },
 
     // ── 2 ── Announce STATUS page
