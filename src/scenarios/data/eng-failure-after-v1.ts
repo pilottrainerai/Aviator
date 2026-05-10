@@ -256,26 +256,52 @@ export const engFailureAfterV1: Scenario = {
       },
     },
 
-    // Engine secured call + TCAS (parallel after MASTER OFF)
+    // ENGINE SECURED — per FCTM 12850: for engine failure WITHOUT damage,
+    // engine is secured at "ENG MASTER OFF" (no FIRE pb, no agents needed).
     {
       id: "engine_secured_call",
       label: "ENGINE SECURED",
-      action: "CALL",
-      hint: "PM→PF: 'ENGINE SECURED — ENG 1 MASTER OFF — NO FIRE.' PF: 'CHECKED.' Engine is secured once ECAM actioned to ENG MASTER OFF (no damage, no fire).",
+      action: "ANNOUNCE",
+      hint: "After ENG MASTER OFF (no fire, no damage), PM announces 'ENGINE SECURED'. PF acknowledges.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
       requires: ["eng1_master_off"],
     },
+
+    // LAND ASAP — amber per FCOM (engine shutdown without damage/fire).
+    // Acknowledges the LAND ASAP indication; crew commits to nearest suitable
+    // airport (no rush / no immediate threat like a fire — amber semantics).
     {
-      id: "atc_mayday_inform",
-      label: "MAYDAY — INFORM ATC",
-      action: "CALL",
-      hint: "PM declares MAYDAY to Delhi Tower — ENG 1 failure, engine shut down, maintaining runway heading, engine-out climb procedure. Tower acknowledges and provides handoff to Departure 124.3.",
-      variant: "advisory",
+      id: "announce_land_asap",
+      label: "LAND ASAP",
+      action: "ANNOUNCE",
+      hint: "PF announces 'LAND ASAP' (amber on ECAM). Engine shutdown without damage / fire — land at the nearest suitable airport. Amber = urgency, not distress.",
+      variant: "caution",
+      crew: "PF",
+      group: "chclm",
+      requires: ["engine_secured_call"],
+    },
+
+    // PAN PAN — for engine failure WITHOUT damage (FCOM: PAN PAN, not MAYDAY).
+    // Captain may upgrade to MAYDAY if conditions warrant.
+    {
+      id: "atc_pan_pan",
+      label: "PAN PAN",
+      action: "DECLARE",
+      hint: "Call ATC: 'PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' Brief — declare, state, standby. Captain may upgrade to MAYDAY if conditions worsen.",
+      variant: "caution",
       crew: "PM",
       group: "comms",
-      requires: ["engine_secured_call"],
+      requires: ["announce_land_asap"],
+      notes: [
+        "PAN PAN × 3 (×2 if abbreviated)",
+        "Callsign",
+        "Nature: engine failure engine 1 (no fire)",
+        "Position / heading / altitude",
+        "STANDBY — defer intentions until workload eases",
+        "Upgrade to MAYDAY only if condition worsens (damage indicated, fire, control issue)",
+      ],
     },
     {
       id: "tcas_ta",
@@ -291,9 +317,9 @@ export const engFailureAfterV1: Scenario = {
     // ── CLEAN UP (Eng-Out Acc Altitude, min 1000 ft AGL) ─────────────────────
     {
       id: "level_off_maa",
-      label: "LVL OFF — ENG OUT ACC ALT",
+      label: "V/S 0 AT MAA",
       action: "SELECT",
-      hint: "PF: at Eng-Out Accel Altitude (min 1000 ft AGL, engine secured), push OP CLB. SRS → CLB transition on FMA. Hold speed — do not accelerate until altitude reached.",
+      hint: "PF: at minimum acceleration altitude PUSH V/S knob → V/S 0. Aircraft levels off, A/THR maintains target speed; SRS reverts as the level-off captures. Acceleration delayed until engine secured (FCTM 12850).",
       variant: "switch",
       crew: "PF",
       requires: ["eng1_master_off"],
@@ -390,6 +416,10 @@ export const engFailureAfterV1: Scenario = {
       crew: "PF",
       group: "flightcheck",
       requires: ["oeb_computer_check"],
+      notes: [
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE supplementary procedure (SE flight management — drift-down, perf, fuel).",
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING procedure (approach planning — Vapp, flap setting, autobrake, EO go-around).",
+      ],
     },
     {
       id: "crew_crosscheck",
@@ -413,22 +443,6 @@ export const engFailureAfterV1: Scenario = {
     },
 
     // ── CRM / COMMS ───────────────────────────────────────────────────────────
-    {
-      id: "golden_rules",
-      label: "GOLDEN RULES",
-      action: "CONFIRM",
-      hint: "PF calls rules, PM confirms. Cross-check only — informational.",
-      variant: "advisory",
-      crew: "PF",
-      group: "comms",
-      optional: true,
-      notes: [
-        "① FLY · NAVIGATE · COMMUNICATE — aviate first, always",
-        "② APPROPRIATE AUTOMATION — AP on, FMGS managing — monitor FMA at every mode change",
-        "③ UNDERSTAND FMA — Monitor · Announce · Confirm · Understand every change",
-        "④ ACT if UNEXPECTED — PF changes automation / PM: Question · Challenge · Take-over",
-      ],
-    },
     {
       id: "wx_request",
       label: "WEATHER / ATIS",
