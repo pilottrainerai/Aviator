@@ -114,7 +114,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "cancel_master_warn",
       label: "MASTER WARN",
       action: "CANCEL",
-      hint: "PM pushes MASTER WARN glareshield light — silences CRC, resets red light. ECAM procedure remains displayed.",
+      hint: "PM cancels MASTER WARN FIRST — pushes glareshield light to silence CRC and reset the red light. ECAM procedure stays displayed. Aviate continues; no ECAM actions until 400 ft and flight path stabilised.",
       variant: "warning",
       crew: "PM",
       group: "glareshield",
@@ -129,16 +129,19 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
 
-    // ── 400 FT GATE ── PM announces "ECAM ACTIONS" (flightcheck popup)
-    // Only unlocks after aviate complete + MW cancelled.
+    // ── 400 FT GATE ── AVIATE complete → NAVIGATE SID/EO → "ECAM ACTIONS"
+    // FCTM Golden Rules: 400 ft AGL gates the start of ECAM.  Aviate + flight
+    // path stabilised must come first; Master Warning cancelled.  PM then
+    // announces "AVIATE COMPLETE, NAVIGATE SID/EO PROCEDURE" and PF orders
+    // "ECAM ACTIONS".
     {
       id: "four_hundred_ft_cmd",
-      label: "400 FT — ECAM ACTIONS",
+      label: "400 FT — AVIATE COMPLETE, ECAM ACTIONS",
       action: "ANNOUNCE",
-      hint: "PM: 'ECAM ACTIONS' — PF acknowledges. Aviate complete and MW cancelled first.",
+      hint: "At 400 ft AGL with flight path stabilised, PM announces 'AVIATE COMPLETE, NAVIGATE SID OR EO PROCEDURE'. PF orders 'ECAM ACTIONS'. Master Warning must be cancelled first.",
       variant: "advisory",
       group: "flightcheck",
-      requires: ["engage_ap_fma"],
+      requires: ["engage_ap_fma", "cancel_master_warn"],
       crew: "PM",
     },
 
@@ -284,12 +287,16 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
 
-    // ── 6 ── FCTM: Level off at Minimum Acceleration Altitude (~1500 ft)
+    // ── 6 ── FCTM AOP-30-30: at minimum acceleration altitude (MAA), PF
+    // PUSHES the V/S knob to set V/S 0 — levels off the aircraft so the crew
+    // can accelerate and clean up the configuration while still single-engine.
+    // SRS automatically reverts to CLB / OP CLB when the new altitude is
+    // captured, but the level-off command is V/S 0 (not OP CLB).
     {
       id: "level_off_maa",
-      label: "LVL OFF MAA",
+      label: "V/S 0 AT MAA",
       action: "SELECT",
-      hint: "PF: at MIN ACCEL ALT select OP CLB or LVL CHG. Hold speed, monitor SRS→CLB transition on FMA.",
+      hint: "PF: at minimum acceleration altitude PUSH V/S knob → V/S 0. Aircraft levels off, A/THR maintains target speed; SRS reverts as the level-off captures. Begin accel + flap retraction.",
       variant: "switch",
       requires: ["agent1"],
       crew: "PF",
@@ -306,19 +313,66 @@ export const eng1FireAfterV1: Scenario = {
       crew: "PF",
     },
 
-    // ── CHCLM CROSSCHECK ──────────────────────────────────────────────────────
-    // After ECAM actions complete: PM cross-checks with PF before proceeding.
-    // This step GATES all subsequent CRM/comms actions — pilots cannot advance
-    // until the ECAM crosscheck is verbally confirmed.
+    // ── POST-ECAM SEQUENCE — FCTM AOP-30-30 (lines 2759-2810) ────────────────
+    // The strict order per FCTM is:
+    //   1. (Primary ECAM lines cleared)
+    //   2. Secondary failures announced (HYD / ELEC / AIR BLEED)
+    //   3. PM announces "STATUS" when STATUS page appears
+    //   4. PF orders "STOP ECAM" — ECAM actions stopped
+    //   5. After Takeoff CL, OEB, system reset (as applicable)
+    //   6. STATUS — READ by PF (includes INOP SYS in red)
+    //   7. PM: "REMOVE STATUS?" — PF: "CONFIRM" — PM: STS pb PRESS
+    //   8. PM announces "ECAM ACTIONS COMPLETE"
+    //
+    // We model this as a chain of steps gated on the previous one so the
+    // crew goes through them in order.
+
+    // ── 1 ── Announce secondary failures
     {
-      id: "crew_crosscheck",
-      label: "ECAM CROSSCHECK",
-      action: "CONFIRM",
-      hint: "PM→PF: 'ECAM ACTIONS COMPLETE. AGENT 1 DISCHARGED. FIRE LIGHT [STATUS].' PF: 'CHECKED, MONITOR.'",
+      id: "announce_sec_failures",
+      label: "SEC FAIL ANNOUNCE",
+      action: "ANNOUNCE",
+      hint: "PM announces secondary failures: 'HYD G+Y AFFECTED, ELEC GEN 1 LOST, AIR BLEED 1 LOST.' PF acknowledges. These are consequences of FIRE pb push.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
       requires: ["agent1"],
+    },
+
+    // ── 2 ── Announce STATUS page
+    {
+      id: "announce_status",
+      label: "STATUS — ANNOUNCE",
+      action: "ANNOUNCE",
+      hint: "When STATUS page appears: PM announces 'STATUS' to indicate the ECAM has reached the STATUS phase.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["announce_sec_failures"],
+    },
+
+    // ── 3 ── STOP ECAM — PF orders, PM stops
+    {
+      id: "stop_ecam",
+      label: "STOP ECAM",
+      action: "ORDER",
+      hint: "PF: 'STOP ECAM' — PM stops ECAM actions. Required by FCTM so the crew can perform the After Takeoff CL, system resets, and OEB review BEFORE reading STATUS.",
+      variant: "advisory",
+      crew: "PF",
+      group: "chclm",
+      requires: ["announce_status"],
+    },
+
+    // ── 4 ── After Takeoff Checklist (normal CL)
+    {
+      id: "after_takeoff_cl",
+      label: "AFTER TAKEOFF CL",
+      action: "COMPLETE",
+      hint: "PM runs After Takeoff CL: gear UP, flaps UP, spoilers DISARM, packs ON. FCTM: 'good compromise between necessary ECAM application and system analysis vs delay in system status check.'",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["stop_ecam"],
     },
 
     // ── CRM CHECKLIST ────────────────────────────────────────────────────────────
@@ -343,17 +397,46 @@ export const eng1FireAfterV1: Scenario = {
       ],
     },
 
-    // ── CR-OEB ── OEB Check — at STATUS, before post-ECAM actions
-    // FCOM: at STATUS page, flight crew checks for applicable OEBs that modify procedure.
+    // ── 5 ── OEB / Computer Reset check — between After Takeoff CL and STATUS read
+    // FCTM: at this stage the crew considers any system reset per QRH reset
+    // table (e.g. successful reset → STATUS page disappears).  Also reviews
+    // QRH OEB list for any applicable bulletin modifying the procedure.
     {
       id: "oeb_check",
-      label: "OEB CHECK",
+      label: "OEB / RESET CHECK",
       action: "CONFIRM",
-      hint: "PM: check QRH OEB list for any applicable bulletin modifying ENG 1 FIRE procedure. If none applicable — state 'NO APPLICABLE OEB'. PF acknowledges.",
+      hint: "PM: review QRH OEB list and consider any applicable system reset per QRH reset table. Don't apply system resets from memory. If none applicable — 'NO APPLICABLE OEB OR RESET.' PF acknowledges.",
       variant: "advisory",
       crew: "PM",
-      group: "comms",
-      requires: ["crew_crosscheck"],
+      group: "chclm",
+      requires: ["after_takeoff_cl"],
+    },
+
+    // ── 6 ── STATUS — READ (PF reads the STATUS page)
+    {
+      id: "read_status",
+      label: "STATUS — READ",
+      action: "READ",
+      hint: "PF reads the STATUS page line by line — APPR PROC (any conditional procedure), INOP SYS in red (CAT 3, BLUE HYD…), and any associated SE approach notes. Preview procedures to evaluate workload.",
+      variant: "advisory",
+      crew: "PF",
+      group: "chclm",
+      requires: ["oeb_check"],
+    },
+
+    // ── 7 ── ECAM ACTIONS COMPLETE — final announce by PM
+    // FCTM: after STATUS read, PM "REMOVE STATUS?" / PF "CONFIRM" / PM STS pb
+    // PRESS, then PM announces "ECAM ACTIONS COMPLETE."  Modelled here as a
+    // single confirmation step.
+    {
+      id: "crew_crosscheck",
+      label: "ECAM ACTIONS COMPLETE",
+      action: "ANNOUNCE",
+      hint: "PM 'REMOVE STATUS?' — PF 'CONFIRM' — PM presses STS pb. PM announces 'ECAM ACTIONS COMPLETE.' This gates the move to approach planning.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["read_status"],
     },
 
     // ── CR1 ── WX / ATIS — requires CHCLM crosscheck complete
