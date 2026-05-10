@@ -90,11 +90,15 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     };
 
     // Layout constants
-    const ATX = 260, ATY = 297, ATR = 100;
+    // ADI horizontally centred between the right edge of the speed tape (90)
+    // and the left edge of the altitude tape (392) — midpoint ≈ 241.  Width
+    // bumped 20 % (r 100 → 120) so the ADI fills more of the available
+    // horizontal space.  HDG tape recentred to line up with the ADI.
+    const ATX = 241, ATY = 297, ATR = 120;
     const SX = 28,  SW = 62, ST = 125, SH = 345;
     const AX = 392, AW = 72, AT = 125, AH = 345;
     const VX = 468, VW = 30, VT = 125, VH = 345;
-    const HX = 125, HW = 265, HY = 510, HH = 58;
+    const HX = 108, HW = 265, HY = 510, HH = 58;
     const FH = 92;
 
     // ── Helpers ─────────────────────────────────────────────────────────────
