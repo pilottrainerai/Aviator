@@ -412,6 +412,9 @@ export const eng1FireAfterV1: Scenario = {
       crew: "PF",
       group: "chclm",
       requires: ["oeb_check"],
+      notes: [
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE supplementary procedure (apply after ECAM is complete for SE flight management — drift-down, perf, fuel, single-engine approach).",
+      ],
     },
 
     // ── 7 ── ECAM ACTIONS COMPLETE — final announce by PM

@@ -1525,7 +1525,7 @@ function DslControlPanel({
           switch (ctrl.kind) {
             case "thr_lever": return <DslThrLeverCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
             case "mode_sel":  return <DslModeSelCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={warningActive} />;
+            case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={fireLit} />;
             case "fire_pb":   return (
               <AirbusPB key={ctrl.stepId} topText="FIRE" topColor={C.red} label={ctrl.label} sublabel={ctrl.sub} large
                 legendLit={fireLit}
