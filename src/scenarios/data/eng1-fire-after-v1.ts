@@ -300,7 +300,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "engine_secured",
       label: "ENGINE SECURED",
       action: "ANNOUNCE",
-      hint: "After AGENT 2 discharge and fire extinguishes (FIRE pb red light + ENG MASTER FIRE light go off), PM announces 'ENGINE SECURED'. PF acknowledges. Engine is now secured per FCTM (12852).",
+      hint: "After AGENT 2 discharge and fire extinguishes (FIRE pb red light + ENG MASTER FIRE light go off), PM announces 'ENGINE SECURED'. PF acknowledges.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
