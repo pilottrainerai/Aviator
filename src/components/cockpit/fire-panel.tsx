@@ -294,9 +294,12 @@ function AirbusPB({
 
   // ledBg / ledTextColor: lit whenever btnState is active/armed/done OR the
   // caller explicitly says legendLit (fire-light-on-pb-not-yet-pushed case).
+  // FCOM DSC-26-20-20: the WHOLE pb face lights up red when the FIRE light is
+  // active — both the legend cell and the body, treated as one continuous
+  // red surface.
   const lit = btnState === "active" || legendLit;
   const ledBg =
-    lit                    ? `${legendCol}CC` :
+    lit                    ? legendCol :                  // solid red, no alpha
     btnState === "armed"   ? `${C.white}28` :
     btnState === "done"    ? `${legendCol}25` :
     C.ledOff;
@@ -499,14 +502,18 @@ function AirbusPB({
           </span>
         </div>
 
-        {/* Bottom face — the engine label and "PUSH" instruction */}
+        {/* Bottom face — the engine label and "PUSH" instruction.  When the
+            FIRE light is lit, the bottom face shares the legend cell's red
+            background so the WHOLE pb looks like one continuous red surface
+            (FCOM DSC-26-20-20). */}
         <div
           style={{
-            backgroundColor: C.btnFace,
+            backgroundColor: lit ? legendCol : C.btnFace,
             borderRadius: "0 0 1px 1px",
             padding: large ? "5px 6px 7px" : "5px 5px 4px",
             textAlign: "center",
-            borderTop: `1px solid ${bezelBorder}40`,
+            borderTop: `1px solid ${lit ? legendCol : bezelBorder + "40"}`,
+            transition: "background-color 0.2s",
           }}
         >
           <div
@@ -515,9 +522,10 @@ function AirbusPB({
               fontFamily: "monospace",
               fontWeight: 700,
               letterSpacing: "0.08em",
-              color: C.white,
+              color: lit ? "#FFFFFF" : C.white,
               lineHeight: 1.2,
               textTransform: "uppercase",
+              textShadow: lit ? "0 0 4px rgba(0,0,0,0.6)" : "none",
             }}
           >
             {label}
@@ -528,11 +536,12 @@ function AirbusPB({
               style={{
                 fontSize: "8px",
                 fontFamily: "monospace",
-                color: btnState === "active" ? legendCol : C.dim,
+                color: lit ? "#FFFFFF" : btnState === "active" ? legendCol : C.dim,
                 fontWeight: 700,
                 letterSpacing: "0.18em",
                 marginTop: "3px",
                 textTransform: "uppercase",
+                textShadow: lit ? "0 0 4px rgba(0,0,0,0.6)" : "none",
                 transition: "color 0.2s",
               }}
             >
