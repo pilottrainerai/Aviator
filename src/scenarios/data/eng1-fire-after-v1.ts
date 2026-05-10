@@ -287,18 +287,40 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
 
+    // ── 5b ── ENGINE SECURED — PM announce per FCTM
+    // FCTM line 12852: "An engine is considered as secured when the ECAM
+    // actions of the procedures are performed until […] Fire extinguished or
+    // 'AGENT 2 DISCH' for an engine fire."  The fire_extinguished trigger
+    // fires 5 s after AGENT 2 (fire pb red light + ENG MASTER FIRE light
+    // both go off); PM then announces "ENGINE SECURED" and the crew may
+    // proceed with the acceleration sequence (level off MAA → S speed →
+    // clean).  Per FCTM line 12848 the flight crew must DELAY the
+    // acceleration until the engine is secured.
+    {
+      id: "engine_secured",
+      label: "ENGINE SECURED",
+      action: "ANNOUNCE",
+      hint: "After AGENT 2 discharge and fire extinguishes (FIRE pb red light + ENG MASTER FIRE light go off), PM announces 'ENGINE SECURED'. PF acknowledges. Engine is now secured per FCTM (12852).",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["agent2"],
+    },
+
     // ── 6 ── FCTM AOP-30-30: at minimum acceleration altitude (MAA), PF
     // PUSHES the V/S knob to set V/S 0 — levels off the aircraft so the crew
     // can accelerate and clean up the configuration while still single-engine.
     // SRS automatically reverts to CLB / OP CLB when the new altitude is
-    // captured, but the level-off command is V/S 0 (not OP CLB).
+    // captured, but the level-off command is V/S 0 (not OP CLB).  Acceleration
+    // is delayed until the engine is secured (FCTM 12848) — hence requires
+    // engine_secured.
     {
       id: "level_off_maa",
       label: "V/S 0 AT MAA",
       action: "SELECT",
       hint: "PF: at minimum acceleration altitude PUSH V/S knob → V/S 0. Aircraft levels off, A/THR maintains target speed; SRS reverts as the level-off captures. Begin accel + flap retraction.",
       variant: "switch",
-      requires: ["agent1"],
+      requires: ["engine_secured"],
       crew: "PF",
     },
 
@@ -336,7 +358,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["agent1"],
+      requires: ["engine_secured"],
       notes: [
         // Affected systems after ENG 1 FIRE pb push + AGENT 1 — draft list,
         // refine as scenario logic is firmed up.
