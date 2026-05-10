@@ -536,7 +536,7 @@ function AirbusPB({
               style={{
                 fontSize: "8px",
                 fontFamily: "monospace",
-                color: lit ? "#FFFFFF" : btnState === "active" ? legendCol : C.dim,
+                color: lit ? "#FFFFFF" : C.dim,
                 fontWeight: 700,
                 letterSpacing: "0.18em",
                 marginTop: "3px",
