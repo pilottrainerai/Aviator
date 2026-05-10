@@ -387,23 +387,6 @@ export const eng1FireAfterV1: Scenario = {
     // ATC MAYDAY is declared via the ATC distraction calls (not a separate step here).
     // Sequence: Golden Rules → WX + LDG perf → NIS → PAX → OPS → Approach brief → Prep
 
-    // ── CR0 ── Golden Rules — available from the start (no requires)
-    {
-      id: "golden_rules",
-      label: "GOLDEN RULES",
-      action: "CONFIRM",
-      hint: "PF calls rules, PM responds CONFIRMED. Confirms crew is following Airbus priority sequence.",
-      variant: "advisory",
-      crew: "PF",
-      group: "comms",
-      notes: [
-        "① FLY · NAVIGATE · COMMUNICATE — in this order, with appropriate tasksharing",
-        "② Use APPROPRIATE AUTOMATION — pilot judgment prevails, including manual flight",
-        "③ Understand your FMA — Monitor · Announce · Confirm · Understand",
-        "④ Take ACTION if unexpected — PF changes automation / PM: Question · Challenge · Take-over",
-      ],
-    },
-
     // ── 5 ── OEB / Computer Reset check — between After Takeoff CL and STATUS read
     // FCTM: at this stage the crew considers any system reset per QRH reset
     // table (e.g. successful reset → STATUS page disappears).  Also reviews
@@ -439,7 +422,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "crew_crosscheck",
       label: "ECAM ACTIONS COMPLETE",
       action: "ANNOUNCE",
-      hint: "PM 'REMOVE STATUS?' — PF 'CONFIRM' — PM presses STS pb. PM announces 'ECAM ACTIONS COMPLETE.' This gates the move to approach planning.",
+      hint: "PM 'REMOVE STATUS?' — PF 'CONFIRM' — PM presses STS pb. PM announces 'ECAM ACTIONS COMPLETE.'",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
@@ -451,7 +434,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "wx_request",
       label: "WX / ATIS",
       action: "REQUEST",
-      hint: "PM requests ATIS or direct from Delhi Approach: wind dir/speed, QNH, temp, vis, RVR RWY 28. Note contamination risk.",
+      hint: "PM requests latest weather from Delhi Approach: wind dir/speed, QNH, temp, vis, RVR RWY 28.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
@@ -509,7 +492,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "nis_brief",
       label: "NITS BRIEF",
       action: "CONFIRM",
-      hint: "Interphone to SCCM — NATURE: engine fire, ENG 1 shut down. INTENTIONS: landing VIDP RWY 28. TIME: approx 15 min. SPECIAL: crew at stations, prepare for emergency landing.",
+      hint: "Interphone to SCCM — NATURE: engine fire, ENG 1 shut down. INTENTIONS: landing VIDP RWY 28. TIME: approx 15 min. SPECIAL: precautionary or emergency landing per Captain's decision.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
@@ -518,7 +501,7 @@ export const eng1FireAfterV1: Scenario = {
         "N — NATURE: 'Engine fire, ENG 1 shut down, aircraft serviceable'",
         "I — INTENTIONS: 'Returning and landing runway 28 Delhi VIDP'",
         "T — TIME: 'Approximately 15 minutes to landing'",
-        "S — SPECIAL: 'Crew at stations. On brace command — BRACE BRACE BRACE. Do NOT evacuate unless instructed.'",
+        "S — SPECIAL: 'Crew at stations. Precautionary or emergency landing per Captain's decision.'",
       ],
     },
 
