@@ -322,16 +322,28 @@ export const eng1FireAfterV1: Scenario = {
       requires: ["engine_secured"],
     },
 
-    // ── 5d ── MAYDAY call to ATC
+    // ── 5d ── MAYDAY call to ATC — brief FCTM/SOP format
+    // MAYDAY identification + state + STANDBY.  No intentions or runway
+    // requests yet — that comes later once workload eases (see CR6
+    // approach_brief).  ATC will acknowledge with vectors/altitude and
+    // standby for the crew to come back when ready.
     {
       id: "mayday_atc",
       label: "MAYDAY",
       action: "DECLARE",
-      hint: "Call ATC: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, request immediate return.' Establishes priority handling.",
+      hint: "Call ATC: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' Brief — declare, state, standby. No intentions yet.",
       variant: "warning",
       crew: "PM",
       group: "comms",
       requires: ["announce_land_asap"],
+      notes: [
+        "MAYDAY × 3",
+        "Callsign",
+        "Nature: engine fire engine 1",
+        "Position / heading / altitude",
+        "STANDBY — defer intentions and POB/fuel until workload eases",
+        "ATC will respond with vectors / altitude and standby for further call",
+      ],
     },
 
     // ── 6 ── FCTM AOP-30-30: at minimum acceleration altitude (MAA), PF
