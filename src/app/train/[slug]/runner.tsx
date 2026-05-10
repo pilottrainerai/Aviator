@@ -891,8 +891,36 @@ function AccordionGroupRow({
 
 import type { RunnerHandle } from "@/lib/scenarios/runner";
 
+// ─── Draggable helper — header acts as drag handle ──────────────────────────
+function useDraggable(defaultX: number, defaultY: number) {
+  const [pos, setPos] = useState<{ x: number; y: number }>({ x: defaultX, y: defaultY });
+  const originRef = useRef<{ mouseX: number; mouseY: number; panelX: number; panelY: number } | null>(null);
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!originRef.current) return;
+      const dx = e.clientX - originRef.current.mouseX;
+      const dy = e.clientY - originRef.current.mouseY;
+      setPos({ x: originRef.current.panelX + dx, y: originRef.current.panelY + dy });
+    };
+    const onUp = () => { originRef.current = null; document.body.style.userSelect = ""; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+  const startDrag = useCallback((e: React.MouseEvent) => {
+    originRef.current = { mouseX: e.clientX, mouseY: e.clientY, panelX: pos.x, panelY: pos.y };
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  }, [pos.x, pos.y]);
+  return { pos, startDrag };
+}
+
 function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenario }) {
   const [open, setOpen] = useState(true);
+  const { pos, startDrag } = useDraggable(16, typeof window !== "undefined" ? window.innerHeight - 720 : 100);
 
   const unFiredTriggers = scenario.triggers.filter(
     (t) => !runner.state.triggersFired[t.id],
@@ -914,10 +942,11 @@ function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenar
 
   return (
     <div
-      className="fixed font-mono"
+      className="font-mono"
       style={{
-        bottom: "60px",
-        left: "16px",
+        position: "fixed",
+        left: `${pos.x}px`,
+        top: `${pos.y}px`,
         zIndex: 9999,
         width: open ? "300px" : "auto",
         backgroundColor: "#0A0D10",
@@ -926,14 +955,14 @@ function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenar
         boxShadow: "0 0 20px #FF660020",
       }}
     >
-      {/* Header */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-3 py-2"
-        style={{ borderBottom: open ? "1px solid #FF660025" : "none" }}
+      {/* Header — drag handle (whole bar).  Toggle button is separate. */}
+      <div
+        onMouseDown={startDrag}
+        className="flex items-center justify-between px-3 py-2 select-none"
+        style={{ borderBottom: open ? "1px solid #FF660025" : "none", cursor: "grab" }}
       >
         <div className="flex items-center gap-2">
+          <span style={{ fontSize: "9px", color: "#FF660080" }}>⋮⋮</span>
           <span style={{ fontSize: "7px", letterSpacing: "0.25em", color: "#FF6600", fontWeight: 700 }}>
             ⚙ DEV MODE
           </span>
@@ -943,8 +972,15 @@ function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenar
             </span>
           )}
         </div>
-        <span style={{ color: "#FF660060", fontSize: "9px" }}>{open ? "▾" : "▸"}</span>
-      </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+          style={{ color: "#FF660060", fontSize: "9px", padding: "0 4px", cursor: "pointer" }}
+        >
+          {open ? "▾" : "▸"}
+        </button>
+      </div>
 
       {open && (
         <div className="flex flex-col gap-3 p-3">
@@ -1147,6 +1183,10 @@ function AtcDevPanel({
   setDistractionQueue: React.Dispatch<React.SetStateAction<ScenarioDistraction[]>>;
 }) {
   const [open, setOpen] = useState(true);
+  const { pos, startDrag } = useDraggable(
+    typeof window !== "undefined" ? window.innerWidth - 340 : 800,
+    typeof window !== "undefined" ? window.innerHeight - 720 : 100,
+  );
   const distractions = scenario.distractions ?? [];
   const activeId = atcPhase.kind !== "idle" ? atcPhase.d.id : null;
 
@@ -1169,10 +1209,11 @@ function AtcDevPanel({
 
   return (
     <div
-      className="fixed font-mono"
+      className="font-mono"
       style={{
-        bottom: "60px",
-        right: "16px",
+        position: "fixed",
+        left: `${pos.x}px`,
+        top: `${pos.y}px`,
         zIndex: 9999,
         width: open ? "320px" : "auto",
         backgroundColor: "#0A0D10",
@@ -1181,13 +1222,13 @@ function AtcDevPanel({
         boxShadow: "0 0 20px #00D06020",
       }}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-3 py-2"
-        style={{ borderBottom: open ? "1px solid #00D06025" : "none" }}
+      <div
+        onMouseDown={startDrag}
+        className="flex items-center justify-between px-3 py-2 select-none"
+        style={{ borderBottom: open ? "1px solid #00D06025" : "none", cursor: "grab" }}
       >
         <div className="flex items-center gap-2">
+          <span style={{ fontSize: "9px", color: "#00D06080" }}>⋮⋮</span>
           <span style={{ fontSize: "7px", letterSpacing: "0.25em", color: "#00D060", fontWeight: 700 }}>
             📡 ATC DEV
           </span>
@@ -1197,8 +1238,15 @@ function AtcDevPanel({
             </span>
           )}
         </div>
-        <span style={{ color: "#00D06060", fontSize: "9px" }}>{open ? "▾" : "▸"}</span>
-      </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+          style={{ color: "#00D06060", fontSize: "9px", padding: "0 4px", cursor: "pointer" }}
+        >
+          {open ? "▾" : "▸"}
+        </button>
+      </div>
 
       {open && (
         <div className="flex flex-col gap-3 p-3">
