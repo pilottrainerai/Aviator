@@ -90,7 +90,7 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     };
 
     // Layout constants
-    const ATX = 260, ATY = 315, ATR = 130;
+    const ATX = 260, ATY = 297, ATR = 100;
     const SX = 28,  SW = 62, ST = 125, SH = 345;
     const AX = 392, AW = 72, AT = 125, AH = 345;
     const VX = 468, VW = 30, VT = 125, VH = 345;
@@ -174,10 +174,10 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     // top-arc centre so its apex always tracks the bank-angle position.
     const drawADI = () => {
       const cx = ATX, cy = ATY, r = ATR;       // r = arc radius (also bank arc)
-      // Stadium with WIDER arcs and a SHORT straight middle, so the ADI
-      // appears squarish (W ≈ H) rather than tall.  W = 2r = 260,
-      // H = 2r + 2·VEXT = 300 → W/H ≈ 0.87.
-      const VEXT = 20;                          // half-height of straight middle
+      // Stadium tuned to MATCH the speed / altitude tape height (345 px).
+      // Smaller top + bottom arcs + LONGER straight middle, per the FCOM
+      // photo proportions.  W = 200, H = 346, ratio 29 % / 42 % / 29 %.
+      const VEXT = 73;                          // half-height of straight middle
       const PPD = 9.5;
       const topArcCY = cy - VEXT;               // centre of the top arc
       const botArcCY = cy + VEXT;               // centre of the bottom arc
