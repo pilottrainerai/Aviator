@@ -307,6 +307,33 @@ export const eng1FireAfterV1: Scenario = {
       requires: ["agent2"],
     },
 
+    // ── 5c ── LAND ASAP announce (red on ECAM)
+    // Before reading secondary failures, PF acknowledges the LAND ASAP
+    // indication shown in red on ECAM — confirms commitment to land at the
+    // nearest suitable airport.
+    {
+      id: "announce_land_asap",
+      label: "LAND ASAP",
+      action: "ANNOUNCE",
+      hint: "PF announces 'LAND ASAP' (red on ECAM). Crew commits to land at the nearest suitable airport with full emergency services.",
+      variant: "warning",
+      crew: "PF",
+      group: "chclm",
+      requires: ["engine_secured"],
+    },
+
+    // ── 5d ── MAYDAY call to ATC
+    {
+      id: "mayday_atc",
+      label: "MAYDAY",
+      action: "DECLARE",
+      hint: "Call ATC: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, request immediate return.' Establishes priority handling.",
+      variant: "warning",
+      crew: "PM",
+      group: "comms",
+      requires: ["announce_land_asap"],
+    },
+
     // ── 6 ── FCTM AOP-30-30: at minimum acceleration altitude (MAA), PF
     // PUSHES the V/S knob to set V/S 0 — levels off the aircraft so the crew
     // can accelerate and clean up the configuration while still single-engine.
@@ -358,7 +385,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["engine_secured"],
+      requires: ["mayday_atc"],
       notes: [
         // Affected systems after ENG 1 FIRE pb push + AGENT 1 — draft list,
         // refine as scenario logic is firmed up.

@@ -64,7 +64,16 @@ export function reduce(state: ScenarioState, event: ScenarioEvent): ScenarioStat
       return next;
     }
     case "EFFECT": {
-      let next: ScenarioState = { ...state, tMs: event.tMs };
+      // An EFFECT event represents the delayed side-effect of a step's
+      // afterEffect.  Mark the source trigger id as fired so downstream
+      // queries (e.g. fireLit = !triggersFired.fire_extinguished) work.
+      let next: ScenarioState = {
+        ...state,
+        tMs: event.tMs,
+        triggersFired: state.triggersFired[event.sourceId]
+          ? state.triggersFired
+          : { ...state.triggersFired, [event.sourceId]: event.tMs },
+      };
       for (const effect of event.effects) {
         next = applyEffect(next, effect);
       }
