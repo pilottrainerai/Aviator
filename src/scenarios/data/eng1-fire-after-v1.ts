@@ -413,7 +413,8 @@ export const eng1FireAfterV1: Scenario = {
       group: "chclm",
       requires: ["oeb_check"],
       notes: [
-        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE supplementary procedure (apply after ECAM is complete for SE flight management — drift-down, perf, fuel, single-engine approach).",
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE supplementary procedure (apply after ECAM is complete for SE flight management — drift-down, perf, fuel).",
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING procedure (apply during approach planning — Vapp computation, flap setting, autobrake, autoland eligibility, go-around).",
       ],
     },
 
@@ -566,11 +567,14 @@ export const eng1FireAfterV1: Scenario = {
       id: "approach_brief",
       label: "APPROACH BRIEF",
       action: "COMPLETE",
-      hint: "PF briefs: ILS RWY 28 VIDP, single-engine CAT 1. DA 200 ft. Vapp +5 kt. Non-normal items from STATUS: APPR CAT 1, HYD GRN LO PR, GEN 1 INOP. Go-around briefed.",
+      hint: "PF briefs: ILS RWY 28 VIDP, single-engine CAT 1. DA 200 ft. Vapp +5 kt. Non-normal items from STATUS: APPR CAT 1, HYD GRN LO PR, GEN 1 INOP. Go-around briefed. Reference QRH ONE ENG INOPERATIVE LANDING procedure.",
       variant: "advisory",
       crew: "PF",
       group: "comms",
       requires: ["atc_emergency_services"],
+      notes: [
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING (Vapp, flap setting, autobrake, autoland eligibility, EO go-around).",
+      ],
     },
 
     // ── CR6b ── Go-around review — DURING the approach briefing.
