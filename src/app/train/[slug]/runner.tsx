@@ -535,7 +535,16 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
 
       {/* ── DEV PANEL — only when ?dev=1 in URL ── */}
       {isDevMode && (
-        <DevPanel runner={runner} scenario={scenario} />
+        <>
+          <DevPanel runner={runner} scenario={scenario} />
+          <AtcDevPanel
+            scenario={scenario}
+            atcPhase={atcPhase}
+            firedDistractionsRef={firedDistractionsRef}
+            setAtcPhase={setAtcPhase}
+            setDistractionQueue={setDistractionQueue}
+          />
+        </>
       )}
     </main>
   );
@@ -888,9 +897,20 @@ function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenar
   const unFiredTriggers = scenario.triggers.filter(
     (t) => !runner.state.triggersFired[t.id],
   );
+  const firedTriggers = scenario.triggers.filter(
+    (t) => !!runner.state.triggersFired[t.id],
+  );
   const pendingSteps = scenario.steps.filter(
     (s) => !runner.state.completedSteps[s.id] && !s.optional,
   );
+  // Completed steps in the order they were completed (most recent first)
+  const completedSteps = scenario.steps
+    .filter((s) => !!runner.state.completedSteps[s.id])
+    .sort(
+      (a, b) =>
+        (runner.state.completedSteps[b.id] || 0) -
+        (runner.state.completedSteps[a.id] || 0),
+    );
 
   return (
     <div
@@ -1019,11 +1039,272 @@ function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenar
             </div>
           )}
 
+          {/* Completed steps — undo buttons for moving BACK */}
+          {completedSteps.length > 0 && (
+            <div>
+              <div style={{ color: "#3A4858", fontSize: "7px", letterSpacing: "0.2em", marginBottom: "4px" }}>
+                COMPLETED — click ↩ to undo
+              </div>
+              <div className="flex flex-col gap-1" style={{ maxHeight: "180px", overflowY: "auto" }}>
+                {completedSteps.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-2 px-2 py-1.5"
+                    style={{
+                      backgroundColor: "#00D06008",
+                      border: "1px solid #00D06030",
+                      borderRadius: "2px",
+                    }}
+                  >
+                    <span style={{ color: "#5AAA75", fontSize: "9px", flex: 1 }}>{s.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => runner.undoStep(s.id)}
+                      title={`Undo ${s.label}`}
+                      style={{
+                        padding: "1px 6px",
+                        fontSize: "9px",
+                        fontWeight: 700,
+                        backgroundColor: "#FFB30018",
+                        color: "#FFB300",
+                        border: "1px solid #FFB30040",
+                        borderRadius: "2px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ↩
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Fired triggers — undo to re-fire */}
+          {firedTriggers.length > 0 && (
+            <div>
+              <div style={{ color: "#3A4858", fontSize: "7px", letterSpacing: "0.2em", marginBottom: "4px" }}>
+                FIRED TRIGGERS — click ↩ to un-fire
+              </div>
+              <div className="flex flex-col gap-1" style={{ maxHeight: "120px", overflowY: "auto" }}>
+                {firedTriggers.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-2 px-2 py-1.5"
+                    style={{
+                      backgroundColor: "#FF660008",
+                      border: "1px solid #FF660030",
+                      borderRadius: "2px",
+                    }}
+                  >
+                    <span style={{ color: "#CC8844", fontSize: "9px", flex: 1 }}>{t.id}</span>
+                    <button
+                      type="button"
+                      onClick={() => runner.undoTrigger(t.id)}
+                      title={`Un-fire ${t.id}`}
+                      style={{
+                        padding: "1px 6px",
+                        fontSize: "9px",
+                        fontWeight: 700,
+                        backgroundColor: "#FFB30018",
+                        color: "#FFB300",
+                        border: "1px solid #FFB30040",
+                        borderRadius: "2px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ↩
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {pendingSteps.length === 0 && unFiredTriggers.length === 0 && (
             <span style={{ color: "#2E3A48", fontSize: "8px", letterSpacing: "0.15em" }}>
               ALL STEPS COMPLETE
             </span>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ATC dev panel — right side, lets dev jump to any ATC call ──────────────
+function AtcDevPanel({
+  scenario,
+  atcPhase,
+  firedDistractionsRef,
+  setAtcPhase,
+  setDistractionQueue,
+}: {
+  scenario: Scenario;
+  atcPhase: AtcPhase;
+  firedDistractionsRef: React.RefObject<Set<string>>;
+  setAtcPhase: React.Dispatch<React.SetStateAction<AtcPhase>>;
+  setDistractionQueue: React.Dispatch<React.SetStateAction<ScenarioDistraction[]>>;
+}) {
+  const [open, setOpen] = useState(true);
+  const distractions = scenario.distractions ?? [];
+  const activeId = atcPhase.kind !== "idle" ? atcPhase.d.id : null;
+
+  const fireDistraction = (d: ScenarioDistraction) => {
+    firedDistractionsRef.current?.add(d.id);
+    setDistractionQueue([]);                     // clear any pending queue
+    setAtcPhase({ kind: "active", d });
+  };
+
+  const skipCurrent = () => {
+    setAtcPhase({ kind: "idle" });
+  };
+
+  const replayDistraction = (d: ScenarioDistraction) => {
+    firedDistractionsRef.current?.delete(d.id);  // allow re-fire
+    setAtcPhase({ kind: "active", d });
+  };
+
+  if (distractions.length === 0) return null;
+
+  return (
+    <div
+      className="fixed font-mono"
+      style={{
+        bottom: "60px",
+        right: "16px",
+        zIndex: 9999,
+        width: open ? "320px" : "auto",
+        backgroundColor: "#0A0D10",
+        border: "1px solid #00D06040",
+        borderRadius: "4px",
+        boxShadow: "0 0 20px #00D06020",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2"
+        style={{ borderBottom: open ? "1px solid #00D06025" : "none" }}
+      >
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: "7px", letterSpacing: "0.25em", color: "#00D060", fontWeight: 700 }}>
+            📡 ATC DEV
+          </span>
+          {activeId && (
+            <span style={{ fontSize: "7px", letterSpacing: "0.2em", color: "#FFB300", fontWeight: 700 }}>
+              {atcPhase.kind === "active" ? "▶ ACTIVE" : "⏸ STANDBY"}
+            </span>
+          )}
+        </div>
+        <span style={{ color: "#00D06060", fontSize: "9px" }}>{open ? "▾" : "▸"}</span>
+      </button>
+
+      {open && (
+        <div className="flex flex-col gap-3 p-3">
+          {activeId && (
+            <button
+              type="button"
+              onClick={skipCurrent}
+              style={{
+                padding: "4px 10px",
+                fontSize: "8px",
+                letterSpacing: "0.15em",
+                fontWeight: 700,
+                backgroundColor: "#FF330018",
+                color: "#FF6666",
+                border: "1px solid #FF333340",
+                borderRadius: "2px",
+                cursor: "pointer",
+              }}
+            >
+              ⏭ SKIP CURRENT
+            </button>
+          )}
+
+          <div>
+            <div style={{ color: "#3A4858", fontSize: "7px", letterSpacing: "0.2em", marginBottom: "4px" }}>
+              ATC CALLS — click to fire, ↩ to replay
+            </div>
+            <div className="flex flex-col gap-1" style={{ maxHeight: "420px", overflowY: "auto" }}>
+              {distractions.map((d, idx) => {
+                const fired = firedDistractionsRef.current?.has(d.id) ?? false;
+                const isActive = activeId === d.id;
+                return (
+                  <div
+                    key={d.id}
+                    className="flex items-center gap-2 px-2 py-1.5"
+                    style={{
+                      backgroundColor: isActive ? "#00D06020" : fired ? "#1A2030" : "#00D06008",
+                      border: `1px solid ${isActive ? "#00D06080" : fired ? "#1E2A3A" : "#00D06030"}`,
+                      borderRadius: "2px",
+                      opacity: isActive ? 1 : fired ? 0.5 : 1,
+                    }}
+                  >
+                    <span
+                      style={{
+                        padding: "1px 4px",
+                        fontSize: "8px",
+                        fontWeight: 800,
+                        backgroundColor: "#FFEB3B",
+                        color: "#000",
+                        borderRadius: "2px",
+                        letterSpacing: "0.04em",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      A{idx + 1}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: isActive ? "#9AE0A8" : "#7A8A9A", fontSize: "9px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {d.from}
+                      </div>
+                      <div style={{ color: "#3A4858", fontSize: "7px", letterSpacing: "0.05em" }}>
+                        {d.id} · T+{(d.atMs / 1000).toFixed(0)}s
+                      </div>
+                    </div>
+                    {fired && !isActive ? (
+                      <button
+                        type="button"
+                        onClick={() => replayDistraction(d)}
+                        title={`Replay ${d.id}`}
+                        style={{
+                          padding: "1px 6px",
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          backgroundColor: "#FFB30018",
+                          color: "#FFB300",
+                          border: "1px solid #FFB30040",
+                          borderRadius: "2px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        ↩
+                      </button>
+                    ) : !isActive ? (
+                      <button
+                        type="button"
+                        onClick={() => fireDistraction(d)}
+                        title={`Fire ${d.id}`}
+                        style={{
+                          padding: "1px 6px",
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          backgroundColor: "#00D06018",
+                          color: "#00D060",
+                          border: "1px solid #00D06040",
+                          borderRadius: "2px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        ▶
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { reduce } from "@/engine/reducer";
 import { initialScenarioState, type ScenarioState } from "@/engine/state";
 import type { ScenarioEvent, PilotAction } from "@/engine/events";
@@ -23,10 +23,19 @@ export type RunnerHandle = {
   resume: () => void;
   /** Manually fire a trigger by id (dev mode only). No-op if already fired. */
   fireTrigger: (triggerId: string) => void;
+  /** Dev-mode undo of a completed step.  Removes the STEP event and any
+   *  EFFECT events sourced from its afterEffect, then replays state. */
+  undoStep: (stepId: string) => void;
+  /** Dev-mode undo of a fired trigger.  Removes the TRIGGER event and
+   *  replays state.  The trigger becomes re-fireable. */
+  undoTrigger: (triggerId: string) => void;
 };
 
 export function useScenarioRunner(scenario: Scenario): RunnerHandle {
-  const [state, dispatch] = useReducer(reduce, undefined, initialScenarioState);
+  const [state, setState] = useState<ScenarioState>(() => initialScenarioState());
+  const dispatch = useCallback((e: ScenarioEvent) => {
+    setState((s) => reduce(s, e));
+  }, []);
   const [events, setEvents] = useState<ScenarioEvent[]>([]);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [status, setStatus] = useState<RunnerStatus>("running");
@@ -145,7 +154,47 @@ export function useScenarioRunner(scenario: Scenario): RunnerHandle {
     setStatus("ended");
   }, []);
 
-  return { state, events, elapsedMs, status, paused, perform, end, pause, resume, fireTrigger };
+  // ── Dev-mode undo helpers ──────────────────────────────────────────────────
+  // Filter the recorded events list and recompute state by replaying through
+  // the reducer.  This gives a clean undo without trying to invert each
+  // individual side effect.
+
+  const replayEvents = useCallback((newEvents: ScenarioEvent[]) => {
+    let next = initialScenarioState();
+    for (const e of newEvents) {
+      next = reduce(next, e);
+    }
+    setState(next);
+    setEvents(newEvents);
+  }, []);
+
+  const undoStep = useCallback(
+    (stepId: string) => {
+      const step = scenario.steps.find((s) => s.id === stepId);
+      const triggerIdToRemove = step?.afterEffect?.triggerId ?? null;
+      const filtered = events.filter((e) => {
+        if (e.kind === "STEP" && e.stepId === stepId) return false;
+        if (e.kind === "EFFECT" && triggerIdToRemove && e.sourceId === triggerIdToRemove) return false;
+        return true;
+      });
+      replayEvents(filtered);
+    },
+    [scenario, events, replayEvents],
+  );
+
+  const undoTrigger = useCallback(
+    (triggerId: string) => {
+      firedTriggersRef.current.delete(triggerId);
+      const filtered = events.filter((e) => {
+        if (e.kind === "TRIGGER" && e.triggerId === triggerId) return false;
+        return true;
+      });
+      replayEvents(filtered);
+    },
+    [events, replayEvents],
+  );
+
+  return { state, events, elapsedMs, status, paused, perform, end, pause, resume, fireTrigger, undoStep, undoTrigger };
 }
 
 export const TICK_INTERVAL_MS_PUBLIC = TICK_INTERVAL_MS;
