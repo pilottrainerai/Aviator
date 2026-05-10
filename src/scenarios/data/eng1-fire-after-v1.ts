@@ -388,22 +388,20 @@ export const eng1FireAfterV1: Scenario = {
     // We model this as a chain of steps gated on the previous one so the
     // crew goes through them in order.
 
-    // ── 1 ── Announce secondary failures (just what the ECAM shows)
+    // ── 1 ── Announce secondary failures (PM reads from SD, ECAM-line format)
     {
       id: "announce_sec_failures",
-      label: "SEC FAIL ANNOUNCE",
-      action: "ANNOUNCE",
-      hint: "PM reads what's affected on the ECAM secondary failures column and announces: 'HYD …, ELEC …, AIR BLEED …'. PF acknowledges.",
+      label: "ECAM — SECONDARY FAILURES",
+      action: "READ",
+      hint: "PM reads secondary system failures from SD after engine secured. PF cross-checks and acknowledges each item.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
       requires: ["mayday_atc"],
       notes: [
-        // Affected systems after ENG 1 FIRE pb push + AGENT 1 — draft list,
-        // refine as scenario logic is firmed up.
-        "HYD — GREEN system LO PR. ENG 1 pump SOV closed by FIRE pb. PTU may transfer YELLOW → GREEN.",
-        "ELEC — GEN 1 LOST. IDG 1 deactivated by FIRE pb. AC BUS 1 powered via BUS TIE from GEN 2 (or APU GEN if started).",
-        "AIR BLEED — BLEED 1 LOST. ENG 1 bleed SOV closed by FIRE pb. PACK 1 SHUT DOWN; X-BLEED may auto-open to feed PACK 1 from BLEED 2.",
+        "HYD G ENG1 PUMP...LO PR  — Green sys ENG1 pump SOV closed by FIRE pb. PTU may transfer YELLOW → GREEN.",
+        "GEN 1 FAULT.........OFF  — IDG1 deactivated by FIRE pb. BTC auto-closes, AC BUS 1 fed by GEN 2.",
+        "ENG 1 BLEED......FAULT   — ENG 1 bleed SOV closed by FIRE pb. XBLEED AUTO opens, PACK 1 monitor.",
       ],
     },
 
@@ -436,11 +434,18 @@ export const eng1FireAfterV1: Scenario = {
       id: "after_takeoff_cl",
       label: "AFTER TAKEOFF CL",
       action: "COMPLETE",
-      hint: "PM runs After Takeoff CL: gear UP, flaps UP, spoilers DISARM, packs ON. FCTM: 'good compromise between necessary ECAM application and system analysis vs delay in system status check.'",
+      hint: "PF: 'Any NORMAL CHECKLIST?' — PM runs After Takeoff checklist. Note items already complete or N/A due to failure.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
       requires: ["stop_ecam"],
+      notes: [
+        "PACKS ............. CHECK (single pack ops — PACK 2 AUTO)",
+        "SEAT BELTS ........ ON",
+        "LANDING GEAR ...... UP / 3 OFF",
+        "ENGINE MODE SEL ... IGN (already set per ECAM)",
+        "FLAPS ............. 0 (clean / as required)",
+      ],
     },
 
     // ── CRM CHECKLIST ────────────────────────────────────────────────────────────
@@ -448,50 +453,70 @@ export const eng1FireAfterV1: Scenario = {
     // ATC MAYDAY is declared via the ATC distraction calls (not a separate step here).
     // Sequence: Golden Rules → WX + LDG perf → NIS → PAX → OPS → Approach brief → Prep
 
-    // ── 5 ── OEB / Computer Reset check — between After Takeoff CL and STATUS read
-    // FCTM: at this stage the crew considers any system reset per QRH reset
-    // table (e.g. successful reset → STATUS page disappears).  Also reviews
-    // QRH OEB list for any applicable bulletin modifying the procedure.
+    // ── 5 ── OEB / Computer Resets check
     {
       id: "oeb_check",
-      label: "OEB / RESET CHECK",
-      action: "CONFIRM",
-      hint: "PM: review QRH OEB list and consider any applicable system reset per QRH reset table. Don't apply system resets from memory. If none applicable — 'NO APPLICABLE OEB OR RESET.' PF acknowledges.",
+      label: "OEB / COMPUTER RESETS",
+      action: "CHECK",
+      hint: "PF: 'Any OEB? Any COMPUTER RESETS?' — PM checks for applicable OEB items and required computer resets per QRH reset table. Don't apply resets from memory. If none — 'NO APPLICABLE OEB OR RESET.'",
       variant: "advisory",
-      crew: "PM",
+      crew: "PF",
       group: "chclm",
       requires: ["after_takeoff_cl"],
     },
 
-    // ── 6 ── STATUS — READ (PF reads the STATUS page)
+    // ── 6 ── READ STATUS — PF calls for STATUS to be read
     {
       id: "read_status",
-      label: "STATUS — READ",
-      action: "READ",
-      hint: "PF reads the STATUS page line by line — APPR PROC (any conditional procedure), INOP SYS in red (CAT 3, BLUE HYD…), and any associated SE approach notes. Preview procedures to evaluate workload.",
+      label: "READ STATUS",
+      action: "CALL",
+      hint: "PF: 'READ STATUS' — PM reads the ECAM STATUS page aloud. PF cross-checks each item.",
       variant: "advisory",
       crew: "PF",
       group: "chclm",
       requires: ["oeb_check"],
       notes: [
-        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE supplementary procedure (apply after ECAM is complete for SE flight management — drift-down, perf, fuel).",
-        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING procedure (apply during approach planning — Vapp computation, flap setting, autobrake, autoland eligibility, go-around).",
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE supplementary procedure (SE flight management — drift-down, perf, fuel).",
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING procedure (approach planning — Vapp, flap setting, autobrake, EO go-around).",
+      ],
+    },
+
+    // ── 6b ── STATUS items / INOP SYS — PM reads aloud, PF cross-checks
+    {
+      id: "status_read_aloud",
+      label: "ECAM STATUS — PM READS",
+      action: "REVIEW",
+      hint: "PM reads STATUS page aloud, item by item. PF: 'CHECKED' after each item. APPR PROC, INOP SYS (red), and any conditional procedure are reviewed for workload.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["read_status"],
+      notes: [
+        "ENG 1 SHUT DOWN",
+        "AGENT 1 DISCH / AGENT 2 DISCH (both bottles used)",
+        "ENG 1 FIRE DET ... DEGRADED (single loop remaining)",
+        "HYD G ENG1 PUMP LO PR",
+        "GEN 1 INOP",
+        "ENG 1 BLEED FAULT",
+        "PACK 1 ........... MONITOR (single pack ops)",
+        "APPR CAT 1 (degraded approach capability)",
+        "MAX FL 250 (single-engine ceiling)",
+        "TCAS .............. TA only",
       ],
     },
 
     // ── 7 ── ECAM ACTIONS COMPLETE — final announce by PM
     // FCTM: after STATUS read, PM "REMOVE STATUS?" / PF "CONFIRM" / PM STS pb
-    // PRESS, then PM announces "ECAM ACTIONS COMPLETE."  Modelled here as a
-    // single confirmation step.
+    // PRESS, then PM announces "ECAM ACTIONS COMPLETE."
     {
       id: "crew_crosscheck",
-      label: "ECAM ACTIONS COMPLETE",
+      label: "ECAM ACTIONS COMPLETED",
       action: "ANNOUNCE",
-      hint: "PM 'REMOVE STATUS?' — PF 'CONFIRM' — PM presses STS pb. PM announces 'ECAM ACTIONS COMPLETE.'",
+      hint: "PM: 'ECAM ACTIONS COMPLETED.' PF acknowledges. All primary ECAM procedures complete, secondary failures reviewed, STATUS read.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["read_status"],
+      requires: ["status_read_aloud"],
     },
 
     // ── CR1 ── WX / ATIS — requires CHCLM crosscheck complete
