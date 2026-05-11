@@ -174,3 +174,121 @@ If FCOM is silent on a visual property and FCTM doesn't fill the gap:
 ```
 
 And note in the assessment under `Divergences` with severity `low` and classification `simulation-placeholder`.
+
+---
+
+## 10. Build Mode — high-fidelity panel construction
+
+**Auto-engages** whenever the user wants to build or reproduce a cockpit
+element with fidelity to a reference.  The reference can be:
+- A **photo** (alone) — Claude reads measurements from the image.
+- An **FCOM/FCTM section** (alone) — e.g., "Build the BLEED panel per DSC-36-20" — Claude greps the section and treats the manual as the visual spec.
+- **Both** — photo + FCOM section — Claude uses photo for measurements/colors AND FCOM for behaviour/states, cross-checking the two.
+
+User does not need to remember the protocol — Claude runs the internal
+phases and surfaces only **two checkpoints**.
+
+### 10.1 The two checkpoints
+
+```
+Checkpoint A — THE PLAN
+  Claude shows ONE document: scope + measurements + FCOM check + tech choice.
+  User: "go" → proceed.  Or: "fix X" → revise the plan, show again.
+
+Checkpoint B — THE RESULT
+  Claude shows ONE document: code summary + render diff (photo vs build).
+  User: "done" → ship.  Or: "fix Y" → ONE focused iteration, then done.
+```
+
+That's it.  The user only ever says "go" / "done" or specific corrections
+("the legend cell is too short", "make the border thinner").  Claude
+handles scope-lock, measurement, FCOM grep, implementation plan,
+verification, and the one-iteration cap internally.
+
+### 10.2 Checkpoint A — THE PLAN
+
+Single combined output before any code is written.  Format:
+
+```
+┌─ THE PLAN ─────────────────────────────────────────────────────────┐
+SCOPE:        <element name>.  In scope: <X>.  Out of scope: <Y>.
+FCOM:         <DSC-XX-YY> — <one-line summary of what FCOM says>
+
+MEASUREMENTS (from photo):
+  Container:        <W>px × <H>px (≈<X%> of panel)
+  Sub-elements:
+    • <name>:       <W>×<H> px at <x,y>, color #XXXXXX
+    • ...
+  Typography:       <font> <size>px <weight>, letter-spacing <X>em
+  Borders/shadow:   <details>
+  States:           off=<color>  lit=<color>  armed=<color>
+
+PHOTO vs FCOM:
+  • <property>: photo=<X>, FCOM=<Y> → using <source> because <reason>
+
+PLAN:
+  File:             src/components/cockpit/<file>.tsx
+  Render mode:      <SVG | canvas | div+CSS>  (why: <reason>)
+  Open questions:   <anything Claude is unsure about — flag for user>
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**User responses at Checkpoint A:**
+- **"go"** / **"approved"** / **"build it"** → Claude moves to code.
+- Specific correction ("legend cell should be 30% tall not 35%") → Claude updates the plan in place and shows it again.
+- **"new spec"** → abandon, ask for a fresh photo / scope.
+
+Claude does NOT write code until "go" is said.
+
+### 10.3 Checkpoint B — THE RESULT
+
+After code is written, Claude takes a final pass: it summarises what was
+written and asks the user for a screenshot of the rendered output.  Once
+the user provides the screenshot, Claude shows:
+
+```
+┌─ THE RESULT ───────────────────────────────────────────────────────┐
+FILES CHANGED:    <list>
+LINES:            <count> changed
+TYPECHECK:        pass / fail
+
+RENDER DIFF (photo vs your screenshot):
+  | Property        | Spec        | Rendered    | Δ           | OK? |
+  | <prop>          | <value>     | <value>     | <delta>     | ✓/✗ |
+
+VERDICT:           DONE  /  needs 1 fix  /  needs new spec
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**User responses at Checkpoint B:**
+- **"done"** / **"ship it"** → element is complete; move on.
+- Specific correction ("the bottom face is too tall, shrink to 50% of body") → Claude does ONE focused iteration on those items only, then declares DONE or "needs new spec" — no further tweaking.
+- **"new spec"** → restart from Checkpoint A.
+
+After one Checkpoint-B iteration, Claude stops.  If it's still wrong, the
+plan was wrong — restart.
+
+### 10.4 Hard rules Claude enforces internally
+
+These are NOT for the user to remember.  Claude enforces:
+
+1. **No code before the user says "go".**  Plan first.
+2. **No improvisation in code.**  Every literal (px, hex, font-size) must trace to a row in the plan's measurements.  No "approximately".
+3. **One iteration max after Checkpoint B.**  If still wrong, declare "needs new spec" — do not keep tweaking.
+4. **Touch only the in-scope element.**  No refactoring nearby code, no "while I'm here" cleanups.
+5. **No training-data guesses.**  Only the photo + FCOM grep determine values.
+6. **Typecheck must pass before showing Checkpoint B.**
+
+### 10.5 What the user needs to remember
+
+Literally two phrases:
+- **"go"** at Checkpoint A.
+- **"done"** at Checkpoint B (or one specific correction).
+
+Plus optional escape hatches:
+- **"new spec"** to restart.
+- **"build mode"** to force-engage without a photo (rare).
+
+Anything else (scope statements, measurement schemas, FCOM cross-checks,
+implementation plans) lives inside Claude's process.  The user reads the
+two checkpoint documents and approves/corrects.  Claude does the rest.

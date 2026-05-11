@@ -113,7 +113,9 @@ export type DistractionChoice = {
 
 export type ScenarioDistraction = {
   id: string;
-  /** Wall-clock ms after session start when this fires */
+  /** Wall-clock ms after session start when this fires.  If `requiresStep` is
+   *  set, this becomes a *minimum* delay — the distraction only fires once
+   *  the step is complete AND the elapsed time has reached atMs. */
   atMs: number;
   kind: DistractionKind;
   /** Display name of the caller — "ATC LONDON", "PURSER", "F/O", etc. */
@@ -124,6 +126,10 @@ export type ScenarioDistraction = {
   autoDismissMs?: number;
   /** If pilot says Stand By, re-surface after this many ms (default 25 000) */
   standbyResurfaceMs?: number;
+  /** If set, this distraction only fires once the named step is complete.
+   *  Use for ATC calls that must come after a procedural milestone — e.g.
+   *  ATC requesting briefing info only after the crew has finished ECAM. */
+  requiresStep?: string;
 };
 
 export type StatusItem = {

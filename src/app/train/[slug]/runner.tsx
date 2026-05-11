@@ -81,16 +81,19 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
   const standbyCountRef = useRef<Map<string, number>>(new Map());
   const atcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fire distractions at their scheduled atMs
+  // Fire distractions at their scheduled atMs.  If `requiresStep` is set,
+  // the distraction also waits for that step to be marked complete — atMs
+  // becomes a minimum delay rather than the fire time.
   useEffect(() => {
     if (runner.status !== "running" || !scenario.distractions) return;
     for (const d of scenario.distractions) {
-      if (runner.elapsedMs >= d.atMs && !firedDistractionsRef.current.has(d.id)) {
-        firedDistractionsRef.current.add(d.id);
-        setDistractionQueue((prev) => [...prev, d]);
-      }
+      if (firedDistractionsRef.current.has(d.id)) continue;
+      if (runner.elapsedMs < d.atMs) continue;
+      if (d.requiresStep && !runner.state.completedSteps[d.requiresStep]) continue;
+      firedDistractionsRef.current.add(d.id);
+      setDistractionQueue((prev) => [...prev, d]);
     }
-  }, [runner.elapsedMs, runner.status, scenario.distractions]);
+  }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.distractions]);
 
   // Cooldown after a correct answer — next queued call waits this long
   const [atcNextAllowedAt, setAtcNextAllowedAt] = useState(0);
