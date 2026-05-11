@@ -22,14 +22,14 @@ import { ENG_FAILURE_AFTER_V1_META } from "@/scenarios/registry";
 //   400ft: PF calls "ECAM ACTIONS" → PM acknowledges, runs ECAM → PM calls ENGINE SECURED
 //   Acc altitude: push OP CLB → F/S/GD flap retraction → MCT
 //   Note: for FLX takeoff, TOGA on live engine considered below F speed (VMCA margin)
-//   ATC: declare MAYDAY to TOWER before accepting frequency change; full call to Departure
+//   ATC: declare PAN PAN (urgency, no damage) on first contact with Departure; upgrade to MAYDAY only if condition worsens
 
 export const engFailureAfterV1: Scenario = {
   meta: ENG_FAILURE_AFTER_V1_META,
   brief: {
     situation:
       "Departing VIDP RWY 28 in FLEX thrust. Two seconds after passing V1 at 145 kt, a MASTER CAUTION fires with a single chime — ECAM displays ENG 1 FAIL. No fire. The engine has flamed out. Asymmetric thrust demands immediate rudder correction.",
-    job: "V1 is passed — takeoff committed. Memory item: maintain direction. Follow SRS to V2+10. Run the ECAM at 400 ft: IGN → IDLE → 30 s relight wait → if none, MASTER OFF. Accelerate clean to green dot single-engine. FORDEC, declare MAYDAY, return VIDP.",
+    job: "V1 is passed — takeoff committed. Memory item: maintain direction. Follow SRS to V2+10. Run the ECAM at 400 ft: IGN → IDLE → 30 s relight wait → if none, MASTER OFF. Accelerate clean to green dot single-engine. FORDEC, declare PAN PAN, return VIDP.",
   },
 
   triggers: [
@@ -547,7 +547,7 @@ export const engFailureAfterV1: Scenario = {
       id: "atc_emergency_services",
       label: "ATC — EMERG SVCS",
       action: "ADVISE",
-      hint: "PM: 'MAYDAY IFLY101, request Category 3 emergency services runway 28. CFR vehicles, ambulances, medical standby required. 186 POB, 8.4 tonnes fuel.'",
+      hint: "PM: 'PAN PAN IFLY101, request Category 3 emergency services runway 28. CFR vehicles, ambulances, medical standby required. 186 POB, 8.4 tonnes fuel.'",
       variant: "advisory",
       crew: "PM",
       group: "comms",
@@ -629,88 +629,157 @@ export const engFailureAfterV1: Scenario = {
     { id: "st_steep",      line: "STEEP APPR",       severity: "advisory", inopSys: true },
   ],
 
-  // ── Distractions ─────────────────────────────────────────────────────────────
-  // FCTM radio discipline: declare MAYDAY to Tower BEFORE accepting frequency change.
-  // Correct sequence: (1) MAYDAY to Tower → Tower acknowledges + hands off
-  //                   (2) Full MAYDAY call to Departure/Radar
+  // ── Distractions — FCOM-realistic ATC sequence ─────────────────────────────
+  // Realism rule: during the high-workload phase (initial PAN PAN through ECAM
+  // completion) the crew sticks to "STANDBY / CONTINUING CHECKLIST" responses.
+  // ATC reciprocally avoids POB/fuel/intent questions until the workload eases.
+  // Only AFTER checklists + performance + decision making does the crew advise
+  // intentions and accept the operational interrogation.
+  //
+  // Phraseology: engine failure WITHOUT damage is PAN PAN per FCOM / ICAO Annex 10
+  // (urgency, not distress). Captain may upgrade to MAYDAY if condition worsens.
+  //
+  // Use of STANDBY: most calls during the early phase have STANDBY (system pb)
+  // as a *correct* discipline.  A correct = "standby" run still scores well —
+  // resurface delays simulate ATC giving the crew room.
   distractions: [
-    // ① T+65s (~800 ft AGL / 1600 ft AMSL) — Delhi Tower hands off to Departure
-    // Pilot MUST declare MAYDAY to Tower first, then accept frequency change.
-    // "Standby" resurfaces the call — pilot still has to declare before accepting.
+    // ① Tower → Departure handoff (low workload, just before failure)
     {
-      id: "tower_freq_change",
-      atMs: 65_000,
+      id: "atc_handoff_to_departure",
+      atMs: 25_000,
       kind: "atc",
       from: "DELHI TOWER",
-      message: "IFLY101, passing 1600, contact Delhi Departure 124.3. Good day.",
-      standbyResurfaceMs: 30_000,
+      message: "IFLY101, contact Delhi Departure 124.85.",
+      standbyResurfaceMs: 25_000,
       choices: [
-        {
-          id: "a",
-          label: "MAYDAY MAYDAY MAYDAY, Delhi Tower, IFLY101 — ENG 1 failure, engine shut down, maintaining runway heading 280, climbing. Wilco 124.3 after acknowledgement.",
-          correct: true,
-        },
-        {
-          id: "b",
-          label: "IFLY101 Wilco, contacting Departure 124.3. Good day.",
-          correct: false,
-        },
+        { id: "a", label: "Delhi Departure 124.85, IFLY101",                                 correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                  correct: false },
       ],
     },
 
-    // ② T+145s — Delhi Departure initial call (after handoff)
-    // Pilot delivers full MAYDAY call including position, SOB, fuel.
-    // Intentions (return RWY 28) are stated AFTER FORDEC — not in this initial call.
+    // ② Initial PAN PAN — BRIEF, essential info only.  No runway, no intentions.
     {
-      id: "departure_mayday",
-      atMs: 145_000,
+      id: "atc_radar_contact_pan_pan",
+      atMs: 42_000,
       kind: "atc",
       from: "DELHI DEPARTURE",
-      message: "IFLY101, Delhi Departure, identified. Go ahead.",
-      standbyResurfaceMs: 30_000,
+      message: "IFLY101, Delhi Departure, radar contact.",
+      standbyResurfaceMs: 25_000,
       choices: [
-        {
-          id: "a",
-          label: "MAYDAY MAYDAY MAYDAY, Delhi Departure, IFLY101 — ENG 1 failure, engine shut down, passing 2400 feet runway heading 280, 186 souls on board, 8.4 tonnes fuel, Category 3 emergency.",
-          correct: true,
-        },
-        {
-          id: "b",
-          label: "IFLY101, single engine, request return to VIDP, runway 28.",
-          correct: false,
-        },
-        {
-          id: "c",
-          label: "IFLY101 request lower, climbing 4000.",
-          correct: false,
-        },
+        // Correct — short, no premature commitments
+        { id: "a", label: "PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, no fire, maintaining runway track, climbing 3 000 feet, standby", correct: true  },
+        // Wrong — over-committal during high workload
+        { id: "b", label: "PAN PAN IFLY101, engine failure, returning immediate, request runway 28 ILS, full emergency",                                 correct: false },
+        // Wrong — under-informative (no PAN PAN urgency call)
+        { id: "c", label: "Maintaining runway track, climbing 3 000, IFLY101",                                                                            correct: false },
+        // Wrong — MAYDAY over-declared for a clean shutdown without damage
+        { id: "d", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine failure engine 1, no fire, maintaining runway track, climbing 3 000 feet, standby",     correct: false },
       ],
     },
 
-    // ③ T+280s — Delhi Approach vectors for ILS
+    // ③ ATC acknowledges + provides vectors/altitude — NO questions during workload
     {
-      id: "approach_ifd_confirm",
-      atMs: 280_000,
+      id: "atc_vectors_climb",
+      atMs: 70_000,
       kind: "atc",
-      from: "DELHI APPROACH",
-      message: "IFLY101, radar vectors ILS runway 28. Confirm souls on board and fuel remaining.",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, roger PAN PAN, radar contact, continue runway track, climb 4 000 feet, standing by for your call.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Continuing runway track, climbing 4 000, IFLY101",                correct: true  },
+        // Wrong — pilot offering intentions/info before workload eased
+        { id: "b", label: "IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel", correct: false },
+      ],
+    },
+
+    // ④ ATC offers vectors when ready — pilot should STANDBY (still ECAM-busy)
+    //    Correct response = STANDBY pb (system-provided), or "Continuing checklist".
+    {
+      id: "atc_vectors_when_ready",
+      atMs: 105_000,
+      kind: "atc",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, vectors available when ready, no reported traffic.",
       standbyResurfaceMs: 30_000,
       choices: [
-        {
-          id: "a",
-          label: "MAYDAY IFLY101, 186 souls on board, 8.4 tonnes fuel, Category 3 emergency services required runway 28.",
-          correct: true,
-        },
-        {
-          id: "b",
-          label: "IFLY101, 186 POB, 8.4 tonnes — no emergency services needed.",
-          correct: false,
-        },
-        {
-          id: "c",
-          label: "IFLY101 unable confirm — stand by.",
-          correct: false,
-        },
+        // Correct — concise discipline phrase during high workload
+        { id: "a", label: "Continuing checklist, will advise, IFLY101",                       correct: true  },
+        // Also valid — but the system STANDBY button is the cleaner response here
+        { id: "b", label: "Unable at this time, IFLY101",                                     correct: true  },
+        // Wrong — premature commitment
+        { id: "c", label: "IFLY101 returning Delhi, request runway 28 ILS",                   correct: false },
+      ],
+    },
+
+    // ⑤ Workload eased — ATC asks for ready (post-ECAM, post-decision)
+    {
+      id: "atc_advise_when_ready",
+      atMs: 150_000,
+      kind: "atc",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, advise when ready.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — pilot now informs INTENTION (no POB yet — ATC will ask)
+        { id: "a", label: "IFLY101, engine secured, returning Delhi, request vectors for ILS runway 28", correct: true  },
+        // Wrong — too narrow, doesn't include decision context
+        { id: "b", label: "IFLY101 ready",                                                     correct: false },
+      ],
+    },
+
+    // ⑥ NOW ATC asks the operational questions (POB / fuel / services)
+    {
+      id: "atc_pob_fuel_services",
+      atMs: 180_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, roger, vectors runway 28 ILS, say persons on board, fuel endurance, and assistance required.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "IFLY101, 186 persons on board, 8.4 tonnes fuel, endurance 3 hours, request full emergency services on the runway", correct: true  },
+        { id: "b", label: "Standby IFLY101",                                                                                                   correct: false },
+      ],
+    },
+
+    // ⑦ ATC clears for approach + tower handoff
+    {
+      id: "atc_cleared_approach",
+      atMs: 210_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, cleared for the ILS approach runway 28, contact Delhi Tower 118.10 when established.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Cleared for the ILS runway 28, contact Tower 118.10 when established, IFLY101", correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                                  correct: false },
+      ],
+    },
+
+    // ⑧ Tower contact
+    {
+      id: "atc_tower_contact",
+      atMs: 235_000,
+      kind: "atc",
+      from: "DELHI TOWER",
+      message: "IFLY101, Delhi Tower, continue ILS approach runway 28, report established.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Continuing ILS runway 28, will report established, IFLY101",      correct: true  },
+        { id: "b", label: "Switching, IFLY101",                                                correct: false },
+      ],
+    },
+
+    // ⑨ Landing clearance — readback required
+    {
+      id: "atc_cleared_to_land",
+      atMs: 260_000,
+      kind: "atc",
+      from: "DELHI TOWER",
+      message: "IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Cleared to land runway 28, IFLY101",                                correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                    correct: false },
       ],
     },
   ],
