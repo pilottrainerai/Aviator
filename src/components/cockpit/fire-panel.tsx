@@ -296,18 +296,24 @@ function AirbusPB({
   // caller explicitly says legendLit (fire-light-on-pb-not-yet-pushed case).
   // FCOM DSC-26-20-20: the WHOLE pb face lights up red when the FIRE light is
   // active — both the legend cell and the body, treated as one continuous
-  // red surface.
+  // red surface.  Dark-cockpit convention: the FIRE legend remains visible
+  // at dim intensity even at rest, so the pb body has the same dim-red
+  // baseline before the fire and after extinguish — one continuous surface
+  // at all times.  SQUIB / DISCH legends stay off at rest per FCOM.
+  const isFire = topText.trim().toUpperCase() === "FIRE";
   const lit = btnState === "active" || legendLit;
   const ledBg =
     lit                    ? legendCol :                  // solid red, no alpha
     btnState === "armed"   ? `${C.white}28` :
     btnState === "done"    ? `${legendCol}25` :
+    isFire                 ? `${legendCol}25` :           // dim-red baseline (FIRE pb only)
     C.ledOff;
 
   const ledTextColor =
     lit                    ? "#FFFFFF" :
     btnState === "armed"   ? C.white :
     btnState === "done"    ? legendCol :
+    isFire                 ? legendCol :                  // red legend on dim-red surface
     C.dimLo;
 
   const containerShadow =
@@ -502,17 +508,18 @@ function AirbusPB({
           </span>
         </div>
 
-        {/* Bottom face — the engine label and "PUSH" instruction.  When the
-            FIRE light is lit, the bottom face shares the legend cell's red
-            background so the WHOLE pb looks like one continuous red surface
-            (FCOM DSC-26-20-20). */}
+        {/* Bottom face — the engine label and "PUSH" instruction.  Shares the
+            legend cell's background at all times so the WHOLE pb looks like
+            one continuous surface (FCOM DSC-26-20-20: pb face is a single
+            illuminated surface; dark-cockpit convention keeps the dim-red
+            baseline continuous across top + bottom on the FIRE pb). */}
         <div
           style={{
-            backgroundColor: lit ? legendCol : C.btnFace,
+            backgroundColor: isFire ? ledBg : (lit ? legendCol : C.btnFace),
             borderRadius: "0 0 1px 1px",
             padding: large ? "5px 6px 7px" : "5px 5px 4px",
             textAlign: "center",
-            borderTop: `1px solid ${lit ? legendCol : bezelBorder + "40"}`,
+            borderTop: isFire ? "none" : `1px solid ${lit ? legendCol : bezelBorder + "40"}`,
             transition: "background-color 0.2s",
           }}
         >
