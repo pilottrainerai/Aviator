@@ -342,7 +342,7 @@ export const engFailureAfterV1: Scenario = {
       id: "accel_s_speed",
       label: "FLAPS UP — S SPEED",
       action: "SELECT",
-      hint: "PM: 'S SPEED'. PF: 'FLAPS UP'. PM: checks AS, calls 'FLAPS UP' back, selects flap lever to 0, disarms spoilers. PF monitors selection. Aircraft now clean — accelerate to Green Dot.",
+      hint: "PM: 'S SPEED'. PF: 'FLAPS UP'. PM: checks AS, calls 'FLAPS UP' back, selects flap lever to 0. PF monitors selection. Aircraft now clean — accelerate to Green Dot.",
       variant: "switch",
       crew: "PM",
       requires: ["accel_f_speed"],

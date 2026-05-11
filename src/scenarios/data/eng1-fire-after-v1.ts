@@ -369,14 +369,14 @@ export const eng1FireAfterV1: Scenario = {
     //                                  "FLAPS 1" back, selects flap lever to 1.
     //   S speed:                       PF calls "FLAPS UP" → PM checks AS, calls
     //                                  "FLAPS UP" back, selects flap lever to 0.
-    //                                  Disarm spoilers.  Single-engine: NO After
-    //                                  Takeoff CL yet — runs after ECAM complete.
+    //                                  Single-engine: NO After Takeoff CL yet —
+    //                                  runs after ECAM complete.
     //   Green dot:                     PF calls "MCT" → PM verifies thrust at MCT.
     {
       id: "accel_clean",
       label: "ACCEL / CLEAN",
       action: "CONFIRM",
-      hint: "PF calls 'FLAPS 1' at F speed → PM checks AS, calls 'FLAPS 1' back, selects flap lever 1. PF calls 'FLAPS UP' at S speed → PM checks AS, calls 'FLAPS UP' back, selects flap lever 0, disarms spoilers. Verify CONFIG CLEAN on ECAM.",
+      hint: "PF calls 'FLAPS 1' at F speed → PM checks AS, calls 'FLAPS 1' back, selects flap lever 1. PF calls 'FLAPS UP' at S speed → PM checks AS, calls 'FLAPS UP' back, selects flap lever 0. Verify CONFIG CLEAN on ECAM.",
       variant: "switch",
       requires: ["level_off_maa"],
       crew: "PF",
