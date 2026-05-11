@@ -58,10 +58,21 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
   const [autoEndAt, setAutoEndAt] = useState<number | null>(null);
   const [decisionOpen, setDecisionOpen] = useState(false);
 
-  // Dev/admin mode — enabled via ?dev=1 in the URL
-  const [isDevMode] = useState(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("dev"),
-  );
+  // Dev/admin mode — toggle via ?dev=1 (on) or ?dev=0 (off); persisted in
+  // localStorage so the flag follows the user across scenarios + reloads.
+  const [isDevMode, setIsDevMode] = useState(false);
+  useEffect(() => {
+    const urlVal = new URLSearchParams(window.location.search).get("dev");
+    if (urlVal === "1") {
+      localStorage.setItem("crosscheck:dev", "1");
+      setIsDevMode(true);
+    } else if (urlVal === "0") {
+      localStorage.removeItem("crosscheck:dev");
+      setIsDevMode(false);
+    } else {
+      setIsDevMode(localStorage.getItem("crosscheck:dev") === "1");
+    }
+  }, []);
 
   // ── ATC state machine ──────────────────────────────────────────────────────
   const [atcPhase, setAtcPhase] = useState<AtcPhase>({ kind: "idle" });
