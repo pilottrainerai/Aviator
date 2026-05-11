@@ -324,22 +324,27 @@ export const engFailureAfterV1: Scenario = {
       crew: "PF",
       requires: ["eng1_master_off"],
     },
+    // Task-sharing per callouts.txt — single-engine cleanup:
+    //   PF CALLS the new config ("FLAPS 1" / "FLAPS UP").
+    //   PM CHECKS AS, CALLS the new config back, and SELECTS the flap lever.
+    //   PF NEVER moves the flap lever; PM operates it.  Do not retract below
+    //   F speed — VMCA margin on single engine.
     {
       id: "accel_f_speed",
-      label: "CONF 1 — F SPEED",
+      label: "FLAPS 1 — F SPEED",
       action: "SELECT",
-      hint: "PM calls 'F SPEED'. PF calls 'CONF 1' and selects flap lever to CONF 1. PM cross-checks selection. Do not retract below F speed — VMCA margin required on single engine.",
+      hint: "PM: 'F SPEED'. PF: 'FLAPS 1'. PM: checks AS, calls 'FLAPS 1' back, selects flap lever to 1. PF monitors selection. Do not retract below F speed — VMCA margin required on single engine.",
       variant: "switch",
-      crew: "PF",
+      crew: "PM",
       requires: ["level_off_maa"],
     },
     {
       id: "accel_s_speed",
-      label: "FLAPS 0 — S SPEED",
+      label: "FLAPS UP — S SPEED",
       action: "SELECT",
-      hint: "PM calls 'S SPEED'. PF calls 'FLAPS 0' and selects CONF 0. PM cross-checks selection. Aircraft now clean — accelerate to Green Dot.",
+      hint: "PM: 'S SPEED'. PF: 'FLAPS UP'. PM: checks AS, calls 'FLAPS UP' back, selects flap lever to 0, disarms spoilers. PF monitors selection. Aircraft now clean — accelerate to Green Dot.",
       variant: "switch",
-      crew: "PF",
+      crew: "PM",
       requires: ["accel_f_speed"],
     },
     {
