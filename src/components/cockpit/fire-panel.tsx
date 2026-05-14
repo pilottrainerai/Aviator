@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
 import type { Scenario, SysSwState } from "@/scenarios/types";
 import { evalSysCase, SYS_COLORS } from "@/components/cockpit/system-display";
+import { EngineFireScenarioPanel } from "@/components/cockpit/engine-fire-panel-scenario";
 
 // ─── CSS keyframes (AGENT arming pulse, TEST pulse) ─────────────────────────
 // Injected once via <style> in the panel root.
@@ -42,6 +43,41 @@ const C = {
   panel:  "#080C12",
   ledOff: "#060A0E",
 } as const;
+
+// ─── Phillips-head panel screw ────────────────────────────────────────────────
+// 5 × 5 px corner screw matching the FCOM photo trim.  Two-tone radial
+// gradient (#B8C0C8 → #4A5260) with a faint cross slot at ~30°.
+function PanelScrew({
+  top, left, right, bottom,
+}: { top?: number; left?: number; right?: number; bottom?: number }) {
+  return (
+    <div style={{
+      position: "absolute",
+      width: "5px", height: "5px",
+      top, left, right, bottom,
+      borderRadius: "50%",
+      background: "radial-gradient(circle at 32% 32%, #C4CCD4 0%, #6A7280 60%, #2A303C 100%)",
+      boxShadow: "0 1px 1px rgba(0,0,0,0.5), inset 0 -0.5px 0.5px rgba(0,0,0,0.45)",
+      zIndex: 5,
+    }}>
+      {/* Phillips cross slot — two tiny dark lines crossed at ~30° */}
+      <div style={{
+        position: "absolute", top: "2px", left: "0.5px",
+        width: "4px", height: "1px",
+        background: "rgba(20,24,32,0.85)",
+        transform: "rotate(30deg)",
+        transformOrigin: "50% 50%",
+      }} />
+      <div style={{
+        position: "absolute", top: "0.5px", left: "2px",
+        width: "1px", height: "4px",
+        background: "rgba(20,24,32,0.85)",
+        transform: "rotate(30deg)",
+        transformOrigin: "50% 50%",
+      }} />
+    </div>
+  );
+}
 
 // ─── DSL switch state rendering ───────────────────────────────────────────────
 const DSL_SW_COLORS: Record<SysSwState, string> = {
@@ -284,6 +320,9 @@ function AirbusPB({
   // the pb when stowed; flips up and back when the crew lifts it before the
   // push.  Pb face shows "FIRE" (red legend) + "PUSH" beneath.
   const guardLifted = large && (btnState === "active" || btnState === "armed" || btnState === "done" || legendLit);
+  // Unique gradient id for the SVG wire-frame guard (avoids `defs` collisions
+  // between the two FIRE pbs that render side-by-side on the panel).
+  const guardId = useId().replace(/:/g, "");
 
   const bezelBorder =
     btnState === "active" ? legendCol :
@@ -296,55 +335,77 @@ function AirbusPB({
   // caller explicitly says legendLit (fire-light-on-pb-not-yet-pushed case).
   // FCOM DSC-26-20-20: the WHOLE pb face lights up red when the FIRE light is
   // active — both the legend cell and the body, treated as one continuous
-  // red surface.  Dark-cockpit convention: the FIRE legend remains visible
-  // at dim intensity even at rest, so the pb body has the same dim-red
-  // baseline before the fire and after extinguish — one continuous surface
-  // at all times.  SQUIB / DISCH legends stay off at rest per FCOM.
+  // red surface.  At rest the FIRE pb keeps its baked-in orange-red body
+  // (vertical gradient #C24018 → #8C2A10) with off-white "FIRE" / "PUSH"
+  // text — that's the physical pb appearance under panel lighting, NOT a
+  // dim-LED effect.  When the FIRE warning fires, the legend lights to
+  // pure red with pure-white text + glow.
   const isFire = topText.trim().toUpperCase() === "FIRE";
   const lit = btnState === "active" || legendLit;
+  const FIRE_BODY_GRADIENT = "linear-gradient(180deg, #C24018 0%, #8C2A10 100%)";
+  const FIRE_LEGEND_OFFWHITE = "#FFE4D0";
   const ledBg =
-    lit                    ? legendCol :                  // solid red, no alpha
+    lit                    ? legendCol :                  // lit: solid red
     btnState === "armed"   ? `${C.white}28` :
     btnState === "done"    ? `${legendCol}25` :
-    isFire                 ? `${legendCol}25` :           // dim-red baseline (FIRE pb only)
+    isFire                 ? FIRE_BODY_GRADIENT :        // baseline orange-red gradient
     C.ledOff;
 
   const ledTextColor =
     lit                    ? "#FFFFFF" :
     btnState === "armed"   ? C.white :
     btnState === "done"    ? legendCol :
-    isFire                 ? legendCol :                  // red legend on dim-red surface
+    isFire                 ? FIRE_LEGEND_OFFWHITE :       // off-white legend on orange-red
     C.dimLo;
 
-  const containerShadow =
+  // FIRE-pb-only 3-D depth: top highlight + bottom pillow shadow.  Gives the
+  // physical-pushbutton look (vs the v1 flat sticker).  Layered with the
+  // state-driven halo so both can apply at once.
+  const fireDepthShadow = (isFire && large)
+    ? "inset 0 1px 0 rgba(255, 200, 170, 0.22), inset 0 -2px 4px rgba(0, 0, 0, 0.40)"
+    : null;
+  const stateShadow =
     lit                    ? `0 0 14px ${legendCol}90, inset 0 0 6px ${legendCol}20` :
     btnState === "armed"   ? `0 0 10px ${C.white}50` :
     btnState === "done"    ? `0 0 8px ${legendCol}40` :
-    "none";
+    null;
+  const containerShadow = [stateShadow, fireDepthShadow].filter(Boolean).join(", ") || "none";
 
   return (
     <div
       style={{
         cursor: isClickable ? "pointer" : "default",
-        width: large ? "108px" : wide ? "80px" : "68px",
+        // PLAN v3: large (FIRE pb) = 96 px wide × ~72 px tall (LANDSCAPE).
+        // v2 had this backwards (82 × 96 portrait).
+        width: large ? "96px" : wide ? "80px" : "68px",
         userSelect: "none",
-        filter: btnState === "disabled" ? "brightness(0.4)" : "none",
+        // FIRE pb's physical body is always bright orange-red — "disabled"
+        // (not-yet-clickable) doesn't mean physically dimmer.  Skip the
+        // brightness filter for isFire so the baseline gradient + the
+        // bottom-corner Phillips screws stay visible at rest.
+        filter: (btnState === "disabled" && !isFire) ? "brightness(0.4)" : "none",
         position: "relative",
       }}
     >
       {/* Recessed metal frame around the pb — gives the "in the panel" look. */}
       {large && (
-        <div
-          style={{
-            position: "absolute",
-            top: "-4px", left: "-4px", right: "-4px", bottom: "-4px",
-            background: "linear-gradient(135deg, #5A6470 0%, #2E3440 60%, #1A1E28 100%)",
-            border: "1px solid #14181F",
-            borderRadius: "3px",
-            boxShadow: "inset 0 1px 1px rgba(255,255,255,0.10), inset 0 -1px 1px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.55)",
-            zIndex: 0,
-          }}
-        />
+        <>
+          <div
+            style={{
+              position: "absolute",
+              top: "-4px", left: "-4px", right: "-4px", bottom: "-4px",
+              background: "linear-gradient(135deg, #5A6470 0%, #2E3440 60%, #1A1E28 100%)",
+              border: "1px solid #14181F",
+              borderRadius: "3px",
+              boxShadow: "inset 0 1px 1px rgba(255,255,255,0.10), inset 0 -1px 1px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.55)",
+              zIndex: 0,
+            }}
+          />
+          {/* Phillips-head screws at the two BOTTOM corners (top corners are
+              occupied by the wire-guard hinge knuckles). */}
+          <PanelScrew bottom={-3} left={-3} />
+          <PanelScrew bottom={-3} right={-3} />
+        </>
       )}
 
       {/* Wireframe metal guard — only on FIRE pb (large).  Hinged at the top of
@@ -369,60 +430,62 @@ function AirbusPB({
               boxShadow: "0 1px 1px rgba(0,0,0,0.55)",
             } as React.CSSProperties} />
           ))}
-          {/* The wireframe guard frame, hinged at top */}
+          {/* SVG wire-frame guard, hinged at top.  PLAN v3: viewBox 96 × 18
+              to match the landscape pb shape; non-scaling strokes keep the
+              wire weight constant. */}
           <div style={{
             position: "absolute",
             top: "0", left: "0", right: "0",
-            height: "20px",
+            height: "18px",
             transformOrigin: "50% 0%",
             transform: guardLifted
               ? "rotateX(-115deg) translateZ(0)"
               : "rotateX(0deg) translateZ(0)",
             transition: "transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)",
             backfaceVisibility: "hidden",
+            filter: guardLifted
+              ? "none"
+              : "drop-shadow(0 1px 2px rgba(0,0,0,0.4))",
           }}>
-            {/* Outer frame — thin metal outline */}
-            <div style={{
-              position: "absolute", inset: 0,
-              border: "1.5px solid #6A7488",
-              borderRadius: "2px",
-              backgroundColor: "rgba(40, 46, 56, 0.10)",
-              boxShadow: guardLifted
-                ? "none"
-                : "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.4)",
-            }} />
-            {/* Diagonal wire 1 (top-left → bottom-right) */}
-            <div style={{
-              position: "absolute",
-              top: "50%", left: "0",
-              width: "100%", height: "1.2px",
-              transformOrigin: "50% 50%",
-              transform: "rotate(28deg)",
-              background: "linear-gradient(90deg, #4A5260 0%, #B0B8C0 50%, #4A5260 100%)",
-              boxShadow: "0 1px 0 rgba(0,0,0,0.45)",
-              opacity: guardLifted ? 0.4 : 1,
-            }} />
-            {/* Diagonal wire 2 (top-right → bottom-left) */}
-            <div style={{
-              position: "absolute",
-              top: "50%", left: "0",
-              width: "100%", height: "1.2px",
-              transformOrigin: "50% 50%",
-              transform: "rotate(-28deg)",
-              background: "linear-gradient(90deg, #4A5260 0%, #B0B8C0 50%, #4A5260 100%)",
-              boxShadow: "0 1px 0 rgba(0,0,0,0.45)",
-              opacity: guardLifted ? 0.4 : 1,
-            }} />
-            {/* Center pivot dot — where the two wires cross */}
-            <div style={{
-              position: "absolute",
-              top: "50%", left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "3px", height: "3px",
-              background: "radial-gradient(circle at 30% 30%, #C8D0D8 0%, #5A6470 100%)",
-              borderRadius: "50%",
-              opacity: guardLifted ? 0.5 : 1,
-            }} />
+            <svg
+              viewBox="0 0 96 18"
+              preserveAspectRatio="none"
+              width="100%"
+              height="100%"
+              style={{ display: "block", overflow: "visible" }}
+            >
+              <defs>
+                <linearGradient id={`fireGuardWire-${guardId}`} x1="0%" y1="50%" x2="100%" y2="50%">
+                  <stop offset="0%"   stopColor="#4A5260"/>
+                  <stop offset="50%"  stopColor="#C0C8D0"/>
+                  <stop offset="100%" stopColor="#4A5260"/>
+                </linearGradient>
+              </defs>
+              {/* Outer rectangular frame */}
+              <rect
+                x="1.5" y="1.5" width="93" height="15"
+                fill="rgba(40,46,56,0.10)"
+                stroke={`url(#fireGuardWire-${guardId})`}
+                strokeWidth="1.8"
+                vectorEffect="non-scaling-stroke"
+                rx="1.5"
+              />
+              {/* X diagonals */}
+              <line
+                x1="2" y1="2" x2="94" y2="16"
+                stroke={`url(#fireGuardWire-${guardId})`}
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
+              />
+              <line
+                x1="94" y1="2" x2="2" y2="16"
+                stroke={`url(#fireGuardWire-${guardId})`}
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
+              />
+              {/* Center pivot dot where the wires cross */}
+              <circle cx="48" cy="9" r="1.6" fill="#C8D0D8" opacity={guardLifted ? 0.5 : 1}/>
+            </svg>
           </div>
         </div>
       )}
@@ -433,7 +496,9 @@ function AirbusPB({
         style={{
           backgroundColor: C.bezel,
           border: `2px solid ${bezelBorder}`,
-          borderRadius: "2px",
+          // PLAN v3: 6 px radius — proportional to the shorter 72 px height
+          // (was 8 px on the tall portrait body).
+          borderRadius: large ? "6px" : "2px",
           padding: "2px",
           boxShadow: containerShadow,
           transition: "box-shadow 0.2s, border-color 0.2s, transform 0.25s",
@@ -443,9 +508,10 @@ function AirbusPB({
           zIndex: 1,
         }}
       >
-        {/* "OUT" indicator — small amber dot when pb has been pushed AND fire
-            is no longer detected (so the user can see the pb is mechanically
-            out even with the FIRE light off) */}
+        {/* "OUT" indicator — small amber dot in the top-right when the pb has
+            been pushed AND the fire is no longer detected.  Sim-only training
+            cue so the crew can see the pb is mechanically out even when the
+            FIRE light is off (kept per Build-Mode Open Question #1). */}
         {pbOut && !lit && (
           <div style={{
             position: "absolute", top: "-1px", right: "-1px",
@@ -479,26 +545,28 @@ function AirbusPB({
           </>
         )}
 
-        {/* Top legend cell — "FIRE" (red) for the FIRE pb */}
+        {/* Top legend cell — "FIRE" (red) for the FIRE pb.  PLAN v3: legend
+            cell ≈ 30 px tall (was ~40), bigger 20 px sans-serif "FIRE"
+            text now that the pb is landscape-oriented. */}
         <div
           style={{
-            backgroundColor: ledBg,
-            borderRadius: "1px 1px 0 0",
-            padding: large ? "8px 6px 6px" : "4px 5px",
+            background: ledBg,
+            borderRadius: large ? "5px 5px 0 0" : "1px 1px 0 0",
+            padding: large ? "5px 6px 5px" : "4px 5px",
             textAlign: "center",
-            minHeight: large ? "26px" : "24px",
+            minHeight: large ? "20px" : "24px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            transition: "background-color 0.2s",
+            transition: "background 0.2s",
           }}
         >
           <span
             style={{
-              fontSize: large ? "16px" : "8px",
-              fontFamily: "monospace",
+              fontSize: large ? "20px" : "8px",
+              fontFamily: '"Helvetica Neue", Arial, sans-serif',
               fontWeight: 800,
-              letterSpacing: "0.12em",
+              letterSpacing: large ? "0.04em" : "0.12em",
               color: ledTextColor,
               textTransform: "uppercase",
               textShadow: lit ? `0 0 10px ${legendCol}, 0 0 4px #fff` : btnState === "done" ? `0 0 6px ${legendCol}80` : "none",
@@ -515,21 +583,25 @@ function AirbusPB({
             baseline continuous across top + bottom on the FIRE pb). */}
         <div
           style={{
-            backgroundColor: isFire ? ledBg : (lit ? legendCol : C.btnFace),
-            borderRadius: "0 0 1px 1px",
-            padding: large ? "5px 6px 7px" : "5px 5px 4px",
+            background: isFire ? ledBg : (lit ? legendCol : C.btnFace),
+            borderRadius: large ? "0 0 5px 5px" : "0 0 1px 1px",
+            // PLAN v3: bottom face ≈ 38 px tall (was 56).  Label + PUSH stack
+            // is now ~25 px of content, centred with 6 / 7 px padding so the
+            // whole pb hits ~72 px total height.
+            padding: large ? "6px 6px 7px" : "5px 5px 4px",
             textAlign: "center",
             borderTop: isFire ? "none" : `1px solid ${lit ? legendCol : bezelBorder + "40"}`,
-            transition: "background-color 0.2s",
+            transition: "background 0.2s",
           }}
         >
           <div
             style={{
-              fontSize: large ? "10px" : "9px",
-              fontFamily: "monospace",
+              fontSize: large ? "11px" : "9px",
+              fontFamily: '"Helvetica Neue", Arial, sans-serif',
               fontWeight: 700,
-              letterSpacing: "0.08em",
-              color: lit ? "#FFFFFF" : C.white,
+              letterSpacing: large ? "0.04em" : "0.08em",
+              // FIRE pb at rest: off-white label on orange-red body.
+              color: lit ? "#FFFFFF" : (isFire ? FIRE_LEGEND_OFFWHITE : C.white),
               lineHeight: 1.2,
               textTransform: "uppercase",
               textShadow: lit ? "0 0 4px rgba(0,0,0,0.6)" : "none",
@@ -541,12 +613,12 @@ function AirbusPB({
           {large && (
             <div
               style={{
-                fontSize: "8px",
-                fontFamily: "monospace",
-                color: lit ? "#FFFFFF" : C.dim,
+                fontSize: "10px",
+                fontFamily: '"Helvetica Neue", Arial, sans-serif',
+                color: lit ? "#FFFFFF" : FIRE_LEGEND_OFFWHITE,
                 fontWeight: 700,
-                letterSpacing: "0.18em",
-                marginTop: "3px",
+                letterSpacing: "0.14em",
+                marginTop: "4px",
                 textTransform: "uppercase",
                 textShadow: lit ? "0 0 4px rgba(0,0,0,0.6)" : "none",
                 transition: "color 0.2s",
@@ -630,8 +702,13 @@ function AgentPb({
     <div
       style={{
         userSelect: "none",
-        width: "52px",
-        opacity: (!active && !done) ? 0.45 : 1,
+        // Per PLAN: AGENT pb 50 × 54 px (slightly taller than wide) — matches
+        // the FCOM photo proportions; was 52 × 52.
+        width: "50px",
+        // Photo shows the AGENT bezel + corner screws fully visible at rest
+        // (only the SQUIB / DISCH cells stay dark).  Don't fade the whole
+        // pb to 0.45 — keep the trim crisp.
+        opacity: (!active && !done) ? 0.85 : 1,
         transition: "opacity 0.2s",
         display: "flex", flexDirection: "column", alignItems: "center",
       }}
@@ -640,7 +717,7 @@ function AgentPb({
         onClick={isClickable ? onClick : undefined}
         style={{
           cursor: isClickable ? "pointer" : "default",
-          width: "52px", height: "52px",
+          width: "50px", height: "54px",
           position: "relative",
         }}
       >
@@ -654,9 +731,15 @@ function AgentPb({
           boxShadow: "inset 0 1px 1px rgba(255,255,255,0.10), inset 0 -1px 1px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.55)",
           zIndex: 0,
         }} />
+        {/* Phillips-head screws at all four corners. */}
+        <PanelScrew top={-2}    left={-2} />
+        <PanelScrew top={-2}    right={-2} />
+        <PanelScrew bottom={-2} left={-2} />
+        <PanelScrew bottom={-2} right={-2} />
 
-        {/* Square pb body — equal width and height per FCOM AGENT pb proportions.
-            Outer boundary GLOWS by state:
+        {/* AGENT pb body — rounded rectangle (~4 px) with a recessed inner
+            shadow so the SQUIB / DISCH cells sit INSIDE the bezel rather
+            than floating on top.  Outer boundary glows by state:
               - arming (10-s wait): amber pulse on the outer ring
               - armed (squibLit):   solid white halo
               - discharged:         solid amber halo */}
@@ -665,16 +748,17 @@ function AgentPb({
           inset: 0,
           backgroundColor: C.bezel,
           border: `1.5px solid ${accent}`,
-          borderRadius: "2px",
+          // PLAN v2: rounded ~4 px (was 2 px) for the bezel, matches photo.
+          borderRadius: "4px",
           padding: "3px",
           display: "flex", flexDirection: "column",
           gap: "2px",
           animation: arming ? "agent-arming-edge-pulse 1s ease-in-out infinite" : undefined,
           boxShadow:
             arming   ? undefined :  // animation drives the box-shadow during arming
-            dischLit ? `0 0 0 1.5px ${C.amber}, 0 0 12px ${C.amber}90, 0 0 20px ${C.amber}40` :
-            squibLit ? `0 0 0 1.5px ${C.white}, 0 0 10px ${C.white}80, 0 0 18px ${C.white}40` :
-            "none",
+            dischLit ? `0 0 0 1.5px ${C.amber}, 0 0 12px ${C.amber}90, 0 0 20px ${C.amber}40, inset 0 0 4px rgba(0,0,0,0.55)` :
+            squibLit ? `0 0 0 1.5px ${C.white}, 0 0 10px ${C.white}80,  0 0 18px ${C.white}40, inset 0 0 4px rgba(0,0,0,0.55)` :
+                       "inset 0 0 4px rgba(0,0,0,0.55)",
           transition: arming ? undefined : "all 0.2s",
           zIndex: 1,
         }}>
@@ -685,15 +769,19 @@ function AgentPb({
           <div style={{
             flex: 1,
             backgroundColor: squibLit ? `${C.white}30` : C.ledOff,
-            borderRadius: "1px",
+            // PLAN v2: ~3 px cell radius (was 1 px) so the inner cells echo
+            // the rounded bezel.
+            borderRadius: "3px",
             display: "flex",
             alignItems: "center", justifyContent: "center",
             transition: "background-color 0.2s",
           }}>
             <span style={{
-              fontSize: "9px", fontFamily: "monospace", fontWeight: 800,
+              fontSize: "9px",
+              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontWeight: 800,
               color: squibLit ? C.white : C.dimLo,
-              letterSpacing: "0.08em",
+              letterSpacing: "0.06em",
               textShadow: squibLit ? `0 0 4px ${C.white}` : "none",
             }}>SQUIB</span>
           </div>
@@ -702,15 +790,17 @@ function AgentPb({
           <div style={{
             flex: 1,
             backgroundColor: dischLit ? `${C.amber}30` : C.ledOff,
-            borderRadius: "1px",
+            borderRadius: "3px",
             display: "flex",
             alignItems: "center", justifyContent: "center",
             transition: "background-color 0.2s",
           }}>
             <span style={{
-              fontSize: "9px", fontFamily: "monospace", fontWeight: 800,
+              fontSize: "9px",
+              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontWeight: 800,
               color: dischLit ? C.amber : C.dimLo,
-              letterSpacing: "0.08em",
+              letterSpacing: "0.06em",
               textShadow: dischLit ? `0 0 4px ${C.amber}` : "none",
             }}>DISCH</span>
           </div>
@@ -721,15 +811,21 @@ function AgentPb({
       <div style={{
         marginTop: "6px",
         textAlign: "center",
-        fontSize: "8px", fontFamily: "monospace", fontWeight: 700,
+        fontSize: "8px",
+        fontFamily: '"Helvetica Neue", Arial, sans-serif',
+        fontWeight: 700,
         color: dischLit ? C.amber : squibLit ? C.white : arming ? C.amber : C.dim,
-        letterSpacing: "0.1em",
+        letterSpacing: "0.08em",
         textTransform: "uppercase",
         transition: "color 0.2s",
       }}>
         {label}
         {sub && (
-          <span style={{ display: "block", fontSize: "7px", color: C.dim, marginTop: "1px", letterSpacing: "0.08em" }}>
+          <span style={{
+            display: "block", fontSize: "7px",
+            fontFamily: '"Helvetica Neue", Arial, sans-serif',
+            color: C.dim, marginTop: "1px", letterSpacing: "0.06em",
+          }}>
             {sub}
           </span>
         )}
@@ -1528,39 +1624,72 @@ function DslControlPanel({
         <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
       </div>
 
-      {/* Controls row */}
-      <div style={{ display: "flex", gap: "12px", justifyContent: "center", alignItems: "flex-end", flexWrap: "wrap", paddingLeft: "6px", paddingRight: "6px" }}>
-        {controls.map((ctrl) => {
-          const done    = isDone(ctrl.stepId);
-          const step    = scenario.steps.find(s => s.id === ctrl.stepId);
-          const reqsMet = (step?.requires ?? []).every(r => !!state.completedSteps[r]);
-          const active  = !done && reqsMet && warningActive;
-          const clickable = !done && reqsMet && warningActive && !disabled;
-          const onClick = () => { if (clickable) perform({ kind: "STEP", stepId: ctrl.stepId }); };
+      {/* Controls row — fire_pb + the AGENT pbs are replaced by a single
+          EngineFireScenarioPanel (canonical mockup design, scaled).  Other
+          controls (thr_lever, master, cancel_*, …) stay as individual cells. */}
+      {(() => {
+        const firePbCtrl  = controls.find(c => c.kind === "fire_pb");
+        const agentCtrls  = controls.filter(c => c.kind === "agent");
+        const agent1Ctrl  = agentCtrls[0];
+        const agent2Ctrl  = agentCtrls[1];
+        const performStep = (id?: string) => {
+          if (!id || disabled) return;
+          perform({ kind: "STEP", stepId: id });
+        };
+        return (
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center", alignItems: "flex-end", flexWrap: "wrap", paddingLeft: "6px", paddingRight: "6px" }}>
+            {controls.map((ctrl) => {
+              const done    = isDone(ctrl.stepId);
+              const step    = scenario.steps.find(s => s.id === ctrl.stepId);
+              const reqsMet = (step?.requires ?? []).every(r => !!state.completedSteps[r]);
+              const active  = !done && reqsMet && warningActive;
+              const clickable = !done && reqsMet && warningActive && !disabled;
+              const onClick = () => { if (clickable) perform({ kind: "STEP", stepId: ctrl.stepId }); };
 
-          switch (ctrl.kind) {
-            case "thr_lever": return <DslThrLeverCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "mode_sel":  return <DslModeSelCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={fireLit} />;
-            case "fire_pb":   return (
-              <AirbusPB key={ctrl.stepId} topText="FIRE" topColor={C.red} label={ctrl.label} sublabel={ctrl.sub} large
-                legendLit={fireLit}
-                state={done ? "done" : active ? "active" : "disabled"} onClick={clickable ? onClick : undefined} />
-            );
-            case "agent":     return (
-              <AgentPb key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick}
-                label={ctrl.label} sub={ctrl.sub} />
-            );
-            case "cancel_warn": return <DslCancelWarnCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "cancel_caut": return <DslCancelCautCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            case "o2_mask":     return <DslO2MaskCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-            case "toggle_sw":   return <DslToggleSwCtrl   key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-            case "emer_pb":     return <DslEmerPbCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-            case "spd_brk":     return <DslSpdBrkCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-            default:            return <DslMonitorCtrl    key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-          }
-        })}
-      </div>
+              switch (ctrl.kind) {
+                case "thr_lever": return <DslThrLeverCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                case "mode_sel":  return <DslModeSelCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={fireLit} />;
+                case "fire_pb":
+                  // Render the canonical cyan FIRE panel (mockup design,
+                  // chromeless, cropped) covering FIRE pb + AGENT 1 +
+                  // AGENT 2 + FIRE bar + TEST in one combined embed.
+                  //
+                  // THR LEVERS + MASTER controls reserve a status-memo
+                  // line (~15 px) below their visual frames, so flex-end
+                  // alone lines up wrappers but NOT visible bottoms.
+                  // marginBottom: 15px lifts the cyan panel by the same
+                  // amount so all three visible bottoms (THR frame, MASTER
+                  // housing, cyan box) sit at one line.
+                  return (
+                    <div key={ctrl.stepId} style={{ marginBottom: "25px" }}>
+                      <EngineFireScenarioPanel
+                        fireDetected={fireLit}
+                        firePbDone={isDone(firePbCtrl?.stepId ?? "")}
+                        agent1Disch={isDone(agent1Ctrl?.stepId ?? "")}
+                        agent2Disch={isDone(agent2Ctrl?.stepId ?? "")}
+                        onPushFirePb={() => performStep(firePbCtrl?.stepId)}
+                        onPushAgent1={() => performStep(agent1Ctrl?.stepId)}
+                        onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
+                      />
+                    </div>
+                  );
+                case "agent":
+                  // AGENT pbs are now drawn inside EngineFireScenarioPanel
+                  // — skip the standalone cell so we don't double-render.
+                  return null;
+                case "cancel_warn": return <DslCancelWarnCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                case "cancel_caut": return <DslCancelCautCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                case "o2_mask":     return <DslO2MaskCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+                case "toggle_sw":   return <DslToggleSwCtrl   key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+                case "emer_pb":     return <DslEmerPbCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+                case "spd_brk":     return <DslSpdBrkCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                default:            return <DslMonitorCtrl    key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+              }
+            })}
+          </div>
+        );
+      })()}
 
       {/* Status memo line */}
       <div style={{ marginTop: "6px", minHeight: "14px", textAlign: "center" }}>

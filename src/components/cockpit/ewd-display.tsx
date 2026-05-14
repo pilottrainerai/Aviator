@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
 import type { ECAMLevel, Scenario } from "@/scenarios/types";
 
@@ -19,6 +20,7 @@ function levelColor(level: ECAMLevel): string {
     case "warning":  return C.red;
     case "caution":  return C.amber;
     case "advisory": return C.cyan;
+    case "remark":   return C.white;
     case "memo":     return C.green;
   }
 }
@@ -28,6 +30,9 @@ function isRightCol(line: string) {
   return line === "LAND ASAP" || line === "SECONDARY FAILURES" || line.startsWith("* ");
 }
 
+// FCOM AGENT 1 arming window — keep in sync with fire-panel.tsx
+const AGENT1_ARM_MS = 10_000;
+
 export function EwdDisplay({
   state,
   scenario,
@@ -35,6 +40,33 @@ export function EwdDisplay({
   state: ScenarioState;
   scenario: Scenario;
 }) {
+  // Live wall-clock tick — drives the AGENT 1 10-s countdown text in the
+  // ECAM line ("AGENT 1 AFTER 7 S ... DISCH").  Only runs while the FIRE
+  // pb is pushed and AGENT 1 isn't yet done.  We capture Date.now() at
+  // the moment FIRE pb completes (because the engine's state.tMs is
+  // session-relative — performance.now() based — and doesn't tick with
+  // wall clock between events).
+  const firePbAt   = state.completedSteps["eng1_fire_pb"];
+  const agent1Done = !!state.completedSteps["agent1"];
+  const ticking    = !!firePbAt && !agent1Done;
+  const [, setTick] = useState(0);
+  const [firePbWallMs, setFirePbWallMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (firePbAt && firePbWallMs === null) {
+      setFirePbWallMs(Date.now());
+    }
+  }, [firePbAt, firePbWallMs]);
+  useEffect(() => {
+    if (!ticking) return;
+    const i = setInterval(() => setTick(t => t + 1), 500);
+    return () => clearInterval(i);
+  }, [ticking]);
+
+  // FCOM ECAM: LAND ASAP downgrades from red (warning) to amber (caution)
+  // once the fire is extinguished — the directive becomes "land at the
+  // nearest suitable airport" rather than "land immediately".
+  const fireExtinguished = !!state.triggersFired["fire_extinguished"];
+
   const ecamToStep = new Map(
     scenario.steps
       .filter((s) => !!s.ecamRef)
@@ -48,11 +80,29 @@ export function EwdDisplay({
   function renderMsg(m: (typeof messages)[number]) {
     const linkedStep  = ecamToStep.get(m.id);
     const isCompleted = linkedStep ? !!state.completedSteps[linkedStep.id] : false;
-    const color       = isCompleted ? C.green : levelColor(m.level);
+
+    // Effective level for this row (after FCOM overrides like LAND ASAP
+    // downgrading once the fire is out).
+    let effectiveLevel: ECAMLevel = m.level;
+    if (m.id === "land_asap" && fireExtinguished) effectiveLevel = "caution";
+
+    const color = isCompleted ? C.green : levelColor(effectiveLevel);
+
+    // AGENT 1 dynamic countdown — only while the 10-s window is open and
+    // the step isn't yet done.  Renders "AGENT 1 AFTER N S....DISCH"
+    // counting from 10 → 0, then "AGENT 1 NOW...........DISCH".
+    let displayLine = m.line;
+    if (m.id === "ecam_agent1" && firePbWallMs && !agent1Done) {
+      const elapsed = Date.now() - firePbWallMs;
+      const remaining = Math.max(0, Math.ceil((AGENT1_ARM_MS - elapsed) / 1000));
+      displayLine = remaining > 0
+        ? `AGENT 1 AFTER ${remaining} S....DISCH`
+        : `AGENT 1 NOW...........DISCH`;
+    }
 
     // Large title: ENG 1 FAIL, LAND ASAP (directives / procedure headers)
     if (!linkedStep && (m.level === "warning" || m.line === "LAND ASAP" || m.line === "ENG 1 FAIL")) {
-      return <TitleRow key={m.id} color={color}>{m.line}</TitleRow>;
+      return <TitleRow key={m.id} color={color}>{displayLine}</TitleRow>;
     }
     // SECONDARY FAILURES section header — white label, no bullet
     if (m.line === "SECONDARY FAILURES") {
@@ -66,12 +116,12 @@ export function EwdDisplay({
     if (linkedStep) {
       return (
         <ActionRow key={m.id} color={color} completed={isCompleted}>
-          {m.line}
+          {displayLine}
         </ActionRow>
       );
     }
     // Advisory / system callout
-    return <SystemRow key={m.id} color={color}>{m.line}</SystemRow>;
+    return <SystemRow key={m.id} color={color}>{displayLine}</SystemRow>;
   }
 
   return (
@@ -79,22 +129,28 @@ export function EwdDisplay({
       className="border border-[var(--color-border)] font-mono select-none flex flex-col"
       style={{ backgroundColor: "#000000", flex: "1 1 0", minHeight: 0 }}
     >
-      {/* Header */}
+      {/* Header — only the ECAM label is shown when nothing is wrong.
+          Once a message exists OR master warning is active, the message
+          count badge and ENG 1 N1 read-out reappear. */}
       <div
         className="flex items-center justify-between px-3 py-[5px] border-b"
         style={{ borderColor: C.border }}
       >
         <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.25em" }}>ECAM</span>
-        <span style={{ color: state.masterWarnActive ? C.red : C.dim, fontSize: "9px", letterSpacing: "0.15em" }}>
-          {messages.length === 0 ? "NORM" : `${messages.length} MSG`}
-        </span>
-        <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.1em" }}>
-          ENG 1 N1{" "}
-          <span style={{ color: state.masterWarnActive ? C.red : C.green }}>
-            {state.masterWarnActive ? "- - -" : "84.2"}
+        {messages.length > 0 && (
+          <span style={{ color: state.masterWarnActive ? C.red : C.dim, fontSize: "9px", letterSpacing: "0.15em" }}>
+            {messages.length} MSG
           </span>
-          {" "}%
-        </span>
+        )}
+        {(messages.length > 0 || state.masterWarnActive) && (
+          <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.1em" }}>
+            ENG 1 N1{" "}
+            <span style={{ color: state.masterWarnActive ? C.red : C.green }}>
+              {state.masterWarnActive ? "- - -" : "84.2"}
+            </span>
+            {" "}%
+          </span>
+        )}
       </div>
 
       {/* Two-column body */}
@@ -105,14 +161,9 @@ export function EwdDisplay({
           className="flex flex-col gap-[3px]"
           style={{ flex: "1 1 0", padding: "10px 8px 10px 14px", overflowY: "auto" }}
         >
-          {leftMsgs.length === 0 ? (
-            <>
-              <MemoRow color={C.green} size="sm">— NORMAL —</MemoRow>
-              <MemoRow color={C.dim}   size="xs">ALL WARNINGS CLEAR</MemoRow>
-            </>
-          ) : (
-            leftMsgs.map(renderMsg)
-          )}
+          {/* When there are no ECAM messages, leave the column blank —
+              per user spec, only the "ECAM" header label should remain. */}
+          {leftMsgs.length > 0 && leftMsgs.map(renderMsg)}
         </div>
 
         {/* RIGHT — secondary failures (visible only after MASTER OFF) */}

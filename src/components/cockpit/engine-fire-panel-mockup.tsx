@@ -4,6 +4,12 @@
 // Airbus A320 Engine Fire Panel — mockup with realistic FCOM behavior modeled.
 // View at /mockups/fire-panel in dev.
 //
+// CANONICAL DESIGN REFERENCE — DO NOT mutate without explicit user direction.
+// This file is the single source of truth for the FIRE panel visual style.
+// Scenario integrations (e.g. engine-fire-panel-scenario.tsx) import
+// `FireSection` from here and apply scale wrappers; other future panels
+// (APU, ENG 2) should likewise reuse the components defined here.
+//
 // Behaviors modeled (FCOM DSC-26-20-20 + PRO-ABN-ENG):
 //   1. FIRE pb release — pushing releases mechanically; pb stays OUT.
 //   2. FIRE light independent of pb position — red FIRE legend + corner dots
@@ -36,6 +42,7 @@ const PULSE_CSS = `
 
 type EngFire = {
   fireDetected: boolean;
+  guardOpen:    boolean;         // pilot lifted the wire guard
   firePbOut:    boolean;
   firePbOutAt:  number | null;   // timestamp ms
   agent1Disch:  boolean;
@@ -44,6 +51,7 @@ type EngFire = {
 };
 type ApuFire = {
   fireDetected: boolean;
+  guardOpen:    boolean;
   firePbOut:    boolean;
   firePbOutAt:  number | null;
   agentDisch:   boolean;
@@ -52,8 +60,8 @@ type ApuFire = {
 
 const ARM_DELAY_MS = 10_000;  // FCOM "AGENT 1 AFTER 10 S → DISCH"
 
-const initEng = (): EngFire => ({ fireDetected: false, firePbOut: false, firePbOutAt: null, agent1Disch: false, agent2Disch: false, testActive: false });
-const initApu = (): ApuFire => ({ fireDetected: false, firePbOut: false, firePbOutAt: null, agentDisch: false, testActive: false });
+const initEng = (): EngFire => ({ fireDetected: false, guardOpen: false, firePbOut: false, firePbOutAt: null, agent1Disch: false, agent2Disch: false, testActive: false });
+const initApu = (): ApuFire => ({ fireDetected: false, guardOpen: false, firePbOut: false, firePbOutAt: null, agentDisch: false, testActive: false });
 
 export default function EngineFirePanel() {
   const [eng1, setEng1] = useState<EngFire>(initEng());
@@ -72,11 +80,18 @@ export default function EngineFirePanel() {
   }, [eng1.firePbOutAt, eng1.agent1Disch, eng1.agent2Disch, eng2.firePbOutAt, eng2.agent1Disch, eng2.agent2Disch, apu.firePbOutAt, apu.agentDisch]);
 
   // ── Behaviors ─────────────────────────────────────────────────────────────
+  // FCOM two-step: guard is lifted first, THEN the FIRE pb can be pushed.
+  const openEngGuard = (n: 1 | 2) => {
+    const setter = n === 1 ? setEng1 : setEng2;
+    setter(s => s.guardOpen ? s : { ...s, guardOpen: true });
+  };
+  const openApuGuard = () => setApu(s => s.guardOpen ? s : { ...s, guardOpen: true });
+
   const pushEngFirePb = (n: 1 | 2) => {
     const setter = n === 1 ? setEng1 : setEng2;
-    setter(s => s.firePbOut ? s : { ...s, firePbOut: true, firePbOutAt: Date.now() });
+    setter(s => (s.firePbOut || !s.guardOpen) ? s : { ...s, firePbOut: true, firePbOutAt: Date.now() });
   };
-  const pushApuFirePb = () => setApu(s => s.firePbOut ? s : { ...s, firePbOut: true, firePbOutAt: Date.now() });
+  const pushApuFirePb = () => setApu(s => (s.firePbOut || !s.guardOpen) ? s : { ...s, firePbOut: true, firePbOutAt: Date.now() });
 
   const pushAgent = (engN: 1 | 2, agentN: 1 | 2) => {
     const eng = engN === 1 ? eng1 : eng2;
@@ -117,17 +132,23 @@ export default function EngineFirePanel() {
         onSim={simFire} onReset={resetAll}
       />
 
-      {/* ── FIRE PANEL ──────────────────────────────────────────────────── */}
+      {/* ── FIRE PANEL — ENG 1 | APU | ENG 2 (canonical 3-section layout) ──
+          All three sections share the same `FireSection` component, so any
+          downstream tweak (SQUIB-visible-after-discharge, guard rotation,
+          countdown badge, etc.) propagates to every section automatically.
+          Base colour #75B5C5 (lighter desaturated cyan-teal). */}
       <div
-        className="relative rounded-xl border border-gray-500 shadow-2xl flex"
+        className="relative rounded-xl border shadow-2xl flex"
         style={{
-          width: "1400px",
+          width:  "1200px",
           height: "420px",
-          background: "linear-gradient(to bottom, #5d6672 0%, #434b55 100%)",
-          boxShadow: "inset 0 0 25px rgba(0,0,0,0.8), 0 0 30px rgba(0,0,0,0.5)",
+          background: "linear-gradient(to bottom, #75B5C5 0%, #5A98A8 100%)",
+          border: "1px solid #1D1818",
+          boxShadow: "inset 0 0 25px rgba(0,0,0,0.45), 0 0 30px rgba(0,0,0,0.5)",
         }}
       >
-        {[[12, 12], [1376, 12], [12, 396], [1376, 396]].map(([x, y], i) => (
+        {/* Four corner panel screws */}
+        {[[12, 12], [1176, 12], [12, 396], [1176, 396]].map(([x, y], i) => (
           <div key={i} className="absolute rounded-full"
             style={{
               left: x, top: y, width: 12, height: 12,
@@ -143,41 +164,55 @@ export default function EngineFirePanel() {
           FIRE
         </div>
 
+        {/* ENG 1 — TEST pb sits under AGENT 1 (left) */}
         <FireSection
           title="ENG 1"
+          testSide="left"
           fireDetected={eng1.fireDetected}
+          guardOpen={eng1.guardOpen}
           firePbOut={eng1.firePbOut}
           firePbOutAt={eng1.firePbOutAt}
           agent1Disch={eng1.agent1Disch}
           agent2Disch={eng1.agent2Disch}
           testActive={eng1.testActive}
+          onOpenGuard={() => openEngGuard(1)}
           onPushFirePb={() => pushEngFirePb(1)}
           onPushAgent1={() => pushAgent(1, 1)}
           onPushAgent2={() => pushAgent(1, 2)}
           onPushTest={() => toggleEngTest(1)}
         />
+
+        {/* APU — single AGENT, TEST pb centred under it */}
         <FireSection
           title="APU"
           isAPU
+          testSide="center"
           fireDetected={apu.fireDetected}
+          guardOpen={apu.guardOpen}
           firePbOut={apu.firePbOut}
           firePbOutAt={apu.firePbOutAt}
           agent1Disch={apu.agentDisch}
           agent2Disch={false}
           testActive={apu.testActive}
+          onOpenGuard={openApuGuard}
           onPushFirePb={pushApuFirePb}
           onPushAgent1={pushApuAgent}
-          onPushAgent2={() => {}}
+          onPushAgent2={() => { /* APU has only one bottle */ }}
           onPushTest={toggleApuTest}
         />
+
+        {/* ENG 2 — TEST pb sits under AGENT 2 (right) */}
         <FireSection
           title="ENG 2"
+          testSide="right"
           fireDetected={eng2.fireDetected}
+          guardOpen={eng2.guardOpen}
           firePbOut={eng2.firePbOut}
           firePbOutAt={eng2.firePbOutAt}
           agent1Disch={eng2.agent1Disch}
           agent2Disch={eng2.agent2Disch}
           testActive={eng2.testActive}
+          onOpenGuard={() => openEngGuard(2)}
           onPushFirePb={() => pushEngFirePb(2)}
           onPushAgent1={() => pushAgent(2, 1)}
           onPushAgent2={() => pushAgent(2, 2)}
@@ -244,19 +279,22 @@ function DemoBar({
 }
 
 // ─── FIRE section (one engine or APU) ────────────────────────────────────────
-function FireSection({
-  title, isAPU = false,
-  fireDetected, firePbOut, firePbOutAt,
+export function FireSection({
+  title, isAPU = false, testSide = "center",
+  fireDetected, guardOpen, firePbOut, firePbOutAt,
   agent1Disch, agent2Disch, testActive,
-  onPushFirePb, onPushAgent1, onPushAgent2, onPushTest,
+  onOpenGuard, onPushFirePb, onPushAgent1, onPushAgent2, onPushTest,
 }: {
   title: string; isAPU?: boolean;
+  testSide?: "left" | "center" | "right";
   fireDetected: boolean;
+  guardOpen:    boolean;
   firePbOut: boolean;
   firePbOutAt: number | null;
   agent1Disch: boolean;
   agent2Disch: boolean;
   testActive: boolean;
+  onOpenGuard:  () => void;
   onPushFirePb: () => void;
   onPushAgent1: () => void;
   onPushAgent2: () => void;
@@ -273,50 +311,119 @@ function FireSection({
 
   return (
     <div className="relative h-full" style={{ flex: isAPU ? "0 0 320px" : "1 1 0", minWidth: 0 }}>
-      <div className="absolute top-10 left-1/2 -translate-x-1/2 text-gray-100"
-           style={{ letterSpacing: "3px", fontSize: "16px", fontFamily: "monospace", fontWeight: 700 }}>
+      <div className="absolute left-1/2 -translate-x-1/2 text-gray-100"
+           style={{
+             // Dropped down so the "ENG 1" title sits just below the top
+             // of the AGENT pbs (~10 % below their starting y = 100).
+             // Font 50 % larger per user request: 16 → 24 px.
+             top: 105,
+             letterSpacing: "3px", fontSize: "24px",
+             fontFamily: "monospace", fontWeight: 700,
+           }}>
         {title}
       </div>
 
+      {/* FCOM DSC-26-20-20:
+          – TEST illuminates SQUIB (white) + DISCH (amber) on every
+            AGENT pb of the section.  Both stay visible during TEST.
+          – Normal operation: FIRE pb released → SQUIB white on both
+            AGENTs; press an AGENT → that AGENT's SQUIB DISAPPEARS,
+            its DISCH lights amber.
+          `actuallyDisch` carries the real discharge state (no TEST
+          overlay) so the SquibCell can hide its letters only after a
+          real AGENT press, not during TEST. */}
       {!isAPU && (
         <>
           <AgentPanel side="left"  agentNum={1}
-            arming={a1Arming} armed={a1Armed || testActive} discharged={agent1Disch || testActive}
+            arming={a1Arming}
+            armed={firePbOut || testActive}
+            discharged={agent1Disch || testActive}
+            actuallyDisch={agent1Disch}
             clickable={a1Armed} onPush={onPushAgent1} />
           <AgentPanel side="right" agentNum={2}
-            arming={a2Arming} armed={a2Armed || testActive} discharged={agent2Disch || testActive}
+            arming={a2Arming}
+            armed={firePbOut || testActive}
+            discharged={agent2Disch || testActive}
+            actuallyDisch={agent2Disch}
             clickable={a2Armed} onPush={onPushAgent2} />
         </>
       )}
       {isAPU && (
         <AgentPanel side="left" agentNum={1} apuStyle
-          arming={a1Arming} armed={a1Armed || testActive} discharged={agent1Disch || testActive}
+          arming={a1Arming}
+          armed={firePbOut || testActive}
+          discharged={agent1Disch || testActive}
+          actuallyDisch={agent1Disch}
           clickable={a1Armed} onPush={onPushAgent1} />
       )}
 
-      <FirePushbutton fireLightLit={fireLightLit} firePbOut={firePbOut} onPush={onPushFirePb} />
-
-      {/* TEST pb — clickable, illuminates all fire indications for this section */}
-      <button
-        onClick={onPushTest}
-        className="absolute left-1/2 -translate-x-1/2 rounded-full border border-gray-400"
-        style={{
-          bottom: 110, width: 44, height: 44,
-          padding: 0,
-          background: testActive
-            ? "radial-gradient(circle at 30% 30%, #ffd980 0%, #cc7a00 50%, #663d00 100%)"
-            : "radial-gradient(circle at 30% 30%, #9aa4af 0%, #4a525c 50%, #20262e 100%)",
-          boxShadow: testActive
-            ? "0 0 16px rgba(255,179,0,0.7), inset 0 0 8px rgba(255,255,255,0.25)"
-            : "inset 0 0 8px rgba(255,255,255,0.15), inset 0 -5px 10px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.5)",
-          cursor: "pointer", transition: "all 0.2s",
-        }}
-        title="FIRE TEST — illuminate all fire indications"
+      <FirePushbutton
+        fireLightLit={fireLightLit}
+        firePbOut={firePbOut}
+        guardOpen={guardOpen}
+        onOpenGuard={onOpenGuard}
+        onPush={onPushFirePb}
       />
-      <div className="absolute left-1/2 -translate-x-1/2 text-gray-300"
-           style={{ bottom: 88, fontSize: "11px", letterSpacing: "2px", fontFamily: "monospace", fontWeight: 700 }}>
-        TEST
-      </div>
+
+      {/* TEST pb — positioned under AGENT 1 (left) / AGENT 2 (right) /
+          center (APU) per testSide.  Clickable, illuminates all fire
+          indications for the section. */}
+      {(() => {
+        // AGENT pbs are 50 px wide and now sit at left:84 / right:84;
+        // their centres land at 84 + 25 = 109 px from the section edge.
+        // TEST is 32 px wide → left/right edge sits at 109 − 16 = 93 px
+        // so it stays centred under the AGENT pb above it.
+        const horizontalStyle: React.CSSProperties =
+          testSide === "left"  ? { left: 93 } :
+          testSide === "right" ? { right: 93 } :
+                                 { left: "50%", transform: "translateX(-50%)" };
+        const labelHorizontalStyle: React.CSSProperties =
+          testSide === "left"  ? { left: 93 + 16, transform: "translateX(-50%)" } :
+          testSide === "right" ? { right: 93 + 16, transform: "translateX(50%)" } :
+                                 { left: "50%", transform: "translateX(-50%)" };
+        return (
+          <>
+            {/* TEST label sits ABOVE the button now (per user order:
+                "TEST written, then below that, the test push button"). */}
+            <div className="absolute text-gray-300"
+                 style={{
+                   ...labelHorizontalStyle,
+                   bottom: 196, fontSize: "11px", letterSpacing: "0.14em",
+                   fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 700,
+                 }}>
+              TEST
+            </div>
+            <button
+              onClick={onPushTest}
+              className="absolute rounded-full"
+              style={{
+                ...horizontalStyle,
+                // TEST button shrunk 20 % (32 → 26).  Black with a small
+                // white centre dot; never illuminates.  Sits ~5 px below
+                // the "TEST" label and ends ~3 px before the FIRE pb's
+                // bottom edge (≈ y 253).
+                bottom: 171, width: 26, height: 26,
+                padding: 0,
+                background: "#000000",
+                border: "none",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.5)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              title="FIRE TEST — illuminate all fire indications"
+            >
+              <div style={{
+                width: 6, height: 6,
+                background: "#FFFFFF",
+                borderRadius: "50%",
+                pointerEvents: "none",
+              }} />
+            </button>
+          </>
+        );
+      })()}
 
       {/* Countdown badge — visible during the 10-s ECAM arming window */}
       {countdown > 0 && (
@@ -337,19 +444,29 @@ function FireSection({
 
       {!isAPU && (
         <>
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 select-none"
+          {/* White vertical bar — height kept at 80 (previous value). */}
+          <div className="absolute select-none"
                style={{
-                 transform: "translateY(-50%) rotate(-90deg)",
-                 transformOrigin: "left center",
-                 letterSpacing: "8px", fontSize: "16px", fontFamily: "monospace", fontWeight: 700,
-               }}>
-            FIRE
-          </div>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 select-none"
+                 left: 44,
+                 top: 145,
+                 width: 4,
+                 height: 80,
+                 background: "#FFFFFF",
+               }} />
+          {/* "FIRE" — fontSize 16 keeps the actual rendered glyph stack
+              (≈ 4 × 16 × 1.15 ≈ 74 px with monospace ascent/descent)
+              comfortably WITHIN the bar's 80-px span.  Centred so F top
+              and E bottom both sit inside the bar. */}
+          <div className="absolute select-none"
                style={{
-                 transform: "translateY(-50%) rotate(90deg)",
-                 transformOrigin: "right center",
-                 letterSpacing: "8px", fontSize: "16px", fontFamily: "monospace", fontWeight: 700,
+                 left: 47,
+                 top: 148,
+                 color: "#FFFFFF",
+                 writingMode: "vertical-lr",
+                 textOrientation: "upright",
+                 letterSpacing: "0px", fontSize: "16px",
+                 lineHeight: 1,
+                 fontFamily: "monospace", fontWeight: 700,
                }}>
             FIRE
           </div>
@@ -359,62 +476,252 @@ function FireSection({
   );
 }
 
+// ─── GuardCover ──────────────────────────────────────────────────────────────
+// Transparent acrylic guard cover that sits ABOVE the FIRE pb.  NOT the FIRE
+// pb itself — the button must stay visible underneath.  Hinged at the top
+// edge; lifts -105° when `lifted` is true (open/close animation).
+//
+// Layer hierarchy (per Figma spec):
+//   GuardCover
+//   ├── OUTER_GUARD       (symmetric trapezoid + thumb-grip tab)
+//   ├── INNER_GUARD       (110 × 55 acrylic pane border)
+//   ├── OVAL_GAP          (small slot in the lower tab area)
+//   ├── GLASS_HIGHLIGHT   (top reflection line)
+//   └── SHADOW            (n/a yet — kept here for future use)
+//
+// OVAL_GAP is a separate <ellipse> sibling so it rotates with the rest of
+// the guard during the lift animation; it is NOT merged into the path.
+// NEW OUTER — Figma trace with two small softenings:
+//   – Top corners: 2.5 px Q curves
+//   – Bottom tab tip: H62 → Q68.75 113.5 62 111.5 — gentle downward arc
+//     across the flat tab base so the very bottom reads as curvy
+const GUARD_OUTER_PATH =
+  "M0.5 88.5V3Q0.5 0.5 3 0.5H131Q133.5 0.5 134 3L134.5 88.5H95.5L75.5 111.5Q68.75 113.5 62 111.5L59.5 109L50 98.5L41.5 88.5H0.5Z";
+
+// OVEAL GAP — traced ellipse, 14 × 7 (rx 7, ry 3.5).  Centred on the
+// tab's horizontal midline (x = 67.5) and vertically halfway between the
+// main-rect bottom at y = 88.5 and the tab tip at y = 111.5.
+const OVAL_GAP_CX = 67.5;
+const OVAL_GAP_CY = 100;
+const OVAL_GAP_RX = 7;
+const OVAL_GAP_RY = 3.5;
+
+// JOINT — hinge bar at the top of the guard.  Reduced 20 % from the
+// original 67 × 17.5 trace per user request.
+//   width  67   → 54         (20 % smaller)
+//   height 17.5 → 14         (20 % smaller)
+//   x range:  40.5 → 94.5    (centred on x = 67.5)
+//   y range:  0.5  → 14.5
+//   pivot:    (67.5, 7.5)    — centre of the smaller JOINT bar
+const JOINT_X = 40.5;
+const JOINT_Y = 0.5;
+const JOINT_W = 54;
+const JOINT_H = 14;
+const JOINT_STROKE = "#1D1818";
+const PIVOT_X_PX = 67.5;          // half the guard width — equals JOINT_X + JOINT_W/2
+// Pivot at the TOP edge of the JOINT (= top of the guard) so the whole
+// guard swings UP cleanly — none of it rotates downward beneath the
+// pivot, which is what was happening when the pivot was at the JOINT's
+// centre (y 7.5).
+const PIVOT_Y_PX = JOINT_Y;       // 0.5 — top edge of JOINT
+
+function GuardCover({ lifted }: { lifted: boolean }) {
+  // Wrapper sits over the FIRE pb.  Inside:
+  //   1. a ROTATING sub-container holding OUTER / INNER / OVAL / HIGHLIGHT
+  //      that pivots around the JOINT centreline when `lifted` is true
+  //   2. a STATIC JOINT overlay that never moves — it's the hinge mechanism
+  //      bolted to the panel, so the guard rotates around it.
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: -2,
+        left: -5,
+        width: 135,
+        height: 112,
+        // Strong perspective so the lift reads as a real hinged door
+        // opening (angular swing, not a translate-up slide).
+        perspective: "300px",
+        pointerEvents: "none",
+      }}
+    >
+      {/* Rotating sub-container — pivots around the JOINT top edge like
+          a hinged door.  0° = closed, -120° = open (per user spec).
+          `backfaceVisibility: visible` so the guard does NOT disappear
+          past -90° (the back of the panel becomes the visible side). */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 135,
+          height: 112,
+          transformOrigin: `${PIVOT_X_PX}px ${PIVOT_Y_PX}px`,
+          transform: lifted
+            ? "rotateX(-120deg) translateZ(0)"
+            : "rotateX(0deg) translateZ(0)",
+          transition: "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+          backfaceVisibility: "visible",
+        }}
+      >
+      <svg
+        width="135"
+        height="112"
+        viewBox="0 0 135 112"
+        fill="none"
+        style={{ display: "block", overflow: "visible" }}
+      >
+        {/* Guard frame fill — outer ⊖ inner ⊖ oval (evenodd).  The oval
+            is added as a third sub-path so it cuts a real hole through
+            the guard fill — the panel background shows through it. */}
+        <path
+          d={`${GUARD_OUTER_PATH} M12 17 H122 V83 H12 Z M60.5 100 a 7 3.5 0 1 0 14 0 a 7 3.5 0 1 0 -14 0`}
+          fillRule="evenodd"
+          fill="rgba(174, 56, 22, 0.92)"
+        />
+        {/* Outer guard frame — #AE3816 stroke (per user spec). */}
+        <path
+          d={GUARD_OUTER_PATH}
+          fill="none"
+          stroke="#AE3816"
+          strokeWidth="1.5"
+        />
+        {/* Inner acrylic-pane border — dark-red stroke, thinner.
+            Height bumped 55 → 66 (+20 %) per user spec. */}
+        <rect
+          x="12" y="17"
+          width="110" height="66"
+          fill="none"
+          stroke="rgba(92, 10, 10, 0.95)"
+          strokeWidth="0.75"
+        />
+        {/* OVEAL GAP — fill is cut from the guard frame (above) so the
+            panel background shows through.  We keep just a thin outline
+            here to silhouette the cutout. */}
+        <ellipse
+          cx={OVAL_GAP_CX}
+          cy={OVAL_GAP_CY}
+          rx={OVAL_GAP_RX}
+          ry={OVAL_GAP_RY}
+          fill="none"
+          stroke={JOINT_STROKE}
+          strokeWidth="1"
+        />
+        {/* Top reflection highlight — soft red-tinted highlight for the
+            "transparent dark-red acrylic" look */}
+        <line
+          x1="10" y1="8" x2="124" y2="8"
+          stroke="rgba(255,160,160,0.28)"
+          strokeWidth="1"
+        />
+      </svg>
+      </div>
+
+      {/* JOINT — STATIC hinge bar, separate from the rotating sub-container.
+          Does NOT rotate; the guard above rotates around its centreline. */}
+      <svg
+        width="135"
+        height="112"
+        viewBox="0 0 135 112"
+        fill="none"
+        style={{
+          position: "absolute",
+          top: 0, left: 0,
+          display: "block",
+          overflow: "visible",
+        }}
+      >
+        {/* Outer JOINT — dark frame (#1D1818) */}
+        <rect
+          x={JOINT_X}
+          y={JOINT_Y}
+          width={JOINT_W}
+          height={JOINT_H}
+          fill={JOINT_STROKE}
+          stroke={JOINT_STROKE}
+          strokeWidth="1"
+        />
+        {/* Inner JOINT mechanism — 80 % size of outer JOINT, light-gray
+            fill (#A8A7A6) per user spec.  Represents the visible metal
+            hinge mechanism inside the dark frame. */}
+        <rect
+          x={JOINT_X + JOINT_W * 0.1}
+          y={JOINT_Y + JOINT_H * 0.1}
+          width={JOINT_W * 0.8}
+          height={JOINT_H * 0.8}
+          fill="#A8A7A6"
+        />
+      </svg>
+    </div>
+  );
+}
+
 // ─── ENG 1(2) FIRE pushbutton ────────────────────────────────────────────────
 function FirePushbutton({
-  fireLightLit, firePbOut, onPush,
+  fireLightLit, firePbOut, guardOpen, onOpenGuard, onPush,
 }: {
-  fireLightLit: boolean; firePbOut: boolean; onPush: () => void;
+  fireLightLit: boolean;
+  firePbOut:    boolean;
+  guardOpen:    boolean;
+  onOpenGuard:  () => void;
+  onPush:       () => void;
 }) {
+  // PLAN v3 mirrored from fire-panel.tsx + new-spec deltas:
+  //   – LANDSCAPE shape 144 × 108 (was portrait 130 × 168)
+  //   – TWO distinct body colours per FCOM convention: orange-red at rest,
+  //     BRIGHT PURE RED when the FIRE warning is active.
+  //   – Wire guard now ANIMATES — rotates -105° when the pilot has opened
+  //     the guard (guardOpen), or once the pb has been pushed (firePbOut).
+  //   – `perspective` on the button so the rotateX lift renders in 3-D.
+  const guardLifted = guardOpen || firePbOut;
   return (
     <button
-      onClick={onPush}
+      // Two-step FCOM action: tap the guard to lift it first, then tap
+      // the pb face to release.  Once the pb is OUT, clicks are ignored.
+      onClick={() => {
+        if (firePbOut) return;
+        if (!guardOpen) {
+          onOpenGuard();
+        } else {
+          onPush();
+        }
+      }}
       className="absolute left-1/2 top-1/2"
       style={{
-        transform: `translate(-50%, calc(-50% + ${firePbOut ? "-4px" : "0px"}))`,
-        width: 130, height: 168, borderRadius: 6, padding: 0,
+        transform: `translate(-50%, calc(-61% + ${firePbOut ? "-4px" : "0px"}))`,
+        // Per Figma trace: FIRE pb is 131 × 87 (sits inside the 135 × 112
+        // outer guard with 2 px margin around it).  Slightly rounder
+        // corners (6 → 10) for a softer minimalistic look.
+        width: 131, height: 87, borderRadius: 10, padding: 0,
+        // FCOM-faithful: pb face lights bright red when fire warning is
+        // active (fireDetected) or TEST is pressed.  Dusky burgundy at
+        // rest.  Halo glow + white text on activation.
         background: fireLightLit
-          ? "linear-gradient(to bottom, #ff4040 0%, #b80000 50%, #6a0000 100%)"
-          : "linear-gradient(to bottom, #6b737d 0%, #424952 50%, #20262e 100%)",
-        border: fireLightLit ? "3px solid #ff8080" : "3px solid #232932",
+          ? "linear-gradient(180deg, #FF2828 0%, #E81010 50%, #C80000 100%)"
+          : "linear-gradient(180deg, #A85A55 0%, #9A4E49 50%, #7A3835 100%)",
+        border: fireLightLit ? "4px solid #FF6060" : "4px solid #5A2A28",
         boxShadow: fireLightLit
-          ? "0 0 36px rgba(255,40,40,0.85), inset 0 0 18px rgba(255,255,255,0.25), inset 0 -8px 14px rgba(0,0,0,0.55)"
+          ? "0 0 36px rgba(255,30,30,0.95), inset 0 0 18px rgba(255,80,80,0.45), inset 0 -8px 16px rgba(0,0,0,0.65)"
           : firePbOut
-            ? "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -10px 18px rgba(0,0,0,0.65), 0 6px 10px rgba(0,0,0,0.7)"
-            : "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -10px 18px rgba(0,0,0,0.65), 0 2px 6px rgba(0,0,0,0.55)",
+            ? "inset 0 1px 0 rgba(255,220,210,0.35), inset 0 -3px 6px rgba(0,0,0,0.25), 0 6px 10px rgba(0,0,0,0.7)"
+            : "inset 0 1px 0 rgba(255,220,210,0.35), inset 0 -3px 6px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.55)",
         cursor: firePbOut ? "default" : "pointer",
         transition: "all 0.25s ease",
         position: "absolute",
+        perspective: "320px",        // gives the rotateX guard lift real 3-D depth
       }}
       disabled={firePbOut}
     >
-      {/* Wireframe metal guard at top */}
-      <div style={{
-        position: "absolute", top: -10, left: 8, right: 8, height: 20,
-        border: "1.5px solid #6a7488",
-        borderRadius: 3,
-        background: "rgba(40,46,56,0.20)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.20), inset 0 -1px 0 rgba(0,0,0,0.30), 0 2px 3px rgba(0,0,0,0.5)",
-        pointerEvents: "none",
-      }}>
-        <div style={{
-          position: "absolute", top: "50%", left: 0, right: 0, height: 1.4,
-          transform: "rotate(20deg)", transformOrigin: "50% 50%",
-          background: "linear-gradient(90deg, #4a5260, #b0b8c0, #4a5260)",
-        }} />
-        <div style={{
-          position: "absolute", top: "50%", left: 0, right: 0, height: 1.4,
-          transform: "rotate(-20deg)", transformOrigin: "50% 50%",
-          background: "linear-gradient(90deg, #4a5260, #b0b8c0, #4a5260)",
-        }} />
-        <div style={{
-          position: "absolute", top: "50%", left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: 4, height: 4,
-          background: "radial-gradient(circle at 30% 30%, #c8d0d8, #5a6470)",
-          borderRadius: "50%",
-        }} />
-      </div>
+      {/* Guard cover — separate component, exact Figma-traced geometry.
+          See GuardCover above for path data + layer order. */}
+      <GuardCover lifted={guardLifted} />
 
+      {/* Hinge-knuckle dots removed per user request — guard pivots around
+          the JOINT bar inside the GuardCover, no separate knuckle dots
+          needed at the pb corners. */}
+
+      {/* Amber "OUT" indicator dot — when pb has been pushed AND no fire
+          warning is active (mechanically out, ready for next event). */}
       {firePbOut && !fireLightLit && (
         <div style={{
           position: "absolute", top: 6, right: 6,
@@ -424,21 +731,28 @@ function FirePushbutton({
         }} />
       )}
 
+      {/* "FIRE" / "PUSH" — dark red at rest, pure white + red glow when
+          fire warning is active (fireDetected) or TEST is pressed. */}
       <div style={{
-        position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)",
-        fontSize: 24, fontFamily: "monospace", fontWeight: 800, letterSpacing: "3px",
-        color: fireLightLit ? "#fff5f5" : "#a4abb6",
-        textShadow: fireLightLit ? "0 0 14px rgba(255,80,80,0.9), 0 0 4px #fff" : "0 0 4px rgba(0,0,0,0.4)",
+        position: "absolute", top: 22, left: "50%", transform: "translateX(-50%)",
+        fontSize: 22, fontFamily: '"Helvetica Neue", Arial, sans-serif',
+        fontWeight: 800, letterSpacing: "0.06em",
+        color: fireLightLit ? "#ffffff" : "#5A0808",
+        textShadow: fireLightLit ? "0 0 14px rgba(255,80,80,0.9), 0 0 4px #fff" : "none",
         transition: "color 0.2s, text-shadow 0.2s",
       }}>FIRE</div>
 
       <div style={{
-        position: "absolute", bottom: 18, left: "50%", transform: "translateX(-50%)",
-        fontSize: 13, fontFamily: "monospace", fontWeight: 700, letterSpacing: "2.5px",
-        color: fireLightLit ? "#ffd0d0" : "#9aa1ac",
+        position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)",
+        fontSize: 11, fontFamily: '"Helvetica Neue", Arial, sans-serif',
+        fontWeight: 700, letterSpacing: "0.14em",
+        color: fireLightLit ? "#ffffff" : "#5A0808",
+        textShadow: fireLightLit ? "0 0 10px rgba(255,80,80,0.9)" : "none",
         transition: "color 0.2s",
       }}>PUSH</div>
 
+      {/* Four corner red FIRE indicator dots — visible when the pb
+          face is lit (fire warning or TEST). */}
       {fireLightLit && (
         <>
           {[
@@ -447,14 +761,12 @@ function FirePushbutton({
             { bottom: 6, left: 6 },
             { bottom: 6, right: 6 },
           ].map((pos, i) => (
-            <div key={i}
-              style={{
-                position: "absolute", ...pos,
-                width: 6, height: 6, borderRadius: "50%",
-                background: "#ff4040",
-                boxShadow: "0 0 8px rgba(255,80,80,0.95)",
-              }}
-            />
+            <div key={i} style={{
+              position: "absolute", ...pos,
+              width: 6, height: 6, borderRadius: "50%",
+              background: "#ff4040",
+              boxShadow: "0 0 8px rgba(255,80,80,0.95)",
+            }} />
           ))}
         </>
       )}
@@ -464,27 +776,35 @@ function FirePushbutton({
 
 // ─── AGENT 1(2) pb-sw ────────────────────────────────────────────────────────
 function AgentPanel({
-  side, agentNum, arming, armed, discharged, clickable, onPush, apuStyle = false,
+  side, agentNum, arming, armed, discharged, actuallyDisch, clickable, onPush, apuStyle = false,
 }: {
   side: "left" | "right";
   agentNum: 1 | 2;
   arming:     boolean;   // FIRE pb pushed but 10-s window not elapsed
-  armed:      boolean;   // SQUIB armed (or testActive)
-  discharged: boolean;   // DISCH amber
+  armed:      boolean;   // SQUIB armed (firePbOut OR testActive)
+  discharged: boolean;   // DISCH amber (agentDisch OR testActive)
+  actuallyDisch: boolean;// TRUE only when the AGENT pb has actually been pressed
+                         // (NOT when discharged comes from TEST overlay).
+                         // Used to hide SQUIB letters per FCOM sequence.
   clickable:  boolean;
   onPush:     () => void;
   apuStyle?:  boolean;
 }) {
   const sideStyle: React.CSSProperties = {
-    top: 100,
-    [side === "left" ? "left" : "right"]: apuStyle ? "50%" : 26,
+    // AGENT block pushed down 20 % more (100 → 120) per user request.
+    top: 112,
+    // Inset 84 px from each section edge (~40 % closer to FIRE pb).
+    [side === "left" ? "left" : "right"]: apuStyle ? "50%" : 84,
     ...(apuStyle ? { transform: "translateX(-50%)" } : {}),
   };
 
   return (
     <div className="absolute" style={sideStyle}>
-      <div className="text-gray-200 mb-2"
-           style={{ fontSize: 11, letterSpacing: 2, fontFamily: "monospace", fontWeight: 700, textAlign: "center" }}>
+      <div className="text-gray-200"
+           style={{ fontSize: 11, letterSpacing: "0.08em",
+                    fontFamily: '"Helvetica Neue", Arial, sans-serif',
+                    fontWeight: 700, textAlign: "center",
+                    marginBottom: 2 }}>
         AGENT {apuStyle ? "" : agentNum}
       </div>
 
@@ -492,22 +812,35 @@ function AgentPanel({
         onClick={clickable ? onPush : undefined}
         disabled={!clickable}
         style={{
-          width: 64, height: 64, padding: 3,
+          // PLAN v3 mirror: rounded ~4 px (was 3), inset recess shadow on all
+          // states so the cells look INSIDE the bezel.
+          // Shrunk so the FIRE pb dominates proportionally per the photo.
+          // FIRE pb is 131 wide; AGENT pbs are now ~38 % of that.
+          width: 50, height: 56, padding: 3,
           background: "#1e2430",
-          border: `1.5px solid ${discharged ? "#ffb300" : armed ? "#e8ecf4" : arming ? "#FFB30070" : "#3a4252"}`,
-          borderRadius: 3,
+          // Black AGENT pb body; only the SQUIB / DISCH letters inside
+          // light up.  Outer halo: dark "shadow ring" between the pb
+          // body and the white outline so the gap reads as inset, not
+          // panel-coloured.  Outline 2 px (was 1.5, +20 %).
+          border: "1.5px solid #3a4252",
+          borderRadius: 4,
+          outline: "2px solid #FFFFFF",
+          outlineOffset: "3px",
           boxShadow:
-            discharged ? "0 0 8px rgba(255,179,0,0.55)" :
-            armed      ? "0 0 8px rgba(232,236,244,0.45)" :
-            arming     ? "0 0 4px rgba(255,179,0,0.35)" :
-                         "inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 2px rgba(0,0,0,0.5)",
+            "inset 0 0 4px rgba(0,0,0,0.55), " +     // recess (interior)
+            "0 0 0 3px #6E9292, " +                   // darker shade of the panel cyan (a touch darker than #82A6A6) — fills the gap
+            "0 2px 4px rgba(0,0,0,0.40)",             // soft drop shadow
           display: "flex", flexDirection: "column", gap: 2,
           cursor: clickable ? "pointer" : "default",
           transition: "all 0.2s",
         }}
       >
         {/* SQUIB cell — pulses amber during arming, solid white when armed */}
-        <SquibCell arming={arming && !armed && !discharged} armed={armed && !discharged} />
+        <SquibCell
+          arming={arming && !armed && !actuallyDisch}
+          armed={armed && !actuallyDisch}
+          discharged={actuallyDisch}
+        />
         {/* DISCH cell — solid amber when discharged */}
         <Indicator label="DISCH" lit={discharged} color="amber" />
       </button>
@@ -515,19 +848,26 @@ function AgentPanel({
   );
 }
 
-function SquibCell({ arming, armed }: { arming: boolean; armed: boolean }) {
+function SquibCell({ arming, armed, discharged }: { arming: boolean; armed: boolean; discharged: boolean }) {
   return (
     <div
       style={{
         flex: 1,
-        background: arming ? undefined : armed ? "rgba(232,236,244,0.30)" : "#06080c",
+        background: "#06080c",
         animation: arming ? "agent-arming-pulse 1s ease-in-out infinite" : undefined,
-        borderRadius: 1,
+        borderRadius: 3,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 9, fontFamily: "monospace", fontWeight: 800,
-        letterSpacing: "0.08em",
-        color: armed ? "#e8ecf4" : arming ? "#FFB300" : "#3a4252",
-        textShadow: armed ? "0 0 4px #e8ecf4" : arming ? "0 0 3px rgba(255,179,0,0.7)" : "none",
+        fontSize: 9, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 800,
+        letterSpacing: "0.06em",
+        // After the AGENT pb is pressed (discharged), SQUIB stays visible
+        // but dimmed — readable without competing with the lit DISCH amber.
+        // Per user spec (not the original FCOM "hidden" behaviour).
+        color: discharged ? "#3a4252" : armed ? "#e8ecf4" : arming ? "#FFB300" : "#3a4252",
+        textShadow: !discharged && armed
+          ? "0 0 4px #e8ecf4"
+          : !discharged && arming
+            ? "0 0 3px rgba(255,179,0,0.7)"
+            : "none",
         transition: "color 0.2s",
       }}
     >
@@ -537,16 +877,17 @@ function SquibCell({ arming, armed }: { arming: boolean; armed: boolean }) {
 }
 
 function Indicator({ label, lit, color }: { label: string; lit: boolean; color: "white" | "amber" }) {
-  const litBg = color === "white" ? "rgba(232,236,244,0.30)" : "rgba(255,179,0,0.30)";
   const litFg = color === "white" ? "#e8ecf4"               : "#ffb300";
   return (
     <div
       style={{
         flex: 1,
-        background: lit ? litBg : "#06080c",
-        borderRadius: 1,
+        // Background stays dark in all states — per user spec, only the
+        // DISCH text lights up (amber), not the surrounding cell.
+        background: "#06080c",
+        borderRadius: 3,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 9, fontFamily: "monospace", fontWeight: 800,
+        fontSize: 9, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 800,
         letterSpacing: "0.08em",
         color: lit ? litFg : "#3a4252",
         textShadow: lit ? `0 0 4px ${litFg}` : "none",

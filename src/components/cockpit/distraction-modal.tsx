@@ -86,8 +86,19 @@ export function DistractionModal({
         </span>
       </div>
 
-      {/* Message */}
+      {/* Exchange — pilot's call (if present) → ATC's reply */}
       <div style={{ padding: compact ? "8px 16px" : "12px 16px" }}>
+        {distraction.pilotSays && (
+          <div style={{ marginBottom: compact ? "8px" : "10px", paddingBottom: compact ? "8px" : "10px", borderBottom: "1px dashed #1F2A38" }}>
+            <div style={{ color: "#7FB8FF", fontSize: "8px", letterSpacing: "0.2em", fontWeight: 700, marginBottom: "4px" }}>FLIGHT CREW → ATC</div>
+            <p style={{ color: "#A8C8E8", fontSize: compact ? "10px" : "12px", lineHeight: "1.5", letterSpacing: "0.02em", fontStyle: "italic" }}>
+              &ldquo;{distraction.pilotSays}&rdquo;
+            </p>
+          </div>
+        )}
+        {distraction.pilotSays && (
+          <div style={{ color: style.accent, fontSize: "8px", letterSpacing: "0.2em", fontWeight: 700, marginBottom: "4px" }}>ATC → FLIGHT CREW</div>
+        )}
         <p style={{ color: "#D4D8E8", fontSize: compact ? "11px" : "13px", lineHeight: "1.55", letterSpacing: "0.02em" }}>
           &ldquo;{distraction.message}&rdquo;
         </p>

@@ -36,11 +36,14 @@ export function reduce(state: ScenarioState, event: ScenarioEvent): ScenarioStat
   switch (event.kind) {
     case "STEP": {
       if (state.completedSteps[event.stepId]) return state;
-      const order = Object.keys(state.completedSteps).length + 1;
+      // Store the wall-clock tMs the step completed.  Truthy checks
+      // ("is this step done?") still work; ordering by value still gives
+      // chronological order.  Countdown UIs (AGENT arm timers, fire-warn
+      // 30 s window) read this to compute remaining time.
       return {
         ...state,
         tMs: event.tMs,
-        completedSteps: { ...state.completedSteps, [event.stepId]: order },
+        completedSteps: { ...state.completedSteps, [event.stepId]: event.tMs },
       };
     }
     case "DECISION": {

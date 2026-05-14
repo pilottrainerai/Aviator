@@ -27,16 +27,17 @@ export const rapidDepress: Scenario = {
         {
           type: "ADD_ECAM",
           messages: [
-            { id: "cabin_alt",        line: "CAB PR EXCESS CAB ALT",        level: "warning"  },
+            { id: "cabin_alt",        line: "CAB PR EXCESS CAB ALT",            level: "warning"  },
             // FCOM procedure above FL160: EMER DESCENT + crew OXY masks + ATC + PA
-            { id: "crew_masks",       line: "CREW OXY MASKS..........USE",  level: "caution"  },
-            { id: "emer_descent_ecam",line: "EMER DESCENT...........INITIATE", level: "caution" },
-            { id: "spd_brk_ecam",     line: "SPD BRK....................FULL", level: "caution" },
-            { id: "eng_ign_ecam",     line: "ENG MODE SEL..............IGN", level: "caution" },
-            { id: "atc_ecam",         line: "ATC.....................NOTIFY", level: "caution" },
-            { id: "pa_ecam",          line: "EMER DESCENT(PA)..ANNOUNCE",   level: "caution"  },
-            // IF CAB ALT > 14 000 FT:
-            { id: "pax_masks",        line: "PAX OXY MASKS..........MAN ON", level: "caution" },
+            { id: "crew_masks",       line: "CREW OXY MASKS..........USE",       level: "advisory" },
+            { id: "emer_descent_ecam",line: "EMER DESCENT...........INITIATE",   level: "advisory" },
+            { id: "spd_brk_ecam",     line: "SPD BRK....................FULL",  level: "advisory" },
+            { id: "eng_ign_ecam",     line: "ENG MODE SEL..............IGN",     level: "advisory" },
+            { id: "atc_ecam",         line: "ATC.....................NOTIFY",   level: "advisory" },
+            { id: "pa_ecam",          line: "EMER DESCENT(PA)..ANNOUNCE",        level: "advisory" },
+            // Conditional sub-block — only required if cabin altitude breaches 14 000 ft.
+            { id: "ecam_if_cab14k",   line: "·IF CAB ALT > 14 000 FT:",          level: "remark"   },
+            { id: "pax_masks",        line: "  PAX OXY MASKS........MAN ON",     level: "advisory" },
           ],
         },
       ],
@@ -331,41 +332,185 @@ export const rapidDepress: Scenario = {
     { id: "st_med",    line: "MEDICAL ON STANDBY",            severity: "memo"     },
   ],
 
+  // ── ATC sequence — mirrors eng1-fire-after-v1 ──────────────────────────────
+  // High-workload phase (donning masks → emergency descent → checklist):
+  // crew stays brief, STANDBY is correct discipline.  Workload eases once
+  // level at safe altitude — crew advises intentions and accepts the
+  // operational interrogation.
   distractions: [
+    // ① ATC notices the FL350 readout dropping unexpectedly
     {
-      id: "atc_initial",
+      id: "atc_initial_query",
       atMs: 8_000,
       kind: "atc",
       from: "MUMBAI CONTROL",
       message: "IFLY202, confirm FL350.",
       standbyResurfaceMs: 15_000,
       choices: [
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY202, cabin depress, emergency descent FL350 to FL100, SQUAWK 7700", correct: true  },
-        { id: "b", label: "IFLY202 descending, just a precaution",                                                         correct: false },
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY202, cabin depressurisation, emergency descent FL350 to FL100, squawking 7700", correct: true  },
+        { id: "b", label: "IFLY202 descending, just a precaution",                                                                    correct: false },
+        { id: "c", label: "Standby IFLY202",                                                                                            correct: false },
       ],
     },
+
+    // ② ATC clears emergency descent + reciprocal block — pilot reads back
     {
-      id: "atc_block",
-      atMs: 20_000,
+      id: "atc_emer_desc_clearance",
+      atMs: 25_000,
       kind: "atc",
       from: "MUMBAI CONTROL",
-      message: "IFLY202, cleared emergency descent, report reaching FL100. Nearest airport Mumbai 45 nm.",
+      message: "IFLY202, roger MAYDAY, cleared emergency descent FL100, turn right heading 270 clear of traffic, report level.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY202, request vectors Mumbai VABB, declare FULL EMERGENCY, structural damage suspected", correct: true  },
-        { id: "b", label: "IFLY202, thank you, will continue to destination",                                                  correct: false },
+        { id: "a", label: "Cleared emergency descent FL100, right heading 270, will report level, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                                                                    correct: false },
+        // Wrong — partial readback drops the heading, traffic-separation critical
+        { id: "c", label: "Descending FL100, IFLY202",                                                        correct: false },
       ],
     },
+
+    // ③ Level at FL100 — pilot reports + ATC offers nearest airport
     {
-      id: "atc_approach",
-      atMs: 120_000,
+      id: "atc_level_off",
+      atMs: 80_000,
       kind: "atc",
-      from: "MUMBAI APPROACH",
-      message: "IFLY202, cleared ILS RWY 27 Mumbai, wind calm, confirm number of souls.",
+      from: "MUMBAI CONTROL",
+      message: "IFLY202, vectors available, nearest suitable Mumbai VABB 45 nm, advise intentions.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY202, 186 POB, medical assessment required on landing, possible structural damage", correct: true  },
-        { id: "b", label: "IFLY202, 186 POB, normal approach",                                                            correct: false },
+        // Correct — concise discipline phrase while still completing checklists
+        { id: "a", label: "Continuing checklist, will advise intentions, IFLY202", correct: true  },
+        // Also valid — concrete deferral with the diversion intent declared
+        { id: "b", label: "Request vectors Mumbai, level FL100, will confirm requirements shortly, IFLY202", correct: true  },
+        // Wrong — over-committal on approach type before brief is done
+        { id: "c", label: "IFLY202 request immediate ILS runway 27 Mumbai",       correct: false },
+      ],
+    },
+
+    // ④ ATC offers vectors when ready — STANDBY while finishing checklists
+    {
+      id: "atc_vectors_when_ready",
+      atMs: 110_000,
+      kind: "atc",
+      from: "MUMBAI CONTROL",
+      message: "IFLY202, vectors available when ready, no reported traffic in the descent area.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Continuing checklist, will advise when ready, IFLY202", correct: true  },
+        { id: "b", label: "Standby IFLY202",                                       correct: true  },
+        // Wrong — gives clearance details before crew has finished checklist
+        { id: "c", label: "IFLY202 ready for ILS 27 Mumbai",                       correct: false },
+      ],
+    },
+
+    // ⑤ Briefing prompt — step-gated on checklist completion
+    {
+      id: "atc_briefing_prompt",
+      atMs: 140_000,
+      requiresStep: "atc_intentions",
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, Mumbai Approach, advise requirements for the approach and any assistance required.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Request latest Mumbai weather, runway in use, NOTAMs, and expected approach, IFLY202", correct: true  },
+        { id: "b", label: "Standby IFLY202",                                                                       correct: false },
+        // Wrong — premature, no info to brief on yet
+        { id: "c", label: "Request vectors ILS 27, IFLY202",                                                       correct: false },
+      ],
+    },
+
+    // ⑥ ATC delivers briefing info — full readback
+    {
+      id: "atc_briefing_info",
+      atMs: 180_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, wind 270 at 6, runway 27 in use, NOTAMs nil significant, expect ILS runway 27.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Wind 270 at 6, runway 27, ILS runway 27, no significant NOTAMs, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                                                            correct: false },
+        // Wrong — partial readback (missed approach type)
+        { id: "c", label: "Wind 270 at 6, runway 27, IFLY202",                                       correct: false },
+      ],
+    },
+
+    // ⑦ POB / fuel / services request
+    {
+      id: "atc_pob_fuel_services",
+      atMs: 210_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, say persons on board, fuel endurance, and assistance required.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "IFLY202, 186 persons on board, 11 tonnes fuel, endurance 2 hours, request medical and emergency services standby, possible structural damage", correct: true  },
+        // Wrong — standby after explicit ops request
+        { id: "b", label: "Standby IFLY202",                                                                                                                                  correct: false },
+        // Wrong — under-informative for a depress event (medical assessment likely required)
+        { id: "c", label: "IFLY202, 186 POB, normal approach",                                                                                                                  correct: false },
+      ],
+    },
+
+    // ⑧ Ready for approach
+    {
+      id: "atc_ready_for_approach",
+      atMs: 235_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, advise when ready for approach.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "IFLY202 ready, request vectors for ILS runway 27", correct: true  },
+        { id: "b", label: "Ready, IFLY202",                                    correct: false },
+        { id: "c", label: "Standby IFLY202",                                   correct: false },
+      ],
+    },
+
+    // ⑨ Clearance — full readback (intercept heading, altitude, approach, tower handoff)
+    {
+      id: "atc_cleared_approach",
+      atMs: 260_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, turn left heading 240, descend 3 000 feet, cleared ILS runway 27 approach, contact Mumbai Tower 118.10 when established.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Left heading 240, descend 3 000, cleared ILS runway 27, contact Tower 118.10 when established, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                                                                                            correct: false },
+        // Wrong — partial readback
+        { id: "c", label: "Cleared ILS runway 27, IFLY202",                                                                            correct: false },
+      ],
+    },
+
+    // ⑩ Tower contact
+    {
+      id: "atc_tower_contact",
+      atMs: 290_000,
+      kind: "atc",
+      from: "MUMBAI TOWER",
+      message: "IFLY202, Mumbai Tower, continue ILS approach runway 27, report established.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Continuing ILS runway 27, will report established, IFLY202", correct: true  },
+        { id: "b", label: "Switching, IFLY202",                                          correct: false },
+      ],
+    },
+
+    // ⑪ Cleared to land
+    {
+      id: "atc_cleared_to_land",
+      atMs: 315_000,
+      kind: "atc",
+      from: "MUMBAI TOWER",
+      message: "IFLY202, runway 27 cleared to land, wind 270 at 6, emergency and medical services in position.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Cleared to land runway 27, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                       correct: false },
+        // Wrong — runway mis-readback
+        { id: "c", label: "Cleared to land runway 28, IFLY202", correct: false },
       ],
     },
   ],

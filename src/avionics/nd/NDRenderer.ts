@@ -13,7 +13,7 @@ const HDR_H = 82;         // header strip height
 const FTR_H = 58;         // footer strip height
 
 const C = {
-  white:   0xE6E8EC,
+  white:   0xFFFFFF,        // vibrant pure white (was 0xE6E8EC)
   green:   0x00C850,
   cyan:    0x00CFFF,
   amber:   0xFFB300,
@@ -23,8 +23,12 @@ const C = {
   dimG:    0x1A1F28,
   bg:      0x000000,
   border:  0x1C2130,
-  sky:     0x05080F,
+  sky:     0x000000,        // pure black background (was 0x05080F)
 } as const;
+
+// Clean sans-serif matching the FCOM-style ND photo (Windows-era Tahoma /
+// Verdana family — slightly condensed, rounded digits).
+const FONT_FAMILY = 'Tahoma, Verdana, "Helvetica Neue", Arial, sans-serif';
 
 function mkTxt(
   str: string,
@@ -35,7 +39,7 @@ function mkTxt(
 ): Text {
   const t = new Text({
     text: str,
-    style: { fontFamily: 'monospace', fontSize: size, fill: color,
+    style: { fontFamily: FONT_FAMILY, fontSize: size, fill: color,
              fontWeight: bold ? 'bold' : 'normal' },
   });
   t.anchor.set(...anchor);
@@ -69,12 +73,21 @@ export class NDRenderer extends Container {
   private hdgPool:  Text[];          // heading labels
   private wpLabels: Text[];          // waypoint names
 
-  // Header texts
-  private tGS:     Text;
-  private tTAS:    Text;
-  private tWind:   Text;
-  private tTrk:    Text;
-  private tHdgBox: Text;
+  // Header texts — GS/TAS now split into label (white) + value (green)
+  private tGSLabel:  Text;
+  private tGSValue:  Text;
+  private tTASLabel: Text;
+  private tTASValue: Text;
+  private tWind:     Text;
+  private tWpName:   Text;        // TO-waypoint name (magenta)
+  private tWpBrg:    Text;        // TO-waypoint bearing
+  private tWpDist:   Text;        // TO-waypoint distance
+  private tHdgBox:   Text;
+
+  // Range-arc NM labels (one per arc — 25 %, 50 %, 75 % of selected range)
+  private tArc1:   Text;
+  private tArc2:   Text;
+  private tArc3:   Text;
 
   // Footer texts
   private tMode:  Text;
@@ -108,9 +121,11 @@ export class NDRenderer extends Container {
       this.hdgPool.push(t);
     }
 
-    // Waypoint label pool
-    this.wpLabels = WAYPOINTS.map(wp => {
-      const t = mkTxt(wp.id, 24, C.white, false, [0, 0.5]);
+    // Waypoint label pool — first waypoint (the TO fix) is magenta,
+    // the rest are white.
+    this.wpLabels = WAYPOINTS.map((wp, i) => {
+      const t = mkTxt(wp.id, 24, i === 0 ? C.magenta : C.white,
+                      i === 0, [0, 0.5]);
       this.addChild(t);
       return t;
     });
@@ -125,24 +140,53 @@ export class NDRenderer extends Container {
     // Header / footer on top
     this.addChild(this.gHdr, this.gFtr);
 
-    this.tGS     = mkTxt('GS  ---', 30, C.cyan,  false, [0,   0.5]); this.addChild(this.tGS);
-    this.tTAS    = mkTxt('TAS ---', 30, C.cyan,  false, [0,   0.5]); this.addChild(this.tTAS);
-    this.tWind   = mkTxt('---/--kt', 28, C.green, false, [0,  0.5]); this.addChild(this.tWind);
-    this.tTrk    = mkTxt('TRK ---', 26, C.white, false, [1,   0.5]); this.addChild(this.tTrk);
-    this.tHdgBox = mkTxt('---',     34, C.cyan,  true,  [0.5, 0.5]); this.addChild(this.tHdgBox);
+    // GS / TAS — labels white, values green (FCOM convention).  Both on the
+    // same row; wind is on the row below.
+    this.tGSLabel  = mkTxt('GS',     24, C.white, true,  [0,   0.5]); this.addChild(this.tGSLabel);
+    this.tGSValue  = mkTxt('---',    30, C.green, true,  [0,   0.5]); this.addChild(this.tGSValue);
+    this.tTASLabel = mkTxt('TAS',    24, C.white, true,  [0,   0.5]); this.addChild(this.tTASLabel);
+    this.tTASValue = mkTxt('---',    30, C.green, true,  [0,   0.5]); this.addChild(this.tTASValue);
+    this.tWind     = mkTxt('---/--kt', 28, C.green,  false, [0, 0.5]); this.addChild(this.tWind);
+    this.tWpName   = mkTxt('',       30, C.magenta, true,  [1,   0.5]); this.addChild(this.tWpName);
+    this.tWpBrg    = mkTxt('',       26, C.white,   false, [1,   0.5]); this.addChild(this.tWpBrg);
+    this.tWpDist   = mkTxt('',       26, C.white,   false, [1,   0.5]); this.addChild(this.tWpDist);
+    // Current heading — yellow numerals (was cyan).
+    this.tHdgBox   = mkTxt('---',    34, C.yellow,  true,  [0.5, 0.5]); this.addChild(this.tHdgBox);
 
-    this.tMode  = mkTxt('NAV ARC', 28, C.green, false, [0, 0.5]); this.addChild(this.tMode);
-    this.tRange = mkTxt('40 NM',   28, C.cyan,  false, [1, 0.5]); this.addChild(this.tRange);
+    this.tMode  = mkTxt('GPS PRIMARY', 28, C.white, true,  [0.5, 0.5]); this.addChild(this.tMode);
+    this.tRange = mkTxt('10 NM',       28, C.cyan,  false, [1,   0.5]); this.addChild(this.tRange);
+
+    // Range-arc NM labels — at 10 NM selected range, arcs at 25 % / 50 % / 75 %
+    // ⇒ 2.5, 5, 7.5 NM (matches the user's reference photo).
+    this.tArc1 = mkTxt('2.5', 20, C.white, false, [0.5, 0.5]); this.addChild(this.tArc1);
+    this.tArc2 = mkTxt('5',   20, C.white, false, [0.5, 0.5]); this.addChild(this.tArc2);
+    this.tArc3 = mkTxt('7.5', 20, C.white, false, [0.5, 0.5]); this.addChild(this.tArc3);
 
     // Static background
     this.gBg.rect(0, 0, W, H).fill({ color: C.sky });
+  }
+
+  // ── Public: change the selected range (5 / 10 / 20 / 40 NM).  Updates
+  //    the three arc labels and the footer readout.  Geometry stays fixed
+  //    (waypoints aren't scaled to NM in this demo).
+  setRange(nm: number): void {
+    const fmt = (n: number) =>
+      n % 1 === 0 ? String(n)
+                  : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+    this.tArc1.text  = fmt(nm * 0.25);
+    this.tArc2.text  = fmt(nm * 0.5);
+    this.tArc3.text  = fmt(nm * 0.75);
+    this.tRange.text = `${nm} NM`;
   }
 
   // ── Public update (called every ticker tick) ─────────────────────────────
   update(s: AircraftState): void {
     this.drawHeader(s);
     this.drawCompass(s);
-    this.drawWeather(s);
+    // Weather radar disabled — was rendering green precip blobs the user
+    // didn't want on the demo ND.  drawWeather() still exists if we want
+    // to bring it back behind a toggle.
+    this.gWeather.clear();
     this.drawRoute(s);
     this.drawAircraft();
     this.drawFailStrip(s);
@@ -150,46 +194,60 @@ export class NDRenderer extends Container {
   }
 
   // ── Header strip ─────────────────────────────────────────────────────────
+  // No background fill — keep pure black so heading ticks + labels can
+  // extend up into this band from the compass arc.
   private drawHeader(s: AircraftState): void {
     const g = this.gHdr;
     g.clear();
-    g.rect(0, 0, W, HDR_H).fill({ color: 0x020406 });
-    g.moveTo(0, HDR_H).lineTo(W, HDR_H).stroke({ color: C.border, width: 1 });
 
-    // Heading box (centre top)
+    // Heading box (centre top) — yellow border + yellow numerals.
     const hdgStr = String(Math.round(((s.heading % 360) + 360) % 360)).padStart(3, '0');
-    g.rect(W / 2 - 52, 8, 104, 44).fill({ color: 0x001820 })
-                                    .stroke({ color: C.cyan, width: 2 });
+    g.rect(W / 2 - 56, 6, 112, 44).fill({ color: 0x000000 })
+                                   .stroke({ color: C.yellow, width: 2 });
     this.tHdgBox.text = hdgStr;
-    this.tHdgBox.x = W / 2; this.tHdgBox.y = 32;
+    this.tHdgBox.x = W / 2; this.tHdgBox.y = 30;
 
-    // GS / TAS left
-    this.tGS.text  = `GS  ${String(Math.round(s.gs)).padStart(3, ' ')}`;
-    this.tTAS.text = `TAS ${String(Math.round(s.tas)).padStart(3, ' ')}`;
-    this.tGS.x = 18; this.tGS.y = 30;
-    this.tTAS.x = 18; this.tTAS.y = 58;
+    // GS / TAS — same row, white label + green value.
+    const gsStr  = String(Math.round(s.gs));
+    const tasStr = String(Math.round(s.tas));
+    this.tGSLabel.text  = 'GS';
+    this.tGSLabel.x  = 18;   this.tGSLabel.y  = 30;
+    this.tGSValue.text  = gsStr;
+    this.tGSValue.x  = 64;   this.tGSValue.y  = 30;
+    this.tTASLabel.text = 'TAS';
+    this.tTASLabel.x = 150;  this.tTASLabel.y = 30;
+    this.tTASValue.text = tasStr;
+    this.tTASValue.x = 210;  this.tTASValue.y = 30;
 
-    // Wind top-left second row
+    // Wind on the row below GS/TAS — green.
     this.tWind.text = `${String(s.windDir).padStart(3, '0')}°/${s.windSpd}kt`;
-    this.tWind.x = 280; this.tWind.y = 44;
+    this.tWind.x = 18; this.tWind.y = 64;
 
-    // TRK right
+    // TO-waypoint info top-right — name (magenta), bearing, distance.
     const trkStr = String(Math.round(((s.track % 360) + 360) % 360)).padStart(3, '0');
-    this.tTrk.text = `TRK ${trkStr}`;
-    this.tTrk.x = W - 18; this.tTrk.y = 30;
+    this.tWpName.text = 'BIDUR';
+    this.tWpName.x = W - 18; this.tWpName.y = 22;
+    this.tWpBrg.text  = `${trkStr}°`;
+    this.tWpBrg.x = W - 18;  this.tWpBrg.y = 48;
+    this.tWpDist.text = '3.0 NM';
+    this.tWpDist.x = W - 18; this.tWpDist.y = 72;
   }
 
   // ── Footer strip ─────────────────────────────────────────────────────────
+  // Footer: no background strip — just the GPS PRIMARY pill + range readout.
   private drawFooter(s: AircraftState): void {
-    void s;  // footer content is static in this simulation
+    void s;
     const g = this.gFtr;
     g.clear();
-    const fy = H - FTR_H;
-    g.rect(0, fy, W, FTR_H).fill({ color: 0x020406 });
-    g.moveTo(0, fy).lineTo(W, fy).stroke({ color: C.border, width: 1 });
 
-    this.tMode.x  = 18;      this.tMode.y  = H - FTR_H / 2;
-    this.tRange.x = W - 18;  this.tRange.y = H - FTR_H / 2;
+    const modeY = H - FTR_H / 2;
+    const modeW = 240, modeH = 38;
+    g.rect(W / 2 - modeW / 2, modeY - modeH / 2, modeW, modeH)
+     .fill({ color: 0x000000 })
+     .stroke({ color: C.white, width: 1.5 });
+    this.tMode.x = W / 2;  this.tMode.y = modeY;
+
+    this.tRange.x = W - 18; this.tRange.y = modeY;
   }
 
   // ── Compass arc + ticks + labels ─────────────────────────────────────────
@@ -197,27 +255,46 @@ export class NDRenderer extends Container {
     const g = this.gCompass;
     g.clear();
 
-    // Dashed inner half-range ring
-    const R2 = R * 0.5;
-    for (let a = Math.PI * 1.12; a <= Math.PI * 1.88; a += 0.045) {
-      const ex = a + 0.026;
-      g.moveTo(OX + R2 * Math.cos(a),  OY + R2 * Math.sin(a))
-       .lineTo(OX + R2 * Math.cos(ex), OY + R2 * Math.sin(ex))
-       .stroke({ color: C.dimG, width: 1.5 });
-    }
+    // Three dashed range arcs at 1/4, 1/2, 3/4 of selected range —
+    // FCOM DSC-31-45 §(1).  Smaller dashes (30 px) + visible gaps (18 px)
+    // so the rings clearly read as "dash gap dash gap" rather than a
+    // solid-ish line.  Dash length is in PIXELS (converted to radians per
+    // arc) so the pattern is consistent on every ring.
+    const DASH_PX = 30, GAP_PX = 18;
+    const fracs   = [0.25, 0.5, 0.75] as const;
+    fracs.forEach(frac => {
+      const r       = R * frac;
+      const dashAng = DASH_PX / r;
+      const stepAng = (DASH_PX + GAP_PX) / r;
+      for (let a = Math.PI * 1.12; a <= Math.PI * 1.88; a += stepAng) {
+        const ex = Math.min(a + dashAng, Math.PI * 1.88);
+        g.moveTo(OX + r * Math.cos(a),  OY + r * Math.sin(a))
+         .lineTo(OX + r * Math.cos(ex), OY + r * Math.sin(ex))
+         .stroke({ color: C.white, width: 3, alpha: 0.90 });
+      }
+    });
+
+    // NM labels on each arc — positioned at the lower-left of each ring,
+    // just INSIDE the dashed line so they read as "below the arc" and sit
+    // in clear black space rather than on top of a dash.
+    const labelAng = Math.PI * 1.22;
+    [this.tArc1, this.tArc2, this.tArc3].forEach((t, i) => {
+      const r = R * fracs[i] - 20;
+      t.x = OX + r * Math.cos(labelAng);
+      t.y = OY + r * Math.sin(labelAng);
+    });
 
     // Outer compass arc (ARC mode ~144°)
     g.arc(OX, OY, R, Math.PI * 1.1, Math.PI * 1.9)
      .stroke({ color: 0x5A6070, width: 3 });
 
-    // Track line — white, slightly transparent, from aircraft straight up
-    g.moveTo(OX, OY).lineTo(OX, HDR_H + 10)
-     .stroke({ color: C.white, width: 1.5, alpha: 0.25 });
-
     // Heading ticks + pooled labels
     const hdg = s.heading;
     let lblIdx = 0;
 
+    // Ticks + labels sit OUTSIDE the compass arc (FCOM convention).  Ticks
+    // grow from r=R outward to r=R+tl; labels are further out at r=R+LBL.
+    const LBL = 38;
     for (let d = -80; d <= 80; d += 5) {
       const tickHdg = ((Math.round(hdg / 5) * 5 + d) + 3600) % 360;
       let delta = tickHdg - hdg;
@@ -226,28 +303,32 @@ export class NDRenderer extends Container {
 
       // PixiJS: 0=right, π/2=down, π=left, 3π/2=up
       const angle = Math.PI * 1.5 + delta * (Math.PI / 180);
-      const cx = OX + R * Math.cos(angle);
-      const cy = OY + R * Math.sin(angle);
+      const ax = OX + R * Math.cos(angle);
+      const ay = OY + R * Math.sin(angle);
 
-      // Skip ticks that are below the aircraft (i.e. outside the drawn arc)
-      if (cy > OY - 10) continue;
-      // Skip ticks outside horizontal view
-      if (cx < -60 || cx > W + 60) continue;
+      // Skip ticks that fall below the aircraft (outside the drawn arc)
+      if (ay > OY - 10) continue;
+      if (ax < -60 || ax > W + 60) continue;
 
       const major = tickHdg % 10 === 0;
-      const tl    = major ? 36 : 20;
-      const ix = OX + (R - tl) * Math.cos(angle);
-      const iy = OY + (R - tl) * Math.sin(angle);
+      const tl    = major ? 22 : 12;
+      const ox = OX + (R + tl) * Math.cos(angle);
+      const oy = OY + (R + tl) * Math.sin(angle);
 
-      g.moveTo(cx, cy).lineTo(ix, iy)
-       .stroke({ color: major ? C.white : 0x5A6070, width: major ? 2.5 : 1.5 });
+      g.moveTo(ax, ay).lineTo(ox, oy)
+       .stroke({ color: major ? C.white : 0x8A8F9A, width: major ? 2.5 : 1.5 });
 
-      // Every 10° gets a label from the pre-allocated pool
+      // Every 10° gets a label OUTSIDE the arc.  Cardinal letters at
+      // N/E/S/W, 2-digit abbreviated tens elsewhere (280° → "28").
       if (major && lblIdx < this.hdgPool.length) {
-        const lx = OX + (R - 72) * Math.cos(angle);
-        const ly = OY + (R - 72) * Math.sin(angle);
+        const lx = OX + (R + LBL) * Math.cos(angle);
+        const ly = OY + (R + LBL) * Math.sin(angle);
         const t  = this.hdgPool[lblIdx++];
-        t.text    = String(tickHdg).padStart(3, '0');
+        if      (tickHdg === 0)   t.text = 'N';
+        else if (tickHdg === 90)  t.text = 'E';
+        else if (tickHdg === 180) t.text = 'S';
+        else if (tickHdg === 270) t.text = 'W';
+        else                      t.text = String(tickHdg / 10);
         t.x       = lx;
         t.y       = ly;
         t.visible = true;
@@ -269,21 +350,33 @@ export class NDRenderer extends Container {
       const by = OY + R * Math.sin(sa);
       g.poly([bx, by - 12, bx + 10, by + 4, bx, by - 2, bx - 10, by + 4]).fill({ color: C.cyan });
     }
+
+    // Yellow lubber marker — fixed indicator at the top of the arc that
+    // shows the aircraft's current heading.  Vertical bar above the arc +
+    // small downward-pointing triangle whose tip sits just inside the arc.
+    const lubBaseY = OY - R - 4;        // triangle base (also bottom of bar)
+    const lubTopY  = OY - R - 30;       // top of vertical bar
+    const lubTipY  = OY - R + 8;        // triangle tip (inside the arc)
+    g.moveTo(OX, lubBaseY).lineTo(OX, lubTopY)
+     .stroke({ color: C.yellow, width: 3 });
+    g.poly([OX, lubTipY, OX - 8, lubBaseY, OX + 8, lubBaseY])
+     .fill({ color: C.yellow });
   }
 
   // ── Aircraft symbol ───────────────────────────────────────────────────────
+  // FCOM DSC-31-45: yellow aircraft symbol on the ND, oriented to true track.
+  // User-specified stylisation: vertical big line + top horizontal (wider) +
+  // bottom horizontal (smaller).  Matches the /mockups/nd Canvas-2D version
+  // (28-tall vertical, 32-wide top, 14-wide bottom) scaled ~2× for the
+  // 1024×1024 Pixi stage.
   private drawAircraft(): void {
     const g = this.gAc;
     g.clear();
 
     const ax = OX, ay = OY;
-    // Triangle (nose up)
-    g.poly([ax, ay - 24, ax - 15, ay + 8, ax, ay + 1, ax + 15, ay + 8]).fill({ color: C.yellow });
-    // Wings
-    g.rect(ax - 76, ay - 5, 56, 9).fill({ color: C.yellow });
-    g.rect(ax + 20, ay - 5, 56, 9).fill({ color: C.yellow });
-    // Horizontal stabiliser
-    g.rect(ax - 20, ay + 7, 40, 7).fill({ color: C.yellow });
+    g.rect(ax - 4,  ay - 34, 8,  60).fill({ color: C.yellow }); // vertical
+    g.rect(ax - 34, ay - 13, 68, 7 ).fill({ color: C.yellow }); // top horizontal (wider)
+    g.rect(ax - 15, ay + 17, 30, 7 ).fill({ color: C.yellow }); // bottom horizontal (smaller)
   }
 
   // ── Route + waypoints ─────────────────────────────────────────────────────
@@ -301,11 +394,21 @@ export class NDRenderer extends Container {
     for (const p of pts) g.lineTo(p.x, p.y);
     g.stroke({ color: C.magenta, width: 3.5 });
 
-    // Waypoint diamonds
+    // Waypoint markers — first (TO) fix is a hollow magenta circle with a
+    // small inner magenta diamond.  Subsequent fixes are smaller hollow
+    // white diamonds.
     pts.forEach((p, i) => {
-      const d = 10;
-      g.poly([p.x, p.y - d, p.x + d, p.y, p.x, p.y + d, p.x - d, p.y]).fill({ color: C.white });
-      this.wpLabels[i].x = p.x + 16;
+      if (i === 0) {
+        g.circle(p.x, p.y, 14).stroke({ color: C.magenta, width: 2.5 });
+        const d = 5;
+        g.poly([p.x, p.y - d, p.x + d, p.y, p.x, p.y + d, p.x - d, p.y])
+         .fill({ color: C.magenta });
+      } else {
+        const d = 9;
+        g.poly([p.x, p.y - d, p.x + d, p.y, p.x, p.y + d, p.x - d, p.y])
+         .stroke({ color: C.white, width: 1.8 });
+      }
+      this.wpLabels[i].x = p.x + 20;
       this.wpLabels[i].y = p.y - 14;
     });
   }

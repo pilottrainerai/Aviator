@@ -250,45 +250,165 @@ export const unreliableSpeed: Scenario = {
     // ── Right column: INOP SYS (FCOM NAV ADR 1 FAULT STATUS right column) ────
     { id: "st_inop_adr",   line: "ADR 1",          severity: "caution",  inopSys: true },
     { id: "st_inop_gpws",  line: "GPWS",           severity: "caution",  inopSys: true },
-    { id: "st_inop_cat3s", line: "CAT 3 SINGLE",   severity: "advisory", inopSys: true },
-    { id: "st_inop_cat3d", line: "CAT 3 DUAL",     severity: "advisory", inopSys: true },
+    { id: "st_inop_cat3s", line: "CAT 3 SINGLE",   severity: "caution",  inopSys: true },
+    { id: "st_inop_cat3d", line: "CAT 3 DUAL",     severity: "caution",  inopSys: true },
   ],
 
+  // ── ATC sequence — mirrors eng1-fire-after-v1 ──────────────────────────────
+  // Unreliable speed = PAN PAN (urgent, not life-threatening).  Crew works
+  // pitch/thrust memory item first, isolates the faulty ADR, then plans a
+  // raw-data approach back to Delhi.  RVSM lost → block altitude requested.
   distractions: [
+    // ① ATC issues normal climb clearance — pilot declares PAN PAN
     {
-      id: "atc_initial",
+      id: "atc_handoff_climb",
       atMs: 10_000,
       kind: "atc",
       from: "DELHI DEPARTURE",
       message: "IFLY101, climb FL250, direct KARNAL.",
       standbyResurfaceMs: 20_000,
       choices: [
-        { id: "a", label: "IFLY101, unable RVSM, speed unreliable, request block altitude, possible diversion", correct: true  },
-        { id: "b", label: "IFLY101, climbing FL250 direct KARNAL",                                               correct: false },
+        { id: "a", label: "PAN PAN PAN, IFLY101, unreliable airspeed, unable RVSM, request block altitude FL130 to FL150, possible return to Delhi, standby", correct: true  },
+        { id: "b", label: "IFLY101, climbing FL250 direct KARNAL",                                                                                              correct: false },
+        // Wrong — premature MAYDAY for what is a PAN PAN situation
+        { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY101, declaring emergency",                                                                                  correct: false },
       ],
     },
+
+    // ② ATC grants the block + asks for capability
     {
-      id: "atc_block",
-      atMs: 25_000,
+      id: "atc_block_grant",
+      atMs: 30_000,
       kind: "atc",
       from: "DELHI DEPARTURE",
-      message: "IFLY101, block altitude approved FL130–FL150. Confirm airspeed capability.",
+      message: "IFLY101, roger PAN PAN, block altitude approved FL130 to FL150, turn right heading 120 for radar identification.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "IFLY101, speed unreliable, ADR isolated, 2 ADRs agree, request vectors nearest airport, possible diversion", correct: true  },
-        { id: "b", label: "IFLY101, all OK, continuing to destination",                                                                   correct: false },
+        { id: "a", label: "Block FL130 to FL150, right heading 120, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                                      correct: false },
+        // Wrong — drops the heading (traffic-separation critical when unable RVSM)
+        { id: "c", label: "Block FL130 to FL150, IFLY101",                      correct: false },
       ],
     },
+
+    // ③ ATC asks for endurance/intentions — pilot must communicate ISIS use
     {
-      id: "atc_approach",
-      atMs: 120_000,
+      id: "atc_intentions_query",
+      atMs: 65_000,
+      kind: "atc",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, say current capability, intentions, and any assistance required.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "IFLY101, ADR 1 isolated, two remaining ADRs in agreement, using STBY ISIS as reference, AP and A/THR disconnected, request return Delhi for raw-data approach", correct: true  },
+        { id: "b", label: "Standby IFLY101",                                                                                                                                                   correct: false },
+        // Wrong — under-informative for ATC routing
+        { id: "c", label: "IFLY101, no issue, continuing climb",                                                                                                                                 correct: false },
+      ],
+    },
+
+    // ④ Briefing prompt
+    {
+      id: "atc_briefing_prompt",
+      atMs: 110_000,
       kind: "atc",
       from: "DELHI APPROACH",
-      message: "IFLY101, cleared ILS RWY 28, wind calm, QNH 1013. Note RVSM not available.",
-      standbyResurfaceMs: 30_000,
+      message: "IFLY101, Delhi Approach, advise approach requirements and any assistance.",
+      standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "IFLY101, cleared ILS RWY 28, ADR 1 isolated, manual approach ISIS reference, confirm souls 186", correct: true  },
-        { id: "b", label: "IFLY101, standard approach, all fine",                                                             correct: false },
+        { id: "a", label: "Request latest Delhi weather, runway in use, NOTAMs, expected approach type, IFLY101", correct: true  },
+        { id: "b", label: "Standby IFLY101",                                                                       correct: false },
+        { id: "c", label: "Request immediate vectors ILS 28, IFLY101",                                              correct: false },
+      ],
+    },
+
+    // ⑤ Briefing info — full readback
+    {
+      id: "atc_briefing_info",
+      atMs: 145_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, wind 280 at 8, runway 28 in use, NOTAMs nil significant, expect ILS runway 28, QNH 1013.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Wind 280 at 8, runway 28, ILS runway 28, QNH 1013, no significant NOTAMs, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                                                                      correct: false },
+        { id: "c", label: "Wind 280 at 8, runway 28, ILS, IFLY101",                                            correct: false },
+      ],
+    },
+
+    // ⑥ POB / fuel / services
+    {
+      id: "atc_pob_fuel_services",
+      atMs: 175_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, say persons on board, fuel endurance, and assistance required.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "IFLY101, 186 persons on board, 7 tonnes fuel, endurance 2 hours, request fire services as a precaution, no medical required, raw-data approach", correct: true  },
+        { id: "b", label: "Standby IFLY101",                                                                                                                                   correct: false },
+        // Wrong — over-callout (full emergency not warranted for PAN)
+        { id: "c", label: "IFLY101, 186 POB, request full emergency, all services",                                                                                              correct: false },
+      ],
+    },
+
+    // ⑦ Ready for approach
+    {
+      id: "atc_ready_for_approach",
+      atMs: 200_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, advise when ready for approach.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "IFLY101 ready, request vectors for ILS runway 28, raw-data approach, STBY ISIS as speed reference", correct: true  },
+        { id: "b", label: "Ready, IFLY101",                                                                                      correct: false },
+        { id: "c", label: "Standby IFLY101",                                                                                      correct: false },
+      ],
+    },
+
+    // ⑧ Approach clearance
+    {
+      id: "atc_cleared_approach",
+      atMs: 225_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 28 approach, contact Delhi Tower 118.10 when established.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Left heading 240, descend 3 000, cleared ILS runway 28, contact Tower 118.10 when established, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                                                                                            correct: false },
+        { id: "c", label: "Cleared ILS runway 28, IFLY101",                                                                            correct: false },
+      ],
+    },
+
+    // ⑨ Tower contact
+    {
+      id: "atc_tower_contact",
+      atMs: 250_000,
+      kind: "atc",
+      from: "DELHI TOWER",
+      message: "IFLY101, Delhi Tower, continue ILS approach runway 28, report established.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Continuing ILS runway 28, will report established, IFLY101", correct: true  },
+        { id: "b", label: "Switching, IFLY101",                                          correct: false },
+      ],
+    },
+
+    // ⑩ Cleared to land
+    {
+      id: "atc_cleared_to_land",
+      atMs: 275_000,
+      kind: "atc",
+      from: "DELHI TOWER",
+      message: "IFLY101, runway 28 cleared to land, wind 280 at 8, fire services in position as a precaution.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Cleared to land runway 28, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                       correct: false },
+        { id: "c", label: "Cleared to land runway 27, IFLY101", correct: false },
       ],
     },
   ],

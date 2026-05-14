@@ -165,6 +165,103 @@ function OHPSwitch({ label, sublabel, swState }: { label: string; sublabel?: str
   );
 }
 
+// ─── AGENT-style pushbutton (mockup reference) ───────────────────────────────
+// Visual template lifted from engine-fire-panel-mockup.tsx AgentPanel — the
+// AGENT 1 pb in the FIRE panel.  Dark recessed body, white outline, dark
+// shadow ring in the gap, two stacked cells.  Used here to render
+// affected-system switches (HYD, ELEC, AIR, …) so the visual language
+// matches the FIRE panel's AGENT pb.  Working/unaffected systems stay on
+// the legacy OHPSwitch so only the *affected* surfaces draw the eye.
+//
+// Cell colour logic mirrors SquibCell / Indicator from the mockup:
+//   – armed   = white text + faint glow (SQUIB-armed analogue)
+//   – fault   = amber text + glow         (DISCH amber analogue)
+//   – fire    = red   text + glow
+//   – auto    = green text, no glow       (steady normal callout)
+//   – off     = dim  (interlock-tripped pushed-out look)
+//   – norm    = green dim, no glow        (nothing wrong here)
+const AGENT_STYLE_TEXT: Record<SysSwState, string> = {
+  norm:   C.green,
+  fault:  C.amber,
+  off:    "#886655",
+  auto:   C.green,
+  open:   C.amber,
+  fire:   C.red,
+  armed:  "#e8ecf4",       // white, matches SQUIB armed
+};
+
+function AgentStyleSwitch({
+  label, sublabel, swState,
+}: {
+  label: string; sublabel?: string; swState: SysSwState;
+}) {
+  const text  = SW_LABELS[swState];
+  const color = AGENT_STYLE_TEXT[swState];
+  const glow  = swState === "armed" || swState === "fault" || swState === "fire" || swState === "open";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+      <span style={{
+        fontSize: 8, letterSpacing: "0.08em",
+        fontFamily: '"Helvetica Neue", Arial, sans-serif',
+        fontWeight: 700, color: "#C8D4E0",
+        textTransform: "uppercase",
+      }}>
+        {label}
+      </span>
+      <div
+        style={{
+          width: 50, height: 56, padding: 3,
+          background: "#1e2430",
+          border: "1.5px solid #3a4252",
+          borderRadius: 4,
+          outline: "2px solid #FFFFFF",
+          outlineOffset: "3px",
+          // Match the FIRE panel AGENT pb shadow ring (darker shade of the
+          // panel cyan around the outline) — here on a dark background the
+          // ring goes black-ish so the white outline still reads as inset.
+          boxShadow:
+            "inset 0 0 4px rgba(0,0,0,0.55), " +
+            "0 0 0 3px #2A3340, " +
+            "0 2px 4px rgba(0,0,0,0.40)",
+          display: "flex", flexDirection: "column", gap: 2,
+        }}
+      >
+        {/* Top cell — state callout (FAULT / FIRE / ARM / NORM / OFF / AUTO) */}
+        <div
+          style={{
+            flex: 1,
+            background: "#06080c",
+            borderRadius: 3,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 9, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 800,
+            letterSpacing: "0.06em",
+            color,
+            textShadow: glow ? `0 0 4px ${color}` : "none",
+          }}
+        >
+          {text}
+        </div>
+        {/* Bottom cell — sublabel / system identifier */}
+        <div
+          style={{
+            flex: 1,
+            background: "#06080c",
+            borderRadius: 3,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 8, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 700,
+            letterSpacing: "0.06em",
+            color: "#7A8898",
+            textAlign: "center", lineHeight: 1.1, padding: "0 2px",
+          }}
+        >
+          {sublabel ?? label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Switches tray ────────────────────────────────────────────────────────────
 function SwTray({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
@@ -286,8 +383,11 @@ function HydPage({ state }: { state: ScenarioState }) {
         title="HYD PANEL — AFFECTED"
         note="FCOM DSC-29-10: FIRE PB closes green HYD fire SOV → GRN ENG 1 pump shows LO PR (FAULT). Blue ELEC pump auto-activates → maintains brakes, NW steering, spoilers. No crew action required."
       >
-        <OHPSwitch label="GRN" sublabel="ENG1 PMP" swState={firePbDone ? "fault" : "norm"} />
-        <OHPSwitch label="BLU" sublabel="ELEC PMP" swState="auto" />
+        {/* Example: AGENT-pb-style switches (reference: FIRE panel AGENT 1).
+            Affected pump goes amber (FAULT) when FIRE PB is pushed; the
+            ELEC pump backup stays green AUTO. */}
+        <AgentStyleSwitch label="GRN" sublabel="ENG1 PMP" swState={firePbDone ? "fault" : "norm"} />
+        <AgentStyleSwitch label="BLU" sublabel="ELEC PMP" swState="auto" />
       </SwTray>
     </>
   );

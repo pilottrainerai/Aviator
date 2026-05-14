@@ -33,13 +33,20 @@ export const eng1FireAfterV1: Scenario = {
         {
           type: "ADD_ECAM",
           messages: [
-            { id: "eng1_fire",    line: "ENG 1 FIRE",                         level: "warning" },
-            { id: "land_asap",   line: "LAND ASAP",                           level: "warning" },
-            { id: "ecam_thr",    line: "THR LEVER (ENG 1)......IDLE",         level: "caution" },
-            { id: "ecam_master", line: "ENG 1 MASTER...........OFF",          level: "caution" },
-            { id: "ecam_fire_pb",line: "ENG 1 FIRE P/B.........PUSH",         level: "caution" },
-            { id: "ecam_agent1", line: "AGENT 1 AFTER 10 S....DISCH",         level: "caution" },
-            // ATC NOTIFY removed from ECAM messages — handled via ATC distraction mechanic
+            // FCOM PRO-ABN-ENG-70-10 ENG 1 FIRE IN FLIGHT — full ECAM checklist.
+            // FCOM DSC-31-60 colour spec:
+            //   • Title / LAND ASAP   = warning (red)
+            //   • All required ACTION items = advisory (cyan/blue)
+            //   • Conditional / remark headers = remark (white)
+            { id: "eng1_fire",       line: "ENG 1 FIRE",                            level: "warning"  },
+            { id: "ecam_thr",        line: "THR LEVER (ENG 1)......IDLE",           level: "advisory" },
+            { id: "ecam_master",     line: "ENG 1 MASTER...........OFF",            level: "advisory" },
+            { id: "ecam_fire_pb",    line: "ENG 1 FIRE P/B.........PUSH",           level: "advisory" },
+            { id: "ecam_agent1",     line: "AGENT 1 AFTER 10 S....DISCH",           level: "advisory" },
+            { id: "ecam_atc",        line: "ATC..................NOTIFY",           level: "advisory" },
+            { id: "ecam_if_persist", line: "·IF FIRE WARN AFTER 30 S:",             level: "remark"   },
+            { id: "ecam_agent2",     line: "  AGENT 2.............DISCH",           level: "advisory" },
+            { id: "land_asap",       line: "LAND ASAP",                             level: "warning"  },
           ],
         },
       ],
@@ -245,13 +252,14 @@ export const eng1FireAfterV1: Scenario = {
       hardware: true,
       ecamRef: "ecam_agent1",
       afterEffect: {
-        // 25 s after Agent 1: silence the warning + clear the primary procedure
-        // lines so the crew can proceed with the rest of the procedure. The
-        // fire visual indicators (FIRE pb red, FIRE light on master, ENG ✕)
-        // STAY LIT until both agents are discharged (training-driven choice —
-        // FCOM behaviour would extinguish here in the typical case).
-        delayMs: 25_000,
-        triggerId: "primary_ecam_cleared",
+        // 30 s after Agent 1 — FCOM "AGENT 2 IF FIRE WARN AFTER 30 S" window
+        // elapses.  Silence the warning + clear the primary procedure lines
+        // so only the AGENT 2 conditional remains.  The fire visual
+        // indicators (FIRE pb red, FIRE light on master, ENG ✕) STAY LIT
+        // until AGENT 2 is also discharged (training-driven choice — FCOM
+        // behaviour would extinguish here in the typical case).
+        delayMs: 30_000,
+        triggerId: "fire_persists_30s",
         effects: [
           { type: "SET_MASTER_WARN", active: false },
           { type: "SET_ALARM_LABEL", label: null },
@@ -259,7 +267,11 @@ export const eng1FireAfterV1: Scenario = {
             type: "CLEAR_ECAM",
             // Clear fire warning + primary procedure lines.
             // Secondary failures (hyd_g_pump, air_single_pack, elec_gen1) persist on STATUS page.
-            ids: ["eng1_fire", "land_asap", "ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft", "ecam_maa"],
+            // Clears the AGENT-1-and-before slice of the ECAM.  Per FCOM
+            // the ATC NOTIFY item, the "IF FIRE WARN AFTER 30 S" conditional
+            // and AGENT 2 stay visible until their own actions complete.
+            // LAND ASAP also remains until the fire is fully extinguished.
+            ids: ["eng1_fire", "ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft", "ecam_maa"],
           },
         ],
       },
@@ -273,17 +285,25 @@ export const eng1FireAfterV1: Scenario = {
       id: "agent2",
       label: "AGENT 2",
       action: "DISCH",
-      hint: "PM: discharge AGENT 2 to fully extinguish the fire. Last bottle — no restart possible after.",
+      hint: "PM: wait 30 s after AGENT 1 — IF FIRE WARN persists, discharge AGENT 2.  Last bottle, no restart possible after.",
       variant: "caution",
       requires: ["agent1"],
       crew: "PM",
       hardware: true,
+      ecamRef: "ecam_agent2",
       afterEffect: {
         // 5 s: bottle discharges, fire dies out, FIRE pb red light goes off,
         // FIRE light on master panel goes off, ENG ✕ marker clears.
+        // Per FCOM, the AGENT 2 + "IF FIRE WARN AFTER 30 S" + LAND ASAP
+        // ECAM lines clear once the fire is extinguished.
         delayMs: 5_000,
         triggerId: "fire_extinguished",
-        effects: [],
+        effects: [
+          {
+            type: "CLEAR_ECAM",
+            ids: ["ecam_agent2", "ecam_if_persist", "land_asap"],
+          },
+        ],
       },
     },
 
@@ -336,6 +356,18 @@ export const eng1FireAfterV1: Scenario = {
       crew: "PM",
       group: "comms",
       requires: ["announce_land_asap"],
+      // Maps to the FCOM ECAM 'ATC ............ NOTIFY' line — completing
+      // the MAYDAY call satisfies the ECAM notify item.
+      ecamRef: "ecam_atc",
+      afterEffect: {
+        // Once ATC is notified the FCOM NOTIFY item is satisfied — clear
+        // the ECAM line so the crew sees forward progress.
+        delayMs: 1_500,
+        triggerId: "atc_notified",
+        effects: [
+          { type: "CLEAR_ECAM", ids: ["ecam_atc"] },
+        ],
+      },
       notes: [
         "MAYDAY × 3",
         "Callsign",
@@ -745,14 +777,14 @@ export const eng1FireAfterV1: Scenario = {
     { id: "st_fuel_incr",  line: "FUEL CONSUMPT INCRSD",            severity: "advisory" },
     { id: "st_fms",        line: "FMS PRED UNRELIABLE",              severity: "advisory" },
     // ── Right column: INOP SYS ───────────────────────────────────────────────
-    { id: "st_inop_cat3",  line: "CAT 3 DUAL",     severity: "advisory", inopSys: true },
+    { id: "st_inop_cat3",  line: "CAT 3 DUAL",     severity: "caution",  inopSys: true },
     { id: "st_inop_bleed", line: "ENG 1 BLEED",    severity: "caution",  inopSys: true },
     { id: "st_inop_pack",  line: "PACK 1",          severity: "caution",  inopSys: true },
-    { id: "st_inop_galley",line: "MAIN GALLEY",     severity: "memo",     inopSys: true },
+    { id: "st_inop_galley",line: "MAIN GALLEY",     severity: "caution",  inopSys: true },
     { id: "st_inop_gen",   line: "GEN 1",           severity: "caution",  inopSys: true },
     { id: "st_inop_pump",  line: "G ENG 1 PUMP",    severity: "caution",  inopSys: true },
     { id: "st_inop_ice",   line: "WING A. ICE",     severity: "caution",  inopSys: true },
-    { id: "st_inop_steep", line: "STEEP APPR",      severity: "advisory", inopSys: true },
+    { id: "st_inop_steep", line: "STEEP APPR",      severity: "caution",  inopSys: true },
   ],
 
   // ── Distractions — FCOM-realistic ATC sequence ─────────────────────────────

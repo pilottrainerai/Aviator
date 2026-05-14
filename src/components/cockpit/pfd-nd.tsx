@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
 import { defaultAircraftState, type AircraftState } from "@/avionics/core/aircraftState";
 
@@ -155,14 +155,26 @@ export function PfdCanvas({ state }: { state?: ScenarioState }) {
 
 // ─── ND Canvas ─────────────────────────────────────────────────────────────────
 
+const ND_RANGE_OPTIONS = [5, 10, 20, 40] as const;
+
 export function NdCanvas({ state }: { state?: ScenarioState }) {
   const mountRef   = useRef<HTMLDivElement>(null);
   const stateRef   = useRef<AircraftState>(buildAircraftState(state));
   const cleanupRef = useRef<(() => void) | null>(null);
+  // Hold the NDRenderer instance so the range-cycle effect can poke it.
+  // Typed loosely because the renderer is imported asynchronously.
+  const ndRef      = useRef<{ setRange: (nm: number) => void } | null>(null);
+
+  const [rangeIdx, setRangeIdx] = useState(1);    // default 10 NM
 
   useEffect(() => {
     stateRef.current = buildAircraftState(state);
   }, [state]);
+
+  // Whenever the range index changes, push the new NM into the renderer.
+  useEffect(() => {
+    ndRef.current?.setRange(ND_RANGE_OPTIONS[rangeIdx]);
+  }, [rangeIdx]);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -194,11 +206,16 @@ export function NdCanvas({ state }: { state?: ScenarioState }) {
       el.appendChild(app.canvas);
 
       const nd = new NDRenderer();
+      nd.setRange(ND_RANGE_OPTIONS[rangeIdx]);     // initial range
+      ndRef.current = nd;
       app.stage.addChild(nd);
 
       app.ticker.add(() => { nd.update(stateRef.current); });
 
-      cleanupRef.current = () => { app.destroy(true, true); };
+      cleanupRef.current = () => {
+        ndRef.current = null;
+        app.destroy(true, true);
+      };
     })();
 
     return () => {
@@ -209,7 +226,15 @@ export function NdCanvas({ state }: { state?: ScenarioState }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <div ref={mountRef} style={{ width: "100%", height: "100%" }} />;
+  const cycleRange = () => setRangeIdx((i: number) => (i + 1) % ND_RANGE_OPTIONS.length);
+
+  return (
+    <div
+      ref={mountRef}
+      onClick={cycleRange}
+      style={{ width: "100%", height: "100%", cursor: "pointer" }}
+    />
+  );
 }
 
 // ─── Exported composite ────────────────────────────────────────────────────────

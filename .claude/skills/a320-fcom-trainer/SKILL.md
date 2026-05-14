@@ -44,6 +44,12 @@ Located at `~/.claude/manuals/a320/`:
 | `eng-malfunctions.txt` | 38 KB | Handling Engine Malfunctions (17 pp) | Ops briefing — engine identification, recommendations |
 | `callouts.txt` | 30 KB | A319/320/321 Simulator Callouts (24 pp) | Verbatim PF/PM call-and-response for normal + abnormal phases (TO, climb, approach, GA, EO-GA, windshear escape, EGPWS escape, nose-low/high recovery, wake, stall, emergency descent, TCAS, ECAM challenge-response). **Use this when authoring scenario callouts and PF/PM tasksharing — preserves exact phraseology.** |
 
+Additionally at `~/.claude/manuals/atc/`:
+
+| File | Size | Source | Contents |
+|---|---|---|---|
+| `icao-phraseology.txt` | 26 KB | CAA Standards & Procedures Manual §8 (ICAO Annex 10 / PANS-ATM Doc 4444 / Doc 9432) | Authoritative ATC/pilot RTF phraseology — standard abbreviations, read-back rules (§5.6.1), climb/descent/heading/speed phrases, holding, approach clearances, taxi, take-off, landing, vectoring, SSR (SQUAWK), emergency (MAYDAY/PAN PAN/SQUAWK 7700), low-altitude/terrain alerts, GNSS/RNAV.  **Authoritative for every ATC line in `src/scenarios/data/*.ts` — every distraction message and every correct/wrong choice should be verifiable against this file.  Grep here before authoring or editing any ATC distraction.** |
+
 ### Source PDFs
 
 `~/Desktop/snap avia/`:

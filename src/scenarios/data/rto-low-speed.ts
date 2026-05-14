@@ -34,12 +34,12 @@ export const rtoLowSpeed: Scenario = {
         {
           type: "ADD_ECAM",
           messages: [
-            { id: "eng1_fire_gnd", line: "ENG 1 FIRE",                     level: "warning" },
+            { id: "eng1_fire_gnd", line: "ENG 1 FIRE",                     level: "warning"  },
             // On ground the ECAM shows the fire procedure (not IDLE/REVERSE — that's the crew's memory item for RTO)
-            { id: "ecam_thr",      line: "THR LEVER 1........IDLE",         level: "caution" },
-            { id: "ecam_master",   line: "ENG 1 MASTER.......OFF",          level: "caution" },
-            { id: "ecam_fire_pb",  line: "ENG 1 FIRE P/B.....PUSH",        level: "caution" },
-            { id: "ecam_agent1",   line: "AGENT 1 AFTER 10 S..DISCH",      level: "caution" },
+            { id: "ecam_thr",      line: "THR LEVER 1........IDLE",         level: "advisory" },
+            { id: "ecam_master",   line: "ENG 1 MASTER.......OFF",          level: "advisory" },
+            { id: "ecam_fire_pb",  line: "ENG 1 FIRE P/B.....PUSH",         level: "advisory" },
+            { id: "ecam_agent1",   line: "AGENT 1 AFTER 10 S..DISCH",       level: "advisory" },
           ],
         },
       ],
@@ -190,29 +190,92 @@ export const rtoLowSpeed: Scenario = {
     { id: "st_cfr",     line: "CFR ATTENDING",              severity: "memo"    },
   ],
 
+  // ── ATC sequence — ground RTO (compressed scope, single ATC unit) ──────────
+  // Tower is the only ATC unit involved.  Crew priorities: STOP → SECURE →
+  // ASSESS evacuation → ARFF dispatch → ground handling.  No
+  // approach/landing leg — all comms are with Tower.
   distractions: [
+    // ① Tower sees the abort + asks for intentions
     {
-      id: "atc_tower",
+      id: "atc_tower_initial",
       atMs: 8_000,
       kind: "atc",
       from: "DELHI TOWER",
-      message: "IFLY101, confirm intentions.",
+      message: "IFLY101, Delhi Tower, confirm intentions.",
       standbyResurfaceMs: 15_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY101, RTO, engine fire, stopping runway 28, emergency services required", correct: true },
-        { id: "b", label: "IFLY101 continuing takeoff",                                                         correct: false },
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, rejected takeoff, engine 1 fire, stopping on runway 28, emergency services required", correct: true  },
+        { id: "b", label: "IFLY101 continuing takeoff",                                                                                            correct: false },
+        // Wrong — STANDBY is incorrect when ATC asks during a rolling RTO
+        { id: "c", label: "Standby IFLY101",                                                                                                       correct: false },
       ],
     },
+
+    // ② Tower acknowledges + asks aircraft state
     {
-      id: "atc_clear",
+      id: "atc_tower_state",
       atMs: 35_000,
       kind: "atc",
       from: "DELHI TOWER",
-      message: "IFLY101, confirm aircraft stopped and emergency?",
+      message: "IFLY101, roger MAYDAY, ARFF rolling, say aircraft state and assistance required.",
       standbyResurfaceMs: 20_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY101, stopped RWY 28, 186 POB, engine fire, CFR required immediately", correct: true },
-        { id: "b", label: "IFLY101, stopped, all good, no CFR needed",                                      correct: false },
+        { id: "a", label: "IFLY101, aircraft stopped on runway 28, engine 1 fire warning, running fire checklist, 186 persons on board, request immediate ARFF and ambulance", correct: true  },
+        { id: "b", label: "IFLY101, stopped, all good, no services needed",                                                                                                       correct: false },
+        // Wrong — under-informative for an active fire warning
+        { id: "c", label: "IFLY101, just a precaution, will advise",                                                                                                                correct: false },
+      ],
+    },
+
+    // ③ Tower offers ARFF + assessment update
+    {
+      id: "atc_arff_update",
+      atMs: 70_000,
+      kind: "atc",
+      from: "DELHI TOWER",
+      message: "IFLY101, ARFF in position, report fire status and intentions for evacuation.",
+      standbyResurfaceMs: 20_000,
+      choices: [
+        // Correct path A — fire extinguished, deferring evacuation
+        { id: "a", label: "IFLY101, fire indication extinguished after AGENT 1, ARFF to remain in position, evaluating evacuation, standby",      correct: true  },
+        // Correct path B — fire continues, immediate evacuation
+        { id: "b", label: "IFLY101, fire persists, initiating evacuation on the runway, request ARFF approach from the right side, downwind",      correct: true  },
+        // Wrong — committing to taxi while assessment pending
+        { id: "c", label: "IFLY101 requesting taxi back to gate",                                                                                  correct: false },
+      ],
+    },
+
+    // ④ Tower handles disposition — taxi or evacuation
+    {
+      id: "atc_disposition",
+      atMs: 110_000,
+      kind: "atc",
+      from: "DELHI TOWER",
+      message: "IFLY101, advise final intentions — taxi back, tow, or evacuate.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — tow request, no taxi after fire (FCOM: no single-engine taxi after engine fire)
+        { id: "a", label: "IFLY101 request tow to the gate, no engine taxi after engine fire, ARFF to follow, runway will be closed", correct: true  },
+        // Wrong — taxi after engine fire is non-FCOM
+        { id: "b", label: "IFLY101 will taxi back to the gate on engine 2",                                                            correct: false },
+        // Wrong — premature evacuation if fire already out
+        { id: "c", label: "IFLY101 evacuating now",                                                                                     correct: false },
+      ],
+    },
+
+    // ⑤ Tower confirms runway closure + ground frequency handoff
+    {
+      id: "atc_ground_handoff",
+      atMs: 140_000,
+      kind: "atc",
+      from: "DELHI TOWER",
+      message: "IFLY101, runway 28 closed, ARFF on scene, contact Delhi Ground 121.90 when stationary for tow coordination.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Runway 28 closed, ARFF on scene, Ground 121.90 when stationary, IFLY101", correct: true  },
+        { id: "b", label: "Switching, IFLY101",                                                       correct: false },
+        // Wrong — frequency misread under stress
+        { id: "c", label: "Ground 121.80, IFLY101",                                                   correct: false },
       ],
     },
   ],

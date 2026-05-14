@@ -8,7 +8,8 @@ import type { ECAMMessage } from "@/scenarios/types";
 export type ScenarioState = {
   /** Wall-clock ms since session start, set by the most recent event */
   tMs: number;
-  /** stepId → completion order (1, 2, 3, ...) */
+  /** stepId → tMs the step completed.  Truthy = done; the numeric value
+   *  is used by countdown UIs (AGENT arm timer, 30 s fire-warn window). */
   completedSteps: Record<string, number>;
   /** triggerId → tMs the trigger fired */
   triggersFired: Record<string, number>;

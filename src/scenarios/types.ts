@@ -9,7 +9,13 @@ import type {
   ScenarioMeta as RegistryMeta,
 } from "./registry";
 
-export type ECAMLevel = "warning" | "caution" | "advisory" | "memo";
+// FCOM DSC-31-60 ECAM colour convention:
+//   warning  = red    (CRC alarm, critical)
+//   caution  = amber  (SC chime, non-critical)
+//   advisory = cyan   (procedure ACTION items: "THR LEVER 1 ... IDLE")
+//   remark   = white  (conditional headers / remarks: "·IF FIRE WARN AFTER 30 S")
+//   memo     = green  (normal/satisfied indications)
+export type ECAMLevel = "warning" | "caution" | "advisory" | "remark" | "memo";
 
 export type ECAMMessage = {
   id: string;
@@ -130,6 +136,13 @@ export type ScenarioDistraction = {
    *  Use for ATC calls that must come after a procedural milestone — e.g.
    *  ATC requesting briefing info only after the crew has finished ECAM. */
   requiresStep?: string;
+  /** Optional. The pilot's call to ATC that PRECEDES the ATC message in this
+   *  exchange.  When set, the distraction modal renders it as the first line
+   *  ("FLIGHT CREW → ATC") so the user sees the full back-and-forth: pilot's
+   *  call → ATC's response → crew's readback (choices).  Use for pilot-
+   *  initiated calls and for any call where seeing the pilot's prior message
+   *  adds training value.  Omit for routine ATC-initiated calls. */
+  pilotSays?: string;
 };
 
 export type StatusItem = {

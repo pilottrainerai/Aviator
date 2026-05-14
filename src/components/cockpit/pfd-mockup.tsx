@@ -97,8 +97,11 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     const ATX = 241, ATY = 297, ATR = 120;
     const SX = 28,  SW = 62, ST = 125, SH = 345;
     const AX = 392, AW = 72, AT = 125, AH = 345;
-    const VX = 468, VW = 30, VT = 125, VH = 345;
-    const HX = 108, HW = 265, HY = 510, HH = 58;
+    // VS taller than ALT (slightly bigger): start 10 px higher, end 10 px lower.
+    const VX = 468, VW = 30, VT = 115, VH = 365;
+    // HDG tape pushed lower to free a band between the ADI bottom and the
+    // compass strip for the LOC scale + diamond.
+    const HX = 108, HW = 265, HY = 568, HH = 58;
     const FH = 92;
 
     // ── Helpers ─────────────────────────────────────────────────────────────
@@ -326,21 +329,33 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       // filled, yellow-bordered centre square.
       ctx.save(); ctx.translate(cx, cy);
 
-      const drawWingSegment = (x1: number, y1: number, x2: number, y2: number) => {
-        ctx.lineCap = "round";
+      const drawWingL = (outerX: number, innerX: number, dropY: number) => {
+        ctx.lineCap  = "round";
+        ctx.lineJoin = "miter";        // sharp inner corner
         // Yellow outline (thicker)
-        ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 7;
-        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-        // Black core (thinner)
-        ctx.strokeStyle = "#000000"; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 9;
+        ctx.beginPath();
+        ctx.moveTo(outerX, 0);
+        ctx.lineTo(innerX, 0);
+        ctx.lineTo(innerX, dropY);
+        ctx.stroke();
+        // Black core (thinner) — bends WITH the path, so the inner corner
+        // reads BLACK (yellow only as a thin border) instead of yellow.
+        ctx.strokeStyle = "#000000"; ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(outerX, 0);
+        ctx.lineTo(innerX, 0);
+        ctx.lineTo(innerX, dropY);
+        ctx.stroke();
       };
 
-      // Wings (left + right, with downward "tips")
-      drawWingSegment(-65, 0, -20, 0);
-      drawWingSegment(-65, 0, -65, 12);
-      drawWingSegment( 20, 0,  65, 0);
-      drawWingSegment( 65, 0,  65, 12);
+      // Wings — scaled +30 % (was ±85/±62 outer/inner, drop 12; now
+      // ±110/±80, drop 16).  Horizontal sits OUTSIDE the FD bars (FD reaches
+      // ±58, wings start at ±80).  Vertical hooks drop DOWN from the inner
+      // corner, which renders black because the L-path's black core wraps
+      // the join.
+      drawWingL(-110, -80, 16);
+      drawWingL( 110,  80, 16);
 
       // Centre square — smaller per user feedback (was 18×18, now 12×12).
       // Black fill, yellow border.
@@ -387,8 +402,9 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
       const gsY = cy + d.gsPos * 38 * 2;
       diamond(gsx, gsY, 8, 8, "#ff00ff");
 
-      // LOC scale (below ADI)
-      const locy = cy + r + 30;
+      // LOC scale (below ADI) — sits OUTSIDE the stadium bottom (cy + VEXT + r),
+      // in the band between the ADI and the HDG tape.
+      const locy = cy + VEXT + r + 22;
       [2, 1, -1, -2].forEach(i => {
         const sx2 = cx + i * 48;
         ctx.beginPath(); ctx.arc(sx2, locy, 5, 0, Math.PI * 2);

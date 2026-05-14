@@ -28,8 +28,8 @@ export const smokeCabin: Scenario = {
           type: "ADD_ECAM",
           messages: [
             { id: "smoke_warn",   line: "SMOKE / FUMES",              level: "caution"  },
-            { id: "smoke_src",    line: "SOURCE — INVESTIGATE",        level: "caution"  },
-            { id: "recirc_off",   line: "RECIRC FANS..........OFF",    level: "caution"  },
+            { id: "smoke_src",    line: "SOURCE — INVESTIGATE",        level: "advisory" },
+            { id: "recirc_off",   line: "RECIRC FANS..........OFF",    level: "advisory" },
             { id: "pack_isol",    line: "PACK ISOLATION — CHECK",      level: "advisory" },
           ],
         },
@@ -278,41 +278,179 @@ export const smokeCabin: Scenario = {
     { id: "st_appr",    line: "APPR NORMAL",                        severity: "advisory" },
   ],
 
+  // ── ATC sequence — mirrors eng1-fire-after-v1 ──────────────────────────────
+  // Smoke is special: starts as PAN PAN (urgent — investigating source).
+  // Upgrades to MAYDAY if source not isolated within a few minutes.  Crew
+  // should be brief during the QRH SMOKE/FUMES checklist, then escalate
+  // once the assessment is clear.
   distractions: [
+    // ① ATC notices something — pilot declares PAN PAN initially
     {
-      id: "atc_check",
+      id: "atc_initial_query",
       atMs: 10_000,
       kind: "atc",
-      from: "ATC MUMBAI",
+      from: "MUMBAI CONTROL",
       message: "IFLY202, everything OK?",
       standbyResurfaceMs: 20_000,
       choices: [
-        { id: "a", label: "PAN PAN PAN, IFLY202, smoke in cabin, investigating source, may require immediate landing", correct: true  },
-        { id: "b", label: "IFLY202, all OK, continuing",                                                                correct: false },
+        { id: "a", label: "PAN PAN PAN, IFLY202, smoke in cabin, investigating source per QRH, standby", correct: true  },
+        { id: "b", label: "IFLY202, all OK, continuing",                                                  correct: false },
+        // Wrong — premature MAYDAY before assessment of source
+        { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY202, smoke, descending immediately", correct: false },
       ],
     },
+
+    // ② ATC acknowledges + offers vectors when needed
     {
-      id: "atc_intent",
-      atMs: 40_000,
+      id: "atc_offer_vectors",
+      atMs: 30_000,
       kind: "atc",
-      from: "ATC MUMBAI",
-      message: "IFLY202, state your intentions.",
+      from: "MUMBAI CONTROL",
+      message: "IFLY202, roger PAN PAN, radar contact, vectors available when ready, advise intentions when able.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY202, declaring emergency, smoke source not yet isolated, requesting immediate landing nearest airport", correct: true  },
-        { id: "b", label: "IFLY202 continuing to destination, smoke is minor",                                                                correct: false },
+        { id: "a", label: "Continuing investigation, will advise when ready, IFLY202", correct: true  },
+        { id: "b", label: "Standby IFLY202",                                            correct: true  },
+        // Wrong — premature divert before isolation attempt
+        { id: "c", label: "Request immediate vectors nearest airport, IFLY202",         correct: false },
       ],
     },
+
+    // ③ ATC prompts for status — pilot upgrades to MAYDAY if source not isolated
     {
-      id: "atc_approach",
-      atMs: 100_000,
+      id: "atc_status_check",
+      atMs: 75_000,
+      kind: "atc",
+      from: "MUMBAI CONTROL",
+      message: "IFLY202, say status and intentions.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — escalates to MAYDAY because source isn't 100 % isolated (QRH rule)
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY202, smoke source not isolated, declaring full emergency, request immediate vectors nearest suitable airport", correct: true  },
+        { id: "b", label: "IFLY202 continuing to destination, smoke is minor",                                                                                          correct: false },
+        // Wrong — under-commits when QRH requires immediate land
+        { id: "c", label: "PAN PAN IFLY202, plan to continue, will advise",                                                                                              correct: false },
+      ],
+    },
+
+    // ④ ATC acknowledges MAYDAY + vectors
+    {
+      id: "atc_vectors",
+      atMs: 105_000,
+      kind: "atc",
+      from: "MUMBAI CONTROL",
+      message: "IFLY202, roger MAYDAY, descend FL150, turn right heading 180 direct Mumbai, contact Mumbai Approach 119.10.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Descend FL150, right heading 180 direct Mumbai, Approach 119.10, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                                                              correct: false },
+        // Wrong — partial readback (drops heading + frequency)
+        { id: "c", label: "Descending FL150, IFLY202",                                                  correct: false },
+      ],
+    },
+
+    // ⑤ Approach briefing prompt
+    {
+      id: "atc_briefing_prompt",
+      atMs: 140_000,
       kind: "atc",
       from: "MUMBAI APPROACH",
-      message: "IFLY202, cleared ILS RWY 27 Mumbai, wind calm, confirm souls on board.",
-      standbyResurfaceMs: 30_000,
+      message: "IFLY202, Mumbai Approach, advise approach requirements and assistance.",
+      standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY202, full emergency, smoke on board, 186 POB, fire services and medical required", correct: true  },
-        { id: "b", label: "IFLY202, 186 POB, standard approach",                                                          correct: false },
+        { id: "a", label: "Request latest Mumbai weather, runway in use, NOTAMs, expected approach, IFLY202", correct: true  },
+        { id: "b", label: "Standby IFLY202",                                                                   correct: false },
+        { id: "c", label: "Request immediate vectors ILS 27, IFLY202",                                          correct: false },
+      ],
+    },
+
+    // ⑥ Briefing info
+    {
+      id: "atc_briefing_info",
+      atMs: 175_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, wind 270 at 6, runway 27 in use, NOTAMs nil significant, expect ILS runway 27.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Wind 270 at 6, runway 27, ILS runway 27, no significant NOTAMs, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                                                            correct: false },
+        { id: "c", label: "Wind 270 at 6, runway 27, IFLY202",                                       correct: false },
+      ],
+    },
+
+    // ⑦ POB / fuel / services — smoke event needs ARFF + medical
+    {
+      id: "atc_pob_fuel_services",
+      atMs: 205_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, say persons on board, fuel endurance, and assistance required.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "IFLY202, 186 persons on board, 10 tonnes fuel, request full emergency services and medical, smoke on board, possible evacuation on landing", correct: true  },
+        { id: "b", label: "Standby IFLY202",                                                                                                                              correct: false },
+        // Wrong — omits evacuation likelihood (ARFF positioning critical)
+        { id: "c", label: "IFLY202, 186 POB, normal approach",                                                                                                              correct: false },
+      ],
+    },
+
+    // ⑧ Ready for approach
+    {
+      id: "atc_ready_for_approach",
+      atMs: 230_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, advise when ready for approach.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "IFLY202 ready, request vectors for ILS runway 27", correct: true  },
+        { id: "b", label: "Ready, IFLY202",                                    correct: false },
+        { id: "c", label: "Standby IFLY202",                                   correct: false },
+      ],
+    },
+
+    // ⑨ Approach clearance
+    {
+      id: "atc_cleared_approach",
+      atMs: 255_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, turn left heading 240, descend 3 000 feet, cleared ILS runway 27, contact Mumbai Tower 118.10 when established.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Left heading 240, descend 3 000, cleared ILS runway 27, contact Tower 118.10 when established, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                                                                                            correct: false },
+        { id: "c", label: "Cleared ILS runway 27, IFLY202",                                                                            correct: false },
+      ],
+    },
+
+    // ⑩ Tower contact
+    {
+      id: "atc_tower_contact",
+      atMs: 285_000,
+      kind: "atc",
+      from: "MUMBAI TOWER",
+      message: "IFLY202, Mumbai Tower, continue ILS approach runway 27, report established, full emergency services in position.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Continuing ILS runway 27, will report established, IFLY202", correct: true  },
+        { id: "b", label: "Switching, IFLY202",                                          correct: false },
+      ],
+    },
+
+    // ⑪ Cleared to land
+    {
+      id: "atc_cleared_to_land",
+      atMs: 310_000,
+      kind: "atc",
+      from: "MUMBAI TOWER",
+      message: "IFLY202, runway 27 cleared to land, wind 270 at 6, ARFF and medical in position, evacuation on landing as required.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Cleared to land runway 27, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                       correct: false },
+        { id: "c", label: "Cleared to land runway 28, IFLY202", correct: false },
       ],
     },
   ],

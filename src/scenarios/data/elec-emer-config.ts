@@ -26,14 +26,14 @@ export const elecEmerConfig: Scenario = {
           type: "ADD_ECAM",
           messages: [
             // Left column — primary procedure
-            { id: "ac_bus1",     line: "ELEC AC BUS 1 FAULT",              level: "warning" },
-            { id: "ac_bus2",     line: "ELEC AC BUS 2 FAULT",              level: "warning" },
-            { id: "emer_config", line: "ELEC EMER CONFIG",                  level: "warning" },
-            { id: "bat_only",    line: "BATTERIES ONLY — 30 MIN",           level: "caution" },
-            { id: "rat_arm",     line: "RAT — DEPLOY MAN IF NEEDED",       level: "caution" },
-            { id: "ac_ess_shed", line: "AC ESS BUS SHED",                   level: "caution" },
+            { id: "ac_bus1",     line: "ELEC AC BUS 1 FAULT",              level: "warning"  },
+            { id: "ac_bus2",     line: "ELEC AC BUS 2 FAULT",              level: "warning"  },
+            { id: "emer_config", line: "ELEC EMER CONFIG",                  level: "warning"  },
+            { id: "bat_only",    line: "BATTERIES ONLY — 30 MIN",           level: "remark"   },
+            { id: "rat_arm",     line: "RAT — DEPLOY MAN IF NEEDED",       level: "advisory" },
+            { id: "ac_ess_shed", line: "AC ESS BUS SHED",                   level: "caution"  },
             // Right column — LAND ASAP (no SECONDARY FAILURES: inhibited per FCOM DSC-31-15)
-            { id: "land_asap",   line: "LAND ASAP",                         level: "warning" },
+            { id: "land_asap",   line: "LAND ASAP",                         level: "warning"  },
           ],
         },
       ],
@@ -167,14 +167,29 @@ export const elecEmerConfig: Scenario = {
       requires: ["crew_brief_elec"],
     },
     {
-      id: "wx_ldg",
-      label: "WX / LDG PERF",
-      action: "CHECK",
-      hint: "PM: confirm nearest airport with any runway. Normal Vapp. ILS may be limited — nav aids on emergency bus only.",
+      id: "pm_request_info",
+      label: "REQUEST WX / RWY / NOTAMs / APPROACH",
+      action: "CALL",
+      hint: "Pilot-initiated call to ATC.  PM: 'Mumbai Approach, IFLY101 — request latest weather, runway in use, NOTAMs, and expected approach type.'  Needed BEFORE landing performance calc.  ATC will respond — read back fully.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
       requires: ["atc_mayday_elec"],
+      notes: [
+        "Pilot-initiated — this is YOUR call to ATC, not a response.",
+        "This data feeds LDG PERF — make the call BEFORE running performance.",
+        "ATC reply appears as an ATC distraction once this step is checked off.",
+      ],
+    },
+    {
+      id: "wx_ldg",
+      label: "WX / LDG PERF",
+      action: "CHECK",
+      hint: "PM: using the weather/RWY/approach info from ATC, confirm landing performance for nearest suitable airport. Normal Vapp. ILS may be limited — nav aids on emergency bus only.",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      requires: ["pm_request_info"],
     },
     {
       id: "fordec_elec",
@@ -300,45 +315,162 @@ export const elecEmerConfig: Scenario = {
     { id: "st_inop_fuel",  line: "FUEL PUMPS",       severity: "caution",  inopSys: true },
     { id: "st_inop_ask",   line: "ANTI SKID",        severity: "caution",  inopSys: true },
     { id: "st_inop_nws",   line: "N/W STRG",         severity: "caution",  inopSys: true },
-    { id: "st_inop_cat2",  line: "CAT 2",            severity: "advisory", inopSys: true },
-    { id: "st_inop_steep", line: "STEEP APPR",       severity: "advisory", inopSys: true },
+    { id: "st_inop_cat2",  line: "CAT 2",            severity: "caution",  inopSys: true },
+    { id: "st_inop_steep", line: "STEEP APPR",       severity: "caution",  inopSys: true },
   ],
 
+  // ── ATC sequence — mirrors eng1-fire-after-v1 ──────────────────────────────
+  // Special constraint here: BATTERIES ONLY = ~30 min endurance.  Time is
+  // the constraint — the crew cannot afford long STANDBYs once batteries
+  // are the sole AC source.  RAT must be in line (EMER GEN online) before
+  // any reasonable workload eases.
   distractions: [
+    // ① Routine check-in just before the event
     {
-      id: "atc_initial",
+      id: "atc_handoff_checkin",
       atMs: 8_000,
       kind: "atc",
       from: "MUMBAI CONTROL",
-      message: "IFLY101, checking in, maintain FL330.",
-      standbyResurfaceMs: 20_000,
+      message: "IFLY101, Mumbai Control, checking in, maintain FL330.",
+      standbyResurfaceMs: 15_000,
       choices: [
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, total electrical failure, emergency configuration, request immediate diversion", correct: true  },
-        { id: "b", label: "IFLY101, FL330, good day",                                                                                        correct: false },
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, electrical emergency configuration, batteries only, request immediate vectors nearest suitable airport, standby", correct: true  },
+        { id: "b", label: "IFLY101, FL330, good day",                                                                                                                       correct: false },
+        { id: "c", label: "Standby IFLY101",                                                                                                                                  correct: false },
       ],
     },
+
+    // ② ATC acknowledges + initial vectors/altitude + assistance offer
+    //   ATC gives the critical instructions (heading/altitude) then offers
+    //   the assistance window for when crew workload eases.
     {
-      id: "atc_intentions",
+      id: "atc_radar_contact",
       atMs: 30_000,
       kind: "atc",
       from: "MUMBAI CONTROL",
-      message: "IFLY101, state your intentions and equipment status.",
+      message: "IFLY101, roger MAYDAY, radar contact, turn right heading 180 direct Mumbai, descend FL150 at your discretion. Advise any assistance required when ready.",
       standbyResurfaceMs: 20_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY101, RAT deployed, battery power only, request nearest runway, manual ILS approach", correct: true  },
-        { id: "b", label: "IFLY101, continuing to destination, no issues",                                                   correct: false },
+        // Correct — full readback + defer assistance to when workload eases
+        { id: "a", label: "Right heading 180 direct Mumbai, descending FL150, will advise on assistance, IFLY101", correct: true  },
+        // Wrong — bare ack drops the heading + assistance offer
+        { id: "b", label: "Roger IFLY101",                                                                            correct: false },
+        // Wrong — drops the heading (critical for traffic separation)
+        { id: "c", label: "Descending FL150, IFLY101",                                                                correct: false },
       ],
     },
+
+    // ③ ATC asks for endurance status — pilot must communicate battery limit
     {
-      id: "atc_approach",
-      atMs: 120_000,
+      id: "atc_endurance_query",
+      atMs: 65_000,
+      kind: "atc",
+      from: "MUMBAI CONTROL",
+      message: "IFLY101, say endurance and any operational restrictions.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — declares the battery-only 30-min limit (mission-critical for ATC)
+        { id: "a", label: "IFLY101, batteries only — 30 minutes maximum endurance, no autopilot, no transponder if batteries deplete, request priority handling", correct: true  },
+        { id: "b", label: "Standby IFLY101",                                                                                                                        correct: false },
+        // Wrong — under-informative for an EMER CONFIG event
+        { id: "c", label: "IFLY101, no operational restrictions",                                                                                                    correct: false },
+      ],
+    },
+
+    // ④ ATC delivers requested info — STEP-TRIGGERED on pm_request_info.
+    //   The PILOT initiated the call earlier (pm_request_info step) BEFORE
+    //   the LDG PERF calculation, since that data feeds performance.  ATC
+    //   responds here; pilot reads back fully, then uses it for LDG PERF.
+    {
+      id: "atc_briefing_info",
+      atMs: 60_000,
+      requiresStep: "pm_request_info",
       kind: "atc",
       from: "MUMBAI APPROACH",
-      message: "IFLY101, cleared ILS runway 27, wind calm, QNH 1013. Confirm souls on board.",
-      standbyResurfaceMs: 30_000,
+      message: "IFLY101, Mumbai Approach, roger your request. Wind 270 at 6, runway 27 in use, NOTAMs nil significant, expect ILS runway 27, QNH 1013.",
+      standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY101, 186 POB, manual approach only, emergency services required, batteries limited", correct: true  },
-        { id: "b", label: "IFLY101, 186 POB, standard approach",                                                            correct: false },
+        // Correct — full readback of every briefing item
+        { id: "a", label: "Wind 270 at 6, runway 27, ILS 27, QNH 1013, no significant NOTAMs, IFLY101", correct: true  },
+        // Wrong — minimal acknowledgement loses the data
+        { id: "b", label: "Roger IFLY101",                                                                correct: false },
+        // Wrong — partial readback, missed approach type
+        { id: "c", label: "Wind 270 at 6, runway 27, IFLY101",                                            correct: false },
+      ],
+    },
+
+    // ⑥ POB / fuel / services
+    {
+      id: "atc_pob_fuel_services",
+      atMs: 165_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, say persons on board and assistance required.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "IFLY101, 186 persons on board, 9 tonnes fuel, request full emergency services in position, expect manual ILS, batteries limited, no autoland", correct: true  },
+        { id: "b", label: "Standby IFLY101",                                                                                                                                  correct: false },
+        // Wrong — under-informative
+        { id: "c", label: "IFLY101, 186 POB, normal approach",                                                                                                                  correct: false },
+      ],
+    },
+
+    // ⑦ Ready for approach
+    {
+      id: "atc_ready_for_approach",
+      atMs: 195_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, advise when ready for approach.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "IFLY101 ready, request vectors for ILS runway 27, flap 3 approach, Vapp plus 10 knots, manual ILS only", correct: true  },
+        { id: "b", label: "Ready, IFLY101",                                                                                            correct: false },
+        { id: "c", label: "Standby IFLY101",                                                                                            correct: false },
+      ],
+    },
+
+    // ⑧ Approach clearance
+    {
+      id: "atc_cleared_approach",
+      atMs: 220_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 27 approach, contact Mumbai Tower 118.10 when established.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Left heading 240, descend 3 000, cleared ILS runway 27, contact Tower 118.10 when established, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                                                                                            correct: false },
+        { id: "c", label: "Cleared ILS runway 27, IFLY101",                                                                            correct: false },
+      ],
+    },
+
+    // ⑨ Tower contact
+    {
+      id: "atc_tower_contact",
+      atMs: 245_000,
+      kind: "atc",
+      from: "MUMBAI TOWER",
+      message: "IFLY101, Mumbai Tower, continue ILS approach runway 27, report established, emergency services standing by.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Continuing ILS runway 27, will report established, IFLY101", correct: true  },
+        { id: "b", label: "Switching, IFLY101",                                          correct: false },
+      ],
+    },
+
+    // ⑩ Cleared to land
+    {
+      id: "atc_cleared_to_land",
+      atMs: 270_000,
+      kind: "atc",
+      from: "MUMBAI TOWER",
+      message: "IFLY101, runway 27 cleared to land, wind 270 at 6, ARFF in position.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Cleared to land runway 27, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                       correct: false },
+        { id: "c", label: "Cleared to land runway 28, IFLY101", correct: false },
       ],
     },
   ],
