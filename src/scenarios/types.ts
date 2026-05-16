@@ -169,6 +169,8 @@ export type Scenario = {
   systemTabs?: readonly SysTabDef[];
   /** Declarative engine/fire panel config (if absent, FirePanel falls back to hardcoded ENG 1 FIRE rendering) */
   engineDisplay?: EngineDisplayDef;
+  /** Phase-by-phase cockpit channel state: PFD, ND, PF, PM, ATC, overhead */
+  phases?: readonly ScenarioPhase[];
 };
 
 // ─── System / Engine display DSL ─────────────────────────────────────────────
@@ -212,4 +214,124 @@ export type EngineDisplayDef = {
   warningTrigger?: string;
   /** Interactive ECAM procedure controls rendered below engine gauges */
   controlPanel?: EngControlDef[];
+};
+
+// ─── Scenario Channels (phase-based cockpit state) ────────────────────────────
+// Each ScenarioPhase captures a snapshot of all cockpit channels at a key
+// moment in the scenario. Pure data — no engine or UI logic.
+
+/** What the PFD is showing at this phase */
+export type PFDSnapshot = {
+  /** Indicated airspeed in knots, e.g. 145 */
+  speed?: number;
+  /** Target speed label shown on speed tape, e.g. "V2+10", "Vapp+5" */
+  targetSpeed?: string;
+  /** Pressure altitude in feet */
+  altitude?: number;
+  /** Target altitude set in FCU, in feet */
+  targetAltitude?: number;
+  /** Vertical speed in ft/min (positive = climb) */
+  verticalSpeed?: number;
+  /** FMA column 1 — thrust mode, e.g. "MAN TOGA", "A/THR" */
+  fmaThrust?: string;
+  /** FMA column 2 — pitch mode, e.g. "SRS", "OP CLB", "ALT" */
+  fmaPitch?: string;
+  /** FMA column 3 — lateral mode, e.g. "NAV", "TRACK", "LOC" */
+  fmaLateral?: string;
+  /** AP1 engaged */
+  ap1?: boolean;
+  /** AP2 engaged */
+  ap2?: boolean;
+  /** A/THR active */
+  athr?: boolean;
+  /** Any red flags or amber cautions visible on PFD face */
+  flags?: string[];
+  /** Free-text notes for instructor / debrief context */
+  notes?: string[];
+};
+
+/** What the ND is showing at this phase */
+export type NDSnapshot = {
+  /** Display mode: ARC (most common in flight), ROSE NAV, PLAN, ILS */
+  mode?: "ARC" | "ROSE NAV" | "ROSE ILS" | "PLAN";
+  /** Range ring setting in nm */
+  range?: number;
+  /** Magnetic heading */
+  heading?: number;
+  /** Active waypoint or destination shown, e.g. "VIDP" */
+  activeWpt?: string;
+  /** Whether terrain display is on */
+  terrain?: boolean;
+  /** Whether weather radar is on */
+  wxr?: boolean;
+  /** Free-text notes, e.g. "Radar return 20 nm ahead" */
+  notes?: string[];
+};
+
+/** A single spoken line by PF, PM, or ATC */
+export type CockpitLine = {
+  /** Who is speaking */
+  role: "PF" | "PM" | "ATC" | "PURSER" | "OPS";
+  /** Callsign or station label shown before the speech, e.g. "DELHI DEP" */
+  station?: string;
+  /** The spoken words exactly as they should be said */
+  speech: string;
+};
+
+/** What the Pilot Flying is doing and saying at this phase */
+export type PFState = {
+  /** Primary task description, e.g. "Maintain V2+10, monitor SRS guidance" */
+  task: string;
+  /** Spoken callouts in order */
+  callouts?: CockpitLine[];
+};
+
+/** What the Pilot Monitoring is doing and saying at this phase */
+export type PMState = {
+  /** Primary task description, e.g. "Work through ECAM procedure" */
+  task: string;
+  /** Spoken callouts in order */
+  callouts?: CockpitLine[];
+};
+
+/** ATC exchange at this phase — one or more transmissions in sequence */
+export type ATCChannel = {
+  /** All transmissions in this exchange, in chronological order */
+  transmissions: CockpitLine[];
+  /** Whether this is pilot-initiated or ATC-initiated */
+  initiatedBy: "PF" | "PM" | "ATC";
+};
+
+/** Which overhead panel items are active / being actioned at this phase */
+export type OverheadSnapshot = {
+  /** Panel items being touched or monitored, e.g. "APU MASTER — ON", "ENG 1 MASTER — OFF" */
+  items: string[];
+  /** Free-text notes */
+  notes?: string[];
+};
+
+/**
+ * A named phase in the scenario timeline.
+ * Each phase begins at `atMs` and runs until the next phase starts.
+ * All channel fields are optional — only populate what changes at this phase.
+ */
+export type ScenarioPhase = {
+  /** Unique id, e.g. "fire_detected", "ecam_actions", "agent_discharged" */
+  id: string;
+  /** Human-readable label shown in debrief timeline, e.g. "ENG 1 FIRE DETECTED" */
+  label: string;
+  /** Wall-clock ms from session start when this phase begins */
+  atMs: number;
+  /** PFD state at the start of this phase */
+  pfd?: PFDSnapshot;
+  /** ND state at the start of this phase */
+  nd?: NDSnapshot;
+  /** Pilot Flying state */
+  pf?: PFState;
+  /** Pilot Monitoring state */
+  pm?: PMState;
+  /** ATC exchange occurring in this phase */
+  atc?: ATCChannel;
+  /** Overhead panel state */
+  overhead?: OverheadSnapshot;
 };
