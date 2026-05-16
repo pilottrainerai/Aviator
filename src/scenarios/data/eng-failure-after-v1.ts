@@ -844,6 +844,491 @@ export const engFailureAfterV1: Scenario = {
     },
   ],
 
+  // ── Phase-based cockpit channel state ─────────────────────────────────────
+  // FCTM source: A320 FCTM OP-020 Engine Failure After V1 (all phases)
+  // Each phase captures PFD, ND, PF task, PM task, ATC, and overhead state.
+  phases: [
+
+    // ── PHASE 1 — V1 PASSED (T+6s) ──────────────────────────────────────────
+    {
+      id: "v1_passed",
+      label: "V1 PASSED — TAKEOFF COMMITTED",
+      atMs: 6_000,
+      pfd: {
+        speed: 145,
+        targetSpeed: "V2",
+        altitude: 0,
+        targetAltitude: 3_000,
+        verticalSpeed: 0,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "RWY TRK",
+        ap1: false,
+        athr: false,
+        notes: ["SRS armed on FD — will capture at rotation", "ENG OUT not yet displayed"],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["Runway centreline track 280 shown"],
+      },
+      pf: {
+        task: "Maintain runway centreline with rudder, do NOT reduce thrust, prepare to rotate at VR",
+        callouts: [
+          { role: "PF", speech: "V1 — CONTINUE" },
+        ],
+      },
+      pm: {
+        task: "Monitor airspeed, call VR, watch for tyre/directional problem",
+        callouts: [
+          { role: "PM", speech: "V1" },
+        ],
+      },
+    },
+
+    // ── PHASE 2 — ENG 1 FAIL (T+8s) ────────────────────────────────────────
+    {
+      id: "eng1_fail",
+      label: "ENG 1 FAIL — ASYMMETRIC THRUST",
+      atMs: 8_000,
+      pfd: {
+        speed: 147,
+        targetSpeed: "V2",
+        altitude: 0,
+        targetAltitude: 3_000,
+        verticalSpeed: 0,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "RWY TRK",
+        ap1: false,
+        athr: false,
+        flags: ["MASTER CAUT (amber)", "ENG 1 FAIL — SC chime"],
+        notes: [
+          "MASTER CAUTION illuminates amber — single chime",
+          "N2 decaying on ENG 1, ENG 2 at full FLEX",
+          "Asymmetric yaw — LEFT yaw toward failed engine",
+          "FMA col 5: ENG OUT (amber) appears",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        notes: ["Track deviation possible — yaw correction required"],
+      },
+      pf: {
+        task: "MEMORY ITEM: apply right rudder immediately to zero β (sideslip). Do NOT pull back. Do NOT reduce thrust.",
+        callouts: [
+          { role: "PF", speech: "MEMORY ITEMS — MAINTAIN DIRECTION" },
+        ],
+      },
+      pm: {
+        task: "Identify ECAM — ENG 1 FAIL. Do NOT touch MASTER CAUT yet. Call VR.",
+        callouts: [
+          { role: "PM", speech: "ECAM — ENG 1 FAIL" },
+          { role: "PM", speech: "ROTATE" },
+        ],
+      },
+      overhead: {
+        items: ["ENG 1 MASTER — remains ON (failure, not fire)", "No fire panel action"],
+        notes: ["FCTM: do not touch any overhead items during directional control phase"],
+      },
+    },
+
+    // ── PHASE 3 — ROTATION (T+10s) ──────────────────────────────────────────
+    {
+      id: "rotation",
+      label: "ROTATION — VR 12.5°",
+      atMs: 10_000,
+      pfd: {
+        speed: 152,
+        targetSpeed: "V2+10",
+        altitude: 50,
+        targetAltitude: 3_000,
+        verticalSpeed: 800,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "RWY TRK",
+        ap1: false,
+        athr: false,
+        notes: [
+          "FD pitch bar commands 12.5° nose up",
+          "β target = 0 — sideslip ball centered with right rudder",
+          "SRS active: targeting V2+10 on pitch",
+          "Speed trend arrow pointing up — accelerating through V2",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        notes: ["Track 280 — possible minor deviation corrected with bank"],
+      },
+      pf: {
+        task: "Rotate smoothly to 12.5° pitch, follow FD, target V2+10. Hold right rudder — β = 0. Do NOT bank.",
+        callouts: [
+          { role: "PF", speech: "ROTATING — V2+10 TARGET" },
+        ],
+      },
+      pm: {
+        task: "Call 'POSITIVE RATE' once positive climb confirmed. Watch VSI and altimeter.",
+        callouts: [
+          { role: "PM", speech: "POSITIVE RATE" },
+          { role: "PF", speech: "GEAR UP" },
+          { role: "PM", speech: "GEAR UP — SELECTING" },
+        ],
+      },
+    },
+
+    // ── PHASE 4 — GEAR UP / AP1 ENGAGE (~100 ft, T+14s) ────────────────────
+    {
+      id: "gear_up_ap1",
+      label: "GEAR UP — AP1 ENGAGED",
+      atMs: 14_000,
+      pfd: {
+        speed: 163,
+        targetSpeed: "V2+10",
+        altitude: 120,
+        targetAltitude: 3_000,
+        verticalSpeed: 1_800,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "AP1 engaged at ~100 ft — SRS holds V2+10 on pitch channel",
+          "NAV engaged — tracking runway track then SID",
+          "FMA col 5: AP1 (white), ENG OUT (amber)",
+          "CLB armed in row 2 — will engage at acceleration altitude",
+          "Rudder trim applied ~2 units right (toward ENG 2)",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["AP holding RWY TRK → NAV capture"],
+      },
+      pf: {
+        task: "Engage AP1. Read FMA aloud. Apply rudder trim ~2 units toward ENG 2. Monitor SRS holding V2+10.",
+        callouts: [
+          { role: "PF", speech: "AP1 ENGAGE" },
+          { role: "PF", speech: "FMA: MAN TOGA — SRS — NAV — AP1 — ENG OUT. CHECKED." },
+          { role: "PF", speech: "RUDDER TRIM — 2 UNITS RIGHT" },
+        ],
+      },
+      pm: {
+        task: "Confirm gear up / 3 off. Cancel MASTER CAUTION once AP stable. Monitor speed.",
+        callouts: [
+          { role: "PM", speech: "GEAR UP — 3 OFF" },
+          { role: "PM", speech: "MASTER CAUTION — CANCELLING" },
+        ],
+      },
+    },
+
+    // ── PHASE 5 — 400 FT / ECAM ACTIONS START (T+18s) ──────────────────────
+    {
+      id: "ecam_actions_start",
+      label: "400 FT — ECAM ACTIONS",
+      atMs: 18_000,
+      pfd: {
+        speed: 170,
+        targetSpeed: "V2+10",
+        altitude: 400,
+        targetAltitude: 3_000,
+        verticalSpeed: 2_000,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "400 ft AGL — FCTM gate for ECAM actions",
+          "SRS commanding V2+10 — AP holding nicely",
+          "CLB armed — will engage at ~1000 ft (eng-out acc alt)",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+      },
+      pf: {
+        task: "Call ECAM ACTIONS. Monitor FD, speed, altitude. Do not touch controls while PM works ECAM.",
+        callouts: [
+          { role: "PF", speech: "FOUR HUNDRED FEET — ECAM ACTIONS" },
+          { role: "PM", speech: "ECAM ACTIONS" },
+        ],
+      },
+      pm: {
+        task: "Acknowledge ECAM ACTIONS. Read first ECAM line aloud. Begin ENG MODE SEL → IGN.",
+        callouts: [
+          { role: "PM", speech: "ENG MODE SEL — IGN" },
+        ],
+      },
+    },
+
+    // ── PHASE 6 — ECAM: IGN → IDLE (T+20s) ─────────────────────────────────
+    {
+      id: "ecam_ign_idle",
+      label: "ECAM — MODE SEL IGN / THR LEVER IDLE",
+      atMs: 20_000,
+      pfd: {
+        speed: 175,
+        targetSpeed: "V2+10",
+        altitude: 550,
+        targetAltitude: 3_000,
+        verticalSpeed: 2_000,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: ["Speed building through V2+10 — SRS pitching down slightly to hold target"],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+      },
+      pf: {
+        task: "Monitor altitude, speed, SRS guidance. Confirm each ECAM step called by PM.",
+        callouts: [
+          { role: "PM", speech: "ENG MODE SEL — IGN — CHECKED" },
+          { role: "PM", speech: "THR LEVER 1 — IDLE" },
+          { role: "PF", speech: "CONFIRMED" },
+        ],
+      },
+      pm: {
+        task: "Set ENG MODE SEL to IGN. Retard ENG 1 THR LEVER to IDLE detent. Start 30-second relight timer mentally.",
+        callouts: [
+          { role: "PM", speech: "THR LEVER 1 IDLE — SELECTING" },
+          { role: "PM", speech: "RELIGHT — MONITORING 30 SECONDS" },
+        ],
+      },
+      overhead: {
+        items: ["ENG MODE SEL — IGN (centre overhead panel)"],
+        notes: ["FCOM: IGN selects continuous ignition — FADEC relight attempt confirmed"],
+      },
+    },
+
+    // ── PHASE 7 — 30-SECOND RELIGHT WAIT (T+22s → T+52s) ───────────────────
+    {
+      id: "relight_monitor",
+      label: "RELIGHT MONITOR — 30 SECONDS",
+      atMs: 22_000,
+      pfd: {
+        speed: 180,
+        targetSpeed: "V2+10",
+        altitude: 800,
+        targetAltitude: 3_000,
+        verticalSpeed: 1_800,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "Monitor ENG 1 N2 on ECAM SD — ENG page",
+          "Watch EGT for any positive sign of relight",
+          "No change in ENG 1 indications — flameout confirmed",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+      },
+      pf: {
+        task: "Continue monitoring FD, speed, altitude. Aviate — let PM run the relight monitor.",
+        callouts: [
+          { role: "PM", speech: "N2 DECAYING — NO RELIGHT INDICATION" },
+          { role: "PF", speech: "ROGER, MONITORING" },
+        ],
+      },
+      pm: {
+        task: "Watch SD ENG page: N2, EGT, FF on ENG 1. Call any positive relight sign. After 30 s with no relight — call ENG MASTER OFF.",
+        callouts: [
+          { role: "PM", speech: "30 SECONDS — NO RELIGHT. ENG 1 MASTER — CONFIRM OFF?" },
+          { role: "PF", speech: "CONFIRM" },
+        ],
+      },
+    },
+
+    // ── PHASE 8 — ENG MASTER OFF + SECONDARY FAILURES (T+52s) ──────────────
+    {
+      id: "master_off_secondary",
+      label: "ENG 1 MASTER OFF — SECONDARY FAILURES",
+      atMs: 52_000,
+      pfd: {
+        speed: 188,
+        targetSpeed: "V2+10",
+        altitude: 950,
+        targetAltitude: 3_000,
+        verticalSpeed: 1_600,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        flags: ["MASTER CAUT (amber) — secondary failures"],
+        notes: [
+          "Second MASTER CAUTION fires: HYD, ELEC, AIR BLEED",
+          "ENG 1 now fully shut down — no fuel flow",
+          "FCTM: call ENGINE SECURED after MASTER OFF (no damage)",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+      },
+      pf: {
+        task: "Monitor aircraft — AP holding SRS. Confirm ENG MASTER OFF.",
+        callouts: [
+          { role: "PM", speech: "ENG 1 MASTER — OFF" },
+          { role: "PM", speech: "ENGINE SECURED" },
+          { role: "PF", speech: "ENGINE SECURED — ROGER" },
+          { role: "PM", speech: "MASTER CAUTION — CANCELLING" },
+        ],
+      },
+      pm: {
+        task: "Set ENG MASTER 1 OFF. Call ENGINE SECURED. Cancel second MASTER CAUTION. Note secondary failures: HYD G ENG1 PUMP, GEN 1, ENG 1 BLEED.",
+        callouts: [
+          { role: "PM", speech: "SECONDARY FAILURES — HYD, ELEC, AIR BLEED — NOTED" },
+        ],
+      },
+      overhead: {
+        items: [
+          "ENG 1 MASTER — OFF (confirmed by PM, cross-checked by PF)",
+          "TCAS MODE SEL — TA (FCOM STATUS requirement after ENG SHUT DOWN)",
+        ],
+        notes: ["No FIRE pb, no AGENT — this is a failure, not a fire"],
+      },
+    },
+
+    // ── PHASE 9 — ACCELERATION ALTITUDE / CLEAN UP (T+55s) ─────────────────
+    {
+      id: "accel_altitude",
+      label: "ENG-OUT ACCELERATION ALTITUDE — LEVEL OFF / CLEAN",
+      atMs: 55_000,
+      pfd: {
+        speed: 195,
+        targetSpeed: "F SPD",
+        altitude: 1_000,
+        targetAltitude: 3_000,
+        verticalSpeed: 0,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "ALT",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "PF selects OP CLB or V/S 0 at eng-out acc alt (~1000 ft AGL)",
+          "SRS → ALT on pitch channel as level-off captures",
+          "Speed building — watch for F speed (flap retraction threshold)",
+          "FCTM: do NOT retract flaps below F speed on single engine (VMCA margin)",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 20,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["Range expanded to 20 nm to plan return routing"],
+      },
+      pf: {
+        task: "At eng-out acc alt: push OP CLB or select V/S 0. Call flap retraction at F speed. Monitor speed for VMCA margin.",
+        callouts: [
+          { role: "PF", speech: "ACCELERATION ALTITUDE — LEVEL OFF" },
+          { role: "PM", speech: "F SPEED" },
+          { role: "PF", speech: "FLAPS 1" },
+          { role: "PM", speech: "FLAPS 1 — SELECTING" },
+        ],
+      },
+      pm: {
+        task: "Call F speed when reached. Select flap lever on PF command. Call S speed. Monitor speed vs VMCA.",
+        callouts: [
+          { role: "PM", speech: "S SPEED" },
+          { role: "PF", speech: "FLAPS UP" },
+          { role: "PM", speech: "FLAPS UP — SELECTING" },
+        ],
+      },
+    },
+
+    // ── PHASE 10 — MCT / GREEN DOT / SE CLIMB (T+75s) ──────────────────────
+    {
+      id: "se_climb",
+      label: "MCT SET — SINGLE-ENGINE CLIMB AT GREEN DOT",
+      atMs: 75_000,
+      pfd: {
+        speed: 215,
+        targetSpeed: "GREEN DOT",
+        altitude: 2_000,
+        targetAltitude: 3_000,
+        verticalSpeed: 800,
+        fmaThrust: "MAN MCT",
+        fmaPitch: "CLB",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "MCT set on ENG 2 — FMA col 1 shows MAN MCT",
+          "CLB active on pitch — targeting FCU altitude 3000 ft",
+          "Green Dot: single-engine best climb speed (~210 kt at this weight)",
+          "Aircraft clean — FLAPS 0, gear up",
+          "Rudder trim 2 units right still applied — confirm before approach",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 20,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["Begin planning return routing — expect radar vectors VIDP RWY 28"],
+      },
+      pf: {
+        task: "Set MCT on ENG 2 when at Green Dot. Monitor CLB mode. Prepare for FORDEC and LAND ASAP decision.",
+        callouts: [
+          { role: "PF", speech: "GREEN DOT — MCT SETTING" },
+          { role: "PF", speech: "LAND ASAP — RETURNING VIDP" },
+        ],
+      },
+      pm: {
+        task: "Confirm ECAM ACTIONS COMPLETED. Read STATUS page. TCAS TA confirmed. Begin FORDEC with PF.",
+        callouts: [
+          { role: "PM", speech: "ECAM ACTIONS COMPLETED" },
+          { role: "PM", speech: "READING STATUS — ENG 1 SHUT DOWN, HYD G ENG1 PUMP LO PR, GEN 1 INOP, ENG 1 BLEED, PACK 1 MONITOR, CAT 1, MAX FL 250, TCAS TA" },
+          { role: "PF", speech: "CHECKED" },
+        ],
+      },
+      atc: {
+        initiatedBy: "PM",
+        transmissions: [
+          { role: "PM", station: "IFLY101", speech: "PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, no fire, maintaining runway track, climbing 3 000 feet, standby" },
+          { role: "ATC", station: "DELHI DEP", speech: "IFLY101, roger PAN PAN, radar contact, continue runway track, climb 4 000 feet." },
+          { role: "PM", station: "IFLY101", speech: "Continuing runway track, climbing 4 000, IFLY101" },
+        ],
+      },
+      overhead: {
+        items: [
+          "ENG 1 MASTER — OFF (confirmed)",
+          "ENG MODE SEL — IGN (remains set from ECAM)",
+          "TCAS — TA (set per STATUS requirement)",
+        ],
+        notes: ["No further overhead actions unless OEB requires computer resets"],
+      },
+    },
+
+  ],
+
   decisions: [
     {
       value: "LAND_ASAP",
