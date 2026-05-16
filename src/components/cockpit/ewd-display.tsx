@@ -1,19 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
-import type { ECAMLevel, Scenario, StatusItem } from "@/scenarios/types";
+import type { ECAMLevel, Scenario } from "@/scenarios/types";
 
-// ─── Airbus A320 ECAM display color specification ─────────────────────────────
-// Source: Airbus FCOM DSC-31-60 "ECAM — General" + Airbus published display values.
-// Do NOT map these to Tailwind palette — ECAM colors are system-defined.
+// Airbus A320 ECAM color spec — FCOM DSC-31-60
 const C = {
-  red:    "#FF3333",  // Level 3 WARNING  — fire, emergency, LAND ASAP
-  amber:  "#FFB300",  // Level 2 CAUTION  — action required, pending items
-  green:  "#00D060",  // NORMAL / completed action / memo
-  cyan:   "#00CFFF",  // ADVISORY         — informational, ATC NOTIFY
-  white:  "#E6E8EC",  // STATUS page text
-  dim:    "#3A4050",  // Inactive text, borders, header labels
-  border: "#1C2130",  // Internal dividers
+  red:    "#FF3333",
+  amber:  "#FFB300",
+  green:  "#00D060",
+  cyan:   "#00CFFF",
+  white:  "#E6E8EC",
+  dim:    "#6A7488",
+  border: "#1C2130",
 } as const;
 
 function levelColor(level: ECAMLevel): string {
@@ -21,17 +20,18 @@ function levelColor(level: ECAMLevel): string {
     case "warning":  return C.red;
     case "caution":  return C.amber;
     case "advisory": return C.cyan;
+    case "remark":   return C.white;
     case "memo":     return C.green;
   }
 }
 
-function statusColor(severity: StatusItem["severity"]): string {
-  switch (severity) {
-    case "caution":  return C.amber;
-    case "advisory": return C.cyan;
-    case "memo":     return C.green;
-  }
+// Messages that belong to the RIGHT column (secondary failures panel)
+function isRightCol(line: string) {
+  return line === "LAND ASAP" || line === "SECONDARY FAILURES" || line.startsWith("* ");
 }
+
+// FCOM AGENT 1 arming window — keep in sync with fire-panel.tsx
+const AGENT1_ARM_MS = 10_000;
 
 export function EwdDisplay({
   state,
@@ -40,230 +40,208 @@ export function EwdDisplay({
   state: ScenarioState;
   scenario: Scenario;
 }) {
-  // ecamMsgId → step: for tracking which action lines are complete
+  // Live wall-clock tick — drives the AGENT 1 10-s countdown text in the
+  // ECAM line ("AGENT 1 AFTER 7 S ... DISCH").  Only runs while the FIRE
+  // pb is pushed and AGENT 1 isn't yet done.  We capture Date.now() at
+  // the moment FIRE pb completes (because the engine's state.tMs is
+  // session-relative — performance.now() based — and doesn't tick with
+  // wall clock between events).
+  const firePbAt   = state.completedSteps["eng1_fire_pb"];
+  const agent1Done = !!state.completedSteps["agent1"];
+  const ticking    = !!firePbAt && !agent1Done;
+  const [, setTick] = useState(0);
+  const [firePbWallMs, setFirePbWallMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (firePbAt && firePbWallMs === null) {
+      setFirePbWallMs(Date.now());
+    }
+  }, [firePbAt, firePbWallMs]);
+  useEffect(() => {
+    if (!ticking) return;
+    const i = setInterval(() => setTick(t => t + 1), 500);
+    return () => clearInterval(i);
+  }, [ticking]);
+
+  // FCOM ECAM: LAND ASAP downgrades from red (warning) to amber (caution)
+  // once the fire is extinguished — the directive becomes "land at the
+  // nearest suitable airport" rather than "land immediately".
+  const fireExtinguished = !!state.triggersFired["fire_extinguished"];
+
   const ecamToStep = new Map(
     scenario.steps
       .filter((s) => !!s.ecamRef)
       .map((s) => [s.ecamRef as string, s]),
   );
 
-  // STATUS page appears once every required (non-optional) step is done
-  const requiredDone = scenario.steps
-    .filter((s) => !s.optional)
-    .every((s) => !!state.completedSteps[s.id]);
-
   const messages = state.ecamMessages;
+  const leftMsgs  = messages.filter((m) => !isRightCol(m.line));
+  const rightMsgs = messages.filter((m) =>  isRightCol(m.line));
+
+  function renderMsg(m: (typeof messages)[number]) {
+    const linkedStep  = ecamToStep.get(m.id);
+    const isCompleted = linkedStep ? !!state.completedSteps[linkedStep.id] : false;
+
+    // Effective level for this row (after FCOM overrides like LAND ASAP
+    // downgrading once the fire is out).
+    let effectiveLevel: ECAMLevel = m.level;
+    if (m.id === "land_asap" && fireExtinguished) effectiveLevel = "caution";
+
+    const color = isCompleted ? C.green : levelColor(effectiveLevel);
+
+    // AGENT 1 dynamic countdown — only while the 10-s window is open and
+    // the step isn't yet done.  Renders "AGENT 1 AFTER N S....DISCH"
+    // counting from 10 → 0, then "AGENT 1 NOW...........DISCH".
+    let displayLine = m.line;
+    if (m.id === "ecam_agent1" && firePbWallMs && !agent1Done) {
+      const elapsed = Date.now() - firePbWallMs;
+      const remaining = Math.max(0, Math.ceil((AGENT1_ARM_MS - elapsed) / 1000));
+      displayLine = remaining > 0
+        ? `AGENT 1 AFTER ${remaining} S....DISCH`
+        : `AGENT 1 NOW...........DISCH`;
+    }
+
+    // Large title: ENG 1 FAIL, LAND ASAP (directives / procedure headers)
+    if (!linkedStep && (m.level === "warning" || m.line === "LAND ASAP" || m.line === "ENG 1 FAIL")) {
+      return <TitleRow key={m.id} color={color}>{displayLine}</TitleRow>;
+    }
+    // SECONDARY FAILURES section header — white label, no bullet
+    if (m.line === "SECONDARY FAILURES") {
+      return <SectionHeaderRow key={m.id}>{m.line}</SectionHeaderRow>;
+    }
+    // Asterisk item: * HYD, * ELEC, * AIR BLEED
+    if (m.line.startsWith("* ")) {
+      return <AsteriskRow key={m.id} color={color}>{m.line.slice(2)}</AsteriskRow>;
+    }
+    // Action line with checkbox □/✓
+    if (linkedStep) {
+      return (
+        <ActionRow key={m.id} color={color} completed={isCompleted}>
+          {displayLine}
+        </ActionRow>
+      );
+    }
+    // Advisory / system callout
+    return <SystemRow key={m.id} color={color}>{displayLine}</SystemRow>;
+  }
 
   return (
     <div
       className="border border-[var(--color-border)] font-mono select-none flex flex-col"
-      style={{ backgroundColor: "#000000" }}
+      style={{ backgroundColor: "#000000", flex: "1 1 0", minHeight: 0 }}
     >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* Header — only the ECAM label is shown when nothing is wrong.
+          Once a message exists OR master warning is active, the message
+          count badge and ENG 1 N1 read-out reappear. */}
       <div
         className="flex items-center justify-between px-3 py-[5px] border-b"
         style={{ borderColor: C.border }}
       >
-        <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.25em", textTransform: "uppercase" }}>
-          E/WD
-        </span>
-
-        {state.masterWarnActive ? (
-          <span
-            className="animate-pulse font-bold"
-            style={{ color: C.red, fontSize: "9px", letterSpacing: "0.2em" }}
-          >
-            ▲ MASTER WARN
-          </span>
-        ) : (
-          <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.15em" }}>
-            {messages.length === 0 ? "NORM" : `${messages.length} MSG`}
+        <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.25em" }}>ECAM</span>
+        {messages.length > 0 && (
+          <span style={{ color: state.masterWarnActive ? C.red : C.dim, fontSize: "9px", letterSpacing: "0.15em" }}>
+            {messages.length} MSG
           </span>
         )}
-
-        {/* ENG 1 N1 readout — goes to dashes during fire */}
-        <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.1em" }}>
-          ENG 1 N1{" "}
-          <span style={{ color: state.masterWarnActive ? C.red : C.green }}>
-            {state.masterWarnActive ? "- - -" : "84.2"}
-          </span>
-          {" "}%
-        </span>
-      </div>
-
-      {/* ── ECAM warnings + procedure ───────────────────────────────────────── */}
-      <div className="px-4 py-3 flex flex-col gap-[3px]" style={{ minHeight: "200px" }}>
-        {messages.length === 0 ? (
-          <div className="mt-4 flex flex-col gap-1">
-            <MemoRow color={C.green} size="sm">— NORMAL —</MemoRow>
-            <MemoRow color={C.dim}   size="xs">ALL WARNINGS CLEAR</MemoRow>
-          </div>
-        ) : (
-          messages.map((m) => {
-            const linkedStep  = ecamToStep.get(m.id);
-            const isCompleted = linkedStep ? !!state.completedSteps[linkedStep.id] : false;
-
-            // Title = warning-level with no step link (ENG 1 FIRE, LAND ASAP)
-            const isTitle      = m.level === "warning" && !linkedStep;
-            // Action line = has a step link → shows □/✓ and turns green when done
-            const isActionLine = !!linkedStep;
-            // System caution = non-title, no step link (secondary failures HYD/AIR/ELEC)
-
-            const color = isCompleted ? C.green : levelColor(m.level);
-
-            if (isTitle) {
-              return <TitleRow key={m.id} color={color}>{m.line}</TitleRow>;
-            }
-
-            if (isActionLine) {
-              return (
-                <ActionRow key={m.id} color={color} completed={isCompleted}>
-                  {m.line}
-                </ActionRow>
-              );
-            }
-
-            // System caution / secondary failure — no checkbox, slight indent
-            return (
-              <SystemRow key={m.id} color={color}>{m.line}</SystemRow>
-            );
-          })
-        )}
-      </div>
-
-      {/* ── STATUS page ─────────────────────────────────────────────────────── */}
-      {/* Appears after all required ECAM actions are complete (mirrors A320 STS page). */}
-      {requiredDone && scenario.statusItems && scenario.statusItems.length > 0 && (
-        <>
-          <div
-            className="mx-4 border-t flex items-center gap-3 py-[5px]"
-            style={{ borderColor: C.border }}
-          >
-            <span
-              style={{ color: C.white, fontSize: "10px", letterSpacing: "0.2em", fontWeight: 600 }}
-            >
-              STATUS
+        {(messages.length > 0 || state.masterWarnActive) && (
+          <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.1em" }}>
+            ENG 1 N1{" "}
+            <span style={{ color: state.masterWarnActive ? C.red : C.green }}>
+              {state.masterWarnActive ? "- - -" : "84.2"}
             </span>
-            <div className="flex-1" style={{ borderTop: `1px solid ${C.border}` }} />
-          </div>
+            {" "}%
+          </span>
+        )}
+      </div>
 
-          <div className="px-4 pb-3 flex flex-col gap-[3px]">
-            {scenario.statusItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-baseline"
-                style={{
-                  color: statusColor(item.severity),
-                  fontSize: "11px",
-                  letterSpacing: "0.06em",
-                  lineHeight: "1.55",
-                  fontWeight: 500,
-                }}
-              >
-                {item.line}
-              </div>
-            ))}
+      {/* Two-column body */}
+      <div className="flex" style={{ flex: "1 1 0", minHeight: "200px", overflow: "hidden" }}>
+
+        {/* LEFT — primary procedure */}
+        <div
+          className="flex flex-col gap-[3px]"
+          style={{ flex: "1 1 0", padding: "10px 8px 10px 14px", overflowY: "auto" }}
+        >
+          {/* When there are no ECAM messages, leave the column blank —
+              per user spec, only the "ECAM" header label should remain. */}
+          {leftMsgs.length > 0 && leftMsgs.map(renderMsg)}
+        </div>
+
+        {/* RIGHT — secondary failures (visible only after MASTER OFF) */}
+        {rightMsgs.length > 0 && (
+          <div
+            className="flex flex-col gap-[3px]"
+            style={{
+              width: "120px",
+              flexShrink: 0,
+              borderLeft: `1px solid ${C.border}`,
+              padding: "10px 10px 10px 10px",
+              overflowY: "auto",
+            }}
+          >
+            {rightMsgs.map(renderMsg)}
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── Row sub-components ───────────────────────────────────────────────────────
+// ─── Row components ───────────────────────────────────────────────────────────
 
-/** Large warning title — "ENG 1 FIRE", "LAND ASAP" */
 function TitleRow({ color, children }: { color: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        color,
-        fontSize: "14px",
-        fontWeight: 700,
-        letterSpacing: "0.1em",
-        lineHeight: "1.4",
-        marginBottom: "2px",
-        textTransform: "uppercase",
-      }}
-    >
+    <div style={{ color, fontSize: "13px", fontWeight: 700, letterSpacing: "0.08em", lineHeight: "1.4", marginBottom: "2px" }}>
       {children}
     </div>
   );
 }
 
-/**
- * Procedure action line — amber when pending, green when complete.
- * NO strikethrough: the real A320 ECAM does not cross through completed items;
- * it simply changes color to green.
- */
-function ActionRow({
-  color,
-  completed,
-  children,
-}: {
-  color: string;
-  completed: boolean;
-  children: React.ReactNode;
-}) {
+function SectionHeaderRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: "6px" }}>
+      <div style={{ color: C.white, fontSize: "9px", letterSpacing: "0.2em", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: "3px" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function AsteriskRow({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline" style={{ gap: "5px" }}>
+      <span style={{ color, fontSize: "12px", fontWeight: 700, lineHeight: 1, flexShrink: 0 }}>*</span>
+      <span style={{ color, fontSize: "11px", letterSpacing: "0.06em", lineHeight: "1.6", fontWeight: 600 }}>
+        {children}
+      </span>
+    </div>
+  );
+}
+
+function ActionRow({ color, completed, children }: { color: string; completed: boolean; children: React.ReactNode }) {
   return (
     <div
       className="flex items-baseline gap-[5px]"
-      style={{
-        color,
-        opacity: completed ? 0.6 : 1,
-        fontSize: "11px",
-        fontWeight: 500,
-        letterSpacing: "0.06em",
-        lineHeight: "1.55",
-        transition: "color 0.35s ease, opacity 0.35s ease",
-      }}
+      style={{ color, opacity: completed ? 0.6 : 1, fontSize: "11px", fontWeight: 500, letterSpacing: "0.06em", lineHeight: "1.55", transition: "color 0.35s ease, opacity 0.35s ease" }}
     >
       <span style={{ fontSize: "10px", lineHeight: 1, flexShrink: 0, minWidth: "12px" }}>
         {completed ? "✓" : "□"}
       </span>
-      {/* No textDecoration — green color alone signals completion, per Airbus ECAM convention */}
       <span>{children}</span>
     </div>
   );
 }
 
-/** Secondary system fault line (no step link) — shown without checkbox */
 function SystemRow({ color, children }: { color: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        color,
-        fontSize: "11px",
-        fontWeight: 500,
-        letterSpacing: "0.06em",
-        lineHeight: "1.55",
-        paddingLeft: "17px", // align with ActionRow text after the checkbox
-      }}
-    >
+    <div style={{ color, fontSize: "11px", fontWeight: 500, letterSpacing: "0.06em", lineHeight: "1.55", paddingLeft: "17px" }}>
       {children}
     </div>
   );
 }
 
-/** Generic memo row (normal state) */
-function MemoRow({
-  color,
-  size,
-  children,
-}: {
-  color: string;
-  size: "sm" | "xs";
-  children: React.ReactNode;
-}) {
+function MemoRow({ color, size, children }: { color: string; size: "sm" | "xs"; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        color,
-        fontSize: size === "sm" ? "12px" : "10px",
-        letterSpacing: "0.08em",
-        lineHeight: "1.4",
-      }}
-    >
+    <div style={{ color, fontSize: size === "sm" ? "12px" : "10px", letterSpacing: "0.08em", lineHeight: "1.4" }}>
       {children}
     </div>
   );

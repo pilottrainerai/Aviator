@@ -33,13 +33,20 @@ export const eng1FireAfterV1: Scenario = {
         {
           type: "ADD_ECAM",
           messages: [
-            { id: "eng1_fire",    line: "ENG 1 FIRE",                         level: "warning" },
-            { id: "land_asap",   line: "LAND ASAP",                           level: "warning" },
-            { id: "ecam_thr",    line: "THR LEVER (ENG 1)......IDLE",         level: "caution" },
-            { id: "ecam_master", line: "ENG 1 MASTER...........OFF",          level: "caution" },
-            { id: "ecam_fire_pb",line: "ENG 1 FIRE P/B.........PUSH",         level: "caution" },
-            { id: "ecam_agent1", line: "AGENT 1 AFTER 10 S....DISCH",         level: "caution" },
-            // ATC NOTIFY removed from ECAM messages — handled via ATC distraction mechanic
+            // FCOM PRO-ABN-ENG-70-10 ENG 1 FIRE IN FLIGHT — full ECAM checklist.
+            // FCOM DSC-31-60 colour spec:
+            //   • Title / LAND ASAP   = warning (red)
+            //   • All required ACTION items = advisory (cyan/blue)
+            //   • Conditional / remark headers = remark (white)
+            { id: "eng1_fire",       line: "ENG 1 FIRE",                            level: "warning"  },
+            { id: "ecam_thr",        line: "THR LEVER (ENG 1)......IDLE",           level: "advisory" },
+            { id: "ecam_master",     line: "ENG 1 MASTER...........OFF",            level: "advisory" },
+            { id: "ecam_fire_pb",    line: "ENG 1 FIRE P/B.........PUSH",           level: "advisory" },
+            { id: "ecam_agent1",     line: "AGENT 1 AFTER 10 S....DISCH",           level: "advisory" },
+            { id: "ecam_atc",        line: "ATC..................NOTIFY",           level: "advisory" },
+            { id: "ecam_if_persist", line: "·IF FIRE WARN AFTER 30 S:",             level: "remark"   },
+            { id: "ecam_agent2",     line: "  AGENT 2.............DISCH",           level: "advisory" },
+            { id: "land_asap",       line: "LAND ASAP",                             level: "warning"  },
           ],
         },
       ],
@@ -107,18 +114,19 @@ export const eng1FireAfterV1: Scenario = {
       requires: ["positive_rate_gear_up"],
     },
 
-    // ── G1 ── MASTER WARN cancel — after AP is engaged (aviate sequence complete)
-    // FCTM OP-020: PF aviate first (rotation → gear up → AP1 engaged → read FMA),
-    // THEN PM cancels CRC. AP engagement confirms aircraft is stable before any distraction.
+    // ── G1 ── MASTER WARN cancel — available any time after the CRC fires
+    // FCOM: the MASTER WARN pushlight can be pressed at any time to silence the CRC.
+    // No prerequisite — the glareshield light is always pressable once it illuminates.
     {
       id: "cancel_master_warn",
       label: "MASTER WARN",
       action: "CANCEL",
-      hint: "PM pushes MASTER WARN glareshield light — silences CRC, resets red light. ECAM procedure remains displayed.",
+      hint: "PM cancels MASTER WARN FIRST — pushes glareshield light to silence CRC and reset the red light. ECAM procedure stays displayed. Aviate continues; no ECAM actions until 400 ft and flight path stabilised.",
       variant: "warning",
       crew: "PM",
       group: "glareshield",
-      requires: ["engage_ap_fma"],
+      hardware: true,
+      requires: [],
       afterEffect: {
         delayMs: 400,
         triggerId: "mw_cancelled",
@@ -128,16 +136,19 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
 
-    // ── 400 FT GATE ── PM announces "ECAM ACTIONS" (flightcheck popup)
-    // Only unlocks after aviate complete + MW cancelled.
+    // ── 400 FT GATE ── AVIATE complete → NAVIGATE SID/EO → "ECAM ACTIONS"
+    // FCTM Golden Rules: 400 ft AGL gates the start of ECAM.  Aviate + flight
+    // path stabilised must come first; Master Warning cancelled.  PM then
+    // announces "AVIATE COMPLETE, NAVIGATE SID/EO PROCEDURE" and PF orders
+    // "ECAM ACTIONS".
     {
       id: "four_hundred_ft_cmd",
-      label: "400 FT — ECAM ACTIONS",
+      label: "400 FT — AVIATE COMPLETE, ECAM ACTIONS",
       action: "ANNOUNCE",
-      hint: "PM: 'ECAM ACTIONS' — PF acknowledges. Aviate complete and MW cancelled first.",
+      hint: "At 400 ft AGL with flight path stabilised, PM announces 'AVIATE COMPLETE, NAVIGATE SID OR EO PROCEDURE'. PF orders 'ECAM ACTIONS'. Master Warning must be cancelled first.",
       variant: "advisory",
       group: "flightcheck",
-      requires: ["cancel_master_warn", "engage_ap_fma"],
+      requires: ["engage_ap_fma", "cancel_master_warn"],
       crew: "PM",
     },
 
@@ -152,6 +163,7 @@ export const eng1FireAfterV1: Scenario = {
       hint: "PM retards ENG 1 thrust lever to IDLE. Reduces thrust before fuel isolation.",
       variant: "switch",
       crew: "PM",
+      hardware: true,
       ecamRef: "ecam_thr",
       requires: ["four_hundred_ft_cmd"],
     },
@@ -166,6 +178,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "switch",
       requires: ["thr_lever_idle"],
       crew: "PM",
+      hardware: true,
       ecamRef: "ecam_master",
       confirmRequired: true,
     },
@@ -181,32 +194,32 @@ export const eng1FireAfterV1: Scenario = {
       variant: "warning",
       requires: ["eng1_master_off"],
       crew: "PM",
+      hardware: true,
       ecamRef: "ecam_fire_pb",
       confirmRequired: true,
       afterEffect: {
         // 2 s delay: secondary systems respond to FIRE PB isolation
+        // FCOM DSC-31-15: secondary failures appear on E/WD right column with * prefix.
+        // Removed the SECONDARY FAILURES header and itemised lines from ECAM at user
+        // request; the consequences are still surfaced via tab alerts and STATUS page.
         delayMs: 2_000,
         triggerId: "secondary_failures",
         effects: [
           {
             type: "ADD_ECAM",
             messages: [
-              // FCOM DSC-29: Green HYD engine pump lost (fire SOV closed)
-              { id: "hyd_g_pump",      line: "HYD G ENG1 PUMP......LO PR",  level: "caution"  },
-              // FCOM DSC-21: Pack 1 bleed air lost → single pack operation
-              { id: "air_single_pack", line: "AIR SINGLE PACK OPER",         level: "advisory" },
-              // FCOM DSC-24: IDG 1 deactivated → GEN 1 offline
-              { id: "elec_gen1",       line: "ELEC GEN 1............OFF",    level: "caution"  },
+              { id: "sec_hyd",       line: "* HYD",               level: "caution"  },
+              { id: "sec_elec",      line: "* ELEC",              level: "caution"  },
+              { id: "sec_air_bleed", line: "* AIR BLEED",         level: "caution"  },
             ],
           },
-          // Secondary cautions re-illuminate MASTER CAUTION (amber)
           { type: "SET_MASTER_CAUT", active: true },
         ],
       },
     },
 
-    // ── G2 ── MASTER CAUTION cancel — after secondary failures appear (glareshield)
-    // FCOM: PM pushes MASTER CAUTION light → silences SC chime, resets amber light.
+    // ── G2 ── MASTER CAUTION cancel — available any time after the SC chime fires
+    // FCOM: the MASTER CAUTION pushlight can be pressed at any time to silence the SC chime.
     {
       id: "cancel_master_caut",
       label: "MASTER CAUT",
@@ -215,7 +228,8 @@ export const eng1FireAfterV1: Scenario = {
       variant: "caution",
       crew: "PM",
       group: "glareshield",
-      requires: ["eng1_fire_pb"],
+      hardware: true,
+      requires: [],
       afterEffect: {
         delayMs: 300,
         triggerId: "mc_cancelled",
@@ -235,11 +249,17 @@ export const eng1FireAfterV1: Scenario = {
       variant: "caution",
       requires: ["eng1_fire_pb"],
       crew: "PM",
+      hardware: true,
       ecamRef: "ecam_agent1",
       afterEffect: {
-        // 25 s: nominal fire extinction (within the 30 s Agent 2 decision window)
-        delayMs: 25_000,
-        triggerId: "fire_extinguished",
+        // 30 s after Agent 1 — FCOM "AGENT 2 IF FIRE WARN AFTER 30 S" window
+        // elapses.  Silence the warning + clear the primary procedure lines
+        // so only the AGENT 2 conditional remains.  The fire visual
+        // indicators (FIRE pb red, FIRE light on master, ENG ✕) STAY LIT
+        // until AGENT 2 is also discharged (training-driven choice — FCOM
+        // behaviour would extinguish here in the typical case).
+        delayMs: 30_000,
+        triggerId: "fire_persists_30s",
         effects: [
           { type: "SET_MASTER_WARN", active: false },
           { type: "SET_ALARM_LABEL", label: null },
@@ -247,59 +267,225 @@ export const eng1FireAfterV1: Scenario = {
             type: "CLEAR_ECAM",
             // Clear fire warning + primary procedure lines.
             // Secondary failures (hyd_g_pump, air_single_pack, elec_gen1) persist on STATUS page.
-            ids: ["eng1_fire", "land_asap", "ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft", "ecam_maa"],
+            // Clears the AGENT-1-and-before slice of the ECAM.  Per FCOM
+            // the ATC NOTIFY item, the "IF FIRE WARN AFTER 30 S" conditional
+            // and AGENT 2 stay visible until their own actions complete.
+            // LAND ASAP also remains until the fire is fully extinguished.
+            ids: ["eng1_fire", "ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft", "ecam_maa"],
           },
         ],
       },
     },
 
-    // ── 5 ── FCOM: "IF FIRE AFTER 30 S → AGENT 2 → DISCH" (conditional, optional)
+    // ── 5 ── Both-agent rule: fire only extinguishes after AGENT 2 is also
+    // discharged (training simplification — forces the crew to complete the
+    // full bottle sequence). Per strict FCOM, Agent 2 is optional and only
+    // used if fire persists 30 s after Agent 1.
     {
       id: "agent2",
       label: "AGENT 2",
       action: "DISCH",
-      hint: "PM: only if FIRE light still on 30 s after Agent 1. Last bottle — no restart possible after.",
+      hint: "PM: wait 30 s after AGENT 1 — IF FIRE WARN persists, discharge AGENT 2.  Last bottle, no restart possible after.",
       variant: "caution",
       requires: ["agent1"],
       crew: "PM",
-      optional: true,
+      hardware: true,
+      ecamRef: "ecam_agent2",
+      afterEffect: {
+        // 5 s: bottle discharges, fire dies out, FIRE pb red light goes off,
+        // FIRE light on master panel goes off, ENG ✕ marker clears.
+        // Per FCOM, the AGENT 2 + "IF FIRE WARN AFTER 30 S" + LAND ASAP
+        // ECAM lines clear once the fire is extinguished.
+        delayMs: 5_000,
+        triggerId: "fire_extinguished",
+        effects: [
+          {
+            type: "CLEAR_ECAM",
+            ids: ["ecam_agent2", "ecam_if_persist", "land_asap"],
+          },
+        ],
+      },
     },
 
-    // ── 6 ── FCTM: Level off at Minimum Acceleration Altitude (~1500 ft)
+    // ── 5b ── ENGINE SECURED — PM announce per FCTM
+    // FCTM line 12852: "An engine is considered as secured when the ECAM
+    // actions of the procedures are performed until […] Fire extinguished or
+    // 'AGENT 2 DISCH' for an engine fire."  The fire_extinguished trigger
+    // fires 5 s after AGENT 2 (fire pb red light + ENG MASTER FIRE light
+    // both go off); PM then announces "ENGINE SECURED" and the crew may
+    // proceed with the acceleration sequence (level off MAA → S speed →
+    // clean).  Per FCTM line 12848 the flight crew must DELAY the
+    // acceleration until the engine is secured.
+    {
+      id: "engine_secured",
+      label: "ENGINE SECURED",
+      action: "ANNOUNCE",
+      hint: "After AGENT 2 discharge and fire extinguishes (FIRE pb red light + ENG MASTER FIRE light go off), PM announces 'ENGINE SECURED'. PF acknowledges.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["agent2"],
+    },
+
+    // ── 5c ── LAND ASAP announce (red on ECAM)
+    // Before reading secondary failures, PF acknowledges the LAND ASAP
+    // indication shown in red on ECAM — confirms commitment to land at the
+    // nearest suitable airport.
+    {
+      id: "announce_land_asap",
+      label: "LAND ASAP",
+      action: "ANNOUNCE",
+      hint: "PF announces 'LAND ASAP' (red on ECAM). Crew commits to land at the nearest suitable airport with full emergency services.",
+      variant: "warning",
+      crew: "PF",
+      group: "chclm",
+      requires: ["engine_secured"],
+    },
+
+    // ── 5d ── MAYDAY call to ATC — brief FCTM/SOP format
+    // MAYDAY identification + state + STANDBY.  No intentions or runway
+    // requests yet — that comes later once workload eases (see CR6
+    // approach_brief).  ATC will acknowledge with vectors/altitude and
+    // standby for the crew to come back when ready.
+    {
+      id: "mayday_atc",
+      label: "MAYDAY",
+      action: "DECLARE",
+      hint: "Call ATC: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' Brief — declare, state, standby. No intentions yet.",
+      variant: "warning",
+      crew: "PM",
+      group: "comms",
+      requires: ["announce_land_asap"],
+      // Maps to the FCOM ECAM 'ATC ............ NOTIFY' line — completing
+      // the MAYDAY call satisfies the ECAM notify item.
+      ecamRef: "ecam_atc",
+      afterEffect: {
+        // Once ATC is notified the FCOM NOTIFY item is satisfied — clear
+        // the ECAM line so the crew sees forward progress.
+        delayMs: 1_500,
+        triggerId: "atc_notified",
+        effects: [
+          { type: "CLEAR_ECAM", ids: ["ecam_atc"] },
+        ],
+      },
+      notes: [
+        "MAYDAY × 3",
+        "Callsign",
+        "Nature: engine fire engine 1",
+        "Position / heading / altitude",
+        "STANDBY — defer intentions and POB/fuel until workload eases",
+        "ATC will respond with vectors / altitude and standby for further call",
+      ],
+    },
+
+    // ── 6 ── FCTM AOP-30-30: at minimum acceleration altitude (MAA), PF
+    // PUSHES the V/S knob to set V/S 0 — levels off the aircraft so the crew
+    // can accelerate and clean up the configuration while still single-engine.
+    // SRS automatically reverts to CLB / OP CLB when the new altitude is
+    // captured, but the level-off command is V/S 0 (not OP CLB).  Acceleration
+    // is delayed until the engine is secured (FCTM 12848) — hence requires
+    // engine_secured.
     {
       id: "level_off_maa",
-      label: "LVL OFF MAA",
+      label: "V/S 0 AT MAA",
       action: "SELECT",
-      hint: "PF: at MIN ACCEL ALT select OP CLB or LVL CHG. Hold speed, monitor SRS→CLB transition on FMA.",
+      hint: "PF: at minimum acceleration altitude PUSH V/S knob → V/S 0. Aircraft levels off, A/THR maintains target speed; SRS reverts as the level-off captures. Begin accel + flap retraction.",
       variant: "switch",
-      requires: ["agent1"],
+      requires: ["engine_secured"],
       crew: "PF",
     },
 
     // ── 7 ── FCTM: Accelerate through S speed, retract flaps to CLEAN
+    // Task-sharing (callouts.txt §SECTION SRS→CLB and §LOSS OF THRUST):
+    //   F speed (if T/O at FLAPS 2/3): PF calls "FLAPS 1" → PM checks AS, calls
+    //                                  "FLAPS 1" back, selects flap lever to 1.
+    //   S speed:                       PF calls "FLAPS UP" → PM checks AS, calls
+    //                                  "FLAPS UP" back, selects flap lever to 0.
+    //                                  Single-engine: NO After Takeoff CL yet —
+    //                                  runs after ECAM complete.
+    //   Green dot:                     PF calls "MCT" → PM verifies thrust at MCT.
     {
       id: "accel_clean",
       label: "ACCEL / CLEAN",
       action: "CONFIRM",
-      hint: "PF: at S speed retract FLAPS 1, then at green dot retract FLAPS 0. Verify CONFIG CLEAN on ECAM.",
+      hint: "PF calls 'FLAPS 1' at F speed → PM checks AS, calls 'FLAPS 1' back, selects flap lever 1. PF calls 'FLAPS UP' at S speed → PM checks AS, calls 'FLAPS UP' back, selects flap lever 0. Verify CONFIG CLEAN on ECAM.",
       variant: "switch",
       requires: ["level_off_maa"],
       crew: "PF",
     },
 
-    // ── CHCLM CROSSCHECK ──────────────────────────────────────────────────────
-    // After ECAM actions complete: PM cross-checks with PF before proceeding.
-    // This step GATES all subsequent CRM/comms actions — pilots cannot advance
-    // until the ECAM crosscheck is verbally confirmed.
+    // ── POST-ECAM SEQUENCE — FCTM AOP-30-30 (lines 2759-2810) ────────────────
+    // The strict order per FCTM is:
+    //   1. (Primary ECAM lines cleared)
+    //   2. Secondary failures announced (HYD / ELEC / AIR BLEED)
+    //   3. PM announces "STATUS" when STATUS page appears
+    //   4. PF orders "STOP ECAM" — ECAM actions stopped
+    //   5. After Takeoff CL, OEB, system reset (as applicable)
+    //   6. STATUS — READ by PF (includes INOP SYS in red)
+    //   7. PM: "REMOVE STATUS?" — PF: "CONFIRM" — PM: STS pb PRESS
+    //   8. PM announces "ECAM ACTIONS COMPLETE"
+    //
+    // We model this as a chain of steps gated on the previous one so the
+    // crew goes through them in order.
+
+    // ── 1 ── Announce secondary failures (PM reads from SD, ECAM-line format)
     {
-      id: "crew_crosscheck",
-      label: "ECAM CROSSCHECK",
-      action: "CONFIRM",
-      hint: "PM→PF: 'ECAM ACTIONS COMPLETE. AGENT 1 DISCHARGED. FIRE LIGHT [STATUS].' PF: 'CHECKED, MONITOR.'",
+      id: "announce_sec_failures",
+      label: "ECAM — SECONDARY FAILURES",
+      action: "READ",
+      hint: "PM reads secondary system failures from SD after engine secured. PF cross-checks and acknowledges each item.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["agent1"],
+      requires: ["mayday_atc"],
+      notes: [
+        "HYD G ENG1 PUMP...LO PR  — Green sys ENG1 pump SOV closed by FIRE pb. PTU may transfer YELLOW → GREEN.",
+        "GEN 1 FAULT.........OFF  — IDG1 deactivated by FIRE pb. BTC auto-closes, AC BUS 1 fed by GEN 2.",
+        "ENG 1 BLEED......FAULT   — ENG 1 bleed SOV closed by FIRE pb. XBLEED AUTO opens, PACK 1 monitor.",
+      ],
+    },
+
+    // ── 2 ── Announce STATUS page
+    {
+      id: "announce_status",
+      label: "STATUS — ANNOUNCE",
+      action: "ANNOUNCE",
+      hint: "When STATUS page appears: PM announces 'STATUS' to indicate the ECAM has reached the STATUS phase.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["announce_sec_failures"],
+    },
+
+    // ── 3 ── STOP ECAM — PF orders, PM stops
+    {
+      id: "stop_ecam",
+      label: "STOP ECAM",
+      action: "ORDER",
+      hint: "PF: 'STOP ECAM' — PM stops ECAM actions. PF asks for After Takeoff Checklist, any computer resets, and any OEB review before reading STATUS.",
+      variant: "advisory",
+      crew: "PF",
+      group: "chclm",
+      requires: ["announce_status"],
+    },
+
+    // ── 4 ── After Takeoff Checklist (normal CL)
+    {
+      id: "after_takeoff_cl",
+      label: "AFTER TAKEOFF CL",
+      action: "COMPLETE",
+      hint: "PF: 'Any NORMAL CHECKLIST?' — PM runs After Takeoff checklist. Note items already complete or N/A due to failure.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["stop_ecam"],
+      notes: [
+        "PACKS ............. CHECK (single pack ops — PACK 2 AUTO)",
+        "SEAT BELTS ........ ON",
+        "LANDING GEAR ...... UP / 3 OFF",
+        "ENGINE MODE SEL ... IGN (already set per ECAM)",
+        "FLAPS ............. 0 (clean / as required)",
+      ],
     },
 
     // ── CRM CHECKLIST ────────────────────────────────────────────────────────────
@@ -307,21 +493,70 @@ export const eng1FireAfterV1: Scenario = {
     // ATC MAYDAY is declared via the ATC distraction calls (not a separate step here).
     // Sequence: Golden Rules → WX + LDG perf → NIS → PAX → OPS → Approach brief → Prep
 
-    // ── CR0 ── Golden Rules — available from the start (no requires)
+    // ── 5 ── OEB / Computer Resets check
     {
-      id: "golden_rules",
-      label: "GOLDEN RULES",
-      action: "CONFIRM",
-      hint: "PF calls rules, PM responds CONFIRMED. Confirms crew is following Airbus priority sequence.",
+      id: "oeb_check",
+      label: "OEB / COMPUTER RESETS",
+      action: "CHECK",
+      hint: "PF: 'Any OEB? Any COMPUTER RESETS?' — PM checks for applicable OEB items and required computer resets per QRH reset table. Don't apply resets from memory. If none — 'NO APPLICABLE OEB OR RESET.'",
       variant: "advisory",
       crew: "PF",
-      group: "comms",
+      group: "chclm",
+      requires: ["after_takeoff_cl"],
+    },
+
+    // ── 6 ── READ STATUS — PF calls for STATUS to be read
+    {
+      id: "read_status",
+      label: "READ STATUS",
+      action: "CALL",
+      hint: "PF: 'READ STATUS' — PM reads the ECAM STATUS page aloud. PF cross-checks each item.",
+      variant: "advisory",
+      crew: "PF",
+      group: "chclm",
+      requires: ["oeb_check"],
       notes: [
-        "① FLY · NAVIGATE · COMMUNICATE — in this order, with appropriate tasksharing",
-        "② Use APPROPRIATE AUTOMATION — pilot judgment prevails, including manual flight",
-        "③ Understand your FMA — Monitor · Announce · Confirm · Understand",
-        "④ Take ACTION if unexpected — PF changes automation / PM: Question · Challenge · Take-over",
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE supplementary procedure (SE flight management — drift-down, perf, fuel).",
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING procedure (approach planning — Vapp, flap setting, autobrake, EO go-around).",
       ],
+    },
+
+    // ── 6b ── STATUS items / INOP SYS — PM reads aloud, PF cross-checks
+    {
+      id: "status_read_aloud",
+      label: "ECAM STATUS — PM READS",
+      action: "REVIEW",
+      hint: "PM reads STATUS page aloud, item by item. PF: 'CHECKED' after each item. APPR PROC, INOP SYS (red), and any conditional procedure are reviewed for workload.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["read_status"],
+      notes: [
+        "ENG 1 SHUT DOWN",
+        "AGENT 1 DISCH / AGENT 2 DISCH (both bottles used)",
+        "ENG 1 FIRE DET ... DEGRADED (single loop remaining)",
+        "HYD G ENG1 PUMP LO PR",
+        "GEN 1 INOP",
+        "ENG 1 BLEED FAULT",
+        "PACK 1 ........... MONITOR (single pack ops)",
+        "APPR CAT 1 (degraded approach capability)",
+        "MAX FL 250 (single-engine ceiling)",
+        "TCAS .............. TA only",
+      ],
+    },
+
+    // ── 7 ── ECAM ACTIONS COMPLETE — final announce by PM
+    // FCTM: after STATUS read, PM "REMOVE STATUS?" / PF "CONFIRM" / PM STS pb
+    // PRESS, then PM announces "ECAM ACTIONS COMPLETE."
+    {
+      id: "crew_crosscheck",
+      label: "ECAM ACTIONS COMPLETED",
+      action: "ANNOUNCE",
+      hint: "PM: 'ECAM ACTIONS COMPLETED.' PF acknowledges. All primary ECAM procedures complete, secondary failures reviewed, STATUS read.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["status_read_aloud"],
     },
 
     // ── CR1 ── WX / ATIS — requires CHCLM crosscheck complete
@@ -329,7 +564,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "wx_request",
       label: "WX / ATIS",
       action: "REQUEST",
-      hint: "PM requests ATIS or direct from Delhi Approach: wind dir/speed, QNH, temp, vis, RVR RWY 28. Note contamination risk.",
+      hint: "PM requests latest weather from Delhi Approach: wind dir/speed, QNH, temp, vis, RVR RWY 28.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
@@ -348,20 +583,55 @@ export const eng1FireAfterV1: Scenario = {
       requires: ["wx_request"],
     },
 
-    // ── CR3 ── NIS briefing — cabin crew via interphone (Nature · Intentions · Special instructions)
+    // ── CR2b ── FORDEC — structured decision after wx + performance confirmed
+    // Airbus Threat & Error Management: FORDEC is the standard crew decision framework.
     {
-      id: "nis_brief",
-      label: "NIS BRIEF",
-      action: "CONFIRM",
-      hint: "Interphone — NATURE: engine fire, single engine. INTENTIONS: landing VIDP RWY 28. SPECIAL: brace for emergency, crew at stations.",
+      id: "fordec",
+      label: "FORDEC",
+      action: "COMPLETE",
+      hint: "PF leads FORDEC discussion. PM cross-checks each element. Agree and commit to decision before proceeding.",
+      variant: "advisory",
+      crew: "PF",
+      group: "comms",
+      requires: ["ldg_perf"],
+      notes: [
+        "F — FACTS: ENG 1 fire secured. Single engine. VIDP 15 min. RWY 28 LDA 4430 m. Full CFR on field.",
+        "O — OPTIONS: ① Return VIDP RWY 28  ② Divert nearest alternate  ③ Continue (NOT viable)",
+        "R — RISKS & BENEFITS: VIDP = known field, full CFR, adequate LDA. Divert = longer flight, unfamiliar.",
+        "D — DECISION: LAND ASAP — return VIDP RWY 28 with full emergency declared.",
+        "E — EXECUTION: ILS RWY 28, Cat 1, SE approach Vapp+5 kt, full emergency, CFR standing by.",
+        "C — CHECK-BACK: PM confirms 'AGREED — LAND VIDP RWY 28, FULL EMERGENCY'",
+      ],
+    },
+
+    // ── CR2c ── FMGC Preparation — enter diversion/arrival in MCDU
+    {
+      id: "fmgc_prep",
+      label: "FMGC PREP",
+      action: "COMPLETE",
+      hint: "PM: enter VIDP in DEST, select RWY 28, insert ILS 110.30 / CRS 282. Set Vapp = Vref+5 kt (SE). Check F-PLN fuel + ALTN. PF confirms on MCDU.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["crew_crosscheck"],
+      requires: ["fordec"],
+    },
+
+    // ── CR3 ── NITS briefing — cabin crew via interphone (Nature · Intentions · Time · Special)
+    // FCOM: cabin crew briefed AFTER decision is made so intentions and time are confirmed.
+    {
+      id: "nis_brief",
+      label: "NITS BRIEF",
+      action: "CONFIRM",
+      hint: "Interphone to SCCM — NATURE: engine fire, ENG 1 shut down. INTENTIONS: landing VIDP RWY 28. TIME: approx 15 min. SPECIAL: precautionary or emergency landing per Captain's decision.",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      requires: ["fordec"],
       notes: [
-        "N — NATURE: 'Engine fire, ENG 1 shut down, returning to Delhi'",
-        "I — INTENTIONS: 'Landing runway 28 VIDP, approximately 15 minutes'",
-        "S — SPECIAL: 'Crew at stations. On brace command — BRACE BRACE BRACE'",
+        "N — NATURE: 'Engine fire, ENG 1 shut down, aircraft serviceable'",
+        "I — INTENTIONS: 'Returning and landing runway 28 Delhi VIDP'",
+        "T — TIME: 'Approximately 15 minutes to landing'",
+        "S — SPECIAL: 'Crew at stations. Precautionary or emergency landing per Captain's decision.'",
       ],
     },
 
@@ -390,91 +660,334 @@ export const eng1FireAfterV1: Scenario = {
       optional: true,
     },
 
-    // ── CR6 ── Approach briefing — PF briefs the approach
-    {
-      id: "approach_brief",
-      label: "APPROACH BRIEF",
-      action: "COMPLETE",
-      hint: "PF briefs: ILS RWY 28 VIDP, single-engine, CAT 1. DA 200 ft. Vapp +5 kt. Go-around: TOGA, positive rate, gear up, maintain V2+10.",
-      variant: "advisory",
-      crew: "PF",
-      group: "comms",
-      requires: ["ldg_perf"],
-    },
-
-    // ── CR7 ── Approach preparation — MCDU, radio, checklist
+    // ── CR5b ── Approach preparation — set up MCDU / radios / autobrake
+    // (FCOM SOP: prep BEFORE the briefing, so the briefing can reference
+    // the configured PERF / approach data.)
     {
       id: "approach_prep",
       label: "APPROACH PREP",
       action: "COMPLETE",
-      hint: "PM: set ILS freq + CRS, set BARO minima, QNH, set LDG configuration on MCDU. PF: confirm DEST, F-PLN, fuel.",
+      hint: "PM: set ILS RWY 28 freq 110.30 / CRS 282. BARO minima 200 ft / QNH set. Autobrake MED. Spoilers ARM. Landing lights ON. Confirm seat belts.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
+      requires: ["fmgc_prep"],
+    },
+
+    // ── CR5c ── Advise ATC of emergency services required
+    {
+      id: "atc_emergency_services",
+      label: "ATC — EMERG SVCS",
+      action: "ADVISE",
+      hint: "PM advises ATC: 'IFLY101, request Category 3 emergency services on runway 28. Require CFR vehicles, ambulances, and medical standby.'",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      requires: ["approach_prep"],
+    },
+
+    // ── CR6 ── Approach briefing — normal + non-normal, using STATUS page items.
+    // Go-around plan is briefed as PART of this step (see go_around_review below
+    // which is a continuation of the briefing flow).
+    {
+      id: "approach_brief",
+      label: "APPROACH BRIEF",
+      action: "COMPLETE",
+      hint: "PF briefs: ILS RWY 28 VIDP, single-engine CAT 1. DA 200 ft. Vapp +5 kt. Non-normal items from STATUS: APPR CAT 1, HYD GRN LO PR, GEN 1 INOP. Go-around briefed. Reference QRH ONE ENG INOPERATIVE LANDING procedure.",
+      variant: "advisory",
+      crew: "PF",
+      group: "comms",
+      requires: ["atc_emergency_services"],
+      notes: [
+        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING (Vapp, flap setting, autobrake, autoland eligibility, EO go-around).",
+      ],
+    },
+
+    // ── CR6b ── Go-around review — DURING the approach briefing.
+    // FCOM SOP: GA plan + fuel cross-check is briefed as part of approach
+    // brief, not as a separate pre-briefing item.
+    {
+      id: "go_around_review",
+      label: "GO-AROUND REVIEW",
+      action: "CONFIRM",
+      hint: "PF briefs go-around plan and confirms fuel state is adequate for alternate if approach is missed.",
+      variant: "advisory",
+      crew: "PF",
+      group: "comms",
       requires: ["approach_brief"],
+      notes: [
+        "GO-AROUND: TOGA (ENG 2 only) — SRS engages — positive rate GEAR UP — maintain V2+10",
+        "FMA: TOGA → SRS / NAV / AP1 — monitor and call FMA at each transition",
+        "FUEL CHECK: confirm total fuel vs [DEST + ALTN + FINAL RESERVE]. If marginal — LAND VIDP.",
+        "RUNWAY VACATION: vacate via first available exit (Golf / Foxtrot). Brake to stop if needed.",
+        "Emergency services attend runway — do NOT delay evacuation call if required.",
+      ],
+    },
+
+    // ── APPROACH CHECKLIST ──────────────────────────────────────────────────
+    {
+      id: "approach_cl",
+      label: "APPROACH CL",
+      action: "COMPLETE",
+      hint: "PM runs approach checklist. Call each item, PF cross-checks and responds. Complete before top of descent.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["go_around_review"],
+      notes: [
+        "BARO ................. QNH SET",
+        "MDA/DH ............... 200 ft SET",
+        "SEAT BELTS ........... ON",
+        "AUTOBRAKE ............ MED",
+        "SPOILERS ............. ARM (green)",
+        "LANDING LIGHTS ....... ON",
+        "APPROACH USING HIGHEST LEVEL OF AUTOMATION",
+      ],
+    },
+
+    // ── LANDING CHECKLIST ───────────────────────────────────────────────────
+    {
+      id: "landing_cl",
+      label: "LANDING CL",
+      action: "COMPLETE",
+      hint: "PM runs landing checklist at 1000 ft on final. PF confirms each item. Cross-check standard callouts throughout approach.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["approach_cl"],
+      notes: [
+        "GEAR ................. DOWN — 3 GREEN",
+        "FLAPS ................ FULL (or as required)",
+        "SPOILERS ............. ARM (green)",
+        "AUTOBRAKE ............ MED (SET)",
+        "CABIN ................ ADVISED",
+        "STANDARD CALLOUTS: 1000 ft / 500 ft / 100 ft / 50-40-30-20-10 RETARD",
+      ],
     },
   ],
 
   // ── Status page ─────────────────────────────────────────────────────────────
-  // Shown after all required ECAM actions are complete (FCOM STATUS page logic).
-  // Reflects systems degraded by ENG 1 shutdown + FIRE PB isolation.
+  // FCOM PRO-ABN-ENG p.39-42: ENG SHUT DOWN STATUS page after ENG FIRE PB pushed.
   statusItems: [
-    { id: "st_eng1",    line: "ENG 1....................INOP",      severity: "caution"  },
-    { id: "st_hyd",     line: "HYD GRN ENG1 PUMP.....LO PR",       severity: "caution"  },
-    { id: "st_air",     line: "AIR SINGLE PACK OPER",               severity: "advisory" },
-    { id: "st_elec",    line: "ELEC GEN 1...............INOP",      severity: "caution"  },
-    { id: "st_appr",    line: "APPR CAT.................CAT 1",     severity: "advisory" },
-    { id: "st_maxfl",   line: "MAX FL.....................FL250",    severity: "memo"     },
+    // ── Left column: limitations & directives ────────────────────────────────
+    { id: "st_eng1",       line: "ENG 1 SHUT DOWN",                severity: "caution"  },
+    { id: "st_avoid_ice",  line: "AVOID ICING CONDITIONS",          severity: "caution"  },
+    { id: "st_appr",       line: "APPR CAT . . . . CAT 1",         severity: "advisory" },
+    { id: "st_ldg_dist",   line: "LDG DIST PROC . . . . APPLY",    severity: "caution"  },
+    { id: "st_fuel_incr",  line: "FUEL CONSUMPT INCRSD",            severity: "advisory" },
+    { id: "st_fms",        line: "FMS PRED UNRELIABLE",              severity: "advisory" },
+    // ── Right column: INOP SYS ───────────────────────────────────────────────
+    { id: "st_inop_cat3",  line: "CAT 3 DUAL",     severity: "caution",  inopSys: true },
+    { id: "st_inop_bleed", line: "ENG 1 BLEED",    severity: "caution",  inopSys: true },
+    { id: "st_inop_pack",  line: "PACK 1",          severity: "caution",  inopSys: true },
+    { id: "st_inop_galley",line: "MAIN GALLEY",     severity: "caution",  inopSys: true },
+    { id: "st_inop_gen",   line: "GEN 1",           severity: "caution",  inopSys: true },
+    { id: "st_inop_pump",  line: "G ENG 1 PUMP",    severity: "caution",  inopSys: true },
+    { id: "st_inop_ice",   line: "WING A. ICE",     severity: "caution",  inopSys: true },
+    { id: "st_inop_steep", line: "STEEP APPR",      severity: "caution",  inopSys: true },
   ],
 
-  // ── Distractions — ATC only ─────────────────────────────────────────────────
-  // ATC calls arrive mid-procedure as genuine distractions.
-  // Pilot may respond "Stand By" — the call will resurface after standbyResurfaceMs.
-  // They must eventually declare MAYDAY and complete the full ATC sequence.
+  // ── Distractions — FCOM-realistic ATC sequence ─────────────────────────────
+  // Realism rule: during the high-workload phase (initial MAYDAY through ECAM
+  // completion) the crew sticks to "STANDBY / CONTINUING CHECKLIST" responses.
+  // ATC reciprocally avoids POB/fuel/intent questions until the workload eases.
+  // Only AFTER checklists + performance + decision making does the crew advise
+  // intentions and accept the operational interrogation.
+  //
+  // Use of STANDBY: most calls during the early phase have STANDBY (system pb)
+  // as a *correct* discipline.  A correct = "standby" run still scores well —
+  // resurface delays simulate ATC giving the crew room.
   distractions: [
-    // ① T+28s — ATC radar contact (fires only after 400 ft gate passed)
+    // ① Tower → Departure handoff (low workload, just before fire)
     {
-      id: "atc_heading_check",
-      atMs: 28_000,
+      id: "atc_handoff_to_departure",
+      atMs: 25_000,
       kind: "atc",
-      from: "DELHI DEPARTURE",
-      message:
-        "IFLY101, radar contact. Confirm maintaining runway heading 280.",
+      from: "DELHI TOWER",
+      message: "IFLY101, contact Delhi Departure 124.85.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, maintaining 280, MAYDAY", correct: true  },
-        { id: "b", label: "Affirm, maintaining 280",                                              correct: false },
+        { id: "a", label: "Delhi Departure 124.85, IFLY101",                                 correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                  correct: false },
+        // Wrong — off-by-one-digit frequency readback (classic stress error)
+        { id: "c", label: "Delhi Departure 124.95, IFLY101",                                 correct: false },
       ],
     },
 
-    // ② T+40s — ATC requesting intentions (clean, realistic)
+    // ② Initial MAYDAY — BRIEF, essential info only.  No runway, no intentions.
     {
-      id: "atc_intentions",
-      atMs: 40_000,
+      id: "atc_radar_contact_mayday",
+      atMs: 42_000,
       kind: "atc",
       from: "DELHI DEPARTURE",
-      message:
-        "IFLY101, state your intentions.",
+      message: "IFLY101, Delhi Departure, radar contact.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY101 — returning VIDP, request immediate approach runway 28, full emergency", correct: true  },
-        { id: "b", label: "IFLY101 continuing to destination",                                                      correct: false },
+        // Correct — short, no premature commitments
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, standby", correct: true  },
+        // Wrong — over-committal during high workload
+        { id: "b", label: "MAYDAY IFLY101, engine fire, returning immediate, request runway 28 ILS, full emergency",                     correct: false },
+        // Wrong — under-informative (no MAYDAY)
+        { id: "c", label: "Maintaining runway track, climbing 3 000, IFLY101",                                                            correct: false },
       ],
     },
 
-    // ③ T+98s — ATC clears for immediate return
+    // ③ ATC acknowledges + provides vectors/altitude — NO questions during workload
     {
-      id: "atc_final_decision",
-      atMs: 98_000,
+      id: "atc_vectors_climb",
+      atMs: 70_000,
       kind: "atc",
-      from: "DELHI APPROACH",
-      message:
-        "IFLY101, runway 28 clear for immediate return. Confirm souls on board and fuel.",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, roger MAYDAY, radar contact, continue runway track, climb 4 000 feet.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Continuing runway track, climbing 4 000, IFLY101",                correct: true  },
+        // Wrong — pilot offering intentions/info before workload eased
+        { id: "b", label: "IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel", correct: false },
+      ],
+    },
+
+    // ④ ATC offers vectors when ready — pilot should STANDBY (still ECAM-busy)
+    //    Correct response = STANDBY pb (system-provided), or "Continuing checklist".
+    {
+      id: "atc_vectors_when_ready",
+      atMs: 105_000,
+      kind: "atc",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, vectors available when ready, no reported traffic.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "MAYDAY IFLY101, runway 28, 186 POB, 8.4 tonnes fuel, CFR required", correct: true  },
-        { id: "b", label: "IFLY101 requesting runway 10 instead",                               correct: false },
-        { id: "c", label: "IFLY101 no CFR required",                                            correct: false },
+        // Correct — concise discipline phrase during high workload
+        { id: "a", label: "Continuing checklist, will advise, IFLY101",                       correct: true  },
+        // Also valid — concrete deferral with intent to come back when ready
+        { id: "b", label: "Unable at this time, request hold, will advise when ready for approach, IFLY101", correct: true  },
+        // Wrong — premature commitment
+        { id: "c", label: "IFLY101 returning Delhi, request runway 28 ILS",                   correct: false },
+      ],
+    },
+
+    // ⑤ ATC prompts for briefing requirements — STEP-TRIGGERED on
+    //   crew_crosscheck ("ECAM ACTIONS COMPLETED") so this only fires once
+    //   the crew has finished ECAM, not on a fixed clock.  atMs is a floor
+    //   (won't fire before this even if the step is done early).
+    {
+      id: "atc_info_request_prompt",
+      atMs: 150_000,
+      requiresStep: "crew_crosscheck",
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, Delhi Approach, advise any requirements for the approach and any assistance required.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — PM asks for what they need to brief the approach
+        { id: "a", label: "Request latest Delhi weather, runway in use, NOTAMs, and expected approach type, IFLY101", correct: true },
+        // Wrong — standby after workload has eased + ATC has prompted
+        { id: "b", label: "Standby IFLY101",                                                  correct: false },
+        // Wrong — premature commitment without info to brief on
+        { id: "c", label: "Request vectors ILS runway 28, IFLY101",                           correct: false },
+      ],
+    },
+
+    // ⑦ NEW — ATC delivers the briefing info; full readback expected
+    {
+      id: "atc_provides_briefing_info",
+      atMs: 200_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, roger standby. … Delhi wind 280 at 8, runway 28 in use, NOTAMs nil significant, expect ILS runway 28.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — full readback of the items needed for the approach brief
+        { id: "a", label: "Wind 280 at 8, runway 28, ILS runway 28, no significant NOTAMs, IFLY101", correct: true  },
+        // Wrong — minimal acknowledgement loses the data
+        { id: "b", label: "Roger, IFLY101",                                                          correct: false },
+        // Wrong — partial readback, missed approach type
+        { id: "c", label: "Wind 280 at 8, runway 28, IFLY101",                                       correct: false },
+      ],
+    },
+
+    // ⑧ ATC asks the operational questions (POB / fuel / services) — was ⑥
+    {
+      id: "atc_pob_fuel_services",
+      atMs: 225_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, say persons on board, fuel endurance, and assistance required.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — full ops info; full emergency services standard for engine fire
+        { id: "a", label: "IFLY101, 186 persons on board, 8.4 tonnes fuel, endurance 3 hours, request full emergency services on the runway", correct: true  },
+        // Wrong — standby after ATC has explicitly asked for ops data
+        { id: "b", label: "Standby IFLY101",                                                                                                   correct: false },
+        // Wrong — confusing partial info ("no services" is incorrect for confirmed engine fire)
+        { id: "c", label: "IFLY101, 186 POB, 8.4 tonnes, no emergency services required",                                                      correct: false },
+      ],
+    },
+
+    // ⑨ NEW — Ready-for-approach call (PM-initiated style; ATC prompts)
+    {
+      id: "atc_ready_for_approach",
+      atMs: 250_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, advise when ready for approach.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — concrete intention with the requested config
+        { id: "a", label: "IFLY101 ready, request vectors for ILS runway 28",                  correct: true  },
+        // Wrong — too narrow, no intention conveyed
+        { id: "b", label: "Ready, IFLY101",                                                    correct: false },
+        // Wrong — standby is inconsistent after the crew has gone through briefing
+        { id: "c", label: "Standby IFLY101",                                                   correct: false },
+      ],
+    },
+
+    // ⑩ ATC clears for ILS — intercept heading + altitude + clearance + tower
+    //    handoff (was ⑦, expanded with intercept heading per real ATC clearance)
+    {
+      id: "atc_cleared_approach",
+      atMs: 275_000,
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 28 approach, contact Delhi Tower 118.10 when established.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — full readback of every clearance element
+        { id: "a", label: "Left heading 240, descend 3 000, cleared ILS runway 28, contact Tower 118.10 when established, IFLY101", correct: true  },
+        // Wrong — bare acknowledgement loses the clearance content
+        { id: "b", label: "Roger, IFLY101",                                                                                          correct: false },
+        // Wrong — partial readback (missing heading + altitude + tower freq)
+        { id: "c", label: "Cleared ILS runway 28, IFLY101",                                                                          correct: false },
+      ],
+    },
+
+    // ⑪ Tower contact — was ⑧
+    {
+      id: "atc_tower_contact",
+      atMs: 300_000,
+      kind: "atc",
+      from: "DELHI TOWER",
+      message: "IFLY101, Delhi Tower, continue ILS approach runway 28, report established.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Continuing ILS runway 28, will report established, IFLY101",      correct: true  },
+        { id: "b", label: "Switching, IFLY101",                                                correct: false },
+      ],
+    },
+
+    // ⑫ Landing clearance — readback required — was ⑨
+    {
+      id: "atc_cleared_to_land",
+      atMs: 325_000,
+      kind: "atc",
+      from: "DELHI TOWER",
+      message: "IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Cleared to land runway 28, IFLY101",                                correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                    correct: false },
+        // Wrong — runway number mis-readback (listening trap on a high-workload call)
+        { id: "c", label: "Cleared to land runway 29, IFLY101",                                correct: false },
       ],
     },
   ],
@@ -508,6 +1021,390 @@ export const eng1FireAfterV1: Scenario = {
       description:
         "Press on to destination. Not appropriate — engine is shut down, single-engine flight to destination cannot be justified.",
       tone: "danger",
+    },
+  ],
+
+  // ── Engine Display DSL ───────────────────────────────────────────────────────
+  engineDisplay: {
+    warningTrigger: "fire_warn",
+    controlPanel: [
+      { stepId: "thr_lever_idle",  kind: "thr_lever", label: "THR LVR",  sub: "IDLE"    },
+      { stepId: "eng1_master_off", kind: "master",    label: "MASTER",   sub: "ENG 1"   },
+      { stepId: "eng1_fire_pb",    kind: "fire_pb",   label: "ENG 1",    sub: "FIRE PB" },
+      { stepId: "agent1",          kind: "agent",     label: "AGENT 1",  sub: "DISCH"   },
+      { stepId: "agent2",          kind: "agent",     label: "AGENT 2",  sub: "DISCH"   },
+    ],
+    eng1: {
+      rows: [
+        {
+          label: "THR LVR", unit: undefined,
+          states: [
+            { when: { step: "thr_lever_idle" }, value: { v: "IDLE", c: "green" } },
+            { when: { trigger: "fire_warn" },   value: { v: "MCT/FLX", c: "amber" } },
+            { value: { v: "CLB", c: "green" } },
+          ],
+        },
+        {
+          label: "N1", unit: "%",
+          states: [
+            { when: { step: "eng1_master_off" }, value: { v: "0.0", c: "amber" } },
+            { when: { trigger: "fire_warn" },    value: { v: "- -", c: "red" } },
+            { value: { v: "84.2", c: "green" } },
+          ],
+        },
+        {
+          label: "EGT", unit: "°C",
+          states: [
+            { when: { step: "eng1_fire_pb" },  value: { v: "180", c: "amber" } },
+            { when: { trigger: "fire_warn" },  value: { v: "820", c: "red" } },
+            { value: { v: "620", c: "green" } },
+          ],
+        },
+        {
+          label: "FF", unit: "KG/H",
+          states: [
+            { when: { step: "eng1_master_off" }, value: { v: "0", c: "amber" } },
+            { when: { trigger: "fire_warn" },    value: { v: "0", c: "red" } },
+            { value: { v: "2400", c: "green" } },
+          ],
+        },
+        {
+          label: "STATUS", unit: undefined,
+          states: [
+            { when: { step: "eng1_master_off" }, value: { v: "SHUT DOWN", c: "amber" } },
+            { when: { trigger: "fire_warn" },    value: { v: "FIRE", c: "red" } },
+            { value: { v: "NORMAL", c: "green" } },
+          ],
+        },
+      ],
+    },
+    eng2: {
+      rows: [
+        { label: "N1",     unit: "%",    states: [{ value: { v: "84.2", c: "green" } }] },
+        { label: "EGT",    unit: "°C",   states: [{ value: { v: "618",  c: "green" } }] },
+        { label: "FF",     unit: "KG/H", states: [{ value: { v: "2350", c: "green" } }] },
+        { label: "STATUS", unit: undefined, states: [{ value: { v: "NORMAL", c: "green" } }] },
+      ],
+    },
+  },
+
+  // ── System Display DSL (4 tabs: ENG, HYD, ELEC, AIR) ────────────────────────
+  systemTabs: [
+    // ── ENG tab ───────────────────────────────────────────────────────────────
+    {
+      id: "eng", label: "ENG",
+      alertStates: [{ when: { trigger: "fire_warn" }, value: true }, { value: false }],
+      autoSelect: { trigger: "fire_warn" },
+      sections: [
+        {
+          title: "ENG 1",
+          colorStates: [
+            { when: { trigger: "fire_warn" }, value: "red" },
+            { value: "dim" },
+          ],
+          rows: [
+            {
+              label: "THR LVR",
+              states: [
+                { when: { step: "thr_lever_idle" }, value: { v: "IDLE", c: "green" } },
+                { when: { trigger: "fire_warn" },   value: { v: "MCT/FLX", c: "amber" } },
+                { value: { v: "CLB", c: "green" } },
+              ],
+            },
+            {
+              label: "N1", unit: "%",
+              states: [
+                { when: { step: "eng1_master_off" }, value: { v: "0.0", c: "amber" } },
+                { when: { trigger: "fire_warn" },    value: { v: "- -", c: "red" } },
+                { value: { v: "84.2", c: "green" } },
+              ],
+            },
+            {
+              label: "EGT", unit: "°C",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "180", c: "amber" } },
+                { when: { trigger: "fire_warn" }, value: { v: "820", c: "red" } },
+                { value: { v: "620", c: "green" } },
+              ],
+            },
+            {
+              label: "FF", unit: "KG/H",
+              states: [
+                { when: { step: "eng1_master_off" }, value: { v: "0", c: "amber" } },
+                { when: { trigger: "fire_warn" },    value: { v: "0", c: "red" } },
+                { value: { v: "2400", c: "green" } },
+              ],
+            },
+            {
+              label: "STATUS",
+              states: [
+                { when: { step: "eng1_master_off" }, value: { v: "SHUT DOWN", c: "amber" } },
+                { when: { trigger: "fire_warn" },    value: { v: "FIRE", c: "red" } },
+                { value: { v: "NORMAL", c: "green" } },
+              ],
+            },
+          ],
+        },
+        {
+          title: "ENG 2",
+          colorStates: [{ value: "dim" }],
+          rows: [
+            { label: "N1",     unit: "%",    states: [{ value: { v: "84.2", c: "green" } }] },
+            { label: "EGT",    unit: "°C",   states: [{ value: { v: "618",  c: "green" } }] },
+            { label: "FF",     unit: "KG/H", states: [{ value: { v: "2350", c: "green" } }] },
+            { label: "STATUS",              states: [{ value: { v: "NORMAL", c: "green" } }] },
+          ],
+        },
+      ],
+      tray: {
+        title: "ENG + FIRE PANEL",
+        note: "Step 2: MASTER OFF (fuel SOV + oil SOV close). Step 3: FIRE PB → HYD/bleed/IDG SOVs + fuel shutoff. Steps 4-5: AGENT 1 → AGENT 2 if fire persists (30 s each)",
+        switches: [
+          {
+            label: "MASTER", sub: "ENG 1",
+            states: [
+              { when: { step: "eng1_master_off" }, value: "off" as const },
+              { value: "norm" as const },
+            ],
+          },
+          {
+            label: "FIRE PB", sub: "ENG 1",
+            states: [
+              { when: { step: "eng1_fire_pb" },   value: "off"  as const },
+              { when: { trigger: "fire_warn" },    value: "fire" as const },
+              { value: "norm" as const },
+            ],
+          },
+          {
+            label: "AGENT 1", sub: "DISCH",
+            states: [
+              { when: { step: "agent1" },          value: "off"   as const },
+              { when: { step: "eng1_fire_pb" },    value: "armed" as const },
+              { value: "norm" as const },
+            ],
+          },
+          {
+            label: "AGENT 2", sub: "DISCH",
+            states: [
+              { when: { step: "agent2" },          value: "off"   as const },
+              { when: { step: "agent1" },          value: "armed" as const },
+              { value: "norm" as const },
+            ],
+          },
+        ],
+      },
+    },
+
+    // ── HYD tab ───────────────────────────────────────────────────────────────
+    {
+      id: "hyd", label: "HYD",
+      alertStates: [{ when: { step: "eng1_fire_pb" }, value: true }, { value: false }],
+      autoSelect: { step: "eng1_fire_pb" },
+      sections: [
+        {
+          title: "GREEN SYS",
+          colorStates: [
+            { when: { step: "eng1_fire_pb" }, value: "amber" },
+            { value: "green" },
+          ],
+          rows: [
+            {
+              label: "ENG 1 PUMP",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "LO PR", c: "amber" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+            {
+              label: "PRESSURE", unit: "PSI",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "LO PR", c: "amber" } },
+                { value: { v: "3000", c: "green" } },
+              ],
+            },
+            { label: "RESERVOIR", states: [{ value: { v: "NORM", c: "green" } }] },
+          ],
+        },
+        {
+          title: "BLUE SYS",
+          colorStates: [{ value: "green" }],
+          rows: [
+            { label: "ELEC PUMP", states: [{ value: { v: "AUTO / ON", c: "green" } }] },
+            { label: "PRESSURE", unit: "PSI", states: [{ value: { v: "3000", c: "green" } }] },
+          ],
+        },
+        {
+          title: "YELLOW SYS",
+          colorStates: [{ value: "green" }],
+          rows: [
+            { label: "ENG 2 PUMP", states: [{ value: { v: "NORM", c: "green" } }] },
+            { label: "PRESSURE", unit: "PSI", states: [{ value: { v: "3000", c: "green" } }] },
+          ],
+        },
+      ],
+      tray: {
+        title: "HYD PANEL — AFFECTED",
+        note: "FCOM DSC-29-10: FIRE PB closes green HYD fire SOV → GRN ENG 1 pump shows LO PR (FAULT). Blue ELEC pump auto-activates → maintains brakes, NW steering, spoilers. No crew action required.",
+        switches: [
+          {
+            label: "GRN", sub: "ENG1 PMP",
+            states: [
+              { when: { step: "eng1_fire_pb" }, value: "fault" as const },
+              { value: "norm" as const },
+            ],
+          },
+          { label: "BLU", sub: "ELEC PMP", states: [{ value: "auto" as const }] },
+        ],
+      },
+    },
+
+    // ── ELEC tab ──────────────────────────────────────────────────────────────
+    {
+      id: "elec", label: "ELEC",
+      alertStates: [{ when: { step: "eng1_fire_pb" }, value: true }, { value: false }],
+      sections: [
+        {
+          title: "AC NETWORK",
+          colorStates: [
+            { when: { step: "eng1_fire_pb" }, value: "amber" },
+            { value: "green" },
+          ],
+          rows: [
+            {
+              label: "GEN 1",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "FAULT / OFF", c: "amber" } },
+                { value: { v: "ON", c: "green" } },
+              ],
+            },
+            { label: "GEN 2", states: [{ value: { v: "ON — NORM", c: "green" } }] },
+            {
+              label: "AC BUS 1",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "← GEN 2 (BTC)", c: "amber" } },
+                { value: { v: "GEN 1", c: "green" } },
+              ],
+            },
+            { label: "AC BUS 2", states: [{ value: { v: "GEN 2", c: "green" } }] },
+            {
+              label: "BUS TIE",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "CLOSED (AUTO)", c: "cyan" } },
+                { value: { v: "AUTO", c: "green" } },
+              ],
+            },
+          ],
+        },
+        {
+          title: "DC NETWORK",
+          colorStates: [{ value: "green" }],
+          rows: [
+            {
+              label: "TR 1",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "FAULT", c: "amber" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+            { label: "TR 2",   states: [{ value: { v: "NORM", c: "green" } }] },
+            {
+              label: "ESS TR",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "AUTO (ALTN)", c: "cyan" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+            { label: "BAT 1/2", states: [{ value: { v: "AUTO", c: "green" } }] },
+          ],
+        },
+      ],
+      tray: {
+        title: "ELEC PANEL — AFFECTED",
+        note: "FCOM DSC-24-10: FIRE PB disconnects IDG 1 → GEN 1 FAULT/OFF. Bus Tie Contactor (sw in AUTO) auto-closes → AC BUS 1 now fed by GEN 2. TR 1 may show FAULT; ESS TR switches to ALTN supply. No crew action required.",
+        switches: [
+          {
+            label: "GEN 1", sub: "IDG 1",
+            states: [
+              { when: { step: "eng1_fire_pb" }, value: "fault" as const },
+              { value: "norm" as const },
+            ],
+          },
+          { label: "BUS TIE", sub: "CONTCTR", states: [{ value: "auto" as const }] },
+        ],
+      },
+    },
+
+    // ── AIR tab ───────────────────────────────────────────────────────────────
+    {
+      id: "air", label: "AIR",
+      alertStates: [{ when: { step: "eng1_fire_pb" }, value: true }, { value: false }],
+      sections: [
+        {
+          title: "BLEED",
+          colorStates: [
+            { when: { step: "eng1_fire_pb" }, value: "amber" },
+            { value: "green" },
+          ],
+          rows: [
+            {
+              label: "ENG 1 BLEED",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "FAULT (SOV CL)", c: "amber" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+            { label: "ENG 2 BLEED", states: [{ value: { v: "NORM", c: "green" } }] },
+            { label: "X BLEED",     states: [{ value: { v: "AUTO", c: "green" } }] },
+            { label: "APU BLEED",   states: [{ value: { v: "OFF",  c: "dim"   } }] },
+          ],
+        },
+        {
+          title: "PACKS",
+          colorStates: [
+            { when: { step: "eng1_fire_pb" }, value: "amber" },
+            { value: "green" },
+          ],
+          rows: [
+            {
+              label: "PACK 1",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "FAULT / OFF", c: "amber" } },
+                { value: { v: "AUTO", c: "green" } },
+              ],
+            },
+            { label: "PACK 2",    states: [{ value: { v: "AUTO — NORM", c: "green" } }] },
+            { label: "CABIN ΔP",  states: [{ value: { v: "NORM",        c: "green" } }] },
+            {
+              label: "DUCT TEMP",
+              states: [
+                { when: { step: "eng1_fire_pb" }, value: { v: "PACK 2 ONLY", c: "cyan" } },
+                { value: { v: "NORM", c: "green" } },
+              ],
+            },
+          ],
+        },
+      ],
+      tray: {
+        title: "AIR PANEL — AFFECTED",
+        note: "FCOM DSC-21-10: FIRE PB closes bleed SOV → ENG 1 BLEED FAULT. PACK 1 loses bleed supply → FAULT/OFF. X BLEED stays AUTO (closed) — PACK 2 uses ENG 2 bleed only (single pack ops). Cabin ΔP maintained by PACK 2.",
+        switches: [
+          {
+            label: "ENG 1", sub: "BLEED",
+            states: [
+              { when: { step: "eng1_fire_pb" }, value: "fault" as const },
+              { value: "norm" as const },
+            ],
+          },
+          {
+            label: "PACK 1", sub: "FLOW",
+            states: [
+              { when: { step: "eng1_fire_pb" }, value: "fault" as const },
+              { value: "norm" as const },
+            ],
+          },
+          { label: "X BLEED", sub: "SEL", states: [{ value: "auto" as const }] },
+        ],
+      },
     },
   ],
 };

@@ -21,82 +21,78 @@ export function GlareshieldPanel({
   perform: (action: PilotAction) => void;
   disabled?: boolean;
 }) {
-  const mwStep = scenario.steps.find((s) => s.id === "cancel_master_warn");
-  const mcStep = scenario.steps.find((s) => s.id === "cancel_master_caut");
+  // Collect all glareshield steps by variant — supports any number of cancel steps
+  const allMwSteps = scenario.steps.filter((s) => s.group === "glareshield" && s.variant === "warning");
+  const allMcSteps = scenario.steps.filter((s) => s.group === "glareshield" && s.variant === "caution");
 
-  if (!mwStep && !mcStep) return null;
+  if (!allMwSteps.length && !allMcSteps.length) return null;
 
-  const mwDone = !!state.completedSteps["cancel_master_warn"];
-  const mcDone = !!state.completedSteps["cancel_master_caut"];
+  // Current actionable step = first one not yet completed
+  const mwStep = allMwSteps.find((s) => !state.completedSteps[s.id]) ?? null;
+  const mcStep = allMcSteps.find((s) => !state.completedSteps[s.id]) ?? null;
 
-  // MASTER CAUTION only becomes relevant after FIRE PB (when secondary cautions fire)
-  const mcUnlocked = !!state.completedSteps["eng1_fire_pb"];
+  // All done = every step of that type is completed
+  const mwDone = allMwSteps.length > 0 && allMwSteps.every((s) => !!state.completedSteps[s.id]);
+  const mcDone = allMcSteps.length > 0 && allMcSteps.every((s) => !!state.completedSteps[s.id]);
 
-  // MW cancel requires aviate sequence first — read from step definition
+  // Check requires on the current active step
   const mwReqsMet = (mwStep?.requires ?? []).every((r) => !!state.completedSteps[r]);
-  const mwAviatePending = state.masterWarnActive && !mwDone && !mwReqsMet;
+  const mcReqsMet = (mcStep?.requires ?? []).every((r) => !!state.completedSteps[r]);
+
+  const mwAviatePending = state.masterWarnActive && !!mwStep && !mwReqsMet;
 
   return (
     <div
       className="border font-mono"
       style={{ borderColor: "#1C2130", backgroundColor: "#050709" }}
     >
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-3 py-[4px] border-b"
-        style={{ borderColor: "#1C2130" }}
-      >
-        <span style={{ color: "#3A4050", fontSize: "8px", letterSpacing: "0.25em", textTransform: "uppercase" }}>
-          GLARESHIELD
-        </span>
-        <span style={{ color: "#3A4050", fontSize: "8px", letterSpacing: "0.15em" }}>
-          FCOM DSC-31-20
-        </span>
-      </div>
-
-      {/* Buttons row */}
-      <div className="flex gap-3 p-3">
+      {/* Buttons row — no header, compact */}
+      <div className="flex gap-3 px-3 py-2">
         {/* ── MASTER WARN ── */}
-        <MasterButton
-          id="cancel_master_warn"
-          label="MASTER"
-          sublabel="WARN"
-          symbol="⚡"
-          active={state.masterWarnActive && !mwDone}
-          done={mwDone}
-          activeColor="#FF3333"
-          activeBg="#FF333318"
-          activeBorder="#FF3333"
-          inactiveBg="#120808"
-          inactiveBorder="#3A1010"
-          pulse
-          disabled={disabled || mwDone || !state.masterWarnActive || !mwReqsMet}
-          crew="PM"
-          activeLabel={mwAviatePending ? "AVIATE FIRST" : "CRC ACTIVE"}
-          doneLabel="CANCELLED"
-          onClick={() => perform({ kind: "STEP", stepId: "cancel_master_warn" })}
-        />
+        {allMwSteps.length > 0 && (
+          <MasterButton
+            id={mwStep?.id ?? "cancel_master_warn"}
+            label="MASTER"
+            sublabel="WARN"
+            symbol="⚡"
+            active={state.masterWarnActive && !!mwStep && !mwDone}
+            done={mwDone}
+            activeColor="#FF3333"
+            activeBg="#FF333318"
+            activeBorder="#FF3333"
+            inactiveBg="#120808"
+            inactiveBorder="#3A1010"
+            pulse
+            disabled={disabled || mwDone || !state.masterWarnActive || !mwReqsMet || !mwStep}
+            crew="PM"
+            activeLabel={mwAviatePending ? "AVIATE FIRST" : "CRC ACTIVE"}
+            doneLabel=""
+            onClick={() => mwStep && perform({ kind: "STEP", stepId: mwStep.id })}
+          />
+        )}
 
         {/* ── MASTER CAUTION ── */}
-        <MasterButton
-          id="cancel_master_caut"
-          label="MASTER"
-          sublabel="CAUT"
-          symbol="△"
-          active={state.masterCautActive && !mcDone && mcUnlocked}
-          done={mcDone}
-          activeColor="#FFB300"
-          activeBg="#FFB30018"
-          activeBorder="#FFB300"
-          inactiveBg="#100D00"
-          inactiveBorder="#3A2E00"
-          pulse={false}
-          disabled={disabled || mcDone || !state.masterCautActive || !mcUnlocked}
-          crew="PM"
-          activeLabel="SC ACTIVE"
-          doneLabel="CANCELLED"
-          onClick={() => perform({ kind: "STEP", stepId: "cancel_master_caut" })}
-        />
+        {allMcSteps.length > 0 && (
+          <MasterButton
+            id={mcStep?.id ?? "cancel_master_caut"}
+            label="MASTER"
+            sublabel="CAUT"
+            symbol="△"
+            active={state.masterCautActive && !!mcStep && !mcDone && mcReqsMet}
+            done={mcDone}
+            activeColor="#FFB300"
+            activeBg="#FFB30018"
+            activeBorder="#FFB300"
+            inactiveBg="#100D00"
+            inactiveBorder="#3A2E00"
+            pulse={false}
+            disabled={disabled || mcDone || !state.masterCautActive || !mcReqsMet || !mcStep}
+            crew="PM"
+            activeLabel="SC ACTIVE"
+            doneLabel=""
+            onClick={() => mcStep && perform({ kind: "STEP", stepId: mcStep.id })}
+          />
+        )}
       </div>
     </div>
   );

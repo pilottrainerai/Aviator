@@ -9,7 +9,13 @@ import type {
   ScenarioMeta as RegistryMeta,
 } from "./registry";
 
-export type ECAMLevel = "warning" | "caution" | "advisory" | "memo";
+// FCOM DSC-31-60 ECAM colour convention:
+//   warning  = red    (CRC alarm, critical)
+//   caution  = amber  (SC chime, non-critical)
+//   advisory = cyan   (procedure ACTION items: "THR LEVER 1 ... IDLE")
+//   remark   = white  (conditional headers / remarks: "·IF FIRE WARN AFTER 30 S")
+//   memo     = green  (normal/satisfied indications)
+export type ECAMLevel = "warning" | "caution" | "advisory" | "remark" | "memo";
 
 export type ECAMMessage = {
   id: string;
@@ -56,6 +62,16 @@ export type ScenarioStep = {
    * Used for irreversible actions: MASTER OFF, FIRE PB.
    */
   confirmRequired?: boolean;
+  /**
+   * True for steps confirmed by a physical left-panel control (pushbutton, switch, lever).
+   * FlightCheckPopup skips these — they complete when the pilot presses the hardware.
+   */
+  hardware?: boolean;
+  /**
+   * This step is only surfaced in the FlightCheckPopup after the named trigger has fired.
+   * Use to gate procedure cards on system events (e.g. engine failure trigger).
+   */
+  requiresTrigger?: string;
   /** Optional: side-effect that fires `delayMs` after this step is completed */
   afterEffect?: {
     delayMs: number;
@@ -103,7 +119,9 @@ export type DistractionChoice = {
 
 export type ScenarioDistraction = {
   id: string;
-  /** Wall-clock ms after session start when this fires */
+  /** Wall-clock ms after session start when this fires.  If `requiresStep` is
+   *  set, this becomes a *minimum* delay — the distraction only fires once
+   *  the step is complete AND the elapsed time has reached atMs. */
   atMs: number;
   kind: DistractionKind;
   /** Display name of the caller — "ATC LONDON", "PURSER", "F/O", etc. */
@@ -114,6 +132,17 @@ export type ScenarioDistraction = {
   autoDismissMs?: number;
   /** If pilot says Stand By, re-surface after this many ms (default 25 000) */
   standbyResurfaceMs?: number;
+  /** If set, this distraction only fires once the named step is complete.
+   *  Use for ATC calls that must come after a procedural milestone — e.g.
+   *  ATC requesting briefing info only after the crew has finished ECAM. */
+  requiresStep?: string;
+  /** Optional. The pilot's call to ATC that PRECEDES the ATC message in this
+   *  exchange.  When set, the distraction modal renders it as the first line
+   *  ("FLIGHT CREW → ATC") so the user sees the full back-and-forth: pilot's
+   *  call → ATC's response → crew's readback (choices).  Use for pilot-
+   *  initiated calls and for any call where seeing the pilot's prior message
+   *  adds training value.  Omit for routine ATC-initiated calls. */
+  pilotSays?: string;
 };
 
 export type StatusItem = {
@@ -122,6 +151,8 @@ export type StatusItem = {
   line: string;
   /** caution = amber, advisory = cyan, memo = green */
   severity: "caution" | "advisory" | "memo";
+  /** If true, item appears in the right-hand INOP SYS column (FCOM STATUS layout) */
+  inopSys?: boolean;
 };
 
 export type Scenario = {
@@ -134,4 +165,51 @@ export type Scenario = {
   statusItems?: readonly StatusItem[];
   /** Timed interruptions that simulate a real flying environment */
   distractions?: readonly ScenarioDistraction[];
+  /** Declarative system display tabs (if absent, SystemDisplay falls back to hardcoded ENG 1 FIRE pages) */
+  systemTabs?: readonly SysTabDef[];
+  /** Declarative engine/fire panel config (if absent, FirePanel falls back to hardcoded ENG 1 FIRE rendering) */
+  engineDisplay?: EngineDisplayDef;
+};
+
+// ─── System / Engine display DSL ─────────────────────────────────────────────
+// Declarative config for SystemDisplay + FirePanel. Pure data, no functions.
+// The component resolves each "states" array in order — first matching when wins.
+
+export type SysColor = "green" | "amber" | "red" | "cyan" | "dim";
+export type SysSwState = "norm" | "fault" | "off" | "auto" | "open" | "fire" | "armed";
+
+/** Condition: undefined = always matches (use as final/default case) */
+export type SysWhen = { step?: string; trigger?: string };
+export type SysCase<T> = { when?: SysWhen; value: T };
+export type SysVal = { v: string; c: SysColor };
+
+export type SysRowDef    = { label: string; unit?: string; states: SysCase<SysVal>[] };
+export type SysSwitchDef = { label: string; sub?: string;  states: SysCase<SysSwState>[] };
+export type SysTrayDef   = { title: string; note?: string; switches: SysSwitchDef[] };
+export type SysSectionDef = {
+  title: string;
+  colorStates: SysCase<SysColor>[];
+  rows: SysRowDef[];
+};
+export type SysTabDef = {
+  id: string; label: string;
+  alertStates: SysCase<boolean>[];
+  autoSelect?: SysWhen;
+  sections: SysSectionDef[];
+  tray?: SysTrayDef;
+};
+export type EngTrayDef     = { title: string; note?: string; switches: SysSwitchDef[] };
+export type EnginePanelDef = { rows: SysRowDef[]; trays?: EngTrayDef[] };
+
+/** Interactive hardware control shown in the engine display ECAM panel */
+export type EngControlKind = "thr_lever" | "mode_sel" | "master" | "fire_pb" | "agent" | "monitor"
+  | "o2_mask" | "toggle_sw" | "emer_pb" | "spd_brk" | "cancel_warn" | "cancel_caut";
+export type EngControlDef  = { stepId: string; kind: EngControlKind; label: string; sub?: string };
+
+export type EngineDisplayDef = {
+  eng1: EnginePanelDef;
+  eng2: EnginePanelDef;
+  warningTrigger?: string;
+  /** Interactive ECAM procedure controls rendered below engine gauges */
+  controlPanel?: EngControlDef[];
 };

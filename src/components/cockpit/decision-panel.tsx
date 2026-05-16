@@ -27,33 +27,23 @@ export function DecisionPanel({
   const made = !!state.decision;
 
   return (
-    <div className="border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-[var(--color-text-faint)]">
-            Strategic decision
-          </div>
-          <div className="font-sans text-[13px] text-[var(--color-text-muted)] mt-0.5">
-            What's your plan after the abnormality?
-          </div>
+    <div className="border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
+      {made && (
+        <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--color-amber)] mb-2">
+          COMMITTED · {state.decision!.value.replace(/_/g, " ")}
         </div>
-        {made && (
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-amber)]">
-            COMMITTED · {state.decision!.value.replace(/_/g, " ")}
-          </div>
-        )}
-      </div>
+      )}
 
       {!decisionAvailable && !made && (
-        <div className="border border-dashed border-[var(--color-border)] bg-[var(--color-surface-2)] px-4 py-6 text-center">
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-faint)]">
-            UNLOCKS AFTER THE PROCEDURE
+        <div className="py-2 text-center">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-faint)]">
+            UNLOCKS AFTER PROCEDURE
           </p>
         </div>
       )}
 
       {(decisionAvailable || made) && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
           {scenario.decisions.map((d) => {
             const selected = made && state.decision!.value === d.value;
             const color =
@@ -68,7 +58,7 @@ export function DecisionPanel({
                 type="button"
                 disabled={disabled || made}
                 onClick={() => perform({ kind: "DECISION", value: d.value })}
-                className="group flex flex-col items-start gap-1.5 p-4 border rounded-sm text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="group flex flex-col items-start gap-0.5 px-2 py-1.5 border rounded-sm text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   borderColor: selected ? color : "var(--color-border)",
                   backgroundColor: selected
@@ -81,12 +71,12 @@ export function DecisionPanel({
                 }}
               >
                 <span
-                  className="font-mono text-xs uppercase tracking-[0.15em]"
+                  className="font-mono text-[10px] uppercase tracking-[0.12em]"
                   style={{ color: selected ? color : "var(--color-text)" }}
                 >
                   {d.label}
                 </span>
-                <span className="font-sans text-[12px] text-[var(--color-text-muted)] leading-snug">
+                <span className="font-sans text-[10px] text-[var(--color-text-muted)] leading-snug">
                   {d.description}
                 </span>
               </button>

@@ -1,8 +1,8 @@
 /**
  * Cockpit alert audio. Web Audio API only — no external sound files until
  * SME-licensed clips are sourced. Produces:
- *   - MASTER WARN chime: rapid repetitive beep (≈3.5 Hz, 660 Hz tone)
- *   - CRC (continuous repetitive chime): runs alongside, distinct cadence
+ *   - MASTER WARN chime: rapid repetitive beep (≈3.5 Hz, 660 Hz tone) — Level 3 warning
+ *   - MASTER CAUT chime: single chime (SC), one short tone — Level 2 caution
  */
 
 let ctx: AudioContext | null = null;
@@ -56,4 +56,21 @@ export function playMasterWarn(): Active {
       gain.disconnect();
     },
   };
+}
+
+/** Single chime (SC) — FCOM: one brief 800 Hz tone, played once on MASTER CAUTION */
+export function playMasterCaut(): void {
+  const ac = getContext();
+  if (!ac) return;
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(0.07, ac.currentTime);
+  gain.gain.linearRampToValueAtTime(0, ac.currentTime + 0.4);
+  gain.connect(ac.destination);
+  const osc = ac.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(880, ac.currentTime);
+  osc.frequency.linearRampToValueAtTime(820, ac.currentTime + 0.15);
+  osc.connect(gain);
+  osc.start();
+  osc.stop(ac.currentTime + 0.4);
 }

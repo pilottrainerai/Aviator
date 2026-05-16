@@ -1,145 +1,254 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
-import { Wind } from "lucide-react";
-import { PfdPixi } from "./pfd-pixi";
+import { defaultAircraftState, type AircraftState } from "@/avionics/core/aircraftState";
 
-export function PfdNd({ state }: { state?: ScenarioState }) {
-  const fireActive = !!(
-    state?.triggersFired?.["fire_warn"] ||
-    state?.masterWarnActive ||
-    state?.completedSteps?.["cancel_master_warn"]
-  );
+// ENG 1 FIRE after V1 — scenario-phase flight model
+// Each completed step advances the aircraft to a physically accurate snapshot.
+// Values match FCTM OP-020 technique and FCOM SRS/CLB performance data for VIDP ISA.
+export function buildAircraftState(s?: ScenarioState): AircraftState {
+  const step  = (id: string) => !!(s?.completedSteps?.[id]);
+  const fired = (id: string) => !!(s?.triggersFired?.[id]);
+
+  const fireActive  = fired("fire_warn");
+  const eng1Failed  = fireActive;
+  const apEngaged   = step("engage_ap_fma");
+  const thrIdle     = step("thr_lever_idle");
+  const mwCancelled = step("cancel_master_warn");
+  const ecamDone    = step("agent1");
+  const levelOff    = step("level_off_maa");
+  const accelClean  = step("accel_clean");
+  const masterWarn  = !!(s?.masterWarnActive && !mwCancelled);
+  const masterCaut  = !!(s?.masterCautActive && !step("cancel_master_caut"));
+
+  // ── FMA modes ──────────────────────────────────────────────────────────────
+  // Col 1 (A/THR): MAN TOGA pre-TRA; THR MCT after acceleration alt (single engine)
+  const thrMode  = levelOff ? 'THR MCT' : 'MAN TOGA';
+  // Col 2 (vertical): SRS from liftoff → CLB after acceleration alt
+  const vertMode = levelOff ? 'CLB' : 'SRS';
+
+  // ── Flight values per phase ────────────────────────────────────────────────
+  // Phase logic: each step advances the aircraft to the next snapshot.
+  // Speeds/altitudes per FCTM OP-020 ENG FIRE after V1 — VIDP, ~77t, ISA.
+  let speed, altitude, vs, pitch, bank, gs, tas;
+
+  if (accelClean) {
+    // Accelerating through S/F speeds, flap retraction complete
+    speed = 210; altitude = 2200; vs = 1200; pitch = 5; bank = 0;
+    gs    = 208; tas = 212;
+  } else if (levelOff) {
+    // Minimum Acceleration Altitude ~1500ft — level off, hold speed
+    speed = 185; altitude = 1500; vs = 100; pitch = 2; bank = 0;
+    gs    = 183; tas = 187;
+  } else if (ecamDone) {
+    // ECAM actions complete, continuing climb on SRS
+    speed = 172; altitude = 1100; vs = 1800; pitch = 7; bank = 0;
+    gs    = 170; tas = 174;
+  } else if (thrIdle) {
+    // ENG 1 TL at IDLE, ENG 2 still TOGA — climbing through ~800ft
+    speed = 168; altitude = 800; vs = 2000; pitch = 8; bank = 0;
+    gs    = 166; tas = 170;
+  } else if (apEngaged) {
+    // AP1 engaged, SRS tracking V2+10 — ~600ft
+    speed = 166; altitude = 600; vs = 2100; pitch = 8; bank = 0;
+    gs    = 164; tas = 168;
+  } else if (fireActive) {
+    // Fire warning, 400ft AGL, gear retracting
+    speed = 165; altitude = 400; vs = 2200; pitch = 9; bank = 0;
+    gs    = 163; tas = 167;
+  } else {
+    // Pre-fire: just past V1, rotating — 200ft AGL
+    speed = 157; altitude = 200; vs = 1600; pitch = 10; bank = 0;
+    gs    = 155; tas = 159;
+  }
+
+  return {
+    ...defaultAircraftState,
+    // FMA
+    apEngaged,
+    masterWarn,
+    masterCaut,
+    eng1Failed,
+    eng2Failed:   false,
+    thrMode,
+    vertMode,
+    latMode:      'NAV',
+    athrActive:   true,
+    // Flight values
+    speed,
+    altitude,
+    vs,
+    pitch,
+    bank,
+    gs,
+    tas,
+    selectedSpeed: 165,   // SRS target (V2+10 = 145+10+10)
+    selectedAlt:   3000,  // FCU pre-selected ~3000ft QNH
+    selectedHdg:   280,   // RWY 28
+    heading:       280,
+    track:         281,
+    windDir:       260,
+    windSpd:       12,
+  };
+}
+
+// ─── PFD Canvas ────────────────────────────────────────────────────────────────
+
+export function PfdCanvas({ state }: { state?: ScenarioState }) {
+  const mountRef  = useRef<HTMLDivElement>(null);
+  const stateRef  = useRef<AircraftState>(buildAircraftState(state));
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  // Keep stateRef in sync with React props
+  useEffect(() => {
+    stateRef.current = buildAircraftState(state);
+  }, [state]);
+
+  useEffect(() => {
+    if (!mountRef.current) return;
+    const el = mountRef.current;
+
+    let cancelled = false;
+
+    (async () => {
+      const { Application } = await import("pixi.js");
+      const { PFDRenderer }  = await import("@/avionics/pfd/PFDRenderer");
+
+      if (cancelled) return;
+
+      const app = new Application();
+      await app.init({
+        width:           1024,
+        height:          1024,
+        background:      0x000000,
+        antialias:       true,
+        resolution:      1,
+        autoDensity:     false,
+      });
+
+      if (cancelled) { app.destroy(true); return; }
+
+      app.canvas.style.width  = "100%";
+      app.canvas.style.height = "100%";
+      app.canvas.style.display = "block";
+      el.appendChild(app.canvas);
+
+      const pfd = new PFDRenderer();
+      app.stage.addChild(pfd);
+
+      app.ticker.add(() => { pfd.update(stateRef.current); });
+
+      cleanupRef.current = () => { app.destroy(true, true); };
+    })();
+
+    return () => {
+      cancelled = true;
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return <div ref={mountRef} style={{ width: "100%", height: "100%" }} />;
+}
+
+// ─── ND Canvas ─────────────────────────────────────────────────────────────────
+
+const ND_RANGE_OPTIONS = [5, 10, 20, 40] as const;
+
+export function NdCanvas({ state }: { state?: ScenarioState }) {
+  const mountRef   = useRef<HTMLDivElement>(null);
+  const stateRef   = useRef<AircraftState>(buildAircraftState(state));
+  const cleanupRef = useRef<(() => void) | null>(null);
+  // Hold the NDRenderer instance so the range-cycle effect can poke it.
+  // Typed loosely because the renderer is imported asynchronously.
+  const ndRef      = useRef<{ setRange: (nm: number) => void } | null>(null);
+
+  const [rangeIdx, setRangeIdx] = useState(1);    // default 10 NM
+
+  useEffect(() => {
+    stateRef.current = buildAircraftState(state);
+  }, [state]);
+
+  // Whenever the range index changes, push the new NM into the renderer.
+  useEffect(() => {
+    ndRef.current?.setRange(ND_RANGE_OPTIONS[rangeIdx]);
+  }, [rangeIdx]);
+
+  useEffect(() => {
+    if (!mountRef.current) return;
+    const el = mountRef.current;
+
+    let cancelled = false;
+
+    (async () => {
+      const { Application } = await import("pixi.js");
+      const { NDRenderer }  = await import("@/avionics/nd/NDRenderer");
+
+      if (cancelled) return;
+
+      const app = new Application();
+      await app.init({
+        width:       1024,
+        height:      1024,
+        background:  0x000000,
+        antialias:   true,
+        resolution:  1,
+        autoDensity: false,
+      });
+
+      if (cancelled) { app.destroy(true); return; }
+
+      app.canvas.style.width  = "100%";
+      app.canvas.style.height = "100%";
+      app.canvas.style.display = "block";
+      el.appendChild(app.canvas);
+
+      const nd = new NDRenderer();
+      nd.setRange(ND_RANGE_OPTIONS[rangeIdx]);     // initial range
+      ndRef.current = nd;
+      app.stage.addChild(nd);
+
+      app.ticker.add(() => { nd.update(stateRef.current); });
+
+      cleanupRef.current = () => {
+        ndRef.current = null;
+        app.destroy(true, true);
+      };
+    })();
+
+    return () => {
+      cancelled = true;
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const cycleRange = () => setRangeIdx((i: number) => (i + 1) % ND_RANGE_OPTIONS.length);
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <div
-        className="border border-[var(--color-border)] bg-[#050608] overflow-hidden"
-        style={{ height: "200px" }}
-      >
-        <PfdPixi />
-      </div>
-      <div
-        className="border border-[var(--color-border)] bg-[#050608] overflow-hidden"
-        style={{ height: "200px" }}
-      >
-        <Nd fireActive={fireActive} />
-      </div>
-    </div>
+    <div
+      ref={mountRef}
+      onClick={cycleRange}
+      style={{ width: "100%", height: "100%", cursor: "pointer" }}
+    />
   );
 }
 
-function Nd({ fireActive }: { fireActive: boolean }) {
+// ─── Exported composite ────────────────────────────────────────────────────────
+
+export function PfdNd({ state }: { state?: ScenarioState }) {
   return (
-    <div className="w-full h-full bg-black font-mono relative overflow-hidden flex flex-col p-1">
-      {/* Data row */}
-      <div
-        className="flex justify-between border-b border-zinc-800 pb-1 mb-1"
-        style={{ fontSize: "8px", flexShrink: 0 }}
-      >
-        <span style={{ color: "#E6E8EC" }}>
-          GS <span style={{ color: "#00CFFF" }}>195</span>{" "}
-          TAS <span style={{ color: "#00CFFF" }}>198</span>
-        </span>
-        <span style={{ color: "#E6E8EC", display: "flex", alignItems: "center", gap: "2px" }}>
-          280/08 <Wind size={8} />
-        </span>
-        <span style={{ color: "#00FF00" }}>14:15Z</span>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="border border-[var(--color-border)] bg-black overflow-hidden"
+           style={{ aspectRatio: "1", maxHeight: "280px" }}>
+        <PfdCanvas state={state} />
       </div>
-
-      {/* Arc */}
-      <div className="flex-1 relative">
-        <svg viewBox="0 0 180 160" className="w-full h-full">
-          {/* Compass arc */}
-          <path
-            d="M 15 120 A 90 90 0 0 1 165 120"
-            fill="none"
-            stroke="#3A3F48"
-            strokeWidth="1.5"
-          />
-          {/* Inner range ring */}
-          <path
-            d="M 45 120 A 60 60 0 0 1 135 120"
-            fill="none"
-            stroke="#222"
-            strokeWidth="1"
-            strokeDasharray="3 3"
-          />
-
-          {/* Heading ticks */}
-          {[-30, -20, -10, 0, 10, 20, 30].map((offset) => {
-            const angle = (offset * Math.PI) / 180;
-            const r = 90;
-            const cx = 90 + r * Math.sin(angle);
-            const cy = 120 - r * Math.cos(angle);
-            const inner = offset % 10 === 0 ? 6 : 3;
-            const ix = 90 + (r - inner) * Math.sin(angle);
-            const iy = 120 - (r - inner) * Math.cos(angle);
-            return (
-              <g key={offset}>
-                <line x1={cx} y1={cy} x2={ix} y2={iy} stroke="#5A626F" strokeWidth="1" />
-                {offset % 10 === 0 && (
-                  <text
-                    x={90 + (r - 14) * Math.sin(angle)}
-                    y={120 - (r - 14) * Math.cos(angle)}
-                    fontSize="7"
-                    fill="#9AA0A8"
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontFamily="monospace"
-                  >
-                    {String(Math.round((280 + offset + 360) % 360)).padStart(3, "0")}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-
-          {/* Track line */}
-          <line x1="90" y1="120" x2="90" y2="30" stroke="#FFFFFF" strokeWidth="1" opacity="0.4" />
-
-          {/* Route line */}
-          <polyline
-            points="90,120 90,70 115,25"
-            fill="none"
-            stroke="#00FF00"
-            strokeWidth="1.5"
-          />
-
-          {/* Waypoints */}
-          <circle cx="90" cy="70" r="2" fill="#FFFFFF" />
-          <text x="95" y="72" fontSize="6" fill="#FFFFFF" fontFamily="monospace">
-            UKASI
-          </text>
-          <circle cx="115" cy="25" r="2" fill="#FFFFFF" />
-          <text x="120" y="27" fontSize="6" fill="#FFFFFF" fontFamily="monospace">
-            VIDP
-          </text>
-
-          {/* Aircraft symbol */}
-          <polygon points="90,116 87,124 90,121 93,124" fill="#FFB000" />
-
-          {fireActive && (
-            <g>
-              <rect x="95" y="80" width="70" height="28" fill="black" stroke="#FFBF00" strokeWidth="0.8" />
-              <text x="130" y="91" fontSize="6" fill="#FFBF00" textAnchor="middle" fontFamily="monospace">
-                ENG 1 FIRE
-              </text>
-              <text x="130" y="101" fontSize="5.5" fill="#FFBF00" textAnchor="middle" fontFamily="monospace">
-                RTB VIDP
-              </text>
-            </g>
-          )}
-        </svg>
-
-        {/* Range + mode labels */}
-        <div
-          className="absolute bottom-0 left-0 right-0 flex justify-between"
-          style={{ fontSize: "8px" }}
-        >
-          <span style={{ color: "#00FF00" }}>NAV ARC</span>
-          <span style={{ color: "#00CFFF" }}>40 NM</span>
-        </div>
+      <div className="border border-[var(--color-border)] bg-black overflow-hidden"
+           style={{ aspectRatio: "1", maxHeight: "280px" }}>
+        <NdCanvas state={state} />
       </div>
     </div>
   );
