@@ -1407,4 +1407,606 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
   ],
+
+  // ── Phase-based cockpit channel state ─────────────────────────────────────
+  // Sources: FCTM OP-020 Engine Fire After V1, FCOM PRO-ABN-ENG-70-10
+  // Phases follow the crew's actual task-sharing from V1 through engine secured.
+  phases: [
+
+    // ── PHASE 1 — V1 PASSED (T+6s) ──────────────────────────────────────────
+    {
+      id: "v1_passed",
+      label: "V1 PASSED — TAKEOFF COMMITTED",
+      atMs: 6_000,
+      pfd: {
+        speed: 145,
+        targetSpeed: "V2",
+        altitude: 0,
+        targetAltitude: 3_000,
+        verticalSpeed: 0,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "RWY TRK",
+        ap1: false,
+        athr: false,
+        notes: [
+          "SRS armed on FD — captures at rotation",
+          "Both engines at TOGA — normal at this point",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["Runway centreline track 280 shown"],
+      },
+      pf: {
+        task: "Maintain runway centreline. Do NOT reduce thrust. Prepare to rotate at VR.",
+        callouts: [
+          { role: "PF", speech: "V1 — CONTINUE" },
+        ],
+      },
+      pm: {
+        task: "Monitor airspeed, call VR, watch for directional problem.",
+        callouts: [
+          { role: "PM", speech: "V1" },
+        ],
+      },
+    },
+
+    // ── PHASE 2 — ENG 1 FIRE (T+8s) ─────────────────────────────────────────
+    // FCOM: CRC (Continuous Repetitive Chime) fires simultaneously with MASTER WARN.
+    // Fire light on FIRE panel illuminates. ECAM E/WD shows ENG 1 FIRE in red.
+    // FCTM: PF memory item — MAINTAIN DIRECTION. Do NOT reduce thrust. No overhead action.
+    {
+      id: "fire_detected",
+      label: "ENG 1 FIRE DETECTED",
+      atMs: 8_000,
+      pfd: {
+        speed: 147,
+        targetSpeed: "V2",
+        altitude: 0,
+        targetAltitude: 3_000,
+        verticalSpeed: 0,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "RWY TRK",
+        ap1: false,
+        athr: false,
+        flags: ["MASTER WARN (red)", "ENG 1 FIRE — CRC"],
+        notes: [
+          "MASTER WARN illuminates red — CRC fires continuously",
+          "ENG 1 fire loop detected — fire panel FIRE light illuminated",
+          "ENG 1 still producing thrust — do NOT reduce TOGA",
+          "Asymmetric yaw begins — apply right rudder",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        notes: ["Track deviation possible — yaw correction required"],
+      },
+      pf: {
+        task: "MEMORY ITEM: apply right rudder to zero β. Do NOT reduce thrust. Do NOT react to ECAM yet — aviate first.",
+        callouts: [
+          { role: "PF", speech: "MEMORY ITEMS — MAINTAIN DIRECTION" },
+        ],
+      },
+      pm: {
+        task: "Identify ECAM. Call 'MASTER WARNING — ENG FIRE ENGINE ONE'. Do NOT cancel MASTER WARN yet. Call VR.",
+        callouts: [
+          { role: "PM", speech: "MASTER WARNING — ENG FIRE ENGINE ONE" },
+          { role: "PM", speech: "ROTATE" },
+        ],
+      },
+      overhead: {
+        items: ["FIRE panel — ENG 1 FIRE light illuminated (red)"],
+        notes: [
+          "FCTM: do not touch any overhead items during direction control phase",
+          "Fire PB and agents are NOT actioned until ECAM procedure at 400 ft",
+        ],
+      },
+    },
+
+    // ── PHASE 3 — ROTATION (T+10s) ──────────────────────────────────────────
+    {
+      id: "rotation",
+      label: "ROTATION — VR 12.5°",
+      atMs: 10_000,
+      pfd: {
+        speed: 152,
+        targetSpeed: "V2+10",
+        altitude: 50,
+        targetAltitude: 3_000,
+        verticalSpeed: 900,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "RWY TRK",
+        ap1: false,
+        athr: false,
+        flags: ["MASTER WARN (red)", "CRC active"],
+        notes: [
+          "FD pitch bar commands 12.5° nose up — follow it",
+          "β target = 0 — sideslip ball centered with right rudder",
+          "Speed trend arrow pointing up — ENG 1 still contributing thrust",
+          "CRC still sounding — PM has NOT cancelled MW yet (aviate first)",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        notes: ["Track 280 — right rudder input may cause minor heading drift"],
+      },
+      pf: {
+        task: "Rotate smoothly to 12.5° pitch, follow FD, target V2+10. Hold right rudder — β = 0. Do NOT bank.",
+        callouts: [
+          { role: "PF", speech: "ROTATING — V2+10 TARGET" },
+        ],
+      },
+      pm: {
+        task: "Call 'POSITIVE RATE' once VSI positive. Watch for tyre damage or directional problem. Gear Up on PF command.",
+        callouts: [
+          { role: "PM", speech: "POSITIVE RATE" },
+          { role: "PF", speech: "GEAR UP" },
+          { role: "PM", speech: "GEAR UP — SELECTING" },
+        ],
+      },
+    },
+
+    // ── PHASE 4 — GEAR UP / AP1 / MASTER WARN CANCEL (T+14s) ───────────────
+    // FCTM: AP1 engaged at ~100 ft when V2+10 stable. PF reads FMA.
+    // FCOM: MASTER WARN pushlight can be pressed any time to silence CRC once fire
+    // is identified — PM cancels it after AP is stable (aviate sequence complete).
+    {
+      id: "gear_up_ap1",
+      label: "GEAR UP — AP1 ENGAGED — MASTER WARN CANCEL",
+      atMs: 14_000,
+      pfd: {
+        speed: 163,
+        targetSpeed: "V2+10",
+        altitude: 120,
+        targetAltitude: 3_000,
+        verticalSpeed: 1_900,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "AP1 engaged at ~100 ft — SRS holds V2+10 on pitch",
+          "NAV engaged — tracking SID",
+          "FMA col 5: AP1 (white), ENG OUT (amber)",
+          "Rudder trim applied ~2 units right",
+          "PM now silences CRC — MASTER WARN pushlight pressed",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["AP holding RWY TRK → NAV capture"],
+      },
+      pf: {
+        task: "Engage AP1. Read FMA aloud. Apply rudder trim ~2 units toward ENG 2. Monitor SRS holding V2+10.",
+        callouts: [
+          { role: "PF", speech: "AP1 ENGAGE" },
+          { role: "PF", speech: "FMA: MAN TOGA — SRS — NAV — AP1 — ENG OUT. CHECKED." },
+          { role: "PF", speech: "RUDDER TRIM — 2 UNITS RIGHT" },
+        ],
+      },
+      pm: {
+        task: "Confirm gear up / 3 off. Cancel MASTER WARN to silence CRC — ECAM procedure stays displayed.",
+        callouts: [
+          { role: "PM", speech: "GEAR UP — 3 OFF" },
+          { role: "PM", speech: "MASTER WARNING — CANCELLING" },
+        ],
+      },
+      overhead: {
+        items: ["FIRE panel — ENG 1 FIRE light still illuminated (red)"],
+        notes: ["No overhead procedure action until 400 ft ECAM gate"],
+      },
+    },
+
+    // ── PHASE 5 — 400 FT / ECAM ACTIONS START (T+18s) ──────────────────────
+    // FCTM Golden Rule: ECAM actions begin at 400 ft AGL with flight path stabilised.
+    // PM announces "AVIATE COMPLETE, NAVIGATE SID/EO PROCEDURE". PF orders "ECAM ACTIONS".
+    {
+      id: "ecam_actions_start",
+      label: "400 FT — ECAM ACTIONS",
+      atMs: 18_000,
+      pfd: {
+        speed: 170,
+        targetSpeed: "V2+10",
+        altitude: 400,
+        targetAltitude: 3_000,
+        verticalSpeed: 2_000,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "400 ft AGL — FCTM gate for ECAM actions",
+          "SRS commanding V2+10 — AP holding nicely",
+          "CLB armed in FMA — will engage at eng-out accel altitude",
+          "LAND ASAP in red on E/WD — crew commits to return after securing engine",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+      },
+      pf: {
+        task: "Order ECAM ACTIONS. Confirm each PM action. Do not touch controls while PM works ECAM.",
+        callouts: [
+          { role: "PF", speech: "FOUR HUNDRED FEET — ECAM ACTIONS" },
+          { role: "PM", speech: "ECAM ACTIONS" },
+        ],
+      },
+      pm: {
+        task: "Announce 'AVIATE COMPLETE, NAVIGATE SID/EO PROCEDURE'. Begin ECAM checklist — read first line.",
+        callouts: [
+          { role: "PM", speech: "AVIATE COMPLETE — NAVIGATE SID/EO PROCEDURE" },
+          { role: "PM", speech: "ECAM — ENG ONE FIRE. READING." },
+        ],
+      },
+    },
+
+    // ── PHASE 6 — ECAM: THR LEVER IDLE + MASTER OFF (T+22s) ────────────────
+    // FCOM PRO-ABN-ENG-70-10:
+    //   Step 1: THR LEVER (ENG 1) → IDLE   (reduces thrust before fuel isolation)
+    //   Step 2: ENG MASTER → OFF            (Airbus confirm-before-action)
+    //   FCOM: MASTER OFF closes LP + HP fuel shut-off valves immediately.
+    {
+      id: "ecam_thr_master_off",
+      label: "ECAM — THR LEVER IDLE / MASTER OFF",
+      atMs: 22_000,
+      pfd: {
+        speed: 178,
+        targetSpeed: "V2+10",
+        altitude: 600,
+        targetAltitude: 3_000,
+        verticalSpeed: 2_000,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "ENG 1 THR lever retarded to IDLE — ENG 2 still at TOGA",
+          "ENG 1 N1/N2 decaying after IDLE selection",
+          "MASTER OFF closes fuel valves — ENG 1 will spool down",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+      },
+      pf: {
+        task: "Monitor FD, speed, altitude. Confirm each PM ECAM callout. Do not touch controls.",
+        callouts: [
+          { role: "PM", speech: "THR LEVER ONE — IDLE" },
+          { role: "PF", speech: "CONFIRMED" },
+          { role: "PM", speech: "ENG ONE MASTER — OFF — CONFIRM?" },
+          { role: "PF", speech: "CONFIRM" },
+          { role: "PM", speech: "ENG ONE MASTER — OFF" },
+        ],
+      },
+      pm: {
+        task: "Step 1: retard ENG 1 THR lever to IDLE. Step 2: call 'ENG 1 MASTER OFF — CONFIRM?' → PF confirms → set MASTER OFF.",
+        callouts: [
+          { role: "PM", speech: "THR LEVER ONE — IDLE — SELECTING" },
+          { role: "PM", speech: "ENG ONE MASTER — OFF — CONFIRM?" },
+        ],
+      },
+      overhead: {
+        items: ["ENG 1 MASTER switch → OFF (fuel SOV + oil SOV close)"],
+        notes: ["FIRE panel: ENG 1 FIRE light still illuminated — fire not yet isolated"],
+      },
+    },
+
+    // ── PHASE 7 — ENG 1 FIRE P/B PUSH (T+26s) ──────────────────────────────
+    // FCOM PRO-ABN-ENG-70-10:
+    //   Step 3: ENG FIRE P/B → PUSH
+    //   Airbus confirm-before-action (irreversible).
+    //   Effects: arms squibs, closes HYD fire SOV (GRN ENG1 pump → LO PR),
+    //            closes bleed SOV (ENG 1 BLEED FAULT, PACK 1 off), cuts FADEC,
+    //            disconnects IDG1 (GEN 1 FAULT).
+    //   Secondary failures appear on E/WD ~2 s later: * HYD / * ELEC / * AIR BLEED
+    {
+      id: "fire_pb_pushed",
+      label: "ENG 1 FIRE P/B — PUSHED",
+      atMs: 26_000,
+      pfd: {
+        speed: 185,
+        targetSpeed: "V2+10",
+        altitude: 750,
+        targetAltitude: 3_000,
+        verticalSpeed: 1_900,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "ENG 1 N1 decaying — FIRE PB armed squibs",
+          "Secondary failures now on E/WD: * HYD, * ELEC, * AIR BLEED",
+          "MASTER CAUT fires (amber SC chime) for secondary cautions",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+      },
+      pf: {
+        task: "Confirm FIRE PB push. Monitor secondary failures appearing on ECAM. Do NOT act on them yet.",
+        callouts: [
+          { role: "PM", speech: "ENG ONE FIRE P/B — CONFIRM PUSH?" },
+          { role: "PF", speech: "CONFIRM" },
+          { role: "PM", speech: "ENG ONE FIRE P/B — PUSHING" },
+        ],
+      },
+      pm: {
+        task: "Step 3: call 'ENG 1 FIRE P/B CONFIRM PUSH?' → PF confirms → push FIRE pb. Note secondary failures on E/WD.",
+        callouts: [
+          { role: "PM", speech: "AGENT ONE ARMED — WAITING 10 SECONDS FOR N1 DECAY" },
+        ],
+      },
+      overhead: {
+        items: [
+          "FIRE panel — ENG 1 FIRE P/B pushed (armed, illuminated white)",
+          "AGENT 1 squib — ARMED",
+          "AGENT 2 squib — ARMED",
+        ],
+        notes: [
+          "HYD fire SOV closed → GRN ENG1 pump shows LO PR",
+          "BLEED SOV closed → ENG 1 BLEED FAULT, PACK 1 off",
+          "IDG1 disconnected → GEN 1 FAULT, BTC auto-closes",
+        ],
+      },
+    },
+
+    // ── PHASE 8 — AGENT 1 DISCHARGE (T+36s — 10 s after FIRE PB) ───────────
+    // FCOM: "AGENT 1 AFTER 10 S → DISCH"
+    // 10-second wait allows N1 to decay, reducing nacelle ventilation so the
+    // halon agent reaches a higher concentration in the fire zone.
+    // PM monitors 10-second count; then discharges Agent 1 bottle.
+    {
+      id: "agent1_disch",
+      label: "AGENT 1 — DISCHARGED",
+      atMs: 36_000,
+      pfd: {
+        speed: 195,
+        targetSpeed: "V2+10",
+        altitude: 1_050,
+        targetAltitude: 3_000,
+        verticalSpeed: 1_800,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "ENG 1 N1 near zero — nacelle ventilation reduced, agent effective",
+          "Halon Agent 1 discharged into ENG 1 nacelle fire zone",
+          "30-second monitoring window now starts",
+          "FIRE light may or may not extinguish — crews must wait and observe",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+      },
+      pf: {
+        task: "Monitor aircraft. Confirm Agent 1 discharge. Start 30-second timer mentally (or crew timer). Watch FIRE warning.",
+        callouts: [
+          { role: "PM", speech: "AGENT ONE — DISCHARGING" },
+          { role: "PF", speech: "CONFIRMED — 30 SECONDS" },
+        ],
+      },
+      pm: {
+        task: "Discharge AGENT 1 bottle. Announce 'AGENT ONE DISCHARGING'. Start 30-second timer. Monitor ENG 1 FIRE pb — if light extinguishes, fire out.",
+        callouts: [
+          { role: "PM", speech: "AGENT ONE DISCHARGED. MONITORING FIRE WARNING — 30 SECONDS." },
+        ],
+      },
+      overhead: {
+        items: [
+          "AGENT 1 button — pressed (DISCH)",
+          "AGENT 2 squib — still armed (held in reserve)",
+          "ENG 1 FIRE light — may still be illuminated (monitoring)",
+        ],
+        notes: [
+          "FCOM: if FIRE WARN extinguishes before 30 s — fire is out. No AGENT 2 needed.",
+          "If FIRE WARN persists after 30 s — discharge AGENT 2.",
+        ],
+      },
+    },
+
+    // ── PHASE 9 — 30-SECOND MONITOR / FIRE PERSISTS (T+66s) ────────────────
+    // FCOM conditional: "IF FIRE WARN AFTER 30 S → AGENT 2 DISCH"
+    // Training scenario: fire persists → crew must discharge AGENT 2.
+    // ECAM clears primary lines; only AGENT 2 conditional + LAND ASAP remain.
+    {
+      id: "fire_persists_30s",
+      label: "FIRE WARN PERSISTS — 30 S ELAPSED",
+      atMs: 66_000,
+      pfd: {
+        speed: 210,
+        targetSpeed: "V2+10",
+        altitude: 1_800,
+        targetAltitude: 3_000,
+        verticalSpeed: 1_600,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        flags: ["ENG 1 FIRE pb — still illuminated"],
+        notes: [
+          "Fire warning persists 30 s after Agent 1 — AGENT 2 required",
+          "ECAM clears primary lines — only IF FIRE WARN + AGENT 2 + LAND ASAP remain",
+          "Primary CRC silenced — crew remains focused but not distracted",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["Tracking SID/EO procedure — AP holding"],
+      },
+      pf: {
+        task: "Confirm FIRE warning still on. Authorise AGENT 2 discharge. Monitor aircraft — remain on SRS to accel altitude.",
+        callouts: [
+          { role: "PM", speech: "FIRE WARNING AFTER 30 SECONDS" },
+          { role: "PF", speech: "AGENT TWO — CONFIRM DISCHARGE" },
+        ],
+      },
+      pm: {
+        task: "Announce 'FIRE WARNING AFTER 30 SECONDS'. Read ECAM: AGENT 2 DISCH. PF confirms — discharge AGENT 2.",
+        callouts: [
+          { role: "PM", speech: "ECAM — AGENT TWO DISCHARGE. DISCHARGING." },
+        ],
+      },
+      overhead: {
+        items: [
+          "ENG 1 FIRE P/B — illuminated (fire loop still active)",
+          "AGENT 2 button — about to be pressed",
+        ],
+        notes: [
+          "Last available extinguishing agent — no further restart possible",
+          "LAND ASAP remains on ECAM regardless of outcome",
+        ],
+      },
+    },
+
+    // ── PHASE 10 — FIRE EXTINGUISHED / ENGINE SECURED (T+71s) ──────────────
+    // 5 s after AGENT 2: fire extinguishes. FIRE pb red light goes out.
+    // FCTM: engine is considered SECURED when ECAM actions complete through
+    // "AGENT 2 DISCH" and fire warning extinguishes.
+    // PM announces "ENGINE SECURED". PF acknowledges. Acceleration sequence may begin.
+    {
+      id: "engine_secured",
+      label: "ENGINE SECURED — FIRE EXTINGUISHED",
+      atMs: 71_000,
+      pfd: {
+        speed: 215,
+        targetSpeed: "V2+10",
+        altitude: 2_000,
+        targetAltitude: 3_000,
+        verticalSpeed: 1_500,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "SRS",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: false,
+        notes: [
+          "FIRE pb red light extinguished — fire confirmed out",
+          "ENG MASTER FIRE light on overhead panel off",
+          "ENG 1 N1 = 0, EGT cooling",
+          "PM to announce ENGINE SECURED — accel sequence can begin after",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 10,
+        heading: 280,
+        activeWpt: "VIDP",
+      },
+      pf: {
+        task: "Acknowledge ENGINE SECURED. Announce LAND ASAP. Prepare for acceleration at minimum accel altitude.",
+        callouts: [
+          { role: "PM", speech: "ENGINE SECURED" },
+          { role: "PF", speech: "ENGINE SECURED — ACKNOWLEDGED" },
+          { role: "PF", speech: "LAND ASAP — RETURN DELHI" },
+        ],
+      },
+      pm: {
+        task: "Announce 'ENGINE SECURED' once FIRE pb light goes out. Read secondary failures. Announce STATUS.",
+        callouts: [
+          { role: "PM", speech: "ENGINE SECURED. SECONDARY FAILURES ON ECAM — HYD, ELEC, AIR BLEED." },
+          { role: "PM", speech: "STATUS APPEARING." },
+        ],
+      },
+      overhead: {
+        items: [
+          "ENG 1 FIRE P/B — extinguished (dark) — fire out",
+          "ENG 1 MASTER — OFF",
+          "AGENT 1 + AGENT 2 — both DISCH",
+          "GEN 1 — FAULT/OFF (IDG disconnected by FIRE PB)",
+          "ENG 1 BLEED — FAULT (SOV closed by FIRE PB)",
+        ],
+        notes: ["All FIRE panel actions complete — engine is secured"],
+      },
+    },
+
+    // ── PHASE 11 — ACCEL ALTITUDE / LEVEL OFF / CLEAN (T+78s) ──────────────
+    // FCTM: DELAY acceleration until engine is secured (FCTM 12848).
+    // At minimum acceleration altitude (~1500 ft EO), PF pushes V/S knob → V/S 0.
+    // Aircraft levels off, then accelerates through F/S speeds to clean config.
+    // Green dot: PF calls MCT, PM verifies thrust at MCT.
+    {
+      id: "accel_level_off",
+      label: "ACCEL ALTITUDE — LEVEL OFF / CLEAN",
+      atMs: 78_000,
+      pfd: {
+        speed: 225,
+        targetSpeed: "S",
+        altitude: 2_800,
+        targetAltitude: 3_000,
+        verticalSpeed: 200,
+        fmaThrust: "MAN TOGA",
+        fmaPitch: "OP CLB",
+        fmaLateral: "NAV",
+        ap1: true,
+        athr: true,
+        notes: [
+          "V/S 0 selected at MAA — aircraft levelling off",
+          "A/THR activated — ENG 2 maintaining speed at TOGA then CLB",
+          "SRS reverts to OP CLB as level-off captures at target alt",
+          "F speed passed — FLAPS 1 retracted. S speed approaching — prepare FLAPS UP.",
+          "Rudder trim maintained ~2 units right for single-engine",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 20,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["Range increased to 20 nm for VIDP return planning"],
+      },
+      pf: {
+        task: "V/S 0 at MAA. Call FLAPS 1 at F speed, FLAPS UP at S speed. Call MCT at green dot. Monitor A/THR.",
+        callouts: [
+          { role: "PF", speech: "V/S ZERO — LEVELLING OFF" },
+          { role: "PF", speech: "FLAPS ONE" },
+          { role: "PM", speech: "SPEED CHECKED — FLAPS ONE" },
+          { role: "PF", speech: "FLAPS UP" },
+          { role: "PM", speech: "SPEED CHECKED — FLAPS UP — CONFIG CLEAN" },
+          { role: "PF", speech: "MCT" },
+          { role: "PM", speech: "MCT — THRUST SET" },
+        ],
+      },
+      pm: {
+        task: "Cross-check each flap selection (check speed before calling back). Verify CONFIG CLEAN on ECAM. Set MCT on PF call.",
+        callouts: [
+          { role: "PM", speech: "SINGLE ENGINE — MCT SET — GREEN DOT TARGET" },
+        ],
+      },
+      overhead: {
+        items: ["No new overhead actions — all ENG FIRE panel items already completed"],
+        notes: ["After Takeoff CL to follow: ECAM ACTIONS COMPLETE → normal CL → OEB → STATUS"],
+      },
+    },
+  ],
 };
