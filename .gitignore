@@ -42,3 +42,7 @@ next-env.d.ts
 
 # claude code local settings
 .claude/settings.local.json
+
+# Blender — backup files + render output (regeneratable from .blend)
+*.blend1
+blender/**/*.png

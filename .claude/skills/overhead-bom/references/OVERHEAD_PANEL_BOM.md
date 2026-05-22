@@ -490,7 +490,7 @@ ENG 1 PUMP → RAT MAN ON → BLUE ELEC PUMP → PTU → ENG 2 PUMP → YELLOW E
 - Absolute panel dimensions still proportional. Real overhead photo in
   `OVHD PANEL/` will let us anchor HYD width to overall overhead width.
 
-**Build script:** `/Users/czar/Desktop/hyd_panel/hyd_panel_build.py`
+**Build script:** `blender/hyd/hyd_panel_build.py` (in Aviator repo)
 
 ### ELEC (stub)
 
