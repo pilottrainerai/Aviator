@@ -319,10 +319,12 @@ PB_Y_PX   = 200           # single row of 6 pbs, vertical center (pixel Y)
 # Per FCOM DSC-29-20 P 1/8: 6 pbs in a single row, L → R order:
 #   (1) ENG 1 PUMP  (5) RAT MAN ON  (2) BLUE ELEC PUMP  (4) PTU  (1) ENG 2 PUMP  (3) YELLOW ELEC PUMP
 COL_PX    = [94, 217, 340, 463, 586, 709]  # 123 px center-to-center (35 px gap)
-# Per-column vertical offset (pixel Y). PTU sits slightly higher than
-# the surrounding pbs in the real cockpit photos and FCOM illustration —
-# row 3 (PTU) gets a -10 px shift up. All others align at PB_Y_PX.
-COL_Y_OFFSET_PX = {0: 0, 1: 0, 2: 0, 3: -10, 4: 0, 5: 0}
+# Per-column vertical offset (pixel Y). After rechecking FCOM DSC-29-20 P 1/8:
+# all 6 pbs are at the SAME Y level. The "PTU appears slightly up" effect
+# from the photos is the function-label box sitting closer to the zone
+# label (less vertical gap), NOT the pb itself being higher.
+# v8 incorrectly offset PTU pb by -10; reverted in v9.
+COL_Y_OFFSET_PX = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
 
 # Label offset above/below pb (same formula as the AGENT label in fire panel,
 # with the +20% cumulative shift already applied)
@@ -491,42 +493,66 @@ def col_fn_top_y_px(col):
     pb_y = PB_Y_PX + COL_Y_OFFSET_PX.get(col, 0)
     return (pb_y - LBL_OFFSET_MM / PX) - 7
 
-def zone_bracket(name, label_col_or_x, pb_cols):
-    """Layer 1: drop from zone label → horizontal connector → vertical
-    drops to each function-label box. ARROWS REQUIRED at the end of
-    every vertical drop (pointing down at the function label) and at
-    horizontal ends for inter-zone connectors."""
-    if isinstance(label_col_or_x, int):
-        label_x = COL_PX[label_col_or_x]
+# Layer 1 — green flow schematic per FCOM DSC-29-20 P 1/8:
+# ONE continuous horizontal "river" at LINE_TOP_Y_PX (well below zone-
+# label boxes so they don't overlap). Drops UP from the river to each
+# zone label baseline, drops DOWN from the river to each function-label
+# box top. Arrows on the river show pressure flow direction between
+# systems.
+ZONE_LABEL_COLS = {'GREEN': 0, 'BLUE': 2, 'PTU': 3, 'YELLOW': (4, 5)}
+
+def _zone_label_x(col_or_pair):
+    if isinstance(col_or_pair, tuple):
+        return sum(COL_PX[c] for c in col_or_pair) / len(col_or_pair)
+    return COL_PX[col_or_pair]
+
+# 1. The single horizontal river — from leftmost zone label to rightmost,
+#    sitting at LINE_TOP_Y_PX which is well below all zone label boxes.
+river_xs = sorted(_zone_label_x(c) for c in ZONE_LABEL_COLS.values())
+river_x_left  = river_xs[0]
+river_x_right = river_xs[-1]
+line('br_river', river_x_left, LINE_TOP_Y_PX, river_x_right, LINE_TOP_Y_PX)
+
+# 2. Drops UP from the river to each zone label.
+for label_name, col_or_pair in ZONE_LABEL_COLS.items():
+    label_x = _zone_label_x(col_or_pair)
+    line(f'br_zoneUp_{label_name}', label_x, ZONE_Y_PX + 10, label_x, LINE_TOP_Y_PX)
+
+# 3. Drops DOWN from the river to each function-label box.
+#    Each drop ends with an ARROW pointing down at the function label.
+for col in range(6):
+    px = COL_PX[col]
+    fn_top_y = col_fn_top_y_px(col)
+    line(f'br_fnDrop_v{col}', px, LINE_TOP_Y_PX, px, fn_top_y - 2)
+    arrow_tip(f'br_fnDrop_v{col}_arrow', px, fn_top_y - 1, direction='down')
+
+# 4. Flow-direction arrows on the river itself. Per FCOM:
+#    - GREEN system feeds rightward toward PTU  →
+#    - YELLOW system feeds leftward toward PTU  ←
+#    - PTU mediates bidirectional GREEN↔YELLOW transfer
+PTU_X = _zone_label_x(ZONE_LABEL_COLS['PTU'])
+arrow_tip('br_river_arr_GtoP', PTU_X - 50, LINE_TOP_Y_PX, direction='right')
+arrow_tip('br_river_arr_YtoP', PTU_X + 50, LINE_TOP_Y_PX, direction='left')
+
+# 5. Side-arrows on zone label boxes per FCOM (small arrows on the
+#    sides of each zone label box showing system flow direction).
+def zone_side_arrow(name, col_or_pair, side, direction):
+    """Small arrow tip just outside the side of a zone label box."""
+    x_center = _zone_label_x(col_or_pair)
+    # Zone label boxes have w_px from len(text)*6+14 ≈ 38-50 px wide. Use
+    # 30 px offset from box center to place arrow just outside the border.
+    if side == 'right':
+        x_tip = x_center + 30
+    elif side == 'left':
+        x_tip = x_center - 30
     else:
-        label_x = label_col_or_x
-    pb_xs = [COL_PX[c] for c in pb_cols]
-    # Vertical drop from zone-label baseline to connector row
-    line(f'{name}_drop', label_x, ZONE_Y_PX + 4, label_x, LINE_TOP_Y_PX)
-    # Horizontal connector across the pb columns
-    x_left, x_right = min(pb_xs + [label_x]), max(pb_xs + [label_x])
-    if x_right - x_left > 4:    # only draw horizontal if it spans >0
-        line(f'{name}_h', x_left, LINE_TOP_Y_PX, x_right, LINE_TOP_Y_PX)
-    # Vertical drops from connector row to each function-label box top,
-    # each ending with an ARROW pointing down at the function label.
-    # Per-column FN_TOP_Y so PTU's drop ends at PTU's (higher) label.
-    for i, col in enumerate(pb_cols):
-        px = COL_PX[col]
-        fn_top_y = col_fn_top_y_px(col)
-        line(f'{name}_v{i}', px, LINE_TOP_Y_PX, px, fn_top_y - 2)
-        arrow_tip(f'{name}_v{i}_arrow', px, fn_top_y - 1, direction='down')
+        raise ValueError(side)
+    arrow_tip(name, x_tip, ZONE_Y_PX, direction=direction)
 
-zone_bracket('br_GREEN',  0, [0])
-zone_bracket('br_BLUE',   2, [2])
-zone_bracket('br_PTU',    3, [3])
-zone_bracket('br_YELLOW', (COL_PX[4]+COL_PX[5])/2, [4, 5])
-
-# NOTE (v8): Earlier draft drew an inter-zone horizontal line at the same
-# Y as the zone labels, which ran straight through the GREEN / BLUE / PTU
-# / YELLOW text. Removed. The per-zone brackets above already convey the
-# flow direction via their drops + arrows. A future refinement could add
-# a between-zone connector at LINE_TOP_Y_PX (below the labels) — but only
-# if it does not overlap any per-zone bracket horizontal segments.
+zone_side_arrow('br_GREEN_R',  0,           'right', 'right')   # → out of GREEN
+zone_side_arrow('br_PTU_L',    3,           'left',  'left')    # ← into PTU
+zone_side_arrow('br_PTU_R',    3,           'right', 'right')   # → out of PTU
+zone_side_arrow('br_YELLOW_L', (4, 5),      'left',  'left')    # ← into YELLOW
 
 
 # PTU vertical AUTO indicator — column of A/U/T/O letters stacked beside
