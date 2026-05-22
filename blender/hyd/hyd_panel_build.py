@@ -98,9 +98,10 @@ M = {
     'lit_green':    mat('lit_green',    '#00C26B', 0.25, em='#00FF7F', em_str=5),
     # T-GUARDED-RAT guard cover — solid red opaque plastic, photo-matched
     'rat_red':      mat('rat_red',      '#C82010', 0.45),
-    # Green bracket / line art painted on the panel face (Airbus convention
-    # for zone-grouping graphics — visible on the HYD panel photos)
-    'bracket_green': mat('bracket_green', '#3FAA60', 0.30, em='#5FCC80', em_str=3),
+    # Green flow-line + arrowhead material (Layer 1). Lower emission than
+    # v7 (was strength 3, arrows looked washed-out white). Now relies on
+    # base color for visibility, with just enough emission to feel painted.
+    'bracket_green': mat('bracket_green', '#2F9050', 0.30, em='#3FAA60', em_str=0.8),
 }
 
 # Cockpit font — try Futura Bold first (closer to real Airbus panel
@@ -318,6 +319,10 @@ PB_Y_PX   = 200           # single row of 6 pbs, vertical center (pixel Y)
 # Per FCOM DSC-29-20 P 1/8: 6 pbs in a single row, L → R order:
 #   (1) ENG 1 PUMP  (5) RAT MAN ON  (2) BLUE ELEC PUMP  (4) PTU  (1) ENG 2 PUMP  (3) YELLOW ELEC PUMP
 COL_PX    = [94, 217, 340, 463, 586, 709]  # 123 px center-to-center (35 px gap)
+# Per-column vertical offset (pixel Y). PTU sits slightly higher than
+# the surrounding pbs in the real cockpit photos and FCOM illustration —
+# row 3 (PTU) gets a -10 px shift up. All others align at PB_Y_PX.
+COL_Y_OFFSET_PX = {0: 0, 1: 0, 2: 0, 3: -10, 4: 0, 5: 0}
 
 # Label offset above/below pb (same formula as the AGENT label in fire panel,
 # with the +20% cumulative shift already applied)
@@ -359,19 +364,19 @@ PUMPS = [
 
 for col, name, top_lbl, bot_lbl, top_lit_key, bot_lit_key, fn_lbl in PUMPS:
     ax_px = COL_PX[col]
-    acx, acy = p(ax_px, PB_Y_PX)
+    pb_y_px = PB_Y_PX + COL_Y_OFFSET_PX.get(col, 0)   # PTU sits 10 px higher
+    acx, acy = p(ax_px, pb_y_px)
 
     if name == 'RAT':
         # T-GUARDED-RAT: pb-sw underneath + opaque red guard cover on top.
         # Photo-confirmed: the RAT MAN ON has a solid red flip-up guard,
         # NOT a transparent acrylic cover like the FIRE pb guard.
-        build_pbsw_agent_style(f'HYD_{name}', ax_px, PB_Y_PX, BTN_PX_22,
+        build_pbsw_agent_style(f'HYD_{name}', ax_px, pb_y_px, BTN_PX_22,
                                top_cell_label='MAN ON', one_cell=True,
                                top_lit_mat=None)
         # Red opaque guard sitting on top of the cap — slightly larger than
         # the cap, hinged at the top edge. In rest state, guard is CLOSED
         # so the cap underneath is hidden.
-        acx, acy = p(ax_px, PB_Y_PX)
         GUARD_W = BTN_PX_22*PX + 2.0       # ~24 mm wide (2 mm overhang)
         GUARD_H = BTN_PX_22*PX + 2.0       # ~24 mm tall
         GUARD_D = 3.5                      # 3.5 mm thick guard
@@ -379,21 +384,22 @@ for col, name, top_lbl, bot_lbl, top_lit_key, bot_lit_key, fn_lbl in PUMPS:
         box(f'HYD_{name}_RedGuard', acx, acy, GUARD_Z,
             GUARD_W, GUARD_H, GUARD_D, m=M['rat_red'], bev=0.4)
         # Small dark hinge bar at top edge of the guard
-        hinge_cx, hinge_cy = p(ax_px, PB_Y_PX - BTN_PX_22/2 - 4)
+        hinge_cx, hinge_cy = p(ax_px, pb_y_px - BTN_PX_22/2 - 4)
         box(f'HYD_{name}_GuardHinge', hinge_cx, hinge_cy,
             GUARD_Z + GUARD_D/2 + 0.5,
             GUARD_W*0.55, 1.5, 1.0, m=M['pb_black'], bev=0.1)
     else:
-        build_pbsw_agent_style(f'HYD_{name}', ax_px, PB_Y_PX, BTN_PX_22,
+        build_pbsw_agent_style(f'HYD_{name}', ax_px, pb_y_px, BTN_PX_22,
                                top_cell_label=top_lbl, bot_cell_label=bot_lbl,
                                top_lit_mat=(M[top_lit_key] if top_lit_key else None),
                                bot_lit_mat=(M[bot_lit_key] if bot_lit_key else None))
 
     # Function name in a white-outlined LABEL BOX ABOVE each pb (Layer 2+3).
     # Per photos: zone labels at top → green flow art → function label
-    # boxes → pb caps below. Box width scales with label length.
+    # boxes → pb caps below. Box width scales with label length and
+    # follows the pb's per-column Y offset (PTU sits higher with its pb).
     fn_w_px = max(60, len(fn_lbl) * 7 + 18)
-    fn_cy_px = PB_Y_PX - (LBL_OFFSET_MM / PX)   # ABOVE pb
+    fn_cy_px = pb_y_px - (LBL_OFFSET_MM / PX)   # ABOVE pb, per pb_y_px offset
     label_box(f'HYD_{name}_FnLbl', ax_px, fn_cy_px,
               w_px=fn_w_px, h_px=14,
               text=fn_lbl, text_size_mm=2.75)
@@ -409,10 +415,14 @@ ZONE_Y_PX = 75
 
 def zone_label(name, text, span_cols):
     """Layer 2 + 3: zone label inside a white-outlined box, positioned
-    above the pb column(s) it covers."""
+    above the pb column(s) it covers. Box width scales with text length
+    so GREEN (5 chars) and YELLOW (6 chars) don't overflow the same
+    box that fits PTU (3 chars)."""
     x_avg = sum(COL_PX[c] for c in span_cols) / len(span_cols)
+    # ~6 px per character + 14 px side padding (text size 4.5 mm = 18 px tall)
+    w_px = max(28, len(text) * 6 + 14)
     label_box(f'HYD_zone_{name}', x_avg, ZONE_Y_PX,
-              w_px=32, h_px=18,        # ~8 × 4.5 mm box
+              w_px=w_px, h_px=20,
               text=text, text_size_mm=4.5)
 
 zone_label('GREEN',  'GREEN',  [0])
@@ -475,6 +485,12 @@ def arrow_tip(name, tip_x_px, tip_y_px, direction='down', size_px=5.0):
     obj.location.z = mm(BASE_Z + 0.02)
     return obj
 
+def col_fn_top_y_px(col):
+    """Per-column function-label box top Y (accounts for PTU's -10 offset
+    so the bracket drop lands on the right place when PTU sits higher)."""
+    pb_y = PB_Y_PX + COL_Y_OFFSET_PX.get(col, 0)
+    return (pb_y - LBL_OFFSET_MM / PX) - 7
+
 def zone_bracket(name, label_col_or_x, pb_cols):
     """Layer 1: drop from zone label → horizontal connector → vertical
     drops to each function-label box. ARROWS REQUIRED at the end of
@@ -493,33 +509,34 @@ def zone_bracket(name, label_col_or_x, pb_cols):
         line(f'{name}_h', x_left, LINE_TOP_Y_PX, x_right, LINE_TOP_Y_PX)
     # Vertical drops from connector row to each function-label box top,
     # each ending with an ARROW pointing down at the function label.
-    for i, px in enumerate(pb_xs):
-        line(f'{name}_v{i}', px, LINE_TOP_Y_PX, px, FN_TOP_Y_PX - 2)
-        arrow_tip(f'{name}_v{i}_arrow', px, FN_TOP_Y_PX - 1, direction='down')
+    # Per-column FN_TOP_Y so PTU's drop ends at PTU's (higher) label.
+    for i, col in enumerate(pb_cols):
+        px = COL_PX[col]
+        fn_top_y = col_fn_top_y_px(col)
+        line(f'{name}_v{i}', px, LINE_TOP_Y_PX, px, fn_top_y - 2)
+        arrow_tip(f'{name}_v{i}_arrow', px, fn_top_y - 1, direction='down')
 
 zone_bracket('br_GREEN',  0, [0])
 zone_bracket('br_BLUE',   2, [2])
 zone_bracket('br_PTU',    3, [3])
 zone_bracket('br_YELLOW', (COL_PX[4]+COL_PX[5])/2, [4, 5])
 
-# Inter-zone horizontal arrows showing hydraulic system connections — the
-# PTU links GREEN and YELLOW (bidirectional), so arrow tips point both
-# ways at its horizontal extent.
-# (Simplified: just a horizontal segment + arrows at both ends at the
-# connector-row level, spanning across most of the panel.)
-INTER_Y_PX = ZONE_Y_PX        # at zone-label row level
-line('br_inter_h', COL_PX[0]+22, INTER_Y_PX, COL_PX[5]-22, INTER_Y_PX)
-arrow_tip('br_inter_arrow_R', COL_PX[5]-20, INTER_Y_PX, direction='right')
-arrow_tip('br_inter_arrow_L', COL_PX[0]+20, INTER_Y_PX, direction='left')
+# NOTE (v8): Earlier draft drew an inter-zone horizontal line at the same
+# Y as the zone labels, which ran straight through the GREEN / BLUE / PTU
+# / YELLOW text. Removed. The per-zone brackets above already convey the
+# flow direction via their drops + arrows. A future refinement could add
+# a between-zone connector at LINE_TOP_Y_PX (below the labels) — but only
+# if it does not overlap any per-zone bracket horizontal segments.
 
 
 # PTU vertical AUTO indicator — column of A/U/T/O letters stacked beside
 # the PTU pb (photo-confirmed; also visible in FCOM illustration). Small
 # white letters indicating the pb is in AUTO position.
-PTU_AUTO_X_PX = COL_PX[3] + BTN_PX_22/2 + 8   # just right of PTU cap
+PTU_AUTO_X_PX = COL_PX[3] + BTN_PX_22/2 + 8       # just right of PTU cap
+PTU_PB_Y_PX   = PB_Y_PX + COL_Y_OFFSET_PX.get(3, 0)  # follows PTU's offset
 for i, ch in enumerate('AUTO'):
     ax_px = PTU_AUTO_X_PX
-    ay_px = PB_Y_PX - 18 + i*12   # vertical stack, ~3 mm spacing
+    ay_px = PTU_PB_Y_PX - 18 + i*12   # vertical stack, ~3 mm spacing, follows PTU
     acx, acy = p(ax_px, ay_px)
     txt(f'HYD_PTU_AUTO_{ch}', ch, 2.5,
         acx, acy, PANEL_FRONT + 0.01, M['wtext'], ext=0.01)
