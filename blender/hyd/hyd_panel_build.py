@@ -398,13 +398,17 @@ for col, name, top_lbl, bot_lbl, top_lit_key, bot_lit_key, fn_lbl in PUMPS:
 
     # Function name in a white-outlined LABEL BOX ABOVE each pb (Layer 2+3).
     # Per photos: zone labels at top → green flow art → function label
-    # boxes → pb caps below. Box width scales with label length and
-    # follows the pb's per-column Y offset (PTU sits higher with its pb).
-    fn_w_px = max(60, len(fn_lbl) * 7 + 18)
-    fn_cy_px = pb_y_px - (LBL_OFFSET_MM / PX)   # ABOVE pb, per pb_y_px offset
-    label_box(f'HYD_{name}_FnLbl', ax_px, fn_cy_px,
-              w_px=fn_w_px, h_px=14,
-              text=fn_lbl, text_size_mm=2.75)
+    # boxes → pb caps below. Box width scales with label length.
+    # IMPORTANT: RAT and PTU do NOT get a function label at this row —
+    # their label appears only ONCE, at the top zone-label row. Skipping
+    # them here per the photo (Hydraulic-Panel.jpg shows no lower-row
+    # box for either).
+    if name not in ('RAT', 'PTU'):
+        fn_w_px = max(60, len(fn_lbl) * 7 + 18)
+        fn_cy_px = pb_y_px - (LBL_OFFSET_MM / PX)   # ABOVE pb
+        label_box(f'HYD_{name}_FnLbl', ax_px, fn_cy_px,
+                  w_px=fn_w_px, h_px=14,
+                  text=fn_lbl, text_size_mm=2.75)
 
 
 # Zone labels ABOVE the pbs — per FCOM, brackets/spans group the pbs into
@@ -415,22 +419,28 @@ for col, name, top_lbl, bot_lbl, top_lit_key, bot_lit_key, fn_lbl in PUMPS:
 #   YELLOW → spans ENG 2 PUMP + YELLOW ELEC PUMP (cols 4+5)
 ZONE_Y_PX = 75
 
-def zone_label(name, text, span_cols):
-    """Layer 2 + 3: zone label inside a white-outlined box, positioned
-    above the pb column(s) it covers. Box width scales with text length
-    so GREEN (5 chars) and YELLOW (6 chars) don't overflow the same
-    box that fits PTU (3 chars)."""
+def zone_label(name, text, span_cols, outline_mat=None, text_size_mm=4.5,
+               box_h_px=20):
+    """Layer 2 + 3: zone label inside a bordered box, positioned at the
+    top row above the pb column(s) it covers. Box width scales with text
+    length. outline_mat defaults to white wtext; PTU uses bracket_green
+    per the FCOM photo where the PTU box has a GREEN border, not white."""
     x_avg = sum(COL_PX[c] for c in span_cols) / len(span_cols)
-    # ~6 px per character + 14 px side padding (text size 4.5 mm = 18 px tall)
+    # ~6 px per character + 14 px side padding
     w_px = max(28, len(text) * 6 + 14)
     label_box(f'HYD_zone_{name}', x_avg, ZONE_Y_PX,
-              w_px=w_px, h_px=20,
-              text=text, text_size_mm=4.5)
+              w_px=w_px, h_px=box_h_px,
+              text=text, text_size_mm=text_size_mm,
+              outline_mat=outline_mat)
 
-zone_label('GREEN',  'GREEN',  [0])
-zone_label('BLUE',   'BLUE',   [2])
-zone_label('PTU',    'PTU',    [3])
-zone_label('YELLOW', 'YELLOW', [4, 5])
+# Top-row labels per FCOM DSC-29-20 P 1/8 + photo Hydraulic-Panel.jpg:
+# 5 labels at zone-label row level. RAT MAN ON sits between GREEN and
+# BLUE (col 1, above the red RAT pb). PTU has a GREEN border, not white.
+zone_label('GREEN',     'GREEN',      [0])
+zone_label('RATMANON',  'RAT MAN ON', [1], text_size_mm=2.75, box_h_px=14)
+zone_label('BLUE',      'BLUE',       [2])
+zone_label('PTU',       'PTU',        [3], outline_mat=M['bracket_green'])
+zone_label('YELLOW',    'YELLOW',     [4, 5])
 
 
 # Green bracket / line art on the panel face (Airbus convention — visible
@@ -518,13 +528,19 @@ for label_name, col_or_pair in ZONE_LABEL_COLS.items():
     label_x = _zone_label_x(col_or_pair)
     line(f'br_zoneUp_{label_name}', label_x, ZONE_Y_PX + 10, label_x, LINE_TOP_Y_PX)
 
-# 3. Drops DOWN from the river to each function-label box.
-#    Each drop ends with an ARROW pointing down at the function label.
+# 3. Drops DOWN from the river. Cols with function labels (0, 2, 4, 5)
+#    drop to the function-label-box top. Cols WITHOUT a function label
+#    (1 = RAT, 3 = PTU) drop further, to just above the pb cap.
+COLS_WITH_FNLABEL = {0, 2, 4, 5}
+PB_CAP_TOP_Y_PX  = PB_Y_PX - BTN_PX_22/2 - 4   # 4 px above pb cap top edge
 for col in range(6):
     px = COL_PX[col]
-    fn_top_y = col_fn_top_y_px(col)
-    line(f'br_fnDrop_v{col}', px, LINE_TOP_Y_PX, px, fn_top_y - 2)
-    arrow_tip(f'br_fnDrop_v{col}_arrow', px, fn_top_y - 1, direction='down')
+    if col in COLS_WITH_FNLABEL:
+        drop_end_y = col_fn_top_y_px(col)
+    else:
+        drop_end_y = PB_CAP_TOP_Y_PX
+    line(f'br_fnDrop_v{col}', px, LINE_TOP_Y_PX, px, drop_end_y - 2)
+    arrow_tip(f'br_fnDrop_v{col}_arrow', px, drop_end_y - 1, direction='down')
 
 # 4. Flow-direction arrows on the river itself. Per FCOM:
 #    - GREEN system feeds rightward toward PTU  →
