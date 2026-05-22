@@ -85,12 +85,14 @@ build order:
 
 ```
 Layer 0  Panel back plate            (teal back plate; cavities cut later)
-Layer 1  Painted SCHEMATIC graphics  (green flow lines + arrowheads —
-                                      the hydraulic / electrical / etc.
-                                      flow art printed on the panel face)
+Layer 1  Painted SCHEMATIC graphics  (green flow lines + ARROWHEADS —
+                                      hydraulic/electrical/etc. flow art
+                                      printed on the panel face.
+                                      ARROWS ARE MANDATORY, NOT OPTIONAL.)
 Layer 2  Painted LABEL BOX outlines  (thin white rectangle borders
                                       around every text label, zone or
-                                      function — Airbus signature look)
+                                      function — Airbus signature look.
+                                      BORDERS ARE MANDATORY.)
 Layer 3  Painted TEXT labels         (white text inside the boxes;
                                       uses cockpit font: Futura/Arial Bold)
 Layer 4  Pushbutton CAVITIES + bodies (recessed agent-style: cavity cut
@@ -100,17 +102,30 @@ Layer 5  Lit CELL legends             (illuminated FAULT/OFF/ON cells
                                       inside each pb)
 ```
 
-**If you build a panel without all five layers, you are missing
-Airbus-cockpit signature elements.** The 2026-05-22 HYD v5 build had
-Layers 0/1 partial/3/4/5 but was missing Layer 2 (label boxes) and the
-arrowheads/direction on Layer 1 — the panel didn't read as "Airbus" at
-a glance because of these omissions.
+**A panel without all five layers is INCOMPLETE.** Specifically:
+
+- **Layer 1 must include arrowheads** at the ends of vertical drops
+  (pointing down at the function label) and at the ends of horizontal
+  inter-zone connectors (showing flow direction between systems).
+  A panel without arrows does not match real Airbus.
+- **Layer 2 must surround every text label** — zone labels AND function
+  labels — with a thin white rectangular border. Plain floating text
+  on the panel face is wrong.
+
+Past incident (2026-05-22): HYD v5 had Layer 2 missing entirely;
+v6 added Layer 2 but Layer 1 had no arrows. Both got called out by the
+user comparing to the photos. Don't repeat this — when building any
+panel, **explicitly verify all 5 layers are present** before reporting
+the panel as done.
 
 Build a shared helper for each layer in every panel script:
 - `label_box(name, cx, cy, w, h, text, text_size)` — draws Layer-2 white
   outline + Layer-3 text inside in one call
 - `flow_line(name, x1, y1, x2, y2, arrow_at='end'|'start'|'both'|None)` —
-  draws a Layer-1 green segment with optional arrowhead
+  draws a Layer-1 green segment **with** an arrowhead (use the
+  `arrow_tip(name, x, y, direction)` helper for the triangular tip)
+- `arrow_tip(name, x_px, y_px, direction='down'|'up'|'left'|'right')` —
+  Layer-1 triangular arrowhead, painted green like the lines
 - `build_pbsw_agent_style(...)` — builds Layers 4 + 5 in one call (exists)
 
 When a panel lacks any of these layers naturally (e.g. CB panels have no

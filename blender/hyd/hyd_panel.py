@@ -176,8 +176,8 @@ def label_box(name, cx_px, cy_px, w_px, h_px, text, text_size_mm,
     if outline_mat is None: outline_mat = M['wtext']
     if text_mat is None:    text_mat    = M['wtext']
     cx, cy = p(cx_px, cy_px)
-    BORDER_W_PX  = 0.8   # ~0.2 mm line thickness for the outline
-    BORDER_DEPTH = 0.04
+    BORDER_W_PX  = 1.6   # ~0.4 mm — thicker than v6 (0.8) for clear visibility
+    BORDER_DEPTH = 0.05
     BORDER_Z     = PANEL_FRONT + 0.02
     # 4 edges of the rectangle
     half_w_mm = w_px * PX / 2
@@ -425,8 +425,8 @@ zone_label('YELLOW', 'YELLOW', [4, 5])
 # in the user-supplied photos). Each bracket arrows down from its zone
 # label to the pb(s) it covers. Thin painted green lines, very low Z so
 # they sit just above the panel front like silk-screen graphics.
-LINE_W_PX     = 1.6       # ≈ 0.4 mm line thickness in pixel space
-LINE_DEPTH_MM = 0.04
+LINE_W_PX     = 2.5       # ≈ 0.6 mm line thickness (thicker than v6 for visibility)
+LINE_DEPTH_MM = 0.05
 LINE_TOP_Y_PX = ZONE_Y_PX + 14         # horizontal connector row, just below zone labels
 # Drop endpoint = TOP of the function-label box (not pb cap). The function
 # label is at PB_Y_PX - LBL_OFFSET_MM/PX with half-height 7 px.
@@ -443,9 +443,43 @@ def line(name, x1_px, y1_px, x2_px, y2_px):
         w_px*PX, h_px*PX, LINE_DEPTH_MM,
         m=M['bracket_green'], bev=0)
 
+def arrow_tip(name, tip_x_px, tip_y_px, direction='down', size_px=5.0):
+    """Layer-1 triangular arrowhead, tip at (tip_x_px, tip_y_px), pointing
+    in direction. MANDATORY on every drop and inter-zone connector per
+    the 5-layer architecture — flow lines without arrows don't match
+    real Airbus."""
+    if direction == 'down':
+        offsets = [(0, 0), (-size_px*0.8, -size_px*1.3), ( size_px*0.8, -size_px*1.3)]
+    elif direction == 'up':
+        offsets = [(0, 0), (-size_px*0.8,  size_px*1.3), ( size_px*0.8,  size_px*1.3)]
+    elif direction == 'right':
+        offsets = [(0, 0), (-size_px*1.3, -size_px*0.8), (-size_px*1.3,  size_px*0.8)]
+    elif direction == 'left':
+        offsets = [(0, 0), ( size_px*1.3, -size_px*0.8), ( size_px*1.3,  size_px*0.8)]
+    else:
+        raise ValueError(f"arrow_tip: unknown direction {direction!r}")
+    pts = []
+    for dx, dy in offsets:
+        bx, by = p(tip_x_px + dx, tip_y_px + dy)
+        pts.append((mm(bx), mm(by), 0.0))
+    me = bpy.data.meshes.new(f'{name}_mesh')
+    me.materials.append(M['bracket_green'])
+    obj = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(obj)
+    bm_arrow = bmesh.new()
+    vs = [bm_arrow.verts.new(v) for v in pts]
+    bm_arrow.verts.ensure_lookup_table()
+    bm_arrow.faces.new(vs)
+    bmesh.ops.recalc_face_normals(bm_arrow, faces=list(bm_arrow.faces))
+    bm_arrow.to_mesh(me); bm_arrow.free()
+    obj.location.z = mm(BASE_Z + 0.02)
+    return obj
+
 def zone_bracket(name, label_col_or_x, pb_cols):
-    """Drop from zone label to the connector row, then horizontal across
-    the columns covered, then vertical drops to each pb top."""
+    """Layer 1: drop from zone label → horizontal connector → vertical
+    drops to each function-label box. ARROWS REQUIRED at the end of
+    every vertical drop (pointing down at the function label) and at
+    horizontal ends for inter-zone connectors."""
     if isinstance(label_col_or_x, int):
         label_x = COL_PX[label_col_or_x]
     else:
@@ -455,15 +489,28 @@ def zone_bracket(name, label_col_or_x, pb_cols):
     line(f'{name}_drop', label_x, ZONE_Y_PX + 4, label_x, LINE_TOP_Y_PX)
     # Horizontal connector across the pb columns
     x_left, x_right = min(pb_xs + [label_x]), max(pb_xs + [label_x])
-    line(f'{name}_h', x_left, LINE_TOP_Y_PX, x_right, LINE_TOP_Y_PX)
-    # Vertical drops from connector row to each function-label box top
+    if x_right - x_left > 4:    # only draw horizontal if it spans >0
+        line(f'{name}_h', x_left, LINE_TOP_Y_PX, x_right, LINE_TOP_Y_PX)
+    # Vertical drops from connector row to each function-label box top,
+    # each ending with an ARROW pointing down at the function label.
     for i, px in enumerate(pb_xs):
-        line(f'{name}_v{i}', px, LINE_TOP_Y_PX, px, FN_TOP_Y_PX)
+        line(f'{name}_v{i}', px, LINE_TOP_Y_PX, px, FN_TOP_Y_PX - 2)
+        arrow_tip(f'{name}_v{i}_arrow', px, FN_TOP_Y_PX - 1, direction='down')
 
 zone_bracket('br_GREEN',  0, [0])
 zone_bracket('br_BLUE',   2, [2])
 zone_bracket('br_PTU',    3, [3])
 zone_bracket('br_YELLOW', (COL_PX[4]+COL_PX[5])/2, [4, 5])
+
+# Inter-zone horizontal arrows showing hydraulic system connections — the
+# PTU links GREEN and YELLOW (bidirectional), so arrow tips point both
+# ways at its horizontal extent.
+# (Simplified: just a horizontal segment + arrows at both ends at the
+# connector-row level, spanning across most of the panel.)
+INTER_Y_PX = ZONE_Y_PX        # at zone-label row level
+line('br_inter_h', COL_PX[0]+22, INTER_Y_PX, COL_PX[5]-22, INTER_Y_PX)
+arrow_tip('br_inter_arrow_R', COL_PX[5]-20, INTER_Y_PX, direction='right')
+arrow_tip('br_inter_arrow_L', COL_PX[0]+20, INTER_Y_PX, direction='left')
 
 
 # PTU vertical AUTO indicator — column of A/U/T/O letters stacked beside
@@ -526,4 +573,4 @@ except Exception as e:
     print(f"CPU: {e}")
 
 bpy.ops.render.render(write_still=True)
-print("DONE: /Users/czar/Desktop/hyd_panel/hyd_panel.png")
+print("DONE: hyd_panel.png")
