@@ -218,6 +218,77 @@ and asks the user before writing any material or keyframe value.**
 
 ---
 
+## 2c. Flow art and pb-cell conventions
+
+**Codified from the HYD panel (base panel two, 2026-05-25) — these are
+HARD RULES for any future overhead panel that has cross-zone flow lines or
+two-cell push buttons. Reference implementation:
+`blender/hyd/best_version/hyd_panel_BEST.py`.**
+
+### Green flow art (river segments, callouts, arrows, junctions)
+
+1. **No green line ever enters a pb cap or crosses any text.** Break the
+   river into segments around any callout/bracket. Function-bracket legs
+   must terminate ≥ 4 px above the pb cap edge. (Violation surfaced by the
+   user 2026-05-25: legs extending into pb area, drops cutting through
+   FAULT/OFF cells.)
+2. **River = orthogonal horizontals + verticals only.** No bezier curves
+   for the river itself. Right-angle T-junctions by default at zone↔river
+   meet points. (Earlier curved "intestine" version was wrong.)
+3. **Function brackets are 3-sided** (top bar + half-height L/R ticks,
+   OPEN at the bottom toward the pb). Implemented via
+   `label_box(..., omit_sides=('B',), half_sides=True)`.
+4. **Inline callouts on the river** (e.g. `RAT MAN ON`, `[PTU]`): plain
+   text + partial brackets next to the text. The river BREAKS where the
+   callout's brackets are — leave a gap covering the bracket span so the
+   river never overlaps the callout.
+5. **Bracket sides go toward what they enclose, never away.** A `]` (right
+   bracket): T + R + B, omit L. A `[` (left bracket): T + L + B, omit R.
+6. **Junction emphasis = semicircular dome below the river** (not above).
+   Use a TRUE Bezier semicircle with handle ratio `K = 0.5523` (= 4/3·(√2−1));
+   AUTO handles look oblong. Reserve domes for ONE marked junction
+   (typical: BLUE in HYD). All other zone junctions are plain T-junctions.
+7. **Arrow placement: never inside a river gap.** Recompute arrow x to
+   sit on a live river segment after any break is introduced.
+8. **Flow direction comes from FCOM Description (4b), not from
+   guesswork.** Pump → its system zone (vertical riser + up-arrow into
+   the zone bracket). Cross-zone transfer (e.g. PTU) → bidirectional
+   indicators.
+
+### Two-cell push button cells (FAULT/OFF style)
+
+9. **Cell split is 55% top / 45% bottom** (not equal halves). Top cell
+   (typically FAULT, amber-lit) is taller; bottom cell (typically OFF or
+   ON, white-lit) is shorter. Implemented by setting `top_ch_mm =
+   avail*0.55` and `bot_ch_mm = avail*0.45` rather than the legacy 50/50.
+10. **Thin light-gray inner frame around BOTbg only** (not TOPbg). Frame
+    sits on a layer ABOVE the cell background — frame Z must clear the
+    BOTbg top face (`AZ_FRONT + 0.5`); else it is buried inside the cell
+    and invisible. Frame thickness ≈ 0.4 mm (1.5 px) — visible without
+    being heavy.
+11. **Cell-frame material is non-metallic mid-gray (`#7A7A7A`,
+    roughness 0.70).** The legacy `screw` material at `#C8CED6` with
+    metallic=0.90 reflects light and reads as whitish — DO NOT use for
+    flat borders. Add a dedicated `gray_border` material if missing.
+12. **The top edge of the BOTbg inner frame doubles as the FAULT/OFF
+    divider.** Do not add a separate divider line.
+
+### Lighting trade-offs (applies to all panels, surfaced via HYD)
+
+13. **Lighting scales with panel area.** Reusing fire-panel-best lights
+    (5/2.5/2.5/1.0 energy) on a panel ~¼ the area BLOWS OUT the panel
+    color. Halve the energies when panel area is ≤ ½ of fire panel.
+14. **View transform Standard + matched lighting** preserves the actual
+    hex panel color (#33607A). Filmic compresses highlights and is
+    acceptable but darker materials read paler — verify against PICS
+    before committing.
+
+### When to add this section
+Add a §2c equivalent any time a future panel needs cross-zone flow art
+or two-cell pbs. If a single-pb panel, only §2a/§2b apply.
+
+---
+
 ## 3. Source library and FCOM chapter map
 
 ### Manual files
@@ -502,3 +573,22 @@ from real work. Add a new entry each time a Checkpoint B passes.
 - Frame sequence: 1=rest, 60=FIRE red, 125=guard open+pb pop+SQUIB1+SQUIB2 white, 200=DISCH1 amber, 240=DISCH2 amber
 - Key lessons: CONSTANT interpolation on all emission curves; hold keyframe N-1 before each event; unique material per animated indicator; never read `ob.location` from scene — hard-code rest positions
 - Script: `/private/tmp/eng1_fire_complete.py`
+
+### [2026-05-25] HYD overhead panel — hyd_panel.py (base panel two)
+- Blender: v5.1.1
+- PICS: `~/Desktop/PANELS/HYD/Hydraulic-Panel.jpg`, `a320-ovhd-hyd-40vu.webp`, `FCOM SHOT.png`
+- FCOM 4a: DSC-29-20 (HYD Controls & Indicators); FCOM 4b: DSC-29-10 (HYD Description)
+- Panel: 200×75 mm, PX = 0.25, BTN_PX_22 = 88 px (22 mm caps)
+- 6 controls L→R: ENG 1 PUMP, RAT (red guard), BLUE ELEC PUMP, PTU, ENG 2 PUMP, right ELEC PUMP
+- 3 zone labels: GREEN (col 0), BLUE (col 2), YELLOW (col 4 only — not averaged across col 4+5)
+- Inline callouts on the river: `RAT MAN ON` (partial right bracket only) and `[PTU]` (bracket pair)
+- Key lessons (all codified in §2c above):
+  - Two-cell pbs use 55/45 split with light-gray inner frame around BOTbg only
+  - Function brackets are 3-sided (open at bottom, half-height L/R ticks)
+  - River segments BREAK around callouts; never overlap text or pbs
+  - BLUE junction uses a true Bezier semicircular dome (K=0.5523); GREEN and YELLOW are plain T-junctions
+  - `gray_border` material #7A7A7A non-metallic for flat borders; metallic gray (`screw` #C8CED6) reads whitish under lights
+  - Halved area-light energies (vs fire-panel-best) since HYD is ~¼ the area
+  - Standard view transform preserves #33607A panel color
+- best_version snapshot: `blender/hyd/best_version/hyd_panel_BEST.py` and `hyd_panel_build_BEST.py`
+- Script: `blender/hyd/hyd_panel.py`

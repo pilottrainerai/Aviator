@@ -267,6 +267,56 @@ and asks the user before assigning any value.**
 
 ---
 
+## 2c. Flow art and pb-cell conventions
+
+**Mirror of the conventions codified in `blender-panels` §2c, applied to
+2-D React mockups of cockpit panels. Reference: HYD overhead panel built
+2026-05-25 (the second base panel, after fire_panel_two).**
+
+### Green flow art (in React/SVG/CSS)
+
+1. **Flow lines never overlap pb caps or any text label.** When a flow
+   line would pass over a callout or pb, break the line into segments
+   with a gap. Apply via two separate `<div>`/`<line>` elements rather
+   than one continuous line with z-index gymnastics.
+2. **Orthogonal lines only** — horizontal + vertical with right-angle
+   corners. No SVG `<path>` curves for cross-zone connections.
+3. **Function-bracket labels are 3-sided** — top + left + right, OPEN at
+   the bottom toward the pb. Render with CSS `border-top`, `border-left`,
+   `border-right`; leave `border-bottom: none`.
+4. **Callouts on the flow line** (e.g. `RAT MAN ON`, `[PTU]`): plain text
+   with partial brackets — and the flow line is BROKEN around the
+   bracket span. Use `display: flex` with `gap` to lay out
+   `[flow-segment] [callout] [flow-segment]`.
+5. **Junction emphasis** = a single SVG semicircle below the line (for
+   the BLUE-equivalent zone). All other zone junctions are plain
+   T-junctions.
+
+### Two-cell pushbutton cells (FAULT/OFF style)
+
+6. **Cell split is 55% top / 45% bottom** — top cell (FAULT) is taller,
+   bottom cell (OFF/ON) shorter. In Tailwind/CSS, use explicit `flex`
+   ratios (`flex-[55]` / `flex-[45]` or `h-[55%]` / `h-[45%]`), not
+   `flex-1` / `flex-1`.
+7. **Thin light-gray inner frame around the BOTTOM cell only** (not the
+   top). Render via a CSS `box-shadow: inset 0 0 0 1.5px #7A7A7A;` or an
+   absolutely-positioned `<div>` with a 1.5 px border, INSIDE the
+   bottom cell. Outer dimensions of the bottom cell are unchanged.
+8. **Border color is `#7A7A7A`** (non-metallic mid-gray). The Blender
+   `screw` material at `#C8CED6` reads as whitish under render lighting
+   — in flat 2-D it's less of an issue, but match the Blender canon to
+   keep the two renderings in sync.
+9. **The top edge of the bottom-cell inner frame doubles as the
+   FAULT/OFF divider.** Do not add a separate horizontal divider line.
+
+### Source of truth
+For any new 2-D cockpit panel, FOLLOW the Blender best_version's
+construction one-for-one — same x positions (scaled), same cell ratios,
+same border colors. The blender-panels script is the canonical layout;
+React mirrors it.
+
+---
+
 ## 3. Source library and FCOM chapter map
 
 ### Manual files
@@ -537,3 +587,14 @@ Add a new entry each time a Checkpoint B passes.
 - FCOM 4b: DSC-26-20-10 "DESCRIPTION"
 - Key values: pb roughly square `[photo]` — SQUIB WHITE when FIRE pb released `[fcom:4a:L44434]` — DISCH AMBER when bottle loses pressure `[fcom:4a:L44436]` — pb becomes active only after FIRE pb released `[fcom:4a:L44429]`
 - File: `src/components/cockpit/fire-panel.tsx`
+
+### [2026-05-25] HYD overhead panel — hyd-panel.tsx (base panel two)
+- PICS: `~/Desktop/PANELS/HYD/Hydraulic-Panel.jpg`, `a320-ovhd-hyd-40vu.webp`, `FCOM SHOT.png`
+- FCOM 4a: DSC-29-20 (HYD Controls & Indicators)
+- FCOM 4b: DSC-29-10 (HYD Description)
+- Canonical layout source: `blender/hyd/best_version/hyd_panel_BEST.py` (3-D best version) — React mockup mirrors it
+- Six pbs L→R: ENG 1 PUMP, RAT (red guard), BLUE ELEC PUMP, PTU, ENG 2 PUMP, right ELEC PUMP
+- Two-cell pbs use 55/45 split with light-gray (`#7A7A7A`) inner frame around BOTTOM cell only (the new §2c rule)
+- Function brackets are 3-sided green (open at bottom toward pb)
+- Flow art: two horizontal green segments connecting zones, broken around RAT MAN ON and PTU callouts; semicircular dome at BLUE junction only
+- File: `src/components/cockpit/hyd-panel.tsx` (work in progress — to be aligned with the Blender best version)
