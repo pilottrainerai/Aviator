@@ -1,294 +1,539 @@
 ---
 name: cockpit-ui
-description: FCOM-driven brain for the visual rendering of A320 cockpit elements in Aviator. Use BEFORE editing or extending any cockpit visual — PFD, ND, ECAM/EWD/SD, FMA, attitude indicator, speed/altitude/VS tapes, bank scale, sideslip, FIRE pushbuttons, master switches, glareshield lights, AGENT pb, or any other indicator/control. The skill enforces a manual-first, READ-ONLY workflow: locate the FCOM "controls and indications" section for the element via grep, extract the visual spec (geometry, colors, behaviour, conditions), compare against the current canvas/JSX rendering, classify divergences, and produce an assessment only. Code changes are gated behind explicit trigger phrases. Trigger on any UI/styling/visual ask that touches a cockpit element — colors, fonts, layout positions, animations, blink behaviour, indicator wiring, or "make it look like the FCOM photo".
+description: FCOM-driven brain for the visual rendering of A320 cockpit elements in Aviator. Use BEFORE editing or extending any cockpit visual — PFD, ND, ECAM/EWD/SD, FMA, attitude indicator, speed/altitude/VS tapes, bank scale, sideslip, FIRE pushbuttons, master switches, glareshield lights, AGENT pb, or any other indicator/control. Enforces a six-input intake: NAME, GOAL, PICS, FCOM Controls & Indications (4a), FCOM System Description (4b), USER INPUTS — all six required before any assessment or code. §0 hard rules are always in effect — Claude never asks the user to re-state them. FCOM and FCTM are mandatory references. No improvisation, no values from training data.
 ---
 
 # Cockpit-UI Skill — FCOM-driven visual brain
 
 Sister skill to `a320-fcom-trainer` (which handles procedure/ECAM logic). This
-one handles **visual rendering** — making each cockpit element pixel-faithful
-to FCOM's own description, not to a photo or my training-data approximation.
+one handles **visual rendering** — making each cockpit element faithful to FCOM
+and the reference photos provided by the user, not to Claude's own approximation.
 
-This skill is **read-only assessment**. No code is modified until the user
-gives a trigger phrase from §6.
+**The single most important rule: Claude's own brain is NOT a valid source.
+Every value — color, size, position, animation — must come from PICS, REFERENCES,
+or USER INPUTS. If none of the three provide a value, Claude stops and asks.**
 
 ---
 
-## 0. Hard rules
+## 0. Hard rules (non-negotiable)
 
-1. **Do not redesign anything from scratch.** The Aviator canvas/JSX layout is the baseline.
-2. **Do not invent visual properties.** Every color/dimension/animation cited must come from a grep-able FCOM section, an existing project doc, or be tagged `simulation-placeholder`.
-3. **Photos are reference, not specification.** Always cross-check a photo against the FCOM text dump. If the two disagree, prefer FCOM text and surface the conflict.
-4. **One element at a time.** Push back on "redesign the PFD" — ask which element (FMA, ADI, speed tape, alt tape, VSI, bank scale, sideslip, etc.).
+1. **Six inputs before anything else.** No assessment, no plan, no code until
+   all six inputs from §1 are collected. If any are missing, ask for them.
+2. **No self-generated values.** Claude does not invent colors, dimensions,
+   font sizes, spacing, animations, or behavior from its own training data or judgment.
+3. **No "approximately".** Every literal in the code must trace to a row in
+   the plan that traces to PICS, REFERENCES, or USER INPUTS.
+4. **Do not redesign anything not in scope.** Touch only the named element.
 5. **No silent refactors.** If asked to fix the FMA, don't also rewrite the speed tape.
+6. **Photos are measurement sources, FCOM is behaviour source.** If they conflict,
+   surface the conflict and ask the user which to follow.
+7. **One element at a time.** Push back on "redesign the PFD" — ask which element.
+8. **No code before "go".** The plan must be approved first.
+9. **Font and text must match reference exactly.** The typeface, size, weight,
+   letter-spacing, and color of every label on a panel must come from PICS or
+   FCOM. Claude does not choose or substitute fonts on its own.
+10. **Panel text sizing must match reference.** If PICS show a label at a certain
+    size relative to the panel, Claude measures that ratio from the photo and
+    uses it. If FCOM gives a description, Claude uses that. If neither provides
+    the size, Claude stops and asks — it does not guess.
+11. **Claude does not add anything unprompted.** No extra labels, borders,
+    indicators, shadows, decorations, or features that are not in PICS, FCOM,
+    or USER INPUTS. If Claude thinks something should be added, it asks first.
+12. **When in difficulty, stop and discuss.** If Claude is uncertain about any
+    value, behavior, proportion, or approach — it stops immediately and presents
+    the difficulty to the user. It does not make a decision and continue.
+    Format: "I'm stuck on [X]. Options are [A / B / C]. Which do you want?"
 
 ---
 
-## 1. Source library — same as a320-fcom-trainer
+## 1. The six mandatory inputs
 
-Located at `~/.claude/manuals/a320/`:
-
-| File | Why for UI |
-|---|---|
-| `fcom-full.txt` | DSC-31 (PFD/ND/ECAM rendering), DSC-22 (FMA modes), DSC-26 (fire panel) — visual specs live here |
-| `fctm-full.txt` | Technique nuances — when an indicator changes color, what triggers a flash, etc. |
-| `eng-malfunctions.txt` | Engine-display behaviours during malfunctions |
-| `cockpit-fam.txt` | A320 cockpit familiarization — element-by-element layout index for the GLARESHIELD, MAIN PANEL, PFD, ND, ISIS, EFIS, FCU, E/WD, OHP, MCDU, ECAM SD pages, and PEDESTAL. **First grep this file when a UI ask names an element ("ND mode knob", "GEN 1 indication on ELEC page"). It gives the canonical name + which panel/screen the element lives on, so you can then jump to the right FCOM DSC chapter.** |
-
-PDFs in `~/Desktop/snap avia/` are the source of truth if the text dump is unclear (e.g., a diagram). Re-extract via `pdftotext -layout`.
-
----
-
-## 2. FCOM chapter map for cockpit elements
-
-Use this to know WHICH section to grep before answering a UI question.
-
-| Element / panel | FCOM chapter | Grep anchor |
-|---|---|---|
-| PFD — Attitude Data (ADI, pitch ladder, roll/bank scale, sideslip) | DSC-31-40 | `"ATTITUDE DATA"` |
-| PFD — Airspeed (tape, VLS/VFE/VAPP markers, Mach, trend) | DSC-31-40 | `"AIRSPEED"` |
-| PFD — Altitude (tape, target alt, baro ref, RA, linear deviation) | DSC-31-40 | `"ALTITUDE"` |
-| PFD — Vertical Speed (scale, pointer, digital readout) | DSC-31-40 | `"VERTICAL SPEED"` |
-| PFD — Heading / Track (tape, lubber, selected hdg/trk, true/mag) | DSC-31-40 | `"HEADING"` |
-| PFD — Flight Path Vector / Bird | DSC-31-40 | `"FLIGHT PATH VECTOR"` |
-| PFD — Guidance / FD bars / Trajectory deviation | DSC-31-40 | `"GUIDANCE"` |
-| PFD — Flight Mode Annunciator (FMA) | DSC-31-40 | `"FLIGHT MODE ANNUNCIATOR"` |
-| PFD — Flags & messages | DSC-31-40 | `"FLAGS AND MESSAGES"` |
-| ND — All modes (ROSE, ARC, PLAN, ROSE LS/VOR/NAV) | DSC-31-45 | `"ROSE MODE"`, `"ARC MODE"`, `"PLAN MODE"` |
-| ND — Weather radar, terrain, traffic | DSC-31-45 | `"WEATHER RADAR"`, `"PWS"` |
-| ECAM E/WD (upper screen) | DSC-31-30 | `"ECAM SEQUENCE"`, `"ECAM CONTROLS"` |
-| ECAM SD (lower screen) per system page | DSC-31-30 | `"SYSTEM DISPLAY"` |
-| Engine display (N1/N2/EGT/FF gauges) | DSC-31-30 + DSC-70 | `"ENGINE PRIMARY"`, `"ENGINE SECONDARY"` |
-| FCU / glareshield (AP/ATHR/heading sel/baro knob) | DSC-22 | `"FCU"` |
-| Master Warning / Master Caution lights | DSC-31-25 | `"MASTER WARN"` |
-| Fire panel (ENG MASTER, FIRE pb, AGENT pb, APU FIRE pb) | DSC-26-20 | `"FIRE PUSH"`, `"AGENT"`, `"ENG FIRE"` |
-| OHP (overhead) — ELEC, HYD, BLEED, FUEL, etc. | DSC-24, DSC-29, DSC-36, DSC-28 | `"OVERHEAD PANEL"` plus system |
-| Pedestal — thrust levers, eng masters, speed brake, flap lever | DSC-22, DSC-27, DSC-70 | `"THRUST LEVERS"`, `"FLAP LEVER"` |
-
-**Don't memorize this table — refer back when a new element comes up.** When a cockpit element doesn't fit any row, grep liberally and surface the FCOM section back in the assessment.
-
-### Grep recipe
-
-```bash
-# Find the section
-grep -nE "FLIGHT MODE ANNUNCIATOR|FMA" ~/.claude/manuals/a320/fcom-full.txt | head
-
-# Read a window around a hit
-sed -n '<line-200>,<line+200>p' ~/.claude/manuals/a320/fcom-full.txt
-```
-
-If the FCOM dump has the section but content is fragmented (PDF→text artefacts), open the PDF directly via `Read` with a page range.
-
----
-
-## 3. Visual classification labels
-
-Every observation about a UI element gets exactly one tag:
-
-| Label | Meaning |
-|---|---|
-| `fcom-spec-derived` | Geometry/color/behaviour explicitly stated in an FCOM section, with citation |
-| `fctm-technique-derived` | Visual rule from FCTM (e.g., when something flashes, when amber vs red) |
-| `inferred-from-source` | Reasonable extension where FCOM is silent (e.g., exact px sizes — FCOM gives proportions, not pixels) |
-| `existing-implementation` | What the Aviator code currently does — neutral observation |
-| `simulation-placeholder` | Stand-in we know is non-spec (e.g., we use a JetBrains font where FCOM doesn't specify a font face) |
-| `improvement-suggestion` | Proposed visual change — does NOT execute until §6 trigger |
-
----
-
-## 4. Workflow — every UI ask
-
-1. **Identify the element.** If unclear ("the green thing on the right"), ask. Map it to a row in §2.
-2. **Grep the FCOM dump** for the matching section. Read enough context to capture: geometry (proportions/positions), colors, dynamic behaviour (when it shows/hides/changes), and conditions.
-3. **Read the existing Aviator implementation.** Find the canvas-draw function or React component (`src/components/cockpit/...`).
-4. **Extract a spec table** comparing FCOM-derived rules vs current implementation. Use the format in §5.
-5. **Classify each row** per §3.
-6. **Produce an assessment** (§5 format). Do not modify code.
-7. **Wait for a trigger phrase** (§6).
-
----
-
-## 5. Standard assessment output
+Before any work begins, Claude must have ALL of the following. If any are missing,
+Claude asks for them — one question per missing item, clearly labelled.
+§0 hard rules are always in effect — they are never inputs and never re-asked.
 
 ```
-Element:
-FCOM section / lines:
-Visual spec (FCOM-derived):
-  - color:
-  - geometry:
-  - dynamic behaviour:
-  - conditions:
-Existing implementation (file:line):
-Divergences:
-  | # | Property | FCOM says | Code does | Classification | Severity |
-Risk of changing now:
-Recommended fix (if any):
-Files to edit:
-Do not modify yet:
+1. NAME / TRIGGER   — What cockpit element? What invoked this skill?
+                      Examples: "FIRE pb", "FMA speed column", "AGENT pb SQUIB cell"
+
+2. THE GOAL         — What should it look like or do when done?
+                      Examples: "Match FCOM photo exactly", "SQUIB snaps on white
+                      when pb released, off when AGENT pressed"
+
+3. PICS             — One or more reference photos from the user.
+                      Claude reads the photo for: geometry, colors, proportions,
+                      typography, borders, states (on/off/armed).
+                      Claude does NOT use training-data photos — only what the user provides.
+
+4. REFERENCES       — Two specific FCOM sections are ALWAYS required. Both must
+                      be read and extracted before any plan is made.
+
+                      4a. CONTROLS AND INDICATIONS
+                          The FCOM section that describes exactly how each control,
+                          pushbutton, light, and indicator on the element behaves —
+                          what triggers it, what color it shows, what it means.
+                          This is the primary source for ALL visual states and logic.
+                          Example: DSC-26-20-20 "CONTROLS AND INDICATIONS" for fire panel.
+
+                      4b. SYSTEM DESCRIPTION
+                          The FCOM section that describes how the underlying system
+                          works — gives context so indicator logic makes sense.
+                          Example: DSC-26-20-10 "DESCRIPTION" for fire suppression system.
+
+                      If the user does not know the section codes, Claude finds them
+                      via the chapter map in §3, greps both, and shows the extracted
+                      text to the user for confirmation before treating it as reference.
+
+                      Without BOTH 4a and 4b extracted and confirmed — work stops.
+
+5. USER INPUTS      — Specific values, corrections, preferences, or element-specific
+                      constraints the user states. These override PICS and FCOM.
+                      Examples: "the red should be #FF0000", "border 2px thicker",
+                      "do not touch the guard animation", "SQUIB and DISCH must
+                      have separate materials", "do not change anything outside
+                      the AGENT pb body".
+                      Can be "none" — user must confirm.
+                      §0 hard rules are always in effect and never need re-stating.
 ```
 
-**Severity scale:**
-- `critical` — wrong information presented to crew (e.g., armed mode shown as active)
-- `high` — wrong color semantics (e.g., caution shown red instead of amber)
-- `medium` — wrong proportions / position / animation (e.g., FD bars unequal length)
-- `low` — cosmetic noise (e.g., font weight slightly off)
+**Checklist before proceeding:**
+
+```
+[ ] NAME / TRIGGER received
+[ ] GOAL received
+[ ] PICS received (at least one photo — check ~/Desktop/PANELS/ first)
+[ ] REFERENCES — 4a: Controls and Indications extracted and confirmed
+[ ] REFERENCES — 4b: System Description extracted and confirmed
+[ ] USER INPUTS received (values, corrections, element-specific constraints; "none" is valid)
+→ All six checked: proceed to §2 intake summary
+→ Any unchecked: stop and ask. Do not proceed on partial references.
+```
 
 ---
 
-## 6. Trigger phrases that authorize implementation
+## 2. Intake summary (show before any plan)
 
-- **"Apply this fix"** — surgical change for a specific divergence in the assessment.
-- **"Rebuild this element"** — full canvas-draw rewrite of one named element.
-- **"Match the FCOM spec"** — apply ALL `fcom-spec-derived` divergences in the assessment.
-
-If the user asks for a change without a trigger phrase, return an assessment and ask which trigger applies.
-
----
-
-## 7. Anti-patterns
-
-- ❌ Reading a screenshot and going straight to code without grepping FCOM.
-- ❌ Inferring colors / geometry from a low-resolution photo when FCOM explicitly states them.
-- ❌ Mixing `fcom-spec-derived` and `inferred-from-source` items without labels.
-- ❌ Designing a "more readable" version that diverges from FCOM (this is a TRAINER — fidelity > prettiness).
-- ❌ Re-rendering an entire panel because one tick mark is wrong.
-- ❌ Treating PFD captain side and PFD F/O side as separate cases — FCOM uses `PFD` to mean both.
-- ❌ Ignoring the FCTM. FCOM says *what*, FCTM says *when/why*. Both inform visual behaviour.
-
----
-
-## 8. Cross-skill coordination
-
-- If a UI ask touches procedure semantics (e.g., "the FIRE pb light should go off after AGENT 2 + ENG MASTER off"), invoke `a320-fcom-trainer` for the logic and use this skill for the visual. Both assessments merge into one report.
-- If a procedure ask touches visual rendering (e.g., "ENG OUT badge on FMA"), `a320-fcom-trainer` produces the procedure assessment and references this skill for visual specification.
-
----
-
-## 9. SME flag
-
-If FCOM is silent on a visual property and FCTM doesn't fill the gap:
-
-```ts
-// TODO(sme-ui): verify <property> against current ops manual
-// classification: simulation-placeholder
-```
-
-And note in the assessment under `Divergences` with severity `low` and classification `simulation-placeholder`.
-
----
-
-## 10. Build Mode — high-fidelity panel construction
-
-**Auto-engages** whenever the user wants to build or reproduce a cockpit
-element with fidelity to a reference.  The reference can be:
-- A **photo** (alone) — Claude reads measurements from the image.
-- An **FCOM/FCTM section** (alone) — e.g., "Build the BLEED panel per DSC-36-20" — Claude greps the section and treats the manual as the visual spec.
-- **Both** — photo + FCOM section — Claude uses photo for measurements/colors AND FCOM for behaviour/states, cross-checking the two.
-
-User does not need to remember the protocol — Claude runs the internal
-phases and surfaces only **two checkpoints**.
-
-### 10.1 The two checkpoints
+Once all six inputs are collected, Claude produces a one-page intake summary
+and waits for the user to confirm it before moving to the plan.
 
 ```
-Checkpoint A — THE PLAN
-  Claude shows ONE document: scope + measurements + FCOM check + tech choice.
-  User: "go" → proceed.  Or: "fix X" → revise the plan, show again.
+┌─ INTAKE SUMMARY ───────────────────────────────────────────────────┐
+ELEMENT:        <name>
+GOAL:           <goal statement>
+PHOTOS:         <count> photo(s) received — key observations listed below
+FCOM (4a):      Controls & Indications — <section code> confirmed
+FCOM (4b):      System Description — <section code> confirmed
+USER INPUTS:    <list of specific values / overrides / "none">
+RULES:          <list of constraints / "none">
 
-Checkpoint B — THE RESULT
-  Claude shows ONE document: code summary + render diff (photo vs build).
-  User: "done" → ship.  Or: "fix Y" → ONE focused iteration, then done.
-```
+PHOTO OBSERVATIONS:
+  • <observation 1> — source: photo
+  • <observation 2> — source: photo
+  • ...
 
-That's it.  The user only ever says "go" / "done" or specific corrections
-("the legend cell is too short", "make the border thinner").  Claude
-handles scope-lock, measurement, FCOM grep, implementation plan,
-verification, and the one-iteration cap internally.
+CONTROLS & INDICATIONS EXTRACTS (4a):
+  • <indicator/control>: <behavior / color / trigger> — FCOM <section>, line <N>
+  • ...
 
-### 10.2 Checkpoint A — THE PLAN
+SYSTEM DESCRIPTION EXTRACTS (4b):
+  • <system context>: <detail> — FCOM <section>, line <N>
+  • ...
 
-Single combined output before any code is written.  Format:
+CONFLICTS (photo vs FCOM):
+  • <property>: photo=<X>, FCOM=<Y> → awaiting user direction
 
-```
-┌─ THE PLAN ─────────────────────────────────────────────────────────┐
-SCOPE:        <element name>.  In scope: <X>.  Out of scope: <Y>.
-FCOM:         <DSC-XX-YY> — <one-line summary of what FCOM says>
+GAPS (neither photo nor FCOM provide a value):
+  • <property>: no source found → will ask user before using any value
 
-MEASUREMENTS (from photo):
-  Container:        <W>px × <H>px (≈<X%> of panel)
-  Sub-elements:
-    • <name>:       <W>×<H> px at <x,y>, color #XXXXXX
-    • ...
-  Typography:       <font> <size>px <weight>, letter-spacing <X>em
-  Borders/shadow:   <details>
-  States:           off=<color>  lit=<color>  armed=<color>
+RULES IN EFFECT:
+  BUILT-IN (§0 + §6 + §10 — always apply, non-negotiable):
+  • No self-generated values — every value from FCOM, PICS, or USER INPUTS only
+  • Font, size, placement must match PICS or FCOM exactly — no approximation
+  • Colors and light states from FCOM 4a only — photos confirm, not decide
+  • Touch only the named element — nothing outside scope
+  • No code before "go"
+  • Stop and discuss when uncertain — never make a decision silently
+  ELEMENT-SPECIFIC (user stated for this task):
+  • <rule> — or "none"
 
-PHOTO vs FCOM:
-  • <property>: photo=<X>, FCOM=<Y> → using <source> because <reason>
-
-PLAN:
-  File:             src/components/cockpit/<file>.tsx
-  Render mode:      <SVG | canvas | div+CSS>  (why: <reason>)
-  Open questions:   <anything Claude is unsure about — flag for user>
+Ready to build plan? Say "go" to proceed.
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**User responses at Checkpoint A:**
-- **"go"** / **"approved"** / **"build it"** → Claude moves to code.
-- Specific correction ("legend cell should be 30% tall not 35%") → Claude updates the plan in place and shows it again.
-- **"new spec"** → abandon, ask for a fresh photo / scope.
+**User says "go" → proceed to §4 plan.**
+**User corrects something → update intake summary, show again.**
+**CONFLICTS or GAPS exist → do NOT assume. Ask the user to resolve each one.**
 
-Claude does NOT write code until "go" is said.
+### Worked example — ENG 1 FIRE pushbutton
 
-### 10.3 Checkpoint B — THE RESULT
+```
+┌─ INTAKE SUMMARY — ENG 1 FIRE pb ───────────────────────────────────┐
+ELEMENT:        ENG 1 FIRE pushbutton
+GOAL:           Face lights red on fire detection; SQUIB white when pb
+                released; DISCH amber when agent fires
+PHOTOS:         2 photos received
+FCOM (4a):      DSC-26-20-20 "CONTROLS AND INDICATIONS" — confirmed
+FCOM (4b):      DSC-26-20-10 "DESCRIPTION" — confirmed
+USER INPUTS:    none
+RULES:          Do not touch guard animation. Colors from FCOM only.
 
-After code is written, Claude takes a final pass: it summarises what was
-written and asks the user for a screenshot of the rendered output.  Once
-the user provides the screenshot, Claude shows:
+PHOTO OBSERVATIONS:
+  • pb body: wider than tall, W:H ≈ 2.0    [photo]
+  • FIRE legend: white text, top half of face   [photo]
+  • PUSH legend: white text, bottom half of face   [photo]
+  • lit state: entire face illuminates red   [photo]
+  • guard: covers full pb face, hinges at top   [photo]
+  • SQUIB cell: small, upper right of pb face   [photo]
+  • DISCH cell: small, lower right of pb face   [photo]
+
+CONTROLS & INDICATIONS EXTRACTS (4a):
+  • FIRE pb: "lights up red" when fire is detected   [fcom:4a:L8241]
+  • SQUIB: "comes on white when the flight crew releases the FIRE pb"
+    [fcom:4a:L8265]
+  • DISCH: "comes on amber when the squib of the agent fires"
+    [fcom:4a:L8278]
+
+SYSTEM DESCRIPTION EXTRACTS (4b):
+  • Two fire detection loops monitor each engine   [fcom:4b:L8190]
+  • FIRE pb arms extinguishing agent when pressed   [fcom:4b:L8201]
+
+CONFLICTS:
+  • none
+
+GAPS:
+  • Exact px dimensions: no FCOM spec → measuring from photo
+
+RULES IN EFFECT:
+  BUILT-IN (always apply):
+  • No self-generated values — FCOM + PICS + USER INPUTS only
+  • Font, size, placement must match PICS/FCOM exactly — no approximation
+  • Colors and light states from FCOM 4a only — photos confirm, not decide
+  • Touch only the named element — nothing outside scope
+  • No code before "go" — stop and discuss when uncertain
+  ELEMENT-SPECIFIC:
+  • Do not touch the guard animation
+  • SQUIB and DISCH cells must have separate materials
+
+Ready to build plan? Say "go" to proceed.
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2a. Layout and alignment — source mapping
+
+Pushbutton size, alignment, and panel layout are tracked properties.
+Every aspect maps to a specific input — Claude does not estimate any of them.
+
+| Layout property | Where it comes from | Input category |
+|---|---|---|
+| Panel grid — how many pbs, rows/columns, overall arrangement | FCOM System Description (4b) — panel layout diagrams and text | REFERENCES 4b |
+| Individual pb body dimensions (width × height) | PICS — measure width and height from photo, note W:H ratio | PICS |
+| Pb proportions (wider than tall? square?) | FCOM Controls & Indications (4a) often states shape; PICS confirms | PICS + REFERENCES 4a |
+| Pb-to-pb spacing and gutters | PICS — measure gap between pb edges relative to pb width | PICS |
+| Pb position on panel (x, y offset from panel origin) | PICS — measure from panel edge | PICS |
+| Label text inside pb (what words, what case) | FCOM Controls & Indications (4a) names each light and legend | REFERENCES 4a |
+| Label position within pb (top legend / bottom legend / centre) | PICS — measure text centre relative to pb centre | PICS |
+| Label font size relative to pb body | PICS — measure text height as % of pb height | PICS |
+| Label color (lit vs unlit) | FCOM Controls & Indications (4a) — authoritative | REFERENCES 4a |
+| Guard size and alignment relative to pb | PICS — guard covers pb exactly; measure overhang | PICS |
+| User correction to any of the above | Overrides PICS and FCOM | USER INPUTS |
+
+**Rule: if PICS do not show a layout property clearly enough to measure,
+Claude stops and asks for a closer photo or explicit value. It does not estimate.**
+
+---
+
+## 2b. Color and light indications — FCOM is the only source
+
+**Colors and light states come from FCOM Controls & Indications (4a) only.**
+Photos may be used to visually confirm a color, but they are NOT the source.
+Claude does not pick colors from photos, from training data, or from its own judgment.
+
+| Property | Source | Rule |
+|---|---|---|
+| Pushbutton lit color (red, amber, white, green, blue) | FCOM 4a — explicit color name | Use FCOM. If photo disagrees, surface conflict, ask user. |
+| Pushbutton unlit appearance | FCOM 4a — "off" state description | Use FCOM. |
+| Indicator light color (SQUIB white, DISCH amber, FIRE red) | FCOM 4a — explicit per indicator | Use FCOM exactly. |
+| Light ON trigger (what event causes it) | FCOM 4a — "comes on when..." | Use FCOM verbatim. |
+| Light OFF trigger (what event clears it) | FCOM 4a — "goes off when..." | Use FCOM verbatim. |
+| Flashing / steady / pulsing behavior | FCOM 4a — stated explicitly | Use FCOM. If silent, mark simulation-placeholder and ask. |
+| Panel body color (aluminum, dark gray, etc.) | PICS — structural color, not a system indication | PICS only. |
+| Label text color when unlit | FCOM 4a if stated; PICS as fallback | FCOM first. |
+
+**If FCOM 4a does not state a color or light state explicitly →
+Claude marks it `simulation-placeholder`, flags it in the intake summary,
+and asks the user before assigning any value.**
+
+---
+
+## 3. Source library and FCOM chapter map
+
+### Manual files
+
+All at `~/.claude/manuals/a320/`:
+
+| File | When to use |
+|---|---|
+| `fcom-full.txt` | Primary — all system descriptions, normal/abnormal procedures, controls & indications |
+| `fctm-full.txt` | Technique nuances — when/why, crew coordination philosophy, normal and abnormal |
+| `tasksharing.txt` | CM1/CM2 split — who does each step for every procedure |
+| `callouts.txt` | Verbatim PF/PM callouts (extracted from FCOM PRO-ABN-ABN-00) |
+| `abnormal-procs.txt` | Abnormal procedure tasksharing tables |
+| `abnormal-notes.txt` | Gap analysis — ECAM vs QRH vs FCOM differences |
+| `eng-malfunctions.txt` | Engine identification, indications, recommendations |
+
+**Reference photos (PICS source):**
+
+| Folder | Contents |
+|---|---|
+| `~/Desktop/PANELS/fire panel/` | `a320-ovhd-fire-45vu.webp` — full ENG1/APU/ENG2 fire panel |
+| `~/Desktop/PANELS/HYD/` | Hydraulic panel reference |
+| `~/Desktop/PANELS/AIR COND/` | Air conditioning + ADIRS panels |
+| `~/Desktop/PANELS/FLTCTL COMP/` | Flight control computer panels |
+| `~/Desktop/PANELS/EVAC/` | Evacuation panel |
+| `~/Desktop/PANELS/OVHD PANEL/` | Full overhead panel |
+| `~/Desktop/FirePanel/eng1_left_panel/` | Blender model: `.blend`, `.fbx`, `.png` |
+
+**Grep recipe:**
+```bash
+grep -nE "<term>" ~/.claude/manuals/a320/fcom-full.txt | head
+grep -nE "<term>" ~/.claude/manuals/a320/fctm-full.txt | head
+sed -n '<start>,<end>p' ~/.claude/manuals/a320/fcom-full.txt
+```
+
+### FCOM chapter map
+
+Use this to locate the right section to grep. When the user does not know
+the section, Claude finds the best match here, greps it, and confirms with
+the user before treating it as the reference.
+
+Each element needs TWO sections: System Description (4b) + Controls and Indications (4a).
+
+| Element / panel | System Description (4b) | Controls & Indications (4a) |
+|---|---|---|
+| PFD — Attitude Data (ADI, pitch, roll, sideslip) | DSC-31-40 `"GENERAL"` | DSC-31-40 `"ATTITUDE DATA"` |
+| PFD — Airspeed tape | DSC-31-40 `"GENERAL"` | DSC-31-40 `"AIRSPEED"` |
+| PFD — Altitude tape | DSC-31-40 `"GENERAL"` | DSC-31-40 `"ALTITUDE"` |
+| PFD — Vertical Speed | DSC-31-40 `"GENERAL"` | DSC-31-40 `"VERTICAL SPEED"` |
+| PFD — Heading / Track | DSC-31-40 `"GENERAL"` | DSC-31-40 `"HEADING"` |
+| PFD — Flight Path Vector | DSC-31-40 `"GENERAL"` | DSC-31-40 `"FLIGHT PATH VECTOR"` |
+| PFD — FD bars / Guidance | DSC-22-30 `"DESCRIPTION"` | DSC-31-40 `"GUIDANCE"` |
+| PFD — Flight Mode Annunciator | DSC-22-30 `"DESCRIPTION"` | DSC-31-40 `"FLIGHT MODE ANNUNCIATOR"` |
+| ND — All modes | DSC-31-45 `"GENERAL"` | DSC-31-45 `"ROSE MODE"` / `"ARC MODE"` / `"PLAN MODE"` |
+| ECAM E/WD | DSC-31-30 `"GENERAL"` | DSC-31-30 `"ECAM CONTROLS"` |
+| ECAM SD pages | DSC-31-30 `"GENERAL"` | DSC-31-30 `"SYSTEM DISPLAY"` |
+| Engine display gauges | DSC-70 `"DESCRIPTION"` | DSC-31-30 `"ENGINE PRIMARY"` |
+| FCU / glareshield | DSC-22-10 `"DESCRIPTION"` | DSC-22-10 `"CONTROLS AND INDICATIONS"` |
+| Master Warning / Caution | DSC-31-25 `"DESCRIPTION"` | DSC-31-25 `"MASTER WARN"` |
+| Fire panel — FIRE pb, AGENT pb, ENG MASTER | DSC-26-20-10 `"DESCRIPTION"` | DSC-26-20-20 `"CONTROLS AND INDICATIONS"` |
+| OHP — ELEC panel | DSC-24 `"DESCRIPTION"` | DSC-24 `"CONTROLS AND INDICATIONS"` |
+| OHP — HYD panel | DSC-29 `"DESCRIPTION"` | DSC-29 `"CONTROLS AND INDICATIONS"` |
+| OHP — BLEED panel | DSC-36 `"DESCRIPTION"` | DSC-36 `"CONTROLS AND INDICATIONS"` |
+| OHP — FUEL panel | DSC-28 `"DESCRIPTION"` | DSC-28 `"CONTROLS AND INDICATIONS"` |
+| Pedestal — thrust levers, ENG MASTER | DSC-70 `"DESCRIPTION"` | DSC-22-30 `"CONTROLS AND INDICATIONS"` |
+
+**Grep recipe:**
+```bash
+grep -nE "ATTITUDE DATA|ADI" ~/.claude/manuals/a320/fcom-full.txt | head
+sed -n '<line-100>,<line+200>p' ~/.claude/manuals/a320/fcom-full.txt
+```
+
+---
+
+## 4. The plan (Checkpoint A)
+
+Only produced after intake summary is approved. Every row must trace to a source.
+
+```
+┌─ THE PLAN ─────────────────────────────────────────────────────────┐
+ELEMENT:        <name>
+SCOPE:          In scope: <X>.  Out of scope: <Y>.
+FCOM:           <DSC-XX-YY> — <one-line summary>
+RULES IN EFFECT: <list from intake / "none">
+
+MEASUREMENTS (source for every value in brackets):
+  Container:        <W>px × <H>px  [photo]
+  Sub-elements:
+    • <name>:       <W>×<H>px at <x,y>  [photo]
+    • <color>:      #XXXXXX  [photo / FCOM line N / user input]
+  Typography:       <font> <size>px <weight>  [photo / user input]
+  Borders:          <details>  [photo]
+  States:
+    off:   <color>  [FCOM line N]
+    lit:   <color>  [FCOM line N]
+    armed: <color>  [FCOM line N / user input]
+
+BEHAVIOUR:
+  • <trigger>: <visual change>  [FCOM line N]
+  • ...
+
+OPEN QUESTIONS (values with no source — must resolve before "go"):
+  • <property>: no source — please specify
+
+File:           src/components/cockpit/<file>.tsx
+Render mode:    <SVG | canvas | div+CSS>
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**If OPEN QUESTIONS exist → do NOT proceed. Ask the user to resolve them.**
+**User says "go" with no open questions → write code.**
+**User corrects something → update plan, show again, wait for "go".**
+
+### Worked example — ENG 1 FIRE pb plan
+
+```
+┌─ THE PLAN — ENG 1 FIRE pb ─────────────────────────────────────────┐
+ELEMENT:        ENG 1 FIRE pushbutton face + SQUIB + DISCH cells
+SCOPE:          In scope: pb face, SQUIB state, DISCH state.
+                Out of scope: guard, AGENT pb, panel background.
+FCOM (4a):      DSC-26-20-20 "CONTROLS AND INDICATIONS"
+FCOM (4b):      DSC-26-20-10 "DESCRIPTION"
+RULES IN EFFECT:
+  • Do not touch guard animation
+  • Colors from FCOM only
+
+MEASUREMENTS:
+  pb body:          80px × 40px  [photo — W:H ratio 2.0]
+  FIRE legend:      top 50% of face, centred  [photo]
+  PUSH legend:      bottom 50% of face, centred  [photo]
+  Typography:       monospace 8px white all-caps  [photo]
+  SQUIB cell:       10px × 6px, upper-right of face  [photo]
+  DISCH cell:       10px × 6px, lower-right of face  [photo]
+
+STATES:
+  pb off:           background #1a1a1a, labels white   [photo]
+  pb lit (fire):    background #CC0000 (red)   [fcom:4a:L8241]
+  SQUIB off:        #1a1a1a   [photo]
+  SQUIB on:         white #FFFFFF   [fcom:4a:L8265 "comes on white"]
+  DISCH off:        #1a1a1a   [photo]
+  DISCH on:         amber #FFA500   [fcom:4a:L8278 "comes on amber"]
+
+BEHAVIOUR:
+  • ENG 1 fire detected → pb face goes red   [fcom:4a:L8241]
+  • FIRE pb released → SQUIB goes white   [fcom:4a:L8265]
+  • AGENT pb pressed → DISCH goes amber + SQUIB goes off   [fcom:4a:L8278]
+
+OPEN QUESTIONS:
+  • none
+
+File:           src/components/cockpit/fire-panel.tsx
+Render mode:    SVG
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5. Visual classification labels
+
+Every value in the plan gets exactly one source tag:
+
+| Tag | Meaning |
+|---|---|
+| `[photo]` | Read directly from a user-provided photo |
+| `[fcom:4a:LN]` | From Controls & Indications section, line N |
+| `[fcom:4b:LN]` | From System Description section, line N |
+| `[fcom:LN]` | From another FCOM section, line N |
+| `[fctm:LN]` | From FCTM, line N |
+| `[tasksharing:LN]` | From tasksharing.txt, line N |
+| `[callouts:LN]` | From callouts.txt, line N |
+| `[user-input]` | Explicitly stated by the user in this session |
+| `[simulation-placeholder]` | No source — flagged and user acknowledged |
+
+No tag = not allowed. If Claude cannot find a source, it stops and asks.
+**`inferred-from-source` is retired.** Claude does not infer. If there is no
+source, the value goes into OPEN QUESTIONS and the user is asked.
+
+---
+
+## 6. Code rules
+
+Once "go" is given:
+
+1. Every literal (px, hex color, font-size, padding, timing) must appear in the plan with a source tag.
+2. If a value is needed that is NOT in the plan → stop, ask, update plan, wait for "go" again.
+3. Touch only the element in scope — no surrounding code changes.
+4. TypeScript must pass (`npx tsc --noEmit`) before showing Checkpoint B.
+5. No comments that explain what the code does — only comments that cite the FCOM source for a non-obvious value.
+
+---
+
+## 7. Checkpoint B — The result
+
+After code is written and typecheck passes:
 
 ```
 ┌─ THE RESULT ───────────────────────────────────────────────────────┐
 FILES CHANGED:    <list>
-LINES:            <count> changed
-TYPECHECK:        pass / fail
+TYPECHECK:        pass
 
-RENDER DIFF (photo vs your screenshot):
-  | Property        | Spec        | Rendered    | Δ           | OK? |
-  | <prop>          | <value>     | <value>     | <delta>     | ✓/✗ |
+RENDER DIFF (plan vs implementation):
+  | Property     | Plan value  | Code value  | Source tag         | OK? |
+  | <prop>       | <value>     | <value>     | [photo/fcom/user]  | ✓/✗ |
 
-VERDICT:           DONE  /  needs 1 fix  /  needs new spec
+VERDICT:   DONE  /  one fix needed  /  needs new spec
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**User responses at Checkpoint B:**
-- **"done"** / **"ship it"** → element is complete; move on.
-- Specific correction ("the bottom face is too tall, shrink to 50% of body") → Claude does ONE focused iteration on those items only, then declares DONE or "needs new spec" — no further tweaking.
-- **"new spec"** → restart from Checkpoint A.
+**User says "done"** → complete.
+**User gives one correction** → one focused fix, then DONE or "needs new spec".
+**After one Checkpoint-B iteration → stop.** If still wrong, restart from intake.
 
-After one Checkpoint-B iteration, Claude stops.  If it's still wrong, the
-plan was wrong — restart.
+---
 
-### 10.4 Hard rules Claude enforces internally
+## 8. Trigger phrases
 
-These are NOT for the user to remember.  Claude enforces:
+- **"go"** — approve the intake summary or plan, proceed to next stage.
+- **"done"** — element is complete.
+- **"Apply this fix"** — surgical change for one named property.
+- **"Rebuild this element"** — full rewrite of one named element (restarts from intake).
+- **"Match the FCOM spec"** — apply all fcom-sourced divergences in the current assessment.
+- **"new spec"** — abandon current work, restart intake from scratch.
 
-1. **No code before the user says "go".**  Plan first.
-2. **No improvisation in code.**  Every literal (px, hex, font-size) must trace to a row in the plan's measurements.  No "approximately".
-3. **One iteration max after Checkpoint B.**  If still wrong, declare "needs new spec" — do not keep tweaking.
-4. **Touch only the in-scope element.**  No refactoring nearby code, no "while I'm here" cleanups.
-5. **No training-data guesses.**  Only the photo + FCOM grep determine values.
-6. **Typecheck must pass before showing Checkpoint B.**
+Any request to change code WITHOUT one of these phrases → Claude produces an
+intake checklist instead and asks which inputs are missing.
 
-### 10.5 What the user needs to remember
+---
 
-Literally two phrases:
-- **"go"** at Checkpoint A.
-- **"done"** at Checkpoint B (or one specific correction).
+## 9. Cross-skill coordination
 
-Plus optional escape hatches:
-- **"new spec"** to restart.
-- **"build mode"** to force-engage without a photo (rare).
+- For procedure/ECAM logic (e.g. "when does SQUIB light come on") → invoke `a320-fcom-trainer`.
+- This skill handles only the visual: color, geometry, animation, states.
+- If both are needed, `a320-fcom-trainer` produces the logic assessment and this skill produces the visual spec. Both merge into one plan before "go".
 
-Anything else (scope statements, measurement schemas, FCOM cross-checks,
-implementation plans) lives inside Claude's process.  The user reads the
-two checkpoint documents and approves/corrects.  Claude does the rest.
+---
+
+## 10. Anti-patterns
+
+- ❌ Skipping intake because "we already know what element it is."
+- ❌ Using training-data knowledge for any color, size, or position value.
+- ❌ Treating `inferred-from-source` as a valid tag (it is removed — ask instead).
+- ❌ Writing code while OPEN QUESTIONS exist in the plan.
+- ❌ Touching code outside the named element's scope.
+- ❌ Iterating more than once after Checkpoint B (restart instead).
+- ❌ Designing a "more readable" version that diverges from PICS or FCOM.
+- ❌ Proceeding without a photo when the element is visual. Always ask for PICS.
+- ❌ Asking the user to re-state §0 hard rules — they are always in effect.
+
+---
+
+## 11. Examples log (self-improving reference)
+
+Every completed element is recorded here. Claude uses these to calibrate
+future runs — measurements, FCOM citations, and outcomes from real work.
+Add a new entry each time a Checkpoint B passes.
+
+### [2026-05-23] ENG 1 FIRE pb — fire-panel.tsx
+- PICS: `~/Desktop/PANELS/fire panel/a320-ovhd-fire-45vu.webp`
+- FCOM 4a: DSC-26-20-20 "CONTROLS AND INDICATIONS"
+- FCOM 4b: DSC-26-20-10 "DESCRIPTION"
+- Key values: pb W:H ≈ 2.0 `[photo]` — FIRE face RED `[fcom:4a:L8241]` — SQUIB WHITE `[fcom:4a:L8265]` — DISCH AMBER `[fcom:4a:L8278]`
+- USER INPUTS: separate materials for SQUIB and DISCH cells
+- File: `src/components/cockpit/fire-panel.tsx`
+
+### [2026-05-24] ENG 1 AGENT pb — fire-panel.tsx
+- PICS: `~/Desktop/PANELS/fire panel/a320-ovhd-fire-45vu.webp`
+- FCOM 4a: DSC-26-20-20-10 "AGENT 1(2) PB-SW"
+- FCOM 4b: DSC-26-20-10 "DESCRIPTION"
+- Key values: pb roughly square `[photo]` — SQUIB WHITE when FIRE pb released `[fcom:4a:L44434]` — DISCH AMBER when bottle loses pressure `[fcom:4a:L44436]` — pb becomes active only after FIRE pb released `[fcom:4a:L44429]`
+- File: `src/components/cockpit/fire-panel.tsx`

@@ -496,13 +496,13 @@ export function FireSection({
 //   – Bottom tab tip: H62 → Q68.75 113.5 62 111.5 — gentle downward arc
 //     across the flat tab base so the very bottom reads as curvy
 const GUARD_OUTER_PATH =
-  "M0.5 88.5V3Q0.5 0.5 3 0.5H131Q133.5 0.5 134 3L134.5 88.5H95.5L75.5 111.5Q68.75 113.5 62 111.5L59.5 109L50 98.5L41.5 88.5H0.5Z";
+  "M0.5 98.5V3Q0.5 0.5 3 0.5H131Q133.5 0.5 134 3L134.5 98.5H95.5L75.5 121.5Q68.75 123.5 62 121.5L59.5 119L50 108.5L41.5 98.5H0.5Z";
 
 // OVEAL GAP — traced ellipse, 14 × 7 (rx 7, ry 3.5).  Centred on the
 // tab's horizontal midline (x = 67.5) and vertically halfway between the
 // main-rect bottom at y = 88.5 and the tab tip at y = 111.5.
 const OVAL_GAP_CX = 67.5;
-const OVAL_GAP_CY = 100;
+const OVAL_GAP_CY = 110;
 const OVAL_GAP_RX = 7;
 const OVAL_GAP_RY = 3.5;
 
@@ -516,7 +516,7 @@ const OVAL_GAP_RY = 3.5;
 const JOINT_X = 40.5;
 const JOINT_Y = 0.5;
 const JOINT_W = 54;
-const JOINT_H = 14;
+const JOINT_H = 16;
 const JOINT_STROKE = "#1D1818";
 const PIVOT_X_PX = 67.5;          // half the guard width — equals JOINT_X + JOINT_W/2
 // Pivot at the TOP edge of the JOINT (= top of the guard) so the whole
@@ -538,7 +538,7 @@ function GuardCover({ lifted }: { lifted: boolean }) {
         top: -2,
         left: -5,
         width: 135,
-        height: 112,
+        height: 122,
         // Strong perspective so the lift reads as a real hinged door
         // opening (angular swing, not a translate-up slide).
         perspective: "300px",
@@ -555,7 +555,7 @@ function GuardCover({ lifted }: { lifted: boolean }) {
           top: 0,
           left: 0,
           width: 135,
-          height: 112,
+          height: 122,
           transformOrigin: `${PIVOT_X_PX}px ${PIVOT_Y_PX}px`,
           transform: lifted
             ? "rotateX(-120deg) translateZ(0)"
@@ -566,8 +566,8 @@ function GuardCover({ lifted }: { lifted: boolean }) {
       >
       <svg
         width="135"
-        height="112"
-        viewBox="0 0 135 112"
+        height="122"
+        viewBox="0 0 135 122"
         fill="none"
         style={{ display: "block", overflow: "visible" }}
       >
@@ -575,7 +575,7 @@ function GuardCover({ lifted }: { lifted: boolean }) {
             is added as a third sub-path so it cuts a real hole through
             the guard fill — the panel background shows through it. */}
         <path
-          d={`${GUARD_OUTER_PATH} M12 17 H122 V83 H12 Z M60.5 100 a 7 3.5 0 1 0 14 0 a 7 3.5 0 1 0 -14 0`}
+          d={`${GUARD_OUTER_PATH} M12 17 H122 V93 H12 Z M60.5 110 a 7 3.5 0 1 0 14 0 a 7 3.5 0 1 0 -14 0`}
           fillRule="evenodd"
           fill="rgba(174, 56, 22, 0.92)"
         />
@@ -590,7 +590,7 @@ function GuardCover({ lifted }: { lifted: boolean }) {
             Height bumped 55 → 66 (+20 %) per user spec. */}
         <rect
           x="12" y="17"
-          width="110" height="66"
+          width="110" height="76"
           fill="none"
           stroke="rgba(92, 10, 10, 0.95)"
           strokeWidth="0.75"
@@ -621,8 +621,8 @@ function GuardCover({ lifted }: { lifted: boolean }) {
           Does NOT rotate; the guard above rotates around its centreline. */}
       <svg
         width="135"
-        height="112"
-        viewBox="0 0 135 112"
+        height="122"
+        viewBox="0 0 135 122"
         fill="none"
         style={{
           position: "absolute",
@@ -692,7 +692,7 @@ function FirePushbutton({
         // Per Figma trace: FIRE pb is 131 × 87 (sits inside the 135 × 112
         // outer guard with 2 px margin around it).  Slightly rounder
         // corners (6 → 10) for a softer minimalistic look.
-        width: 131, height: 87, borderRadius: 10, padding: 0,
+        width: 131, height: 97, borderRadius: 10, padding: 0,
         // FCOM-faithful: pb face lights bright red when fire warning is
         // active (fireDetected) or TEST is pressed.  Dusky burgundy at
         // rest.  Halo glow + white text on activation.
@@ -816,7 +816,7 @@ function AgentPanel({
           // states so the cells look INSIDE the bezel.
           // Shrunk so the FIRE pb dominates proportionally per the photo.
           // FIRE pb is 131 wide; AGENT pbs are now ~38 % of that.
-          width: 50, height: 56, padding: 3,
+          width: 56, height: 56, padding: 3,
           background: "#1e2430",
           // Black AGENT pb body; only the SQUIB / DISCH letters inside
           // light up.  Outer halo: dark "shadow ring" between the pb
