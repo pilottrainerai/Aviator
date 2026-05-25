@@ -102,6 +102,32 @@ export const DUAL_HYD_G_Y_META: ScenarioMeta = {
   runHref: runHref("dual-hyd-g-y"),
 };
 
+export const DUAL_HYD_G_B_META: ScenarioMeta = {
+  slug: "dual-hyd-g-b",
+  title: "DUAL HYD G+B LO PR",
+  system: "hydraulics",
+  phase: "cruise",
+  status: "available",
+  difficulty: 5,
+  estimatedMinutes: 12,
+  summary:
+    "Loss of green and blue hydraulic systems. P4576/SA trainer variant with anti-skid and nose-wheel steering available on landing; manage the direct-law FLAP 3 profile and remaining yellow-system limits.",
+  runHref: runHref("dual-hyd-g-b"),
+};
+
+export const DUAL_HYD_G_B_LOW_LEVEL_META: ScenarioMeta = {
+  slug: "dual-hyd-g-b-low-level",
+  title: "DUAL HYD G+B LO PR - LOW LEVEL/PTU",
+  system: "hydraulics",
+  phase: "cruise",
+  status: "available",
+  difficulty: 5,
+  estimatedMinutes: 13,
+  summary:
+    "Alternate G+B entry path where green low level also triggers HYD PTU FAULT. Add the PTU OFF step, then continue the dual-hydraulic landing profile.",
+  runHref: runHref("dual-hyd-g-b-low-level"),
+};
+
 export const ELEC_EMER_CONFIG_META: ScenarioMeta = {
   slug: "elec-emer-config",
   title: "ELEC EMER CONFIG",
@@ -159,6 +185,8 @@ export const SCENARIOS: ScenarioMeta[] = [
   ENG_FAILURE_AFTER_V1_META,
   RTO_LOW_SPEED_META,
   DUAL_HYD_G_Y_META,
+  DUAL_HYD_G_B_META,
+  DUAL_HYD_G_B_LOW_LEVEL_META,
   ELEC_EMER_CONFIG_META,
   RAPID_DEPRESS_META,
   SMOKE_CABIN_META,

@@ -10,6 +10,8 @@ import { eng1FireAfterV1 } from "./data/eng1-fire-after-v1";
 import { engFailureAfterV1 } from "./data/eng-failure-after-v1";
 import { rtoLowSpeed } from "./data/rto-low-speed";
 import { dualHydGY } from "./data/dual-hyd-g-y";
+import { dualHydGB } from "./data/dual-hyd-g-b";
+import { dualHydGBLowLevel } from "./data/dual-hyd-g-b-low-level";
 import { elecEmerConfig } from "./data/elec-emer-config";
 import { rapidDepress } from "./data/rapid-depress";
 import { smokeCabin } from "./data/smoke-cabin";
@@ -20,6 +22,8 @@ export const ALL_SCENARIOS: Scenario[] = [
   engFailureAfterV1,
   rtoLowSpeed,
   dualHydGY,
+  dualHydGB,
+  dualHydGBLowLevel,
   elecEmerConfig,
   rapidDepress,
   smokeCabin,
