@@ -8,6 +8,9 @@
 import type {
   ScenarioMeta as RegistryMeta,
 } from "./registry";
+import type { AirportOption } from "@/data/india-airports";
+
+export type { AirportOption };
 
 // FCOM DSC-31-60 ECAM colour convention:
 //   warning  = red    (CRC alarm, critical)
@@ -171,6 +174,8 @@ export type Scenario = {
   engineDisplay?: EngineDisplayDef;
   /** Phase-by-phase cockpit channel state: PFD, ND, PF, PM, ATC, overhead */
   phases?: readonly ScenarioPhase[];
+  /** If present, a pre-start airport picker is shown in the briefing screen. */
+  airports?: readonly AirportOption[];
 };
 
 // ─── System / Engine display DSL ─────────────────────────────────────────────

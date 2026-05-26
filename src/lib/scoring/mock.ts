@@ -11,6 +11,7 @@ import type { ScenarioEvent } from "@/engine/events";
 import type { ScenarioState } from "@/engine/state";
 import type { Scenario } from "@/scenarios/types";
 import type { DebriefRubric, StoredDebrief } from "@/lib/sessions/store";
+import { getApplicableRequiredSteps, isStepApplicable } from "@/lib/scenarios/step-applicability";
 
 type Args = {
   scenario: Scenario;
@@ -18,8 +19,12 @@ type Args = {
   finalState: ScenarioState;
 };
 
-function scoreCorrectness(scenario: Scenario, events: ScenarioEvent[]) {
-  const required = scenario.steps.filter((s) => !s.optional);
+function scoreCorrectness(
+  scenario: Scenario,
+  events: ScenarioEvent[],
+  finalState: ScenarioState,
+) {
+  const required = getApplicableRequiredSteps(scenario, finalState);
   const completedIds = new Set(
     events.filter((e): e is Extract<ScenarioEvent, { kind: "STEP" }> => e.kind === "STEP")
       .map((e) => e.stepId),
@@ -35,14 +40,18 @@ function scoreCorrectness(scenario: Scenario, events: ScenarioEvent[]) {
   return { score, evidence };
 }
 
-function scoreSequence(scenario: Scenario, events: ScenarioEvent[]) {
+function scoreSequence(
+  scenario: Scenario,
+  events: ScenarioEvent[],
+  finalState: ScenarioState,
+) {
   const stepEvents = events.filter(
     (e): e is Extract<ScenarioEvent, { kind: "STEP" }> => e.kind === "STEP",
   );
   const stepTimes = new Map(stepEvents.map((e) => [e.stepId, e.tMs]));
 
   const violations: string[] = [];
-  for (const step of scenario.steps) {
+  for (const step of scenario.steps.filter((candidate) => isStepApplicable(candidate, finalState))) {
     if (!step.requires?.length) continue;
     const stepTime = stepTimes.get(step.id);
     if (stepTime == null) continue;
@@ -99,6 +108,7 @@ function buildNarrative(
   rubric: DebriefRubric,
   scenario: Scenario,
   events: ScenarioEvent[],
+  finalState: ScenarioState,
 ): string {
   const lines: string[] = [];
   lines.push(
@@ -114,8 +124,8 @@ function buildNarrative(
     events.filter((e): e is Extract<ScenarioEvent, { kind: "STEP" }> => e.kind === "STEP")
       .map((e) => e.stepId),
   );
-  const missingRequired = scenario.steps
-    .filter((s) => !s.optional && !completedIds.has(s.id));
+  const missingRequired = getApplicableRequiredSteps(scenario, finalState)
+    .filter((s) => !completedIds.has(s.id));
 
   if (missingRequired.length > 0) {
     lines.push(
@@ -138,10 +148,11 @@ function buildNarrative(
 export function scoreSessionMock({
   scenario,
   events,
+  finalState,
 }: Args): Pick<StoredDebrief, "rubric" | "compositeScore" | "narrative"> {
   const rubric: DebriefRubric = {
-    correctness: scoreCorrectness(scenario, events),
-    sequence: scoreSequence(scenario, events),
+    correctness: scoreCorrectness(scenario, events, finalState),
+    sequence: scoreSequence(scenario, events, finalState),
     decision: scoreDecision(scenario, events),
   };
   const compositeScore = Math.round(
@@ -149,6 +160,6 @@ export function scoreSessionMock({
       rubric.sequence.score * 0.3 +
       rubric.decision.score * 0.3,
   );
-  const narrative = buildNarrative(rubric, scenario, events);
+  const narrative = buildNarrative(rubric, scenario, events, finalState);
   return { rubric, compositeScore, narrative };
 }

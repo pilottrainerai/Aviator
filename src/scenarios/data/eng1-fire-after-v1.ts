@@ -84,18 +84,18 @@ export const eng1FireAfterV1: Scenario = {
       id: "continue_rotation",
       label: "CONTINUE ROTATION",
       action: "V2+10",
-      hint: "PF maintains rotation — do NOT reduce thrust. Follow flight directors, target V2+10 kt on SRS guidance.",
+      hint: "PF maintains rotation — do NOT reduce thrust. Rotate smoothly toward about 12.5 degrees, follow SRS, hold V2+10, and keep the beta target centered with rudder without chasing it.",
       variant: "switch",
       crew: "PF",
       group: "flightcheck",
     },
 
-    // ── AV2 ── PM calls Positive Rate → PF commands Gear Up (flightcheck popup)
+    // ── AV2 ── PM calls Positive Climb → PF commands Gear Up (flightcheck popup)
     {
       id: "positive_rate_gear_up",
-      label: "POSITIVE RATE — GEAR UP",
+      label: "POSITIVE CLIMB — GEAR UP",
       action: "CALL",
-      hint: "PM calls 'POSITIVE RATE'. PF responds 'GEAR UP'. PM selects gear lever UP. Verify GEAR UP indication.",
+      hint: "PM calls 'POSITIVE CLIMB'. PF responds 'GEAR UP'. PM selects gear lever UP. Verify positive climb and GEAR UP indication.",
       variant: "switch",
       crew: "PM",
       group: "flightcheck",
@@ -107,7 +107,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "engage_ap_fma",
       label: "AP1 ENGAGE — READ FMA",
       action: "CONFIRM",
-      hint: "PF: engage AP1 at ~100 ft (V2+10 stable). Read FMA aloud: 'SRS — NAV — AP1 ENGAGED'. Monitor A/THR active.",
+      hint: "PF: once the flight path is stable and rudder trim is set, engage AP1 at about 100 ft. Read FMA aloud: 'SRS — NAV — AP1 ENGAGED'. Monitor beta, trim, and A/THR.",
       variant: "switch",
       crew: "PF",
       group: "flightcheck",
@@ -145,7 +145,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "four_hundred_ft_cmd",
       label: "400 FT — AVIATE COMPLETE, ECAM ACTIONS",
       action: "ANNOUNCE",
-      hint: "At 400 ft AGL with flight path stabilised, PM announces 'AVIATE COMPLETE, NAVIGATE SID OR EO PROCEDURE'. PF orders 'ECAM ACTIONS'. Master Warning must be cancelled first.",
+      hint: "At 400 ft AGL with the flight path stabilised, PM confirms the failure and reads the ECAM title. PF then orders 'ECAM ACTIONS'. Master Warning must be cancelled first.",
       variant: "advisory",
       group: "flightcheck",
       requires: ["engage_ap_fma", "cancel_master_warn"],
@@ -252,35 +252,27 @@ export const eng1FireAfterV1: Scenario = {
       hardware: true,
       ecamRef: "ecam_agent1",
       afterEffect: {
-        // 30 s after Agent 1 — FCOM "AGENT 2 IF FIRE WARN AFTER 30 S" window
-        // elapses.  Silence the warning + clear the primary procedure lines
-        // so only the AGENT 2 conditional remains.  The fire visual
-        // indicators (FIRE pb red, FIRE light on master, ENG ✕) STAY LIT
-        // until AGENT 2 is also discharged (training-driven choice — FCOM
-        // behaviour would extinguish here in the typical case).
-        delayMs: 30_000,
-        triggerId: "fire_persists_30s",
+        // Base learning path: the fire goes out after the first bottle.
+        // A persistent-fire variant can instead schedule `fire_persists_30s`
+        // to unlock the AGENT 2 branch.
+        delayMs: 5_000,
+        triggerId: "fire_extinguished",
         effects: [
           { type: "SET_MASTER_WARN", active: false },
           { type: "SET_ALARM_LABEL", label: null },
           {
             type: "CLEAR_ECAM",
-            // Clear fire warning + primary procedure lines.
-            // Secondary failures (hyd_g_pump, air_single_pack, elec_gen1) persist on STATUS page.
-            // Clears the AGENT-1-and-before slice of the ECAM.  Per FCOM
-            // the ATC NOTIFY item, the "IF FIRE WARN AFTER 30 S" conditional
-            // and AGENT 2 stay visible until their own actions complete.
-            // LAND ASAP also remains until the fire is fully extinguished.
-            ids: ["eng1_fire", "ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft", "ecam_maa"],
+            // Clear the primary fire-warning slice once the fire is out.
+            // LAND ASAP and ATC NOTIFY remain until their own training steps
+            // are handled, but the conditional AGENT 2 branch disappears.
+            ids: ["eng1_fire", "ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft", "ecam_if_persist", "ecam_agent2"],
           },
         ],
       },
     },
 
-    // ── 5 ── Both-agent rule: fire only extinguishes after AGENT 2 is also
-    // discharged (training simplification — forces the crew to complete the
-    // full bottle sequence). Per strict FCOM, Agent 2 is optional and only
-    // used if fire persists 30 s after Agent 1.
+    // ── 5 ── Conditional branch: only if fire warning persists 30 s after
+    // AGENT 1. Not part of the base success path.
     {
       id: "agent2",
       label: "AGENT 2",
@@ -288,6 +280,7 @@ export const eng1FireAfterV1: Scenario = {
       hint: "PM: wait 30 s after AGENT 1 — IF FIRE WARN persists, discharge AGENT 2.  Last bottle, no restart possible after.",
       variant: "caution",
       requires: ["agent1"],
+      requiresTrigger: "fire_persists_30s",
       crew: "PM",
       hardware: true,
       ecamRef: "ecam_agent2",
@@ -320,11 +313,12 @@ export const eng1FireAfterV1: Scenario = {
       id: "engine_secured",
       label: "ENGINE SECURED",
       action: "ANNOUNCE",
-      hint: "After AGENT 2 discharge and fire extinguishes (FIRE pb red light + ENG MASTER FIRE light go off), PM announces 'ENGINE SECURED'. PF acknowledges.",
+      hint: "Once the fire light is out and the engine is secured, PM announces 'ENGINE SECURED' and 'PRIMARY ECAM ACTIONS COMPLETE'. PF acknowledges before acceleration.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["agent2"],
+      requires: ["agent1"],
+      requiresTrigger: "fire_extinguished",
     },
 
     // ── 5c ── LAND ASAP announce (red on ECAM)
@@ -550,9 +544,9 @@ export const eng1FireAfterV1: Scenario = {
     // PRESS, then PM announces "ECAM ACTIONS COMPLETE."
     {
       id: "crew_crosscheck",
-      label: "ECAM ACTIONS COMPLETED",
+      label: "ECAM ACTIONS COMPLETE",
       action: "ANNOUNCE",
-      hint: "PM: 'ECAM ACTIONS COMPLETED.' PF acknowledges. All primary ECAM procedures complete, secondary failures reviewed, STATUS read.",
+      hint: "PM: 'ECAM ACTIONS COMPLETE.' PF acknowledges. Primary ECAM actions, secondary failures, and STATUS review are all complete.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
@@ -716,7 +710,7 @@ export const eng1FireAfterV1: Scenario = {
       group: "comms",
       requires: ["approach_brief"],
       notes: [
-        "GO-AROUND: TOGA (ENG 2 only) — SRS engages — positive rate GEAR UP — maintain V2+10",
+        "GO-AROUND: TOGA (ENG 2 only) — SRS engages — positive climb GEAR UP — maintain V2+10",
         "FMA: TOGA → SRS / NAV / AP1 — monitor and call FMA at each transition",
         "FUEL CHECK: confirm total fuel vs [DEST + ALTN + FINAL RESERVE]. If marginal — LAND VIDP.",
         "RUNWAY VACATION: vacate via first available exit (Golf / Foxtrot). Brake to stop if needed.",
@@ -867,7 +861,7 @@ export const eng1FireAfterV1: Scenario = {
     },
 
     // ⑤ ATC prompts for briefing requirements — STEP-TRIGGERED on
-    //   crew_crosscheck ("ECAM ACTIONS COMPLETED") so this only fires once
+    //   crew_crosscheck ("ECAM ACTIONS COMPLETE") so this only fires once
     //   the crew has finished ECAM, not on a fixed clock.  atMs is a floor
     //   (won't fire before this even if the step is done early).
     {
@@ -1547,9 +1541,9 @@ export const eng1FireAfterV1: Scenario = {
         ],
       },
       pm: {
-        task: "Call 'POSITIVE RATE' once VSI positive. Watch for tyre damage or directional problem. Gear Up on PF command.",
+        task: "Call 'POSITIVE CLIMB' once VSI positive. Watch for tyre damage or directional problem. Gear Up on PF command.",
         callouts: [
-          { role: "PM", speech: "POSITIVE RATE" },
+          { role: "PM", speech: "POSITIVE CLIMB" },
           { role: "PF", speech: "GEAR UP" },
           { role: "PM", speech: "GEAR UP — SELECTING" },
         ],
@@ -1832,30 +1826,28 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
 
-    // ── PHASE 9 — 30-SECOND MONITOR / FIRE PERSISTS (T+66s) ────────────────
-    // FCOM conditional: "IF FIRE WARN AFTER 30 S → AGENT 2 DISCH"
-    // Training scenario: fire persists → crew must discharge AGENT 2.
-    // ECAM clears primary lines; only AGENT 2 conditional + LAND ASAP remain.
+    // ── PHASE 9 — FIRE OUT AFTER AGENT 1 (T+41s) ───────────────────────────
+    // Training baseline: Agent 1 extinguishes the fire within the monitoring
+    // window, so the conditional Agent 2 branch is not required.
     {
-      id: "fire_persists_30s",
-      label: "FIRE WARN PERSISTS — 30 S ELAPSED",
-      atMs: 66_000,
+      id: "fire_extinguished_after_agent1",
+      label: "FIRE WARN EXTINGUISHED — AGENT 2 NOT REQUIRED",
+      atMs: 41_000,
       pfd: {
-        speed: 210,
+        speed: 202,
         targetSpeed: "V2+10",
-        altitude: 1_800,
+        altitude: 1_250,
         targetAltitude: 3_000,
-        verticalSpeed: 1_600,
+        verticalSpeed: 1_700,
         fmaThrust: "MAN TOGA",
         fmaPitch: "SRS",
         fmaLateral: "NAV",
         ap1: true,
         athr: false,
-        flags: ["ENG 1 FIRE pb — still illuminated"],
         notes: [
-          "Fire warning persists 30 s after Agent 1 — AGENT 2 required",
-          "ECAM clears primary lines — only IF FIRE WARN + AGENT 2 + LAND ASAP remain",
-          "Primary CRC silenced — crew remains focused but not distracted",
+          "FIRE pb red light extinguishes after Agent 1 — fire confirmed out",
+          "Agent 2 remains armed but is not discharged",
+          "LAND ASAP remains on E/WD despite the fire being extinguished",
         ],
       },
       nd: {
@@ -1863,58 +1855,56 @@ export const eng1FireAfterV1: Scenario = {
         range: 10,
         heading: 280,
         activeWpt: "VIDP",
-        notes: ["Tracking SID/EO procedure — AP holding"],
+        notes: ["Tracking SID/EO procedure — AP holding stable climb"],
       },
       pf: {
-        task: "Confirm FIRE warning still on. Authorise AGENT 2 discharge. Monitor aircraft — remain on SRS to accel altitude.",
+        task: "Confirm the fire warning has cleared. Do not use Agent 2. Keep the aircraft stabilized and continue monitoring to acceleration altitude.",
         callouts: [
-          { role: "PM", speech: "FIRE WARNING AFTER 30 SECONDS" },
-          { role: "PF", speech: "AGENT TWO — CONFIRM DISCHARGE" },
+          { role: "PM", speech: "FIRE WARNING OUT" },
+          { role: "PF", speech: "FIRE OUT — NO AGENT TWO" },
         ],
       },
       pm: {
-        task: "Announce 'FIRE WARNING AFTER 30 SECONDS'. Read ECAM: AGENT 2 DISCH. PF confirms — discharge AGENT 2.",
+        task: "Announce that the fire warning is out. Confirm the conditional AGENT 2 line is no longer required and continue with ECAM follow-on items.",
         callouts: [
-          { role: "PM", speech: "ECAM — AGENT TWO DISCHARGE. DISCHARGING." },
+          { role: "PM", speech: "ECAM — FIRE WARNING CLEARED. AGENT TWO NOT REQUIRED." },
         ],
       },
       overhead: {
         items: [
-          "ENG 1 FIRE P/B — illuminated (fire loop still active)",
-          "AGENT 2 button — about to be pressed",
+          "ENG 1 FIRE P/B — extinguished (dark)",
+          "AGENT 1 button — pressed (DISCH)",
+          "AGENT 2 button — armed, retained",
         ],
         notes: [
-          "Last available extinguishing agent — no further restart possible",
-          "LAND ASAP remains on ECAM regardless of outcome",
+          "Single-bottle success path complete — no second discharge",
+          "LAND ASAP still drives the operational decision",
         ],
       },
     },
 
-    // ── PHASE 10 — FIRE EXTINGUISHED / ENGINE SECURED (T+71s) ──────────────
-    // 5 s after AGENT 2: fire extinguishes. FIRE pb red light goes out.
-    // FCTM: engine is considered SECURED when ECAM actions complete through
-    // "AGENT 2 DISCH" and fire warning extinguishes.
-    // PM announces "ENGINE SECURED". PF acknowledges. Acceleration sequence may begin.
+    // ── PHASE 10 — ENGINE SECURED (T+46s) ──────────────────────────────────
+    // FCTM: engine is considered secured once the fire warning is out and the
+    // ENG FIRE ECAM actions are complete for the active branch.
     {
       id: "engine_secured",
-      label: "ENGINE SECURED — FIRE EXTINGUISHED",
-      atMs: 71_000,
+      label: "ENGINE SECURED — SINGLE BOTTLE SUCCESS",
+      atMs: 46_000,
       pfd: {
-        speed: 215,
+        speed: 208,
         targetSpeed: "V2+10",
-        altitude: 2_000,
+        altitude: 1_450,
         targetAltitude: 3_000,
-        verticalSpeed: 1_500,
+        verticalSpeed: 1_650,
         fmaThrust: "MAN TOGA",
         fmaPitch: "SRS",
         fmaLateral: "NAV",
         ap1: true,
         athr: false,
         notes: [
-          "FIRE pb red light extinguished — fire confirmed out",
-          "ENG MASTER FIRE light on overhead panel off",
-          "ENG 1 N1 = 0, EGT cooling",
-          "PM to announce ENGINE SECURED — accel sequence can begin after",
+          "Fire loop no longer indicating — engine secured after Agent 1",
+          "ENG 1 N1 = 0, EGT cooling, secondary failures remain displayed",
+          "Agent 2 retained unused; no further extinguishing action needed",
         ],
       },
       nd: {
@@ -1924,7 +1914,7 @@ export const eng1FireAfterV1: Scenario = {
         activeWpt: "VIDP",
       },
       pf: {
-        task: "Acknowledge ENGINE SECURED. Announce LAND ASAP. Prepare for acceleration at minimum accel altitude.",
+        task: "Acknowledge ENGINE SECURED. Announce LAND ASAP and prepare for acceleration at minimum acceleration altitude.",
         callouts: [
           { role: "PM", speech: "ENGINE SECURED" },
           { role: "PF", speech: "ENGINE SECURED — ACKNOWLEDGED" },
@@ -1932,7 +1922,7 @@ export const eng1FireAfterV1: Scenario = {
         ],
       },
       pm: {
-        task: "Announce 'ENGINE SECURED' once FIRE pb light goes out. Read secondary failures. Announce STATUS.",
+        task: "Announce ENGINE SECURED once the fire warning is extinguished. Read the secondary failures and announce STATUS.",
         callouts: [
           { role: "PM", speech: "ENGINE SECURED. SECONDARY FAILURES ON ECAM — HYD, ELEC, AIR BLEED." },
           { role: "PM", speech: "STATUS APPEARING." },
@@ -1942,40 +1932,37 @@ export const eng1FireAfterV1: Scenario = {
         items: [
           "ENG 1 FIRE P/B — extinguished (dark) — fire out",
           "ENG 1 MASTER — OFF",
-          "AGENT 1 + AGENT 2 — both DISCH",
+          "AGENT 1 — DISCH",
+          "AGENT 2 — ARMED, UNUSED",
           "GEN 1 — FAULT/OFF (IDG disconnected by FIRE PB)",
           "ENG 1 BLEED — FAULT (SOV closed by FIRE PB)",
         ],
-        notes: ["All FIRE panel actions complete — engine is secured"],
+        notes: ["All required FIRE panel actions for this branch are complete"],
       },
     },
 
-    // ── PHASE 11 — ACCEL ALTITUDE / LEVEL OFF / CLEAN (T+78s) ──────────────
-    // FCTM: DELAY acceleration until engine is secured (FCTM 12848).
-    // At minimum acceleration altitude (~1500 ft EO), PF pushes V/S knob → V/S 0.
-    // Aircraft levels off, then accelerates through F/S speeds to clean config.
-    // Green dot: PF calls MCT, PM verifies thrust at MCT.
+    // ── PHASE 11 — ACCEL ALTITUDE / LEVEL OFF / CLEAN (T+58s) ──────────────
+    // FCTM: acceleration is delayed until the engine is secured. In the base
+    // branch, that happens before the eng-out acceleration altitude trigger.
     {
       id: "accel_level_off",
       label: "ACCEL ALTITUDE — LEVEL OFF / CLEAN",
-      atMs: 78_000,
+      atMs: 58_000,
       pfd: {
-        speed: 225,
+        speed: 220,
         targetSpeed: "S",
-        altitude: 2_800,
+        altitude: 2_350,
         targetAltitude: 3_000,
-        verticalSpeed: 200,
+        verticalSpeed: 400,
         fmaThrust: "MAN TOGA",
         fmaPitch: "OP CLB",
         fmaLateral: "NAV",
         ap1: true,
         athr: true,
         notes: [
-          "V/S 0 selected at MAA — aircraft levelling off",
-          "A/THR activated — ENG 2 maintaining speed at TOGA then CLB",
-          "SRS reverts to OP CLB as level-off captures at target alt",
-          "F speed passed — FLAPS 1 retracted. S speed approaching — prepare FLAPS UP.",
-          "Rudder trim maintained ~2 units right for single-engine",
+          "Minimum acceleration altitude reached after engine secured call",
+          "V/S 0 selected — aircraft levelling to accelerate and clean up",
+          "A/THR active on the live engine; rudder trim maintained for single-engine climb",
         ],
       },
       nd: {
@@ -1986,7 +1973,7 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["Range increased to 20 nm for VIDP return planning"],
       },
       pf: {
-        task: "V/S 0 at MAA. Call FLAPS 1 at F speed, FLAPS UP at S speed. Call MCT at green dot. Monitor A/THR.",
+        task: "V/S 0 at MAA. Call FLAPS 1 at F speed, FLAPS UP at S speed, then MCT at green dot. Monitor A/THR and heading control.",
         callouts: [
           { role: "PF", speech: "V/S ZERO — LEVELLING OFF" },
           { role: "PF", speech: "FLAPS ONE" },
@@ -1998,7 +1985,7 @@ export const eng1FireAfterV1: Scenario = {
         ],
       },
       pm: {
-        task: "Cross-check each flap selection (check speed before calling back). Verify CONFIG CLEAN on ECAM. Set MCT on PF call.",
+        task: "Cross-check each flap selection, verify CONFIG CLEAN on ECAM, and set MCT on PF call.",
         callouts: [
           { role: "PM", speech: "SINGLE ENGINE — MCT SET — GREEN DOT TARGET" },
         ],

@@ -282,7 +282,7 @@ function DemoBar({
 export function FireSection({
   title, isAPU = false, testSide = "center",
   fireDetected, guardOpen, firePbOut, firePbOutAt,
-  agent1Disch, agent2Disch, testActive,
+  agent1Disch, agent2Disch, agent2Available = true, testActive,
   onOpenGuard, onPushFirePb, onPushAgent1, onPushAgent2, onPushTest,
 }: {
   title: string; isAPU?: boolean;
@@ -293,6 +293,7 @@ export function FireSection({
   firePbOutAt: number | null;
   agent1Disch: boolean;
   agent2Disch: boolean;
+  agent2Available?: boolean;
   testActive: boolean;
   onOpenGuard:  () => void;
   onPushFirePb: () => void;
@@ -305,8 +306,8 @@ export function FireSection({
   // AGENT 1 / 2 derived state
   const a1Arming = isAgentArming(firePbOutAt, agent1Disch);
   const a1Armed  = isAgentArmed (firePbOutAt, agent1Disch);
-  const a2Arming = isAgentArming(firePbOutAt, agent2Disch);
-  const a2Armed  = isAgentArmed (firePbOutAt, agent2Disch);
+  const a2Arming = agent2Available && isAgentArming(firePbOutAt, agent2Disch);
+  const a2Armed  = agent2Available && isAgentArmed (firePbOutAt, agent2Disch);
   const countdown = a1Arming || a2Arming ? armingCountdownSec(firePbOutAt) : 0;
 
   return (

@@ -15,6 +15,7 @@
 
 import { useEffect, useRef } from "react";
 import type { ScenarioState } from "@/engine/state";
+import type { Scenario } from "@/scenarios/types";
 import { buildAircraftState } from "@/components/cockpit/pfd-nd";
 
 type PfdData = {
@@ -33,12 +34,16 @@ type PfdData = {
   ra: number;
 };
 
-export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
+export default function PfdMockup({ state, scenario, elapsedMs }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number } = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef  = useRef(state);
+  const scenarioRef = useRef(scenario);
+  const elapsedMsRef = useRef(elapsedMs);
   // Keep latest scenario state available to the rAF loop without re-running
   // the whole effect on every state change.
   useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => { scenarioRef.current = scenario; }, [scenario]);
+  useEffect(() => { elapsedMsRef.current = elapsedMs; }, [elapsedMs]);
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -141,7 +146,9 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
 
     // ── FMA ────────────────────────────────────────────────────────────────
     const drawFMA = () => {
-      const live = stateRef.current ? buildAircraftState(stateRef.current) : null;
+      const live = stateRef.current
+        ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current)
+        : null;
       const thrMode  = live?.thrMode  ?? "MAN TOGA";
       const vertMode = live?.vertMode ?? "SRS";
       const latMode  = live?.latMode  ?? "RWY TRK";
@@ -734,7 +741,9 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     let rafId = 0;
     const animate = () => {
       t += 0.004;
-      const live = stateRef.current ? buildAircraftState(stateRef.current) : null;
+      const live = stateRef.current
+        ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current)
+        : null;
       if (live) {
         // Wired to scenario — use derived AircraftState directly.  Pitch and
         // roll get a tiny live shimmer so the attitude indicator feels alive;

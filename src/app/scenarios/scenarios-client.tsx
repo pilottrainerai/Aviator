@@ -12,8 +12,10 @@ import {
   XIcon,
 } from "lucide-react";
 import {
+  DIFFICULTY_LABEL,
   PHASE_LABEL,
   SYSTEM_LABEL,
+  type ScenarioDifficulty,
   type ScenarioMeta,
   type ScenarioPhase,
   type ScenarioSystem,
@@ -31,7 +33,7 @@ import { Footer } from "@/components/marketing/footer";
 
 type SystemFilter = "all" | ScenarioSystem;
 type PhaseFilter = "all" | ScenarioPhase;
-type DifficultyFilter = "all" | "easy" | "moderate" | "hard";
+type DifficultyFilter = "all" | ScenarioDifficulty;
 
 const SYSTEM_OPTIONS: Array<{ value: SystemFilter; label: string }> = [
   { value: "all", label: "All systems" },
@@ -54,16 +56,14 @@ const PHASE_OPTIONS: Array<{ value: PhaseFilter; label: string }> = [
 
 const DIFFICULTY_OPTIONS: Array<{ value: DifficultyFilter; label: string }> = [
   { value: "all", label: "Any difficulty" },
-  { value: "easy", label: "1–2" },
-  { value: "moderate", label: "3" },
-  { value: "hard", label: "4–5" },
+  { value: "easy", label: "Easy" },
+  { value: "moderate", label: "Moderate" },
+  { value: "hard", label: "Hard" },
 ];
 
-function matchesDifficulty(value: number, filter: DifficultyFilter) {
+function matchesDifficulty(value: ScenarioDifficulty, filter: DifficultyFilter) {
   if (filter === "all") return true;
-  if (filter === "easy") return value <= 2;
-  if (filter === "moderate") return value === 3;
-  return value >= 4;
+  return value === filter;
 }
 
 export function ScenariosClient({ scenarios }: { scenarios: ScenarioMeta[] }) {
@@ -400,7 +400,7 @@ function ScenarioCard({ scenario }: { scenario: ScenarioMeta; index: number }) {
                 </span>
               </div>
             </div>
-            <DifficultyBars value={scenario.difficulty} />
+            <DifficultyTier value={scenario.difficulty} />
           </div>
         </CardHeader>
 
@@ -432,19 +432,26 @@ function ScenarioCard({ scenario }: { scenario: ScenarioMeta; index: number }) {
   );
 }
 
-function DifficultyBars({ value }: { value: 1 | 2 | 3 | 4 | 5 }) {
+function DifficultyTier({ value }: { value: ScenarioDifficulty }) {
+  const filledBars = value === "easy" ? 1 : value === "moderate" ? 2 : 3;
+
   return (
-    <div className="flex items-center gap-1" aria-label={`Difficulty ${value} of 5`}>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <span
-          key={i}
-          className="h-1 w-2 rounded-sm transition-colors"
-          style={{
-            backgroundColor:
-              i < value ? "var(--color-brand)" : "var(--color-border)",
-          }}
-        />
-      ))}
+    <div className="flex items-center gap-2" aria-label={`Difficulty ${DIFFICULTY_LABEL[value]}`}>
+      <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+        {DIFFICULTY_LABEL[value]}
+      </span>
+      <div className="flex items-center gap-1">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <span
+            key={i}
+            className="h-1 w-2 rounded-sm transition-colors"
+            style={{
+              backgroundColor:
+                i < filledBars ? "var(--color-brand)" : "var(--color-border)",
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

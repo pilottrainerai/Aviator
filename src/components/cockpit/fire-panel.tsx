@@ -1632,6 +1632,7 @@ function DslControlPanel({
         const agentCtrls  = controls.filter(c => c.kind === "agent");
         const agent1Ctrl  = agentCtrls[0];
         const agent2Ctrl  = agentCtrls[1];
+        const agent2Available = !!state.triggersFired["fire_persists_30s"] && !state.triggersFired["fire_extinguished"];
         const performStep = (id?: string) => {
           if (!id || disabled) return;
           perform({ kind: "STEP", stepId: id });
@@ -1668,6 +1669,7 @@ function DslControlPanel({
                         firePbDone={isDone(firePbCtrl?.stepId ?? "")}
                         agent1Disch={isDone(agent1Ctrl?.stepId ?? "")}
                         agent2Disch={isDone(agent2Ctrl?.stepId ?? "")}
+                        agent2Available={agent2Available}
                         onPushFirePb={() => performStep(firePbCtrl?.stepId)}
                         onPushAgent1={() => performStep(agent1Ctrl?.stepId)}
                         onPushAgent2={() => performStep(agent2Ctrl?.stepId)}

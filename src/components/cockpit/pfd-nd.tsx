@@ -2,12 +2,68 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
+import type { Scenario, ScenarioPhase } from "@/scenarios/types";
 import { defaultAircraftState, type AircraftState } from "@/avionics/core/aircraftState";
 
 // ENG 1 FIRE after V1 — scenario-phase flight model
 // Each completed step advances the aircraft to a physically accurate snapshot.
 // Values match FCTM OP-020 technique and FCOM SRS/CLB performance data for VIDP ISA.
-export function buildAircraftState(s?: ScenarioState): AircraftState {
+function getActiveScenarioPhase(scenario?: Scenario, elapsedMs?: number): ScenarioPhase | null {
+  if (!scenario?.phases?.length || elapsedMs == null) return null;
+
+  let active: ScenarioPhase | null = null;
+  for (const phase of scenario.phases) {
+    if (phase.atMs <= elapsedMs) active = phase;
+    else break;
+  }
+
+  return active;
+}
+
+function buildAircraftStateFromPhase(phase: ScenarioPhase, s?: ScenarioState): AircraftState {
+  const pfd = phase.pfd;
+  const nd = phase.nd;
+  const speed = pfd?.speed ?? defaultAircraftState.speed;
+  const altitude = pfd?.altitude ?? defaultAircraftState.altitude;
+  const heading = nd?.heading ?? defaultAircraftState.heading;
+  const targetSpeedNumeric = pfd?.targetSpeed && /^\d+$/.test(pfd.targetSpeed)
+    ? Number(pfd.targetSpeed)
+    : null;
+
+  return {
+    ...defaultAircraftState,
+    speed,
+    altitude,
+    heading,
+    pitch: defaultAircraftState.pitch,
+    bank: defaultAircraftState.bank,
+    vs: pfd?.verticalSpeed ?? defaultAircraftState.vs,
+    selectedSpeed: targetSpeedNumeric ?? speed,
+    selectedAlt: pfd?.targetAltitude ?? defaultAircraftState.selectedAlt,
+    selectedHdg: heading,
+    apEngaged: !!(pfd?.ap1 || pfd?.ap2),
+    athrActive: pfd?.athr ?? defaultAircraftState.athrActive,
+    thrMode: pfd?.fmaThrust ?? defaultAircraftState.thrMode,
+    vertMode: pfd?.fmaPitch ?? defaultAircraftState.vertMode,
+    latMode: pfd?.fmaLateral ?? defaultAircraftState.latMode,
+    masterWarn: !!s?.masterWarnActive || !!pfd?.flags?.some((flag) => /master warn/i.test(flag)),
+    masterCaut: !!s?.masterCautActive || !!pfd?.flags?.some((flag) => /master caut/i.test(flag)),
+    eng1Failed: defaultAircraftState.eng1Failed,
+    eng2Failed: defaultAircraftState.eng2Failed,
+    gs: Math.max(speed - 2, 0),
+    tas: speed + 2,
+    windDir: defaultAircraftState.windDir,
+    windSpd: defaultAircraftState.windSpd,
+    track: heading,
+  };
+}
+
+export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elapsedMs?: number): AircraftState {
+  const activePhase = getActiveScenarioPhase(scenario, elapsedMs);
+  if (activePhase) {
+    return buildAircraftStateFromPhase(activePhase, s);
+  }
+
   const step  = (id: string) => !!(s?.completedSteps?.[id]);
   const fired = (id: string) => !!(s?.triggersFired?.[id]);
 
@@ -16,7 +72,7 @@ export function buildAircraftState(s?: ScenarioState): AircraftState {
   const apEngaged   = step("engage_ap_fma");
   const thrIdle     = step("thr_lever_idle");
   const mwCancelled = step("cancel_master_warn");
-  const ecamDone    = step("agent1");
+  const ecamDone    = step("engine_secured") || fired("fire_extinguished");
   const levelOff    = step("level_off_maa");
   const accelClean  = step("accel_clean");
   const masterWarn  = !!(s?.masterWarnActive && !mwCancelled);
@@ -95,15 +151,15 @@ export function buildAircraftState(s?: ScenarioState): AircraftState {
 
 // ─── PFD Canvas ────────────────────────────────────────────────────────────────
 
-export function PfdCanvas({ state }: { state?: ScenarioState }) {
+export function PfdCanvas({ state, scenario, elapsedMs }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number }) {
   const mountRef  = useRef<HTMLDivElement>(null);
-  const stateRef  = useRef<AircraftState>(buildAircraftState(state));
+  const stateRef  = useRef<AircraftState>(buildAircraftState(state, scenario, elapsedMs));
   const cleanupRef = useRef<(() => void) | null>(null);
 
   // Keep stateRef in sync with React props
   useEffect(() => {
-    stateRef.current = buildAircraftState(state);
-  }, [state]);
+    stateRef.current = buildAircraftState(state, scenario, elapsedMs);
+  }, [elapsedMs, scenario, state]);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -157,9 +213,9 @@ export function PfdCanvas({ state }: { state?: ScenarioState }) {
 
 const ND_RANGE_OPTIONS = [5, 10, 20, 40] as const;
 
-export function NdCanvas({ state }: { state?: ScenarioState }) {
+export function NdCanvas({ state, scenario, elapsedMs }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number }) {
   const mountRef   = useRef<HTMLDivElement>(null);
-  const stateRef   = useRef<AircraftState>(buildAircraftState(state));
+  const stateRef   = useRef<AircraftState>(buildAircraftState(state, scenario, elapsedMs));
   const cleanupRef = useRef<(() => void) | null>(null);
   // Hold the NDRenderer instance so the range-cycle effect can poke it.
   // Typed loosely because the renderer is imported asynchronously.
@@ -168,8 +224,8 @@ export function NdCanvas({ state }: { state?: ScenarioState }) {
   const [rangeIdx, setRangeIdx] = useState(1);    // default 10 NM
 
   useEffect(() => {
-    stateRef.current = buildAircraftState(state);
-  }, [state]);
+    stateRef.current = buildAircraftState(state, scenario, elapsedMs);
+  }, [elapsedMs, scenario, state]);
 
   // Whenever the range index changes, push the new NM into the renderer.
   useEffect(() => {
@@ -239,16 +295,16 @@ export function NdCanvas({ state }: { state?: ScenarioState }) {
 
 // ─── Exported composite ────────────────────────────────────────────────────────
 
-export function PfdNd({ state }: { state?: ScenarioState }) {
+export function PfdNd({ state, scenario, elapsedMs }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="border border-[var(--color-border)] bg-black overflow-hidden"
            style={{ aspectRatio: "1", maxHeight: "280px" }}>
-        <PfdCanvas state={state} />
+        <PfdCanvas state={state} scenario={scenario} elapsedMs={elapsedMs} />
       </div>
       <div className="border border-[var(--color-border)] bg-black overflow-hidden"
            style={{ aspectRatio: "1", maxHeight: "280px" }}>
-        <NdCanvas state={state} />
+        <NdCanvas state={state} scenario={scenario} elapsedMs={elapsedMs} />
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useScenarioRunner } from "@/lib/scenarios/runner";
-import type { Scenario, ScenarioDistraction, ScenarioStep } from "@/scenarios/types";
+import type { Scenario, ScenarioDistraction, ScenarioStep, AirportOption } from "@/scenarios/types";
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
 import { ScenarioClock } from "@/components/cockpit/scenario-clock";
@@ -21,6 +21,7 @@ import { FlightCheckPopup } from "@/components/cockpit/flight-check-popup";
 import { FirePanel } from "@/components/cockpit/fire-panel";
 import { SystemDisplay } from "@/components/cockpit/system-display";
 import { StatusPanel } from "@/components/cockpit/status-panel";
+import { getApplicableRequiredSteps, isStepApplicable } from "@/lib/scenarios/step-applicability";
 import { track } from "@/lib/analytics";
 
 const AUTO_END_DELAY_MS = 3_000;
@@ -36,21 +37,23 @@ type AtcPhase =
 
 export function ScenarioRunner({ scenario }: { scenario: Scenario }) {
   const [started, setStarted] = useState(false);
+  const [selectedAirport, setSelectedAirport] = useState<AirportOption | undefined>(undefined);
   if (!started) {
     return (
       <PreflightBrief
         scenario={scenario}
-        onStart={() => {
+        onStart={(airport) => {
           track("scenario_started", { slug: scenario.meta.slug });
+          setSelectedAirport(airport);
           setStarted(true);
         }}
       />
     );
   }
-  return <RunningScenario scenario={scenario} />;
+  return <RunningScenario scenario={scenario} selectedAirport={selectedAirport} />;
 }
 
-function RunningScenario({ scenario }: { scenario: Scenario }) {
+function RunningScenario({ scenario, selectedAirport }: { scenario: Scenario; selectedAirport?: AirportOption }) {
   const router = useRouter();
   const runner = useScenarioRunner(scenario);
   const [submitting, setSubmitting] = useState(false);
@@ -286,10 +289,10 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             {/* PFD + ND */}
             <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
               <div style={{ width: "380px", height: "380px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
-                <PfdMockup state={runner.state} />
+                <PfdMockup state={runner.state} scenario={scenario} elapsedMs={runner.elapsedMs} />
               </div>
               <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
-                <NdCanvas state={runner.state} />
+                <NdCanvas state={runner.state} scenario={scenario} elapsedMs={runner.elapsedMs} />
               </div>
             </div>
             {/* Glareshield — compact strip */}
@@ -739,13 +742,13 @@ const GROUP_ORDER = ["flightcheck", "glareshield", "procedure", "comms", "chclm"
 function ScenarioProgress({ scenario, state }: { scenario: Scenario; state: ScenarioState }) {
   const grouped: Record<string, ScenarioStep[]> = {};
   for (const s of scenario.steps) {
-    if (s.optional) continue;
+    if (s.optional || !isStepApplicable(s, state)) continue;
     const g = s.group ?? "procedure";
     if (!grouped[g]) grouped[g] = [];
     grouped[g].push(s);
   }
 
-  const allRequired = scenario.steps.filter((s) => !s.optional);
+  const allRequired = getApplicableRequiredSteps(scenario, state);
   const doneCount = allRequired.filter((s) => state.completedSteps[s.id]).length;
 
   // Active group = first group with a step whose trigger + requires are all met but not yet done

@@ -10,6 +10,7 @@ import type { ScenarioState } from "@/engine/state";
 import type { Scenario } from "@/scenarios/types";
 import type { DebriefRubric, StoredDebrief } from "@/lib/sessions/store";
 import { getLLM, isLLMConfigured } from "@/lib/llm";
+import { getApplicableRequiredSteps, isStepApplicable } from "@/lib/scenarios/step-applicability";
 import { scoreSessionMock } from "./mock";
 
 type Args = {
@@ -42,13 +43,12 @@ function summarizeEvents(events: ScenarioEvent[]): string {
     .join("\n");
 }
 
-function buildPrompt(scenario: Scenario, events: ScenarioEvent[]): string {
-  const requiredSteps = scenario.steps
-    .filter((s) => !s.optional)
+function buildPrompt(scenario: Scenario, events: ScenarioEvent[], finalState: ScenarioState): string {
+  const requiredSteps = getApplicableRequiredSteps(scenario, finalState)
     .map((s) => `- ${s.id}: ${s.label} ${s.action} (${s.hint})`)
     .join("\n");
   const optionalSteps = scenario.steps
-    .filter((s) => s.optional)
+    .filter((s) => s.optional || !isStepApplicable(s, finalState))
     .map((s) => `- ${s.id}: ${s.label} ${s.action} (${s.hint})`)
     .join("\n");
   const decisionOptions = scenario.decisions
@@ -121,7 +121,7 @@ export async function scoreSession({
           content:
             "You are a type-rated A320 examiner debriefing a pilot. You return strict JSON only — no preamble, no code fences. Be direct, specific, and brief. Avoid hedging.",
         },
-        { role: "user", content: buildPrompt(scenario, events) },
+        { role: "user", content: buildPrompt(scenario, events, finalState) },
       ],
       responseFormat: "json",
       temperature: 0.2,
