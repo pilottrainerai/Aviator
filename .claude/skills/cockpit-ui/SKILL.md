@@ -317,6 +317,38 @@ React mirrors it.
 
 ---
 
+## 2d. Typography — Futura Medium
+
+**All overhead panel labels use Futura Medium.** Decision recorded
+2026-05-27 from PICS analysis of `~/Desktop/PANELS/HYD/Hydraulic-Panel.jpg`:
+the real Airbus panel shows a geometric sans-serif with circular `O`/`G`,
+even stroke weight, vertical-spur `G`, and symmetric `U` — matches Futura.
+
+FCOM is silent on typeface. `grep "font" fcom-full.txt` returns only MCDU
+display-size rules at [fcom:L11491-11496] (DSC-22-10-40). PICS is therefore
+the only valid source — and the photo says Futura.
+
+### Scope
+Applies to every overhead-panel label across HYD, FIRE, ELEC, BLEED, FUEL,
+AIR COND, F/CTL — section titles, function labels, pushbutton cell legends
+(`FAULT` / `OFF` / `ON` / `MAN ON` / `DISCH` / `SQUIB`), and rack
+identifiers (`40VU`, `45VU`).
+
+### Implementation
+- **Blender:** Load Futura from `/System/Library/Fonts/Supplemental/Futura.ttc`
+  and immediately call `font.pack()`. The .blend must be self-contained — no
+  external font reference. See blender-panels §2d for the relative-path bug
+  that motivated this rule.
+- **React:** `font-family: 'Futura', 'Futura-Medium', sans-serif;`. Deployed
+  builds should bundle a Futura webfont rather than rely on the macOS system
+  font being present.
+
+### When a new panel's PICS show a different typeface
+Stop and ask. Do not assume Futura applies — surface the conflict, let the
+user decide which source to follow.
+
+---
+
 ## 3. Source library and FCOM chapter map
 
 ### Manual files
@@ -598,3 +630,12 @@ Add a new entry each time a Checkpoint B passes.
 - Function brackets are 3-sided green (open at bottom toward pb)
 - Flow art: two horizontal green segments connecting zones, broken around RAT MAN ON and PTU callouts; semicircular dome at BLUE junction only
 - File: `src/components/cockpit/hyd-panel.tsx` (work in progress — to be aligned with the Blender best version)
+
+### [2026-05-27] Cross-panel typography convergence — Futura Medium
+- PICS: `~/Desktop/PANELS/HYD/Hydraulic-Panel.jpg` (real A320 ovhd panel)
+- FCOM 4a/4b: silent on typeface — only MCDU font-size rules exist at [fcom:L11491-11496] (DSC-22-10-40)
+- Decision: all overhead panel labels use **Futura Medium**, packed into the .blend
+- Applied to: `hyd_panel_BEST.blend` (34 text objs), `eng1_left_panel.blend` (15), `fire_panel_two.blend` (36) — every panel .blend in the repo now packs Futura
+- Bug fixed in HYD: original `.blend` shipped a broken relative font path (`//../../../../../../../System/...`, 7 `../` segments instead of 8). All glyphs rendered as tofu boxes on reopen. Fix: load Futura fresh from absolute path, reassign all FONT objects, call `font.pack()` to embed font data inside the `.blend`. File grew 172 KB → 361 KB.
+- Build script gap (open): `hyd_panel_build*.py`, `fire_panel_two_build.py` load Futura but never call `.pack()`. Re-running them regenerates the broken external reference. Patch pending — see blender-panels §6 rule 11.
+- Rule codified in §2d above
