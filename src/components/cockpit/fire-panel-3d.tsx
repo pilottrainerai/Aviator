@@ -1,5 +1,7 @@
 "use client";
 
+// HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 // ─────────────────────────────────────────────────────────────────────────────
 // FirePanel3D — Blender GLB-driven 3D ENG 1 fire panel
 //

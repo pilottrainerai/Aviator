@@ -1,5 +1,7 @@
 "use client";
 
+// HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 import { useEffect, useId, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";

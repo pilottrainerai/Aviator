@@ -1,5 +1,7 @@
 "use client";
 
+// HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 // ─────────────────────────────────────────────────────────────────────────────
 // FIRE panel — SCENARIO integration wrapper
 //

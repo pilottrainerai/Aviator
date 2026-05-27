@@ -1,5 +1,7 @@
 "use client";
 
+// HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useScenarioRunner } from "@/lib/scenarios/runner";

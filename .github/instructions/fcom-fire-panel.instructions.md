@@ -11,6 +11,8 @@ description: >
 
 # A320 Engine Fire Panel — FCOM Skill
 
+Hub tag: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 ## 0 · Hard Rules (never break)
 
 1. `ARM_DELAY_MS = 10_000` — ECAM "AGENT 1 AFTER 10 S → DISCH". Do not change.

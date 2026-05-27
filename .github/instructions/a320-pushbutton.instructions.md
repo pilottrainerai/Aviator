@@ -21,6 +21,8 @@ description: >
 
 # A320 Lighted Pushbutton Skill
 
+Hub tag: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 > **All values in this skill are extracted verbatim from Airbus FCOM
 > (docs/manuals/fcom-full.txt). No value is invented.
 > If a value is not in this document, stop and grep fcom-full.txt

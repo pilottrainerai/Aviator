@@ -1,5 +1,7 @@
 "use client";
 
+// HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Airbus A320 Engine Fire Panel — mockup with realistic FCOM behavior modeled.
 // View at /mockups/fire-panel in dev.
