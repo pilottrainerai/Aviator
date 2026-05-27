@@ -107,7 +107,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "engage_ap_fma",
       label: "AP1 ENGAGE — READ FMA",
       action: "CONFIRM",
-      hint: "PF: once the flight path is stable, engage AP1 at about 100 ft. Read FMA aloud and confirm the vertical/lateral/autopilot modes. Focus on FMA verification and stable flight path.",
+      hint: "PF: engage AP1 at ~100 ft once flight path stable. Read FMA aloud and announce A/THR. Engine is still running with fire warning — no special beta/trim/A/THR monitoring (those apply only after engine master shutdown — see abnormal-procs.txt L541-543).",
       variant: "switch",
       crew: "PF",
       group: "flightcheck",
@@ -329,7 +329,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "announce_land_asap",
       label: "LAND ASAP",
       action: "ANNOUNCE",
-      hint: "PF announces 'LAND ASAP' (red on ECAM). Crew commits to land at the nearest suitable airport with full emergency services.",
+      hint: "PF announces 'LAND ASAP' (red on ECAM) — this is the cue to declare MAYDAY to ATC (next step). Crew commits to land at the nearest suitable airport with full emergency services. [fcom:L94604 RED LAND ASAP / abnormal-procs:L229-231]",
       variant: "warning",
       crew: "PF",
       group: "chclm",
@@ -383,7 +383,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "level_off_maa",
       label: "V/S 0 AT MAA",
       action: "SELECT",
-      hint: "PF: at minimum acceleration altitude, select V/S 0 to level off (VIDP elev about 777 ft, so MAA is about 2300 ft AMSL in this profile). While levelling, thrust remains in the TOGA/SRS segment until acceleration and cleanup are complete.",
+      hint: "PF: at minimum acceleration altitude (~2300 ft AMSL given VIDP elev ~777 ft), push V/S knob → V/S 0 in the FCU window. FMA vertical mode changes from SRS to V/S; A/THR maintains target speed. Thrust stays in TOGA detent. [fctm:L12872-73 'push ALT pb or push the V/S knob to level off']",
       variant: "switch",
       requires: ["engine_secured"],
       crew: "PF",
@@ -402,9 +402,26 @@ export const eng1FireAfterV1: Scenario = {
       id: "accel_clean",
       label: "ACCEL / CLEAN",
       action: "CONFIRM",
-      hint: "PF calls 'FLAPS 1' at F speed and 'FLAPS UP' at S speed; PM checks speed, repeats callouts, and selects accordingly. As speed reaches green dot (green circle on tape), LVR MCT cue appears; PF calls MCT, PM confirms, then PF selects climb mode per profile and both crew verify FMA.",
+      hint: "PF calls 'FLAPS 1' at F speed and 'FLAPS UP' at S speed; PM checks speed, repeats callouts, selects accordingly. Continue acceleration toward green dot — MCT/OPEN CLB transition is handled in the next step. [fctm:L12872-76 ACCELERATION SEGMENT]",
       variant: "switch",
       requires: ["level_off_maa"],
+      crew: "PF",
+    },
+
+    // ── 7b ── FCTM PR-AEP-ENG FINAL TAKEOFF SEGMENT — at green dot
+    // [fctm:L12879-12882]:
+    //   "As the speed trend arrow reaches Green Dot speed, pull for OPEN CLIMB,
+    //    set THR MCT when the LVR MCT message flashes on the FMA (triggered as
+    //    the speed index reaches green dot) and resume climb using MCT. If the
+    //    thrust lever are already in the FLX/MCT detent, move lever to CL and
+    //    then back to MCT."
+    {
+      id: "mct_open_clb",
+      label: "MCT / OPEN CLB",
+      action: "SELECT",
+      hint: "At green dot speed: 'LVR MCT' flashes amber on FMA (triggered when speed index reaches green dot). PF moves thrust levers from CL to MCT detent (if already at FLX/MCT, recycle CL→MCT to re-arm). PF pulls ALT knob → OPEN CLB engages. FMA: THR MCT / OP CLB. [fctm:L12879-12882]",
+      variant: "switch",
+      requires: ["accel_clean"],
       crew: "PF",
     },
 
@@ -723,7 +740,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "approach_cl",
       label: "APPROACH CL",
       action: "COMPLETE",
-      hint: "PM runs approach checklist. Call each item, PF cross-checks and responds. Include one-engine-inoperative landing considerations per QRH reference.",
+      hint: "PM runs approach checklist. Call each item, PF cross-checks and responds. CRITICAL: also run QRH ABN ONE ENG INOPERATIVE LANDING checklist alongside — Vapp, flap setting, autobrake setting, autoland eligibility, and engine-out go-around plan. [QRH ABN — exact section to be verified in next pass]",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
@@ -911,7 +928,10 @@ export const eng1FireAfterV1: Scenario = {
     {
       id: "atc_pob_fuel_services",
       atMs: 287_500,
-      requiresStep: "fordec",
+      // [user-input 2026-05-27]: A7 (POB/fuel/services) should trigger once
+      // landing performance is computed, not after FORDEC — operationally the
+      // crew has the numbers ATC needs (fuel endurance) right after ldg_perf.
+      requiresStep: "ldg_perf",
       kind: "atc",
       from: "DELHI APPROACH",
       message: "IFLY101, say persons on board, fuel endurance, and assistance required.",
