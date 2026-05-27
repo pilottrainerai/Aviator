@@ -566,7 +566,7 @@ function AirbusPB({
           <span
             style={{
               fontSize: large ? "20px" : "8px",
-              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontFamily: "var(--font-cockpit)",
               fontWeight: 800,
               letterSpacing: large ? "0.04em" : "0.12em",
               color: ledTextColor,
@@ -599,7 +599,7 @@ function AirbusPB({
           <div
             style={{
               fontSize: large ? "11px" : "9px",
-              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontFamily: "var(--font-cockpit)",
               fontWeight: 700,
               letterSpacing: large ? "0.04em" : "0.08em",
               // FIRE pb at rest: off-white label on orange-red body.
@@ -616,7 +616,7 @@ function AirbusPB({
             <div
               style={{
                 fontSize: "10px",
-                fontFamily: '"Helvetica Neue", Arial, sans-serif',
+                fontFamily: "var(--font-cockpit)",
                 color: lit ? "#FFFFFF" : FIRE_LEGEND_OFFWHITE,
                 fontWeight: 700,
                 letterSpacing: "0.14em",
@@ -780,7 +780,7 @@ function AgentPb({
           }}>
             <span style={{
               fontSize: "9px",
-              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontFamily: "var(--font-cockpit)",
               fontWeight: 800,
               color: squibLit ? C.white : C.dimLo,
               letterSpacing: "0.06em",
@@ -799,7 +799,7 @@ function AgentPb({
           }}>
             <span style={{
               fontSize: "9px",
-              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontFamily: "var(--font-cockpit)",
               fontWeight: 800,
               color: dischLit ? C.amber : C.dimLo,
               letterSpacing: "0.06em",
@@ -814,7 +814,7 @@ function AgentPb({
         marginTop: "6px",
         textAlign: "center",
         fontSize: "8px",
-        fontFamily: '"Helvetica Neue", Arial, sans-serif',
+        fontFamily: "var(--font-cockpit)",
         fontWeight: 700,
         color: dischLit ? C.amber : squibLit ? C.white : arming ? C.amber : C.dim,
         letterSpacing: "0.08em",
@@ -825,7 +825,7 @@ function AgentPb({
         {sub && (
           <span style={{
             display: "block", fontSize: "7px",
-            fontFamily: '"Helvetica Neue", Arial, sans-serif',
+            fontFamily: "var(--font-cockpit)",
             color: C.dim, marginTop: "1px", letterSpacing: "0.06em",
           }}>
             {sub}

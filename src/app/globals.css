@@ -37,6 +37,12 @@
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono",
     "JetBrains Mono", Menlo, monospace;
 
+  /* Cockpit overhead-panel typeface — Futura, matches the real A320 silkscreen.
+     Source: cockpit-ui §2d (PICS analysis 2026-05-27). Apply via
+     fontFamily: "var(--font-cockpit)" or class="font-cockpit". */
+  --font-cockpit: "Futura", "Futura-Medium", "Avenir Next", "Century Gothic",
+    var(--font-sans);
+
   --text-xs: 0.6875rem;
   --text-sm: 0.8125rem;
   --text-base: 0.9375rem;

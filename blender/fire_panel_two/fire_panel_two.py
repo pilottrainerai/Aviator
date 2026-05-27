@@ -69,6 +69,22 @@ M = {
     'wtext':     mat('wtext',    '#E8ECF4', 0.20, em='#FFFFFF', em_str=4),
 }
 
+# ─────────────── FONT ─────────────── (blender-panels §2d)
+COCKPIT_FONT = None
+for label, path in [
+    ("Futura.ttc", "/System/Library/Fonts/Supplemental/Futura.ttc"),
+    ("Arial Bold", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
+]:
+    try:
+        COCKPIT_FONT = bpy.data.fonts.load(path)
+        COCKPIT_FONT.pack()  # MANDATORY — blender-panels §6 rule 11
+        print(f"Loaded cockpit font: {label}")
+        break
+    except Exception as e:
+        print(f"  could not load {label}: {e}")
+if COCKPIT_FONT is None:
+    print("All custom fonts failed; using Blender default Bfont")
+
 def asgn(o, m):
     o.data.materials.clear(); o.data.materials.append(m)
 
@@ -96,6 +112,7 @@ def txt(name, body, size_mm, cx, cy, cz, m, ext=0.3):
     bpy.ops.object.text_add(location=(mm(cx), mm(cy), mm(cz)))
     o = bpy.context.active_object; o.name = name
     o.data.body     = body
+    if COCKPIT_FONT: o.data.font = COCKPIT_FONT
     o.data.size     = mm(size_mm)
     o.data.extrude  = mm(ext)
     o.data.align_x  = 'CENTER'
