@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { ScenarioState } from "@/engine/state";
 import type { ECAMLevel, Scenario } from "@/scenarios/types";
 
@@ -217,13 +217,35 @@ function AsteriskRow({ color, children }: { color: string; children: React.React
   );
 }
 
-function ActionRow({ color, completed, children }: { color: string; completed: boolean; children: React.ReactNode }) {
+function ActionRow({ color, completed, children }: { color: string; completed: boolean; children: ReactNode }) {
+  // Track the moment the line is marked complete so we can run a brief
+  // "press" flash — green highlight fades in then the row dims/greys.
+  const [justDone, setJustDone] = useState(false);
+  useEffect(() => {
+    if (!completed) return;
+    setJustDone(true);
+    const t = setTimeout(() => setJustDone(false), 600);
+    return () => clearTimeout(t);
+  }, [completed]);
+
   return (
     <div
       className="flex items-baseline gap-[5px]"
-      style={{ color, opacity: completed ? 0.6 : 1, fontSize: "11px", fontWeight: 500, letterSpacing: "0.06em", lineHeight: "1.55", transition: "color 0.35s ease, opacity 0.35s ease" }}
+      style={{
+        color: completed ? "#00D060" : color,
+        opacity: completed && !justDone ? 0.55 : 1,
+        fontSize: "11px", fontWeight: 500, letterSpacing: "0.06em", lineHeight: "1.55",
+        transition: "color 0.3s ease, opacity 0.5s ease",
+        // Brief green glow on the row when just ticked
+        textShadow: justDone ? "0 0 8px #00D06090" : "none",
+      }}
     >
-      <span style={{ fontSize: "10px", lineHeight: 1, flexShrink: 0, minWidth: "12px" }}>
+      <span style={{ fontSize: "10px", lineHeight: 1, flexShrink: 0, minWidth: "12px",
+        // Checkmark gets a momentary scale-up pop when first set
+        display: "inline-block",
+        transform: justDone ? "scale(1.4)" : "scale(1)",
+        transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+      }}>
         {completed ? "✓" : "□"}
       </span>
       <span>{children}</span>

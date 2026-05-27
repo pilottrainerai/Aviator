@@ -84,7 +84,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "continue_rotation",
       label: "CONTINUE ROTATION",
       action: "V2+10",
-      hint: "PF maintains rotation — do NOT reduce thrust. Rotate smoothly toward about 12.5 degrees, follow SRS, hold V2+10, and keep the beta target centered with rudder without chasing it.",
+      hint: "PF maintains normal takeoff rotation and climb. Do NOT reduce thrust. Follow FD/SRS, hold V2+10, and keep runway track stable.",
       variant: "switch",
       crew: "PF",
       group: "flightcheck",
@@ -107,7 +107,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "engage_ap_fma",
       label: "AP1 ENGAGE — READ FMA",
       action: "CONFIRM",
-      hint: "PF: once the flight path is stable and rudder trim is set, engage AP1 at about 100 ft. Read FMA aloud: 'SRS — NAV — AP1 ENGAGED'. Monitor beta, trim, and A/THR.",
+      hint: "PF: once the flight path is stable, engage AP1 at about 100 ft. Read FMA aloud and confirm the vertical/lateral/autopilot modes. Focus on FMA verification and stable flight path.",
       variant: "switch",
       crew: "PF",
       group: "flightcheck",
@@ -383,7 +383,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "level_off_maa",
       label: "V/S 0 AT MAA",
       action: "SELECT",
-      hint: "PF: at minimum acceleration altitude PUSH V/S knob → V/S 0. Aircraft levels off, A/THR maintains target speed; SRS reverts as the level-off captures. Begin accel + flap retraction.",
+      hint: "PF: at minimum acceleration altitude, select V/S 0 to level off (VIDP elev about 777 ft, so MAA is about 2300 ft AMSL in this profile). While levelling, thrust remains in the TOGA/SRS segment until acceleration and cleanup are complete.",
       variant: "switch",
       requires: ["engine_secured"],
       crew: "PF",
@@ -402,7 +402,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "accel_clean",
       label: "ACCEL / CLEAN",
       action: "CONFIRM",
-      hint: "PF calls 'FLAPS 1' at F speed → PM checks AS, calls 'FLAPS 1' back, selects flap lever 1. PF calls 'FLAPS UP' at S speed → PM checks AS, calls 'FLAPS UP' back, selects flap lever 0. Verify CONFIG CLEAN on ECAM.",
+      hint: "PF calls 'FLAPS 1' at F speed and 'FLAPS UP' at S speed; PM checks speed, repeats callouts, and selects accordingly. As speed reaches green dot (green circle on tape), LVR MCT cue appears; PF calls MCT, PM confirms, then PF selects climb mode per profile and both crew verify FMA.",
       variant: "switch",
       requires: ["level_off_maa"],
       crew: "PF",
@@ -583,7 +583,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "fordec",
       label: "FORDEC",
       action: "COMPLETE",
-      hint: "PF leads FORDEC discussion. PM cross-checks each element. Agree and commit to decision before proceeding.",
+      hint: "PF leads FORDEC discussion. PM cross-checks each element. Agree and commit to decision, then advise ATC of the selected operational intention when workload permits.",
       variant: "advisory",
       crew: "PF",
       group: "comms",
@@ -650,7 +650,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["crew_crosscheck"],
+      requires: ["pax_pa"],
       optional: true,
     },
 
@@ -673,7 +673,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "atc_emergency_services",
       label: "ATC — EMERG SVCS",
       action: "ADVISE",
-      hint: "PM advises ATC: 'IFLY101, request Category 3 emergency services on runway 28. Require CFR vehicles, ambulances, and medical standby.'",
+      hint: "PM advises ATC: 'IFLY101, request Category 3 emergency services on runway 28. Require CFR vehicles, ambulances, and medical standby.' Expect ATC readback/confirmation of services.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
@@ -723,7 +723,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "approach_cl",
       label: "APPROACH CL",
       action: "COMPLETE",
-      hint: "PM runs approach checklist. Call each item, PF cross-checks and responds. Complete before top of descent.",
+      hint: "PM runs approach checklist. Call each item, PF cross-checks and responds. Include one-engine-inoperative landing considerations per QRH reference.",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
@@ -795,7 +795,8 @@ export const eng1FireAfterV1: Scenario = {
     // ① Tower → Departure handoff (low workload, just before fire)
     {
       id: "atc_handoff_to_departure",
-      atMs: 25_000,
+      atMs: 27_500,
+      requiresStep: "continue_rotation",
       kind: "atc",
       from: "DELHI TOWER",
       message: "IFLY101, contact Delhi Departure 124.85.",
@@ -805,13 +806,16 @@ export const eng1FireAfterV1: Scenario = {
         { id: "b", label: "Roger, IFLY101",                                                  correct: false },
         // Wrong — off-by-one-digit frequency readback (classic stress error)
         { id: "c", label: "Delhi Departure 124.95, IFLY101",                                 correct: false },
+        // Wrong — premature mayday declaration at handoff point
+        { id: "d", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, standby",             correct: false },
       ],
     },
 
     // ② Initial MAYDAY — BRIEF, essential info only.  No runway, no intentions.
     {
       id: "atc_radar_contact_mayday",
-      atMs: 42_000,
+      atMs: 57_500,
+      requiresStep: "mayday_atc",
       kind: "atc",
       from: "DELHI DEPARTURE",
       message: "IFLY101, Delhi Departure, radar contact.",
@@ -829,7 +833,8 @@ export const eng1FireAfterV1: Scenario = {
     // ③ ATC acknowledges + provides vectors/altitude — NO questions during workload
     {
       id: "atc_vectors_climb",
-      atMs: 70_000,
+      atMs: 97_500,
+      requiresStep: "mayday_atc",
       kind: "atc",
       from: "DELHI DEPARTURE",
       message: "IFLY101, roger MAYDAY, radar contact, continue runway track, climb 4 000 feet.",
@@ -845,7 +850,8 @@ export const eng1FireAfterV1: Scenario = {
     //    Correct response = STANDBY pb (system-provided), or "Continuing checklist".
     {
       id: "atc_vectors_when_ready",
-      atMs: 105_000,
+      atMs: 137_500,
+      requiresStep: "announce_sec_failures",
       kind: "atc",
       from: "DELHI DEPARTURE",
       message: "IFLY101, vectors available when ready, no reported traffic.",
@@ -866,7 +872,7 @@ export const eng1FireAfterV1: Scenario = {
     //   (won't fire before this even if the step is done early).
     {
       id: "atc_info_request_prompt",
-      atMs: 150_000,
+      atMs: 197_500,
       requiresStep: "crew_crosscheck",
       kind: "atc",
       from: "DELHI APPROACH",
@@ -885,7 +891,8 @@ export const eng1FireAfterV1: Scenario = {
     // ⑦ NEW — ATC delivers the briefing info; full readback expected
     {
       id: "atc_provides_briefing_info",
-      atMs: 200_000,
+      atMs: 257_500,
+      requiresStep: "wx_request",
       kind: "atc",
       from: "DELHI APPROACH",
       message: "IFLY101, roger standby. … Delhi wind 280 at 8, runway 28 in use, NOTAMs nil significant, expect ILS runway 28.",
@@ -903,7 +910,8 @@ export const eng1FireAfterV1: Scenario = {
     // ⑧ ATC asks the operational questions (POB / fuel / services) — was ⑥
     {
       id: "atc_pob_fuel_services",
-      atMs: 225_000,
+      atMs: 287_500,
+      requiresStep: "fordec",
       kind: "atc",
       from: "DELHI APPROACH",
       message: "IFLY101, say persons on board, fuel endurance, and assistance required.",
@@ -921,7 +929,8 @@ export const eng1FireAfterV1: Scenario = {
     // ⑨ NEW — Ready-for-approach call (PM-initiated style; ATC prompts)
     {
       id: "atc_ready_for_approach",
-      atMs: 250_000,
+      atMs: 327_500,
+      requiresStep: "approach_prep",
       kind: "atc",
       from: "DELHI APPROACH",
       message: "IFLY101, advise when ready for approach.",
@@ -940,7 +949,8 @@ export const eng1FireAfterV1: Scenario = {
     //    handoff (was ⑦, expanded with intercept heading per real ATC clearance)
     {
       id: "atc_cleared_approach",
-      atMs: 275_000,
+      atMs: 357_500,
+      requiresStep: "approach_brief",
       kind: "atc",
       from: "DELHI APPROACH",
       message: "IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 28 approach, contact Delhi Tower 118.10 when established.",
@@ -958,7 +968,8 @@ export const eng1FireAfterV1: Scenario = {
     // ⑪ Tower contact — was ⑧
     {
       id: "atc_tower_contact",
-      atMs: 300_000,
+      atMs: 397_500,
+      requiresStep: "approach_cl",
       kind: "atc",
       from: "DELHI TOWER",
       message: "IFLY101, Delhi Tower, continue ILS approach runway 28, report established.",
@@ -972,7 +983,8 @@ export const eng1FireAfterV1: Scenario = {
     // ⑫ Landing clearance — readback required — was ⑨
     {
       id: "atc_cleared_to_land",
-      atMs: 325_000,
+      atMs: 427_500,
+      requiresStep: "landing_cl",
       kind: "atc",
       from: "DELHI TOWER",
       message: "IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.",
@@ -1426,6 +1438,7 @@ export const eng1FireAfterV1: Scenario = {
         notes: [
           "SRS armed on FD — captures at rotation",
           "Both engines at TOGA — normal at this point",
+          "Delhi QNH set from start; field elevation about 777 ft on altimeter reference",
         ],
       },
       nd: {
@@ -1449,10 +1462,9 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
 
-    // ── PHASE 2 — ENG 1 FIRE (T+8s) ─────────────────────────────────────────
     // FCOM: CRC (Continuous Repetitive Chime) fires simultaneously with MASTER WARN.
     // Fire light on FIRE panel illuminates. ECAM E/WD shows ENG 1 FIRE in red.
-    // FCTM: PF memory item — MAINTAIN DIRECTION. Do NOT reduce thrust. No overhead action.
+    // FCTM: maintain directional control and continue takeoff. Do NOT reduce thrust. No overhead action.
     {
       id: "fire_detected",
       label: "ENG 1 FIRE DETECTED",
@@ -1473,7 +1485,7 @@ export const eng1FireAfterV1: Scenario = {
           "MASTER WARN illuminates red — CRC fires continuously",
           "ENG 1 fire loop detected — fire panel FIRE light illuminated",
           "ENG 1 still producing thrust — do NOT reduce TOGA",
-          "Asymmetric yaw begins — apply right rudder",
+          "Maintain runway track and stable takeoff attitude",
         ],
       },
       nd: {
@@ -1483,15 +1495,15 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["Track deviation possible — yaw correction required"],
       },
       pf: {
-        task: "MEMORY ITEM: apply right rudder to zero β. Do NOT reduce thrust. Do NOT react to ECAM yet — aviate first.",
+        task: "Maintain directional control and continue takeoff. Do NOT reduce thrust. Do NOT react to ECAM yet — aviate first.",
         callouts: [
-          { role: "PF", speech: "MEMORY ITEMS — MAINTAIN DIRECTION" },
+          { role: "PF", speech: "CONTINUE — MAINTAIN DIRECTION" },
         ],
       },
       pm: {
-        task: "Identify ECAM. Call 'MASTER WARNING — ENG FIRE ENGINE ONE'. Do NOT cancel MASTER WARN yet. Call VR.",
+        task: "Identify ECAM. Call 'MASTER WARNING — ENGINE FIRE'. Do NOT cancel MASTER WARN yet. Call VR.",
         callouts: [
-          { role: "PM", speech: "MASTER WARNING — ENG FIRE ENGINE ONE" },
+          { role: "PM", speech: "MASTER WARNING — ENGINE FIRE" },
           { role: "PM", speech: "ROTATE" },
         ],
       },
@@ -1507,7 +1519,7 @@ export const eng1FireAfterV1: Scenario = {
     // ── PHASE 3 — ROTATION (T+10s) ──────────────────────────────────────────
     {
       id: "rotation",
-      label: "ROTATION — VR 12.5°",
+      label: "ROTATION — NORMAL VR",
       atMs: 10_000,
       pfd: {
         speed: 152,
@@ -1522,8 +1534,8 @@ export const eng1FireAfterV1: Scenario = {
         athr: false,
         flags: ["MASTER WARN (red)", "CRC active"],
         notes: [
-          "FD pitch bar commands 12.5° nose up — follow it",
-          "β target = 0 — sideslip ball centered with right rudder",
+          "Follow normal FD rotation guidance into initial climb",
+          "Maintain coordinated climb and runway-track discipline",
           "Speed trend arrow pointing up — ENG 1 still contributing thrust",
           "CRC still sounding — PM has NOT cancelled MW yet (aviate first)",
         ],
@@ -1535,7 +1547,7 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["Track 280 — right rudder input may cause minor heading drift"],
       },
       pf: {
-        task: "Rotate smoothly to 12.5° pitch, follow FD, target V2+10. Hold right rudder — β = 0. Do NOT bank.",
+        task: "Rotate smoothly, follow FD, and target V2+10 while keeping a stable, coordinated climb.",
         callouts: [
           { role: "PF", speech: "ROTATING — V2+10 TARGET" },
         ],
@@ -1572,8 +1584,7 @@ export const eng1FireAfterV1: Scenario = {
         notes: [
           "AP1 engaged at ~100 ft — SRS holds V2+10 on pitch",
           "NAV engaged — tracking SID",
-          "FMA col 5: AP1 (white), ENG OUT (amber)",
-          "Rudder trim applied ~2 units right",
+          "FMA confirms AP1 engagement and expected mode set",
           "PM now silences CRC — MASTER WARN pushlight pressed",
         ],
       },
@@ -1585,11 +1596,10 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["AP holding RWY TRK → NAV capture"],
       },
       pf: {
-        task: "Engage AP1. Read FMA aloud. Apply rudder trim ~2 units toward ENG 2. Monitor SRS holding V2+10.",
+        task: "Engage AP1. Read FMA aloud and confirm expected mode engagement while maintaining stable flight path.",
         callouts: [
           { role: "PF", speech: "AP1 ENGAGE" },
-          { role: "PF", speech: "FMA: MAN TOGA — SRS — NAV — AP1 — ENG OUT. CHECKED." },
-          { role: "PF", speech: "RUDDER TRIM — 2 UNITS RIGHT" },
+          { role: "PF", speech: "FMA: MAN TOGA — SRS — NAV — AP1. CHECKED." },
         ],
       },
       pm: {
@@ -1950,19 +1960,20 @@ export const eng1FireAfterV1: Scenario = {
       atMs: 58_000,
       pfd: {
         speed: 220,
-        targetSpeed: "S",
-        altitude: 2_350,
+        targetSpeed: "GREEN DOT",
+        altitude: 2_300,
         targetAltitude: 3_000,
-        verticalSpeed: 400,
-        fmaThrust: "MAN TOGA",
-        fmaPitch: "OP CLB",
+        verticalSpeed: 0,
+        fmaThrust: "MAN TOGA (LVR MCT FLASH)",
+        fmaPitch: "V/S 0",
         fmaLateral: "NAV",
         ap1: true,
         athr: true,
         notes: [
-          "Minimum acceleration altitude reached after engine secured call",
-          "V/S 0 selected — aircraft levelling to accelerate and clean up",
-          "A/THR active on the live engine; rudder trim maintained for single-engine climb",
+          "VIDP profile: MAA reached at about 2300 ft AMSL (field elevation about 777 ft)",
+          "V/S 0 selected — aircraft levelled before acceleration and flap retraction",
+          "During acceleration/cleanup the thrust segment remains TOGA with LVR MCT flashing cue",
+          "At green dot PF sets MCT, then selects climb mode and PM confirms thrust/pitch/lateral FMA changes",
         ],
       },
       nd: {
@@ -1973,21 +1984,25 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["Range increased to 20 nm for VIDP return planning"],
       },
       pf: {
-        task: "V/S 0 at MAA. Call FLAPS 1 at F speed, FLAPS UP at S speed, then MCT at green dot. Monitor A/THR and heading control.",
+        task: "Select V/S 0 at MAA, then run F-speed and S-speed flap retraction sequence. At green dot, respond to LVR MCT cue, set MCT, then select climb mode and cross-check FMA.",
         callouts: [
           { role: "PF", speech: "V/S ZERO — LEVELLING OFF" },
+          { role: "PF", speech: "FMA CHECKED" },
           { role: "PF", speech: "FLAPS ONE" },
           { role: "PM", speech: "SPEED CHECKED — FLAPS ONE" },
           { role: "PF", speech: "FLAPS UP" },
           { role: "PM", speech: "SPEED CHECKED — FLAPS UP — CONFIG CLEAN" },
+          { role: "PM", speech: "GREEN DOT — LVR MCT" },
           { role: "PF", speech: "MCT" },
           { role: "PM", speech: "MCT — THRUST SET" },
+          { role: "PF", speech: "CLIMB" },
+          { role: "PM", speech: "FMA CHECKED" },
         ],
       },
       pm: {
-        task: "Cross-check each flap selection, verify CONFIG CLEAN on ECAM, and set MCT on PF call.",
+        task: "Cross-check each flap selection, verify CONFIG CLEAN on ECAM, call out LVR MCT at green dot, confirm MCT set, then verify FMA after PF selects climb mode.",
         callouts: [
-          { role: "PM", speech: "SINGLE ENGINE — MCT SET — GREEN DOT TARGET" },
+          { role: "PM", speech: "SINGLE ENGINE — MCT SET" },
         ],
       },
       overhead: {
