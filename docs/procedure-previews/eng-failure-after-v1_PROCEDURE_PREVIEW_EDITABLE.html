@@ -1,0 +1,545 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>eng-failure-after-v1 Procedure Preview (Editable)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{--bg:#f3f6fb;--ink:#0f172a;--muted:#475569;--panel:#ffffff;--line:#cbd5e1;--head:#e5edf8;--edit:#fff8db;--accent:#2563eb}
+    body{margin:20px;font-family:Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    h1{margin:0 0 4px;font-size:24px}
+    .sub{font-size:12px;color:var(--muted);margin-bottom:12px}
+    .toolbar{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;z-index:3}
+    button{border:1px solid #9db4d6;background:#eaf1ff;color:#0f172a;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer}
+    button:hover{background:#dce8ff}
+    .status{font-size:12px;color:var(--muted)}
+    .card{margin-top:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:auto}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th,td{border:1px solid var(--line);padding:7px 8px;font-size:11px;vertical-align:top;word-wrap:break-word}
+    th{background:var(--head);text-align:left;position:sticky;top:44px;z-index:2}
+    .editable{background:var(--edit)}
+    .editable:focus{outline:2px solid var(--accent);outline-offset:-2px;background:#fff}
+    .wrap{white-space:pre-wrap}
+  </style>
+</head>
+<body>
+  <h1>eng-failure-after-v1 - Procedure Draft Preview</h1>
+  <div class="sub">Generated from src/scenarios/data/eng-failure-after-v1.ts using current pilot trainer step logic.</div>
+  <div class="toolbar">
+    <button onclick="saveLocal()">Save Local</button>
+    <button onclick="loadLocal()">Load Local</button>
+    <button onclick="clearLocal()">Clear Local</button>
+    <button onclick="exportHtml()">Export HTML</button>
+    <span class="status" id="status">Ready</span>
+  </div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:4%">Seq</th>
+          <th style="width:10%">Step ID</th>
+          <th style="width:13%">Current Label</th>
+          <th style="width:8%">Speaker</th>
+          <th style="width:15%">Current Logic Gate</th>
+          <th style="width:22%">Current Hint / Behavior</th>
+          <th style="width:12%">Proposed Procedure Text</th>
+          <th style="width:8%">Expected Action (Draft)</th>
+          <th style="width:8%">Change Required</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>v1_continue</td>
+          <td>V1 — CONTINUE TAKEOFF</td>
+          <td></td>
+          <td class="wrap">requiresTrigger: after_v1</td>
+          <td class="wrap">V1 passed — takeoff is committed. Airbus policy: once V1 is crossed, continue the takeoff even with an engine failure. Do NOT reduce thrust. Maintain directional control.</td>
+          <td class="editable" contenteditable="true" data-key="proc-0-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-0-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-0-change"></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>maintain_direction</td>
+          <td>MAINTAIN DIRECTION — MEMORY ITEM</td>
+          <td></td>
+          <td class="wrap">requiresTrigger: engine_fail</td>
+          <td class="wrap">FCTM MEMORY ITEM: immediately apply rudder toward the live engine (ENG 2 — right pedal) to stop yaw. Target β = ZERO on the FD sideslip indicator. Maintain nose straight on the runway heading.</td>
+          <td class="editable" contenteditable="true" data-key="proc-1-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-1-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-1-change"></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>continue_rotation</td>
+          <td>ROTATION — VR 12.5°</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF rotates at VR to 12.5° pitch, follows SRS guidance targeting V2+10 kt. Hold rotation attitude — do NOT chase pitch. β = 0 maintained with rudder throughout.</td>
+          <td class="editable" contenteditable="true" data-key="proc-2-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-2-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-2-change"></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>positive_rate_gear_up</td>
+          <td>POSITIVE RATE — GEAR UP</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM calls 'POSITIVE RATE'. PF: 'GEAR UP'. PM selects gear lever UP. Verify GEAR UP indication. PM follows: 'POSITIVE CLIMB'.</td>
+          <td class="editable" contenteditable="true" data-key="proc-3-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-3-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-3-change"></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>rudder_trim</td>
+          <td>RUDDER TRIM</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">FCTM: PF applies rudder trim toward live engine (~2 units toward ENG 2) above 150 kt to reduce sustained pedal force during climb-out. Reset trim to ZERO before approach thrust reduction.</td>
+          <td class="editable" contenteditable="true" data-key="proc-4-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-4-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-4-change"></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>engage_ap_fma</td>
+          <td>AP1 ENGAGE — READ FMA</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF engages AP1 at ~100 ft once speed stable at V2+10. Read FMA aloud: SRS — NAV — AP1 ENGAGED. AP holds SRS guidance on engine-out performance.</td>
+          <td class="editable" contenteditable="true" data-key="proc-5-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-5-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-5-change"></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>cancel_master_caut_initial</td>
+          <td>MASTER CAUT</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM pushes amber MASTER CAUTION glareshield light — silences single SC chime. ENG 1 FAIL remains on ECAM. This is a CAUTION (amber), not a Warning (red).</td>
+          <td class="editable" contenteditable="true" data-key="proc-6-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-6-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-6-change"></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>four_hundred_ft_cmd</td>
+          <td>400 FT — ECAM ACTIONS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: 'ECAM ACTIONS' — PM acknowledges and begins ECAM procedure. FCTM: PF commands at 400 ft; PM executes and reads actions.</td>
+          <td class="editable" contenteditable="true" data-key="proc-7-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-7-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-7-change"></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>eng_mode_sel_ign</td>
+          <td>ENG MODE SEL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: ENG MODE SEL → IGN. FCOM first step for ENG 1(2) FAIL in flight. Selects continuous ignition — confirms the FADEC relight attempt already in progress.</td>
+          <td class="editable" contenteditable="true" data-key="proc-8-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-8-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-8-change"></td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td>thr_lever_idle</td>
+          <td>THR LEVER 1</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM retards ENG 1 thrust lever to IDLE detent. FCOM step 2. Reduces fuel flow, confirms lever position before 30 s relight countdown.</td>
+          <td class="editable" contenteditable="true" data-key="proc-9-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-9-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-9-change"></td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td>relight_wait</td>
+          <td>RELIGHT — MONITOR 30 s</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">FADEC attempts relight with continuous ignition selected. Monitor N2 and EGT for positive indication. FCOM: if no relight after 30 s from alert — proceed to ENG MASTER OFF.</td>
+          <td class="editable" contenteditable="true" data-key="proc-10-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-10-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-10-change"></td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td>eng1_master_off</td>
+          <td>ENG 1 MASTER</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: 'ENG 1 MASTER, CONFIRM OFF?' → PF: 'CONFIRM' → PM sets OFF. No relight after 30 s. No fire — no AGENT discharge. Closes LP + HP fuel SOVs, FADEC de-energised.</td>
+          <td class="editable" contenteditable="true" data-key="proc-11-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-11-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-11-change"></td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td>cancel_master_caut</td>
+          <td>MASTER CAUT</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM pushes MASTER CAUTION — silences SC chime for secondary failures (HYD, ELEC, AIR BLEED). Cautions remain on ECAM for STATUS review.</td>
+          <td class="editable" contenteditable="true" data-key="proc-12-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-12-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-12-change"></td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td>engine_secured_call</td>
+          <td>ENGINE SECURED</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">After ENG MASTER OFF (no fire, no damage), PM announces 'ENGINE SECURED'. PF acknowledges.</td>
+          <td class="editable" contenteditable="true" data-key="proc-13-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-13-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-13-change"></td>
+        </tr>
+        <tr>
+          <td>15</td>
+          <td>announce_land_asap</td>
+          <td>LAND ASAP</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF announces 'LAND ASAP' (amber on ECAM). Engine shutdown without damage / fire — land at the nearest suitable airport. Amber = urgency, not distress.</td>
+          <td class="editable" contenteditable="true" data-key="proc-14-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-14-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-14-change"></td>
+        </tr>
+        <tr>
+          <td>16</td>
+          <td>atc_pan_pan</td>
+          <td>PAN PAN</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">Call ATC: 'PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' Brief — declare, state, standby. Captain may upgrade to MAYDAY if conditions worsen.</td>
+          <td class="editable" contenteditable="true" data-key="proc-15-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-15-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-15-change"></td>
+        </tr>
+        <tr>
+          <td>17</td>
+          <td>tcas_ta</td>
+          <td>TCAS MODE SEL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: TCAS MODE SEL → TA. FCOM ENG SHUT DOWN STATUS requirement — prevents RA commands on single-engine which could compromise control.</td>
+          <td class="editable" contenteditable="true" data-key="proc-16-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-16-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-16-change"></td>
+        </tr>
+        <tr>
+          <td>18</td>
+          <td>level_off_maa</td>
+          <td>V/S 0 AT MAA</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: at minimum acceleration altitude PUSH V/S knob → V/S 0. Aircraft levels off, A/THR maintains target speed; SRS reverts as the level-off captures. Acceleration delayed until engine secured (FCTM 12850).</td>
+          <td class="editable" contenteditable="true" data-key="proc-17-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-17-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-17-change"></td>
+        </tr>
+        <tr>
+          <td>19</td>
+          <td>accel_f_speed</td>
+          <td>FLAPS 1 — F SPEED</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: 'F SPEED'. PF: 'FLAPS 1'. PM: checks AS, calls 'FLAPS 1' back, selects flap lever to 1. PF monitors selection. Do not retract below F speed — VMCA margin required on single engine.</td>
+          <td class="editable" contenteditable="true" data-key="proc-18-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-18-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-18-change"></td>
+        </tr>
+        <tr>
+          <td>20</td>
+          <td>accel_s_speed</td>
+          <td>FLAPS UP — S SPEED</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: 'S SPEED'. PF: 'FLAPS UP'. PM: checks AS, calls 'FLAPS UP' back, selects flap lever to 0. PF monitors selection. Aircraft now clean — accelerate to Green Dot.</td>
+          <td class="editable" contenteditable="true" data-key="proc-19-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-19-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-19-change"></td>
+        </tr>
+        <tr>
+          <td>21</td>
+          <td>accel_green_dot</td>
+          <td>MCT — GREEN DOT</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: when speed reaches Green Dot — set MCT on live engine (ENG 2). Climb at Green Dot single-engine. If already in MCT gate: CL then back to MCT.</td>
+          <td class="editable" contenteditable="true" data-key="proc-20-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-20-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-20-change"></td>
+        </tr>
+        <tr>
+          <td>22</td>
+          <td>ecam_secondary_read</td>
+          <td>ECAM — SECONDARY FAILURES</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM reads secondary system failures from SD after engine secured. PF cross-checks and acknowledges each item.</td>
+          <td class="editable" contenteditable="true" data-key="proc-21-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-21-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-21-change"></td>
+        </tr>
+        <tr>
+          <td>23</td>
+          <td>ecam_stop</td>
+          <td>STOP ECAM</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF calls 'STOP' — ECAM reading complete. All primary actions done and secondary failures read. Proceed to STATUS check.</td>
+          <td class="editable" contenteditable="true" data-key="proc-22-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-22-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-22-change"></td>
+        </tr>
+        <tr>
+          <td>24</td>
+          <td>normal_checklist_check</td>
+          <td>AFTER T/O CL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: 'Any NORMAL CHECKLIST?' — PM runs After Takeoff checklist. Note items already complete or N/A due to failure.</td>
+          <td class="editable" contenteditable="true" data-key="proc-23-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-23-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-23-change"></td>
+        </tr>
+        <tr>
+          <td>25</td>
+          <td>oeb_computer_check</td>
+          <td>OEB / COMPUTER RESETS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: 'Any OEB? Any COMPUTER RESETS?' — PM checks for applicable OEB items and required computer resets. No resets required for pure flameout — awareness check only.</td>
+          <td class="editable" contenteditable="true" data-key="proc-24-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-24-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-24-change"></td>
+        </tr>
+        <tr>
+          <td>26</td>
+          <td>read_status</td>
+          <td>READ STATUS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: 'READ STATUS' — PM reads the ECAM STATUS page aloud. PF cross-checks each item.</td>
+          <td class="editable" contenteditable="true" data-key="proc-25-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-25-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-25-change"></td>
+        </tr>
+        <tr>
+          <td>27</td>
+          <td>crew_crosscheck</td>
+          <td>ECAM STATUS — PM READS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM reads STATUS page aloud. Items: ENG 1 SHUT DOWN, HYD G ENG1 PUMP LO PR, GEN 1 INOP, ENG 1 BLEED FAULT, PACK 1 MONITOR, APPR CAT 1, MAX FL 250, TCAS TA. PF: 'CHECKED' after each item.</td>
+          <td class="editable" contenteditable="true" data-key="proc-26-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-26-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-26-change"></td>
+        </tr>
+        <tr>
+          <td>28</td>
+          <td>ecam_completed</td>
+          <td>ECAM ACTIONS COMPLETED</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: 'ECAM ACTIONS COMPLETED.' PF acknowledges. All primary ECAM procedures complete, secondary failures reviewed, STATUS read.</td>
+          <td class="editable" contenteditable="true" data-key="proc-27-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-27-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-27-change"></td>
+        </tr>
+        <tr>
+          <td>29</td>
+          <td>wx_request</td>
+          <td>WEATHER / ATIS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM requests weather and ATIS for VIDP from ATC or via ACARS. Confirm QNH, visibility, and runway in use for ILS 28. Required before calculating landing performance.</td>
+          <td class="editable" contenteditable="true" data-key="proc-28-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-28-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-28-change"></td>
+        </tr>
+        <tr>
+          <td>30</td>
+          <td>ldg_perf</td>
+          <td>LDG PERF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">SE approach: Vapp = Vref+5 kt. RWY 28 VIDP LDA 4430 m / factored SE dist ~2200 m — ADEQUATE. Confirm LW and Vapp on MCDU.</td>
+          <td class="editable" contenteditable="true" data-key="proc-29-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-29-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-29-change"></td>
+        </tr>
+        <tr>
+          <td>31</td>
+          <td>fordec</td>
+          <td>FORDEC</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF leads FORDEC once landing performance is known. PM cross-checks each element.</td>
+          <td class="editable" contenteditable="true" data-key="proc-30-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-30-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-30-change"></td>
+        </tr>
+        <tr>
+          <td>32</td>
+          <td>inform_atc_intentions</td>
+          <td>INFORM ATC — INTENTIONS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">After FORDEC decision: PM informs Delhi Departure/Approach of return intentions. State decision to return VIDP RWY 28, request ILS vectors, confirm emergency services required.</td>
+          <td class="editable" contenteditable="true" data-key="proc-31-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-31-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-31-change"></td>
+        </tr>
+        <tr>
+          <td>33</td>
+          <td>fmgc_prep</td>
+          <td>FMGC PREP</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: enter VIDP in DEST, select RWY 28, insert ILS 110.30 / CRS 282. Set Vapp = Vref+5 kt for SE approach. Check F-PLN fuel + ALTN.</td>
+          <td class="editable" contenteditable="true" data-key="proc-32-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-32-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-32-change"></td>
+        </tr>
+        <tr>
+          <td>34</td>
+          <td>nis_brief</td>
+          <td>NITS BRIEF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM on interphone to SCCM.</td>
+          <td class="editable" contenteditable="true" data-key="proc-33-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-33-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-33-change"></td>
+        </tr>
+        <tr>
+          <td>35</td>
+          <td>pax_pa</td>
+          <td>PASSENGER PA</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF PA: 'Ladies and gentlemen, this is your Captain. We are returning to Delhi as a precaution. Remain seated with seatbelts fastened. The cabin crew will look after you.'</td>
+          <td class="editable" contenteditable="true" data-key="proc-34-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-34-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-34-change"></td>
+        </tr>
+        <tr>
+          <td>36</td>
+          <td>go_around_review</td>
+          <td>GO-AROUND REVIEW</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF briefs single-engine go-around plan. Confirm fuel vs DEST+ALTN+FINAL RESERVE.</td>
+          <td class="editable" contenteditable="true" data-key="proc-35-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-35-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-35-change"></td>
+        </tr>
+        <tr>
+          <td>37</td>
+          <td>atc_emergency_services</td>
+          <td>ATC — EMERG SVCS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: 'PAN PAN IFLY101, request Category 3 emergency services runway 28. CFR vehicles, ambulances, medical standby required. 186 POB, 8.4 tonnes fuel.'</td>
+          <td class="editable" contenteditable="true" data-key="proc-36-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-36-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-36-change"></td>
+        </tr>
+        <tr>
+          <td>38</td>
+          <td>approach_brief</td>
+          <td>APPROACH BRIEF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF briefs: ILS RWY 28 VIDP, SE CAT 1. DA 200 ft. Vapp Vref+5. Abnormals: HYD G ENG1 PUMP LO PR, GEN 1 INOP, ENG 1 BLEED FAULT. Rudder trim reset before flare. Go-around briefed.</td>
+          <td class="editable" contenteditable="true" data-key="proc-37-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-37-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-37-change"></td>
+        </tr>
+        <tr>
+          <td>39</td>
+          <td>approach_prep</td>
+          <td>APPROACH PREP</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: ILS RWY 28 freq 110.30 / CRS 282. BARO minima 200 ft / QNH set. Autobrake MED. Spoilers ARM. Reset rudder trim to zero before final approach.</td>
+          <td class="editable" contenteditable="true" data-key="proc-38-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-38-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-38-change"></td>
+        </tr>
+        <tr>
+          <td>40</td>
+          <td>approach_cl</td>
+          <td>APPROACH CL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM runs approach checklist.</td>
+          <td class="editable" contenteditable="true" data-key="proc-39-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-39-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-39-change"></td>
+        </tr>
+        <tr>
+          <td>41</td>
+          <td>landing_cl</td>
+          <td>LANDING CL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM runs landing checklist at 1000 ft final. Rudder trim confirmed at zero.</td>
+          <td class="editable" contenteditable="true" data-key="proc-40-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-40-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-40-change"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'proc_preview_eng-failure-after-v1';
+    function allEditable(){ return Array.from(document.querySelectorAll('[contenteditable="true"]')); }
+    function setStatus(msg){ const el=document.getElementById('status'); if (el) el.textContent = msg; }
+    function saveLocal(){
+      const data = {};
+      allEditable().forEach(td => data[td.dataset.key] = td.innerText);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      setStatus('Saved locally at ' + new Date().toLocaleTimeString());
+    }
+    function loadLocal(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { setStatus('No local save found'); return; }
+      const data = JSON.parse(raw);
+      allEditable().forEach(td => { if (data[td.dataset.key] !== undefined) td.innerText = data[td.dataset.key]; });
+      setStatus('Loaded local data');
+    }
+    function clearLocal(){
+      localStorage.removeItem(STORAGE_KEY);
+      allEditable().forEach(td => td.innerText = '');
+      setStatus('Cleared local data');
+    }
+    function exportHtml(){
+      saveLocal();
+      const clone = document.documentElement.cloneNode(true);
+      clone.querySelectorAll('[contenteditable="true"]').forEach(td => td.removeAttribute('contenteditable'));
+      const serialized = '<!doctype html>\n' + clone.outerHTML;
+      const blob = new Blob([serialized], {type:'text/html'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'eng-failure-after-v1_PROCEDURE_PREVIEW_EDITED.html';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setStatus('Exported HTML file');
+    }
+    window.addEventListener('beforeunload', saveLocal);
+    loadLocal();
+  </script>
+</body>
+</html>

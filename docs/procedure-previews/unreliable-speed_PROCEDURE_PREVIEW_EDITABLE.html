@@ -1,0 +1,259 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>unreliable-speed Procedure Preview (Editable)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{--bg:#f3f6fb;--ink:#0f172a;--muted:#475569;--panel:#ffffff;--line:#cbd5e1;--head:#e5edf8;--edit:#fff8db;--accent:#2563eb}
+    body{margin:20px;font-family:Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    h1{margin:0 0 4px;font-size:24px}
+    .sub{font-size:12px;color:var(--muted);margin-bottom:12px}
+    .toolbar{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;z-index:3}
+    button{border:1px solid #9db4d6;background:#eaf1ff;color:#0f172a;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer}
+    button:hover{background:#dce8ff}
+    .status{font-size:12px;color:var(--muted)}
+    .card{margin-top:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:auto}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th,td{border:1px solid var(--line);padding:7px 8px;font-size:11px;vertical-align:top;word-wrap:break-word}
+    th{background:var(--head);text-align:left;position:sticky;top:44px;z-index:2}
+    .editable{background:var(--edit)}
+    .editable:focus{outline:2px solid var(--accent);outline-offset:-2px;background:#fff}
+    .wrap{white-space:pre-wrap}
+  </style>
+</head>
+<body>
+  <h1>unreliable-speed - Procedure Draft Preview</h1>
+  <div class="sub">Generated from src/scenarios/data/unreliable-speed.ts using current pilot trainer step logic.</div>
+  <div class="toolbar">
+    <button onclick="saveLocal()">Save Local</button>
+    <button onclick="loadLocal()">Load Local</button>
+    <button onclick="clearLocal()">Clear Local</button>
+    <button onclick="exportHtml()">Export HTML</button>
+    <span class="status" id="status">Ready</span>
+  </div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:4%">Seq</th>
+          <th style="width:10%">Step ID</th>
+          <th style="width:13%">Current Label</th>
+          <th style="width:8%">Speaker</th>
+          <th style="width:15%">Current Logic Gate</th>
+          <th style="width:22%">Current Hint / Behavior</th>
+          <th style="width:12%">Proposed Procedure Text</th>
+          <th style="width:8%">Expected Action (Draft)</th>
+          <th style="width:8%">Change Required</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>ap_fd_disc</td>
+          <td>AP / FD / A-THR</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: IMMEDIATELY disconnect AP, A/THR, and both FDs. Call 'UNRELIABLE SPEED'. Fly raw data. Do NOT chase speed indications. This is a MEMORY ITEM.</td>
+          <td class="editable" contenteditable="true" data-key="proc-0-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-0-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-0-change"></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>pitch_thrust</td>
+          <td>PITCH + THRUST TABLE</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: IMMEDIATELY apply FCOM pitch/thrust table. CLIMB below thrust red alt: 15° nose up + TOGA. Above thrust red alt below FL100: 10°/CLB. Above FL100: 5°/CLB. Fly ATTITUDE — do NOT chase speed.</td>
+          <td class="editable" contenteditable="true" data-key="proc-1-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-1-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-1-change"></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>adr_disagree</td>
+          <td>ADR DISAGREE CHECK</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: compare ADR 1, ADR 2, ADR 3 on both PFDs — use STBY ISIS as backup reference (independent pitot). Identify the faulty ADR. ADR3 and STBY speeds use the same probe.</td>
+          <td class="editable" contenteditable="true" data-key="proc-2-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-2-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-2-change"></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>cancel_master_caut_initial</td>
+          <td>MASTER CAUT</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: cancel MASTER CAUTION (ADR 1 FAULT is a CAUTION, not Warning). Silences SC chime. ECAM procedure remains displayed.</td>
+          <td class="editable" contenteditable="true" data-key="proc-3-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-3-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-3-change"></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>adr_off</td>
+          <td>FAULTY ADR — OFF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: switch off faulty ADR pushbutton (ADIRS panel). FCOM: if at least one ADR confirmed reliable — switch unreliable ADR(s) OFF. Monitor remaining 2 ADRs — they should agree. If above FL250 with all ADRs suspect: keep ONE ADR ON, switch other two OFF.</td>
+          <td class="editable" contenteditable="true" data-key="proc-4-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-4-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-4-change"></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>spd_check</td>
+          <td>SPEED CROSS-CHECK</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: cross-check: ASI (both), ISIS, Mach. If 2 ADRs agree — speeds reliable. If all unreliable — continue flying attitude table.</td>
+          <td class="editable" contenteditable="true" data-key="proc-5-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-5-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-5-change"></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>probe_heat_on</td>
+          <td>PROBE / WINDOW HEAT</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: FCOM step after ADR disagree check — ensure ALL probe and window heat is ON. Ice accretion is the most common cause of ADR disagreement.</td>
+          <td class="editable" contenteditable="true" data-key="proc-6-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-6-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-6-change"></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>atc_notify_speed</td>
+          <td>ATC NOTIFY</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: 'IFLY101, speed unreliable, unable RVSM, request block FL130–FL150, possible diversion.'</td>
+          <td class="editable" contenteditable="true" data-key="proc-7-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-7-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-7-change"></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>crew_brief_speed</td>
+          <td>CREW BRIEF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: brief cabin crew — precautionary descent, possible diversion.</td>
+          <td class="editable" contenteditable="true" data-key="proc-8-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-8-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-8-change"></td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td>wx_ldg_speed</td>
+          <td>WX / LDG PERF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: nearest airport wx. Normal Vapp if 2 ADRs agree. Use ISIS if only 1 ADR remaining.</td>
+          <td class="editable" contenteditable="true" data-key="proc-9-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-9-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-9-change"></td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td>fordec_speed</td>
+          <td>FORDEC</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF leads FORDEC. If 2 ADRs agree — may continue carefully. If any doubt — land asap.</td>
+          <td class="editable" contenteditable="true" data-key="proc-10-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-10-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-10-change"></td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td>nis_brief_speed</td>
+          <td>NITS BRIEF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: SCCM brief — precautionary landing, normal approach expected.</td>
+          <td class="editable" contenteditable="true" data-key="proc-11-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-11-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-11-change"></td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td>approach_brief</td>
+          <td>APPROACH BRIEF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: manual ILS approach using ISIS + 2 ADRs cross-checked. Normal Vapp. No autoland.</td>
+          <td class="editable" contenteditable="true" data-key="proc-12-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-12-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-12-change"></td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td>approach_cl</td>
+          <td>APPROACH CL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM runs approach checklist.</td>
+          <td class="editable" contenteditable="true" data-key="proc-13-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-13-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-13-change"></td>
+        </tr>
+        <tr>
+          <td>15</td>
+          <td>landing_cl</td>
+          <td>LANDING CL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM runs landing checklist at 1000 ft on final.</td>
+          <td class="editable" contenteditable="true" data-key="proc-14-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-14-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-14-change"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'proc_preview_unreliable-speed';
+    function allEditable(){ return Array.from(document.querySelectorAll('[contenteditable="true"]')); }
+    function setStatus(msg){ const el=document.getElementById('status'); if (el) el.textContent = msg; }
+    function saveLocal(){
+      const data = {};
+      allEditable().forEach(td => data[td.dataset.key] = td.innerText);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      setStatus('Saved locally at ' + new Date().toLocaleTimeString());
+    }
+    function loadLocal(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { setStatus('No local save found'); return; }
+      const data = JSON.parse(raw);
+      allEditable().forEach(td => { if (data[td.dataset.key] !== undefined) td.innerText = data[td.dataset.key]; });
+      setStatus('Loaded local data');
+    }
+    function clearLocal(){
+      localStorage.removeItem(STORAGE_KEY);
+      allEditable().forEach(td => td.innerText = '');
+      setStatus('Cleared local data');
+    }
+    function exportHtml(){
+      saveLocal();
+      const clone = document.documentElement.cloneNode(true);
+      clone.querySelectorAll('[contenteditable="true"]').forEach(td => td.removeAttribute('contenteditable'));
+      const serialized = '<!doctype html>\n' + clone.outerHTML;
+      const blob = new Blob([serialized], {type:'text/html'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'unreliable-speed_PROCEDURE_PREVIEW_EDITED.html';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setStatus('Exported HTML file');
+    }
+    window.addEventListener('beforeunload', saveLocal);
+    loadLocal();
+  </script>
+</body>
+</html>
