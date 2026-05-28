@@ -1618,12 +1618,12 @@ export const eng1FireAfterV1: Scenario = {
         verticalSpeed: 1_900,
         fmaThrust: "MAN TOGA",
         fmaPitch: "SRS",
-        fmaLateral: "RWY TRK",
+        fmaLateral: "NAV",
         ap1: true,
         athr: false,
         notes: [
           "AP1 engaged at ~100 ft — SRS holds V2+10 on pitch",
-          "RWY TRK maintained — tracking runway centreline (NAV not armed; radar-vector SID)",
+          "NAV active (green) — AP following SID path; pilot selects RWY TRK at 400 ft",
           "FMA confirms AP1 engagement and expected mode set",
           "PM now silences CRC — MASTER WARN pushlight pressed",
         ],
@@ -1633,13 +1633,13 @@ export const eng1FireAfterV1: Scenario = {
         range: 10,
         heading: 280,
         activeWpt: "VIDP",
-        notes: ["RWY TRK active — AP holding runway centreline"],
+        notes: ["NAV active — tracking SID below 400 ft AGL"],
       },
       pf: {
         task: "Engage AP1. Read FMA aloud and confirm expected mode engagement while maintaining stable flight path.",
         callouts: [
           { role: "PF", speech: "AP1 ENGAGE" },
-          { role: "PF", speech: "FMA: MAN TOGA — SRS — RWY TRK — AP1. CHECKED." },
+          { role: "PF", speech: "FMA: MAN TOGA — SRS — NAV — AP1. CHECKED." },
         ],
       },
       pm: {
@@ -2049,6 +2049,61 @@ export const eng1FireAfterV1: Scenario = {
       overhead: {
         items: ["No new overhead actions — all ENG FIRE panel items already completed"],
         notes: ["After Takeoff CL to follow: ECAM ACTIONS COMPLETE → normal CL → OEB → STATUS"],
+      },
+    },
+
+    // ── PHASE 12 — MCT SET / OP CLB (T+70s) ────────────────────────────────
+    // FCTM PR-AEP-ENG: "As the speed trend arrow reaches Green Dot speed,
+    // pull for OPEN CLIMB, set THR MCT when the LVR MCT message flashes."
+    // Sequence: LVR MCT flash → PF pulls ALT → OP CLB → PF sets MCT → THR MCT.
+    // A/THR now active (managed to MCT thrust ceiling).
+    {
+      id: "op_clb_climb",
+      label: "MCT SET — OP CLB — FINAL TAKEOFF SEGMENT",
+      atMs: 70_000,
+      pfd: {
+        speed: 220,
+        targetSpeed: "GREEN DOT",
+        altitude: 2_500,
+        targetAltitude: 4_000,
+        verticalSpeed: 700,
+        fmaThrust: "THR MCT",
+        fmaPitch: "OP CLB",
+        fmaLateral: "RWY TRK",
+        ap1: true,
+        athr: true,
+        notes: [
+          "THR MCT green (col 1) — A/THR now active, managing to MCT ceiling",
+          "OP CLB green (col 2) — open climb, FCU altitude target, ALT CSTR disregarded",
+          "RWY TRK green (col 3) — AP maintaining runway track heading",
+          "LVR MCT cue gone — lever is now in MCT detent",
+          "Config CLEAN — flaps 0 / green dot achieved",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 20,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["Radar vectors — AP tracking runway heading 280 in RWY TRK"],
+      },
+      pf: {
+        task: "Confirm THR MCT / OP CLB / RWY TRK on FMA. Continue ECAM STATUS review, then AFTER TAKEOFF CL.",
+        callouts: [
+          { role: "PF", speech: "CLIMB" },
+          { role: "PM", speech: "FMA CHECKED — THR MCT — OP CLB — RWY TRK" },
+          { role: "PF", speech: "CONTINUE ECAM" },
+        ],
+      },
+      pm: {
+        task: "Cross-check FMA, confirm A/THR active, call FMA changes, continue STATUS/CL flow.",
+        callouts: [
+          { role: "PM", speech: "SINGLE ENGINE — MCT SET — OPEN CLIMB ENGAGED" },
+        ],
+      },
+      overhead: {
+        items: ["All fire panel actions complete"],
+        notes: ["Final takeoff segment — single engine climb at MCT thrust, green dot speed+"],
       },
     },
   ],
