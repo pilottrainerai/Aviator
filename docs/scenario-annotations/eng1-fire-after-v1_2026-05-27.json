@@ -1,0 +1,172 @@
+{
+  "annotations": {
+    "step:thr_lever_idle": {
+      "tag": "",
+      "note": ""
+    },
+    "step:continue_rotation": {
+      "tag": "ok",
+      "note": "So incorrect procedure procedure. The engine has not failed, it just engine fired. Once the engine master is shut down, then only it becomes a single engine. That can only happen after the engine master is turned off."
+    },
+    "distraction:atc_handoff_to_departure": {
+      "tag": "edit_pending",
+      "note": "Also needs to be added as one of the options, declare May Day at this time, because this is technically not the right time to declare May Day. It's to be done after primary cam actions have been done.\n[GENERAl] Should come up definitely about 400 feet and also after a few seconds after to takeoff",
+      "fcomRef": ""
+    },
+    "step:positive_rate_gear_up": {
+      "tag": "wrong_order",
+      "note": ""
+    },
+    "phase:agent1_disch": {
+      "tag": "",
+      "note": ""
+    },
+    "phase:v1_passed": {
+      "tag": "ok",
+      "note": ""
+    },
+    "phase:fire_detected": {
+      "tag": "edit_pending",
+      "note": "[PM] The PM does not say engine number he says engine fire\n[PF] Remove the word memory item\n[PFD/FMA] remove the word memory right"
+    },
+    "trigger:after_v1": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] What does a triggers to exactly because they're a bit confusing to me right now",
+      "fcomRef": ""
+    },
+    "trigger:fire_warn": {
+      "tag": "",
+      "note": "PF remove the word memory item the main direction control is not a memory item basic flying you don't have to write memory item and for p.m. master warning engine fire don't have to announce engine number rotate is fine",
+      "fcomRef": ""
+    },
+    "phase:rotation": {
+      "tag": "edit_pending",
+      "note": "[PHASE] The 12 1/2 pitch degree is not for Indian fire it's for engine failure so what happens since the engine only fails when engine master is shut down in this case then it makes sense but not right now as long as the engine is engines are running normal rotation is fine refer to crosscheck information",
+      "fcomRef": ""
+    },
+    "phase:gear_up_ap1": {
+      "tag": "edit_pending",
+      "note": "[PF] The hereditary again not held the Rudder trim is not required until an unless an Indian failure not Indian failure engine failure",
+      "fcomRef": ""
+    },
+    "distraction:atc_radar_contact_mayday": {
+      "tag": "",
+      "note": "Once the primary comms are completed then the pilots should inform agency about the situation with Mayday colony",
+      "fcomRef": ""
+    },
+    "step:four_hundred_ft_cmd": {
+      "tag": "",
+      "note": "Announcing aviator navigate communicate does not make any sense here",
+      "fcomRef": ""
+    },
+    "step:engage_ap_fma": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] So the hereditary is not to be used in this because the engine has not failed Indian feels after we shut down engine master a turn of master and monitor beta is also not to be done and trimming as well and autothrust monitoring is also not to just reach the FMA and announce auto trust",
+      "fcomRef": ""
+    },
+    "step:cancel_master_warn": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] So in the line aviator continues aviator and navigate continues on runway heading or engine outside no actions complete actions until foreign feet and positive stabilised\n[GENERAL] why the master warning cancellation is connected with P4 at 400 feet I hope it's not connected you know after the reach 400 feet with autopilot engage in all that thing has happened and this P4 can come along with this specific, the A1 can come or at the time has passed and the pilots have not reacted",
+      "fcomRef": ""
+    },
+    "step:announce_land_asap": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] And add this step now line ASAP they inform etc about their medical not medical car Mayday Mayday",
+      "fcomRef": ""
+    },
+    "step:mayday_atc": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] after this call the ATC acknowledges and this call also when they acknowledge they also acknowledge their engineers said or their navigation and at that time also standing by for intentions in which the pilots might say standby or something on that sort so if any discrimination is added that is the communication is happening",
+      "fcomRef": ""
+    },
+    "step:level_off_maa": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] At this point the FMS should read V0 okay that means the client mode SRS change to 0BS vertical speed 0OBS vertical vertical speed zero check FMA in the F con for this\n[GENERAL] vs 0 not displayed on fma . review fcom and fctm with skill",
+      "fcomRef": ""
+    },
+    "step:wx_request": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] So after when the cam actions complete somewhere around there A5 should come and then P 18 and then a six",
+      "fcomRef": ""
+    },
+    "step:ldg_perf": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] When the crew is landing performance then a seven should trigger",
+      "fcomRef": ""
+    },
+    "step:fordec": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] And then they're doing for deck then ATC ask about a 7A7 that means ATC communication seven that we are doing so in case you have a doubt when I'm saying the numbers it means that 80 C communication with the number like a seven\n[GENERAL] After the four days is done then the flight crew announced the intention to ATC that they would like to proceed back to Delhi and will advise when ready for the approach so add a communication and investigated in this",
+      "fcomRef": ""
+    },
+    "step:atc_emergency_services": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] and after they done the approach preparation they inform ATC that they need emergency services and\n[GENERAL] and also then ATC response back in the same way that that will be available so that's how the sequence is working",
+      "fcomRef": ""
+    },
+    "step:approach_cl": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] During the briefing and along with the status check they have to remember that they have to do one in inoperative landing with one engine in operative checklist from the QRHNF reference so I will look at their",
+      "fcomRef": ""
+    },
+    "step:accel_clean": {
+      "tag": "edit_pending",
+      "note": "[GENERAL] Okay one more thing in acceleration and cleanup is done that time VS has to show zero on the FMA okay and also the green dot speed should show and when the green dot is reached the flight crew should full level change and the FMS should change again to climb to open climb liver NCT or thrush and city will flash that's where they move and change it so that particular thing of FM needs to be appeared and also that action needs to be added as a part of the procedure after the acceleration and cleanup\n[GENERAL] man toga should chnage to mct after green dot speed is reached and after pilot moves thrust lever to mct or recycle , LVR mct flaeshes and then pulll chnages the mode from vs 0 to open clb , a new needs to be added with correct pfd FMA check fcom and fctm with skill"
+    }
+  },
+  "sequence": [
+    "continue_rotation",
+    "atc_handoff_to_departure",
+    "positive_rate_gear_up",
+    "engage_ap_fma",
+    "atc_radar_contact_mayday",
+    "cancel_master_warn",
+    "four_hundred_ft_cmd",
+    "thr_lever_idle",
+    "atc_vectors_climb",
+    "eng1_master_off",
+    "eng1_fire_pb",
+    "cancel_master_caut",
+    "atc_vectors_when_ready",
+    "agent1",
+    "agent2",
+    "engine_secured",
+    "announce_land_asap",
+    "mayday_atc",
+    "atc_info_request_prompt",
+    "level_off_maa",
+    "accel_clean",
+    "announce_sec_failures",
+    "announce_status",
+    "stop_ecam",
+    "atc_provides_briefing_info",
+    "after_takeoff_cl",
+    "oeb_check",
+    "atc_pob_fuel_services",
+    "read_status",
+    "status_read_aloud",
+    "crew_crosscheck",
+    "atc_ready_for_approach",
+    "wx_request",
+    "ldg_perf",
+    "atc_cleared_approach",
+    "fordec",
+    "fmgc_prep",
+    "nis_brief",
+    "atc_tower_contact",
+    "pax_pa",
+    "company_notify",
+    "atc_cleared_to_land",
+    "approach_prep",
+    "atc_emergency_services",
+    "approach_brief",
+    "go_around_review",
+    "approach_cl",
+    "landing_cl"
+  ],
+  "phaseEdits": {
+    "v1_passed": {}
+  },
+  "scenarioSlug": "eng1-fire-after-v1",
+  "exportedAt": "2026-05-27T20:17:29.535Z"
+}
