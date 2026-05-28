@@ -1991,30 +1991,32 @@ export const eng1FireAfterV1: Scenario = {
       },
     },
 
-    // ── PHASE 11 — ACCEL ALTITUDE / LEVEL OFF / CLEAN (T+58s) ──────────────
-    // FCTM: acceleration is delayed until the engine is secured. In the base
-    // branch, that happens before the eng-out acceleration altitude trigger.
+    // ── PHASE 11 — MAA LEVEL-OFF / FLAP RETRACTION (T+58s) ─────────────────
+    // FCOM DSC-22-30-80-20: "In OEI conditions, SRS does NOT automatically
+    // disengage at EO ACC ALT." Crew must push V/S knob manually to level off.
+    // FCOM DSC-22-30-70-80: FMA displays "V/S = 0" in green when V/S nulled.
+    // LVR MCT does NOT flash yet — speed is below green dot, flaps still retracting.
     {
       id: "accel_level_off",
-      label: "ACCEL ALTITUDE — LEVEL OFF / CLEAN",
+      label: "MAA LEVEL-OFF — FLAP RETRACTION",
       atMs: 58_000,
       pfd: {
-        speed: 220,
-        targetSpeed: "GREEN DOT",
+        speed: 185,
+        targetSpeed: "F SPD",
         altitude: 2_300,
-        targetAltitude: 3_000,
+        targetAltitude: 4_000,
         verticalSpeed: 0,
         fmaThrust: "MAN TOGA",
-        fmaThrCue: "LVR MCT",
         fmaPitch: "V/S = 0",
         fmaLateral: "RWY TRK",
         ap1: true,
-        athr: true,
+        athr: false,
         notes: [
-          "VIDP profile: MAA reached at about 2300 ft AMSL (field elevation about 777 ft)",
-          "V/S = 0 selected (FMA col 2: 'V/S = 0' in green per FCOM) — aircraft levelled before acceleration and flap retraction",
-          "During acceleration/cleanup: FMA col 1 shows 'LVR MCT' flashing white (cue to set lever to MCT at green dot)",
-          "At green dot PF sets MCT, then selects climb mode and PM confirms thrust/pitch/lateral FMA changes",
+          "VIDP MAA ~2300 ft AMSL (~1523 ft AGL at VIDP elev 777 ft) — PF pushes V/S knob",
+          "FCOM: 'In OEI conditions, SRS does not automatically disengage at EO ACC ALT' — crew must push V/S manually",
+          "FMA: MAN TOGA (white) col 1 | V/S = 0 (green) col 2 | RWY TRK (green) col 3",
+          "No LVR MCT yet — aircraft still accelerating through F-speed, flap retraction in progress",
+          "Speed increasing: at F-speed → Flap 1; at S-speed → Flap 0 (CONFIG CLEAN)",
         ],
       },
       nd: {
@@ -2025,44 +2027,93 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["Range increased to 20 nm for VIDP return planning"],
       },
       pf: {
-        task: "Select V/S 0 at MAA, then run F-speed and S-speed flap retraction sequence. At green dot, respond to LVR MCT cue, set MCT, then select climb mode and cross-check FMA.",
+        task: "Push V/S knob to level off at MAA. Confirm FMA shows V/S = 0. Call flap retraction at each speed.",
         callouts: [
           { role: "PF", speech: "V/S ZERO — LEVELLING OFF" },
-          { role: "PF", speech: "FMA CHECKED" },
+          { role: "PF", speech: "FMA CHECKED — MAN TOGA — V/S ZERO — RWY TRACK" },
           { role: "PF", speech: "FLAPS ONE" },
           { role: "PM", speech: "SPEED CHECKED — FLAPS ONE" },
           { role: "PF", speech: "FLAPS UP" },
           { role: "PM", speech: "SPEED CHECKED — FLAPS UP — CONFIG CLEAN" },
-          { role: "PM", speech: "GREEN DOT — LVR MCT" },
-          { role: "PF", speech: "MCT" },
-          { role: "PM", speech: "MCT — THRUST SET" },
-          { role: "PF", speech: "CLIMB" },
-          { role: "PM", speech: "FMA CHECKED" },
         ],
       },
       pm: {
-        task: "Cross-check each flap selection, verify CONFIG CLEAN on ECAM, call out LVR MCT at green dot, confirm MCT set, then verify FMA after PF selects climb mode.",
+        task: "Monitor speed, call each flap check speed, confirm CONFIG CLEAN on ECAM when flap lever zero.",
+        callouts: [
+          { role: "PM", speech: "CONFIG CLEAN — GREEN DOT APPROACHING" },
+        ],
+      },
+      overhead: {
+        items: ["No new overhead actions — all ENG FIRE panel items already completed"],
+        notes: ["After Takeoff CL follows after MCT / OP CLB phase"],
+      },
+    },
+
+    // ── PHASE 12 — GREEN DOT / LVR MCT FLASH (T+65s) ────────────────────────
+    // FCOM DSC-22-20-60-40: "When aircraft is clean and has reached Green Dot,
+    // 'LVR MCT' flashes on the FMA." (white, flashing — col 1 third line)
+    // FCTM: "Pull for OPEN CLIMB, set THR MCT when LVR MCT flashes on FMA."
+    // FMA at this snapshot: MAN TOGA (white) + LVR MCT (flash) | V/S = 0 | RWY TRK
+    {
+      id: "green_dot_lvr_mct",
+      label: "GREEN DOT — CONFIG CLEAN — LVR MCT",
+      atMs: 65_000,
+      pfd: {
+        speed: 210,
+        targetSpeed: "GREEN DOT",
+        altitude: 2_300,
+        targetAltitude: 4_000,
+        verticalSpeed: 0,
+        fmaThrust: "MAN TOGA",
+        fmaThrCue: "LVR MCT",
+        fmaPitch: "V/S = 0",
+        fmaLateral: "RWY TRK",
+        ap1: true,
+        athr: false,
+        notes: [
+          "Green dot speed reached — config CLEAN (Flap 0) — FCOM: LVR MCT now flashes white in FMA col 1",
+          "FMA: MAN TOGA (white) + LVR MCT (white flash, third line col 1) | V/S = 0 (green) | RWY TRK (green)",
+          "Crew must: PULL ALT knob → OP CLB, then SET MCT detent → THR MCT",
+          "FCOM DSC-22-30-70-30: OP CLB engages when flight crew pulls ALT knob (FCU alt > aircraft alt)",
+        ],
+      },
+      nd: {
+        mode: "ARC",
+        range: 20,
+        heading: 280,
+        activeWpt: "VIDP",
+        notes: ["Config clean — ready for OP CLB on ALT pull"],
+      },
+      pf: {
+        task: "On LVR MCT flash: pull ALT knob to engage OP CLB, then move live engine lever to MCT detent.",
+        callouts: [
+          { role: "PM", speech: "GREEN DOT — LVR MCT" },
+          { role: "PF", speech: "MCT" },
+          { role: "PM", speech: "MCT — THRUST SET" },
+        ],
+      },
+      pm: {
+        task: "Call 'GREEN DOT — LVR MCT' when green dot reached, confirm MCT set on live engine.",
         callouts: [
           { role: "PM", speech: "SINGLE ENGINE — MCT SET" },
         ],
       },
       overhead: {
-        items: ["No new overhead actions — all ENG FIRE panel items already completed"],
-        notes: ["After Takeoff CL to follow: ECAM ACTIONS COMPLETE → normal CL → OEB → STATUS"],
+        items: ["All fire panel actions complete"],
+        notes: ["Next: PF pulls ALT knob → OP CLB engages → FMA changes to THR MCT / OP CLB"],
       },
     },
 
-    // ── PHASE 12 — MCT SET / OP CLB (T+70s) ────────────────────────────────
-    // FCTM PR-AEP-ENG: "As the speed trend arrow reaches Green Dot speed,
-    // pull for OPEN CLIMB, set THR MCT when the LVR MCT message flashes."
-    // Sequence: LVR MCT flash → PF pulls ALT → OP CLB → PF sets MCT → THR MCT.
-    // A/THR now active (managed to MCT thrust ceiling).
+    // ── PHASE 13 — THR MCT / OP CLB — FINAL TAKEOFF SEGMENT (T+70s) ────────
+    // FCTM PR-AEP-ENG: Sequence: LVR MCT flash → PF pulls ALT (OP CLB) →
+    // PF sets MCT → THR MCT active. A/THR now managed to MCT ceiling.
+    // FCOM DSC-22-30-70-30: "OP CLB engages when flight crew pulls ALT knob."
     {
       id: "op_clb_climb",
-      label: "MCT SET — OP CLB — FINAL TAKEOFF SEGMENT",
+      label: "THR MCT — OP CLB — FINAL TAKEOFF SEGMENT",
       atMs: 70_000,
       pfd: {
-        speed: 220,
+        speed: 215,
         targetSpeed: "GREEN DOT",
         altitude: 2_500,
         targetAltitude: 4_000,
@@ -2073,11 +2124,11 @@ export const eng1FireAfterV1: Scenario = {
         ap1: true,
         athr: true,
         notes: [
-          "THR MCT green (col 1) — A/THR now active, managing to MCT ceiling",
-          "OP CLB green (col 2) — open climb, FCU altitude target, ALT CSTR disregarded",
-          "RWY TRK green (col 3) — AP maintaining runway track heading",
-          "LVR MCT cue gone — lever is now in MCT detent",
-          "Config CLEAN — flaps 0 / green dot achieved",
+          "THR MCT (green) — A/THR active, managing thrust to MCT ceiling (col 1)",
+          "OP CLB (green) — FCU alt target climbing, ALT CSTR disregarded (col 2)",
+          "RWY TRK (green) — AP tracking runway heading 280 on radar vectors (col 3)",
+          "LVR MCT cue cleared — live engine lever now in MCT detent",
+          "Config CLEAN, speed above green dot — single engine final takeoff segment",
         ],
       },
       nd: {
@@ -2085,25 +2136,25 @@ export const eng1FireAfterV1: Scenario = {
         range: 20,
         heading: 280,
         activeWpt: "VIDP",
-        notes: ["Radar vectors — AP tracking runway heading 280 in RWY TRK"],
+        notes: ["Radar vectors — AP on RWY TRK, climbing on OP CLB to FCU altitude"],
       },
       pf: {
-        task: "Confirm THR MCT / OP CLB / RWY TRK on FMA. Continue ECAM STATUS review, then AFTER TAKEOFF CL.",
+        task: "Confirm FMA: THR MCT / OP CLB / RWY TRK. Continue ECAM STATUS, then AFTER TAKEOFF CL.",
         callouts: [
           { role: "PF", speech: "CLIMB" },
-          { role: "PM", speech: "FMA CHECKED — THR MCT — OP CLB — RWY TRK" },
+          { role: "PM", speech: "FMA CHECKED — THR MCT — OP CLB — RWY TRACK" },
           { role: "PF", speech: "CONTINUE ECAM" },
         ],
       },
       pm: {
-        task: "Cross-check FMA, confirm A/THR active, call FMA changes, continue STATUS/CL flow.",
+        task: "Cross-check FMA, confirm A/THR active (managed), continue STATUS and AFTER TAKEOFF CL flow.",
         callouts: [
-          { role: "PM", speech: "SINGLE ENGINE — MCT SET — OPEN CLIMB ENGAGED" },
+          { role: "PM", speech: "SINGLE ENGINE — OPEN CLIMB — MCT THRUST" },
         ],
       },
       overhead: {
         items: ["All fire panel actions complete"],
-        notes: ["Final takeoff segment — single engine climb at MCT thrust, green dot speed+"],
+        notes: ["Final takeoff segment — OEI climb at MCT to assigned altitude"],
       },
     },
   ],
