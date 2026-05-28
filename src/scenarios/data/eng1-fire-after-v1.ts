@@ -710,7 +710,8 @@ export const eng1FireAfterV1: Scenario = {
       group: "comms",
       requires: ["atc_emergency_services"],
       notes: [
-        "Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING (Vapp, flap setting, autobrake, autoland eligibility, EO go-around).",
+        "Reference: FCTM PR-AEP-ENG ONE ENGINE INOPERATIVE — LANDING [fctm:L13250-13265]",
+        "Key items: autoland available with OEI; slip → blue beta target above threshold thrust; do NOT lower gear too early (high power needed); reset rudder trim to zero before thrust reduction.",
       ],
     },
 
@@ -740,7 +741,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "approach_cl",
       label: "APPROACH CL",
       action: "COMPLETE",
-      hint: "PM runs approach checklist. Call each item, PF cross-checks and responds. CRITICAL: also run QRH ABN ONE ENG INOPERATIVE LANDING checklist alongside — Vapp, flap setting, autobrake setting, autoland eligibility, and engine-out go-around plan. [QRH ABN — exact section to be verified in next pass]",
+      hint: "PM runs approach checklist. Call each item, PF cross-checks and responds. CRITICAL: apply FCTM PR-AEP-ENG ONE ENGINE INOPERATIVE — LANDING technique alongside: autoland is available with OEI; trim to keep slip indication centred (yellow → blue beta target above threshold thrust); do NOT select gear down too early (high power needed to maintain level flight); rudder trim reset to zero in later approach phase before thrust reduction. [fctm:L13250-13265 PR-AEP-ENG-00018104]",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
