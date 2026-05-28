@@ -430,25 +430,21 @@ export function FirePanel3D(props: FirePanel3DProps) {
     <Canvas
       dpr={2}
       camera={{
-        // Wider framing for the smaller in-layout panel.
-        // dpr=2: always render at 2× CSS resolution (sharp on any display).
-        fov:      22,
+        fov:      20,
         near:     0.01,
         far:      2,
-        position: [0, 0, 0.24],
+        position: [0, 0.006, 0.17],
       }}
-      gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping }}
+      gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping, logarithmicDepthBuffer: true }}
       style={{ width: "100%", height: "100%", background: "transparent" }}
     >
       {/*
-        Lighting mirrors the Blender scene setup (fire_panel_two_build.py):
-        – Soft blue-grey ambient  → "overhead cockpit dome"
-        – Front-centre key light  → main illumination, equivalent to Blender area_light at (0, -180mm, 200mm)
-        – Angled fill from lower-right → instrument panel bounce
+        Lighting: soft cockpit dome + front key + lower-right fill.
+        logarithmicDepthBuffer eliminates z-fighting on thin text geometry.
       */}
-      <ambientLight     intensity={0.55} color="#8899BB" />
-      <directionalLight position={[-0.05,  0.35, 0.45]} intensity={2.4} color="#FFFFFF" />
-      <directionalLight position={[ 0.40, -0.10, 0.20]} intensity={0.7} color="#607080" />
+      <ambientLight     intensity={0.85} color="#8899BB" />
+      <directionalLight position={[-0.05,  0.35, 0.45]} intensity={3.2} color="#FFFFFF" />
+      <directionalLight position={[ 0.40, -0.10, 0.20]} intensity={0.9} color="#607080" />
 
       <Suspense fallback={null}>
         <FirePanelScene {...props} />

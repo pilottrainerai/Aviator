@@ -286,7 +286,7 @@ def build_pbsw_agent_style(name, ax_px, ay_px, btn_px,
     box(f'{name}_Body', acx, acy, AZ_FRONT-3,
         btn_px*PX, btn_px*PX, 6, m=M['pb_black'], bev=1.0)
 
-    PAD = 3*PX; GAP = 2*PX
+    PAD = 3*PX; GAP = 0    # GAP=0: cells flush, no dark strip between SQUIB/DISCH
     CW  = btn_px*PX - PAD*2
     # Cell text size: 14/56 = 25% of cap. v2 had 11/56 = 19.6%; user
     # close-up shows text fills ~55-60% of cell height — that's 14/56

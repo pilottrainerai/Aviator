@@ -298,16 +298,21 @@ and asks the user before assigning any value.**
    bottom cell (OFF/ON) shorter. In Tailwind/CSS, use explicit `flex`
    ratios (`flex-[55]` / `flex-[45]` or `h-[55%]` / `h-[45%]`), not
    `flex-1` / `flex-1`.
-7. **Thin light-gray inner frame around the BOTTOM cell only** (not the
+7. **No gap between top and bottom cells.** `GAP = 0` — the two cells
+   sit flush against each other. Any inter-cell gap (even `2px`) leaves
+   a visible dark strip of the pushbutton body between SQUIB and DISCH,
+   which is wrong. The gray border top edge IS the visual divider —
+   no additional spacing is needed or allowed.
+8. **Thin light-gray inner frame around the BOTTOM cell only** (not the
    top). Render via a CSS `box-shadow: inset 0 0 0 1.5px #7A7A7A;` or an
    absolutely-positioned `<div>` with a 1.5 px border, INSIDE the
    bottom cell. Outer dimensions of the bottom cell are unchanged.
-8. **Border color is `#7A7A7A`** (non-metallic mid-gray). The Blender
+9. **Border color is `#7A7A7A`** (non-metallic mid-gray). The Blender
    `screw` material at `#C8CED6` reads as whitish under render lighting
    — in flat 2-D it's less of an issue, but match the Blender canon to
    keep the two renderings in sync.
-9. **The top edge of the bottom-cell inner frame doubles as the
-   FAULT/OFF divider.** Do not add a separate horizontal divider line.
+10. **The top edge of the bottom-cell inner frame doubles as the
+    FAULT/OFF divider.** Do not add a separate horizontal divider line.
 
 ### Source of truth
 For any new 2-D cockpit panel, FOLLOW the Blender best_version's

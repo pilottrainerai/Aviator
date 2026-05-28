@@ -48,8 +48,8 @@ export default function FirePanel3DDevPage() {
       {/* Panel canvas */}
       <div
         style={{
-          width: 380,
-          height: 200,
+          width: 720,
+          height: 480,
           background: "#0A0E16",
           borderRadius: 4,
           border: "1px solid #1A2030",
