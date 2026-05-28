@@ -368,7 +368,10 @@ export const eng1FireAfterV1: Scenario = {
         "Nature: engine fire engine 1",
         "Position / heading / altitude",
         "STANDBY — defer intentions and POB/fuel until workload eases",
-        "ATC will respond with vectors / altitude and standby for further call",
+        "ATC ack sequence (modelled as separate distractions):",
+        "  1. `atc_radar_contact_mayday` — 'IFLY101, Delhi Departure, radar contact.'",
+        "  2. `atc_vectors_climb` — 'IFLY101, roger MAYDAY, radar contact, continue runway track, climb 4 000 feet.'",
+        "  Crew readback expected on the climb clearance.",
       ],
     },
 
@@ -613,6 +616,23 @@ export const eng1FireAfterV1: Scenario = {
         "E — EXECUTION: ILS RWY 28, Cat 1, SE approach Vapp+5 kt, full emergency, CFR standing by.",
         "C — CHECK-BACK: PM confirms 'AGREED — LAND VIDP RWY 28, FULL EMERGENCY'",
       ],
+    },
+
+    // ── CR2b² ── Crew-initiated INTENTION call to ATC after FORDEC decision
+    // [user-input 2026-05-27]: Once FORDEC decision is made, PM informs
+    // ATC of operational intention and notes the crew will advise when
+    // ready for approach. Distinct from `atc_ready_for_approach` distraction
+    // which is later ATC-PROMPTED. ATC may follow up with operational
+    // questions (POB, fuel, endurance) if not already asked.
+    {
+      id: "intention_to_atc",
+      label: "INTENTION — ATC",
+      action: "ADVISE",
+      hint: "PM advises ATC of the FORDEC outcome: 'IFLY101, intentions: returning to VIDP for landing runway 28, will advise when ready for approach.' Expect ATC ack and possible follow-up on POB/fuel/endurance.",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      requires: ["fordec"],
     },
 
     // ── CR2c ── FMGC Preparation — enter diversion/arrival in MCDU
@@ -944,6 +964,26 @@ export const eng1FireAfterV1: Scenario = {
         { id: "b", label: "Standby IFLY101",                                                                                                   correct: false },
         // Wrong — confusing partial info ("no services" is incorrect for confirmed engine fire)
         { id: "c", label: "IFLY101, 186 POB, 8.4 tonnes, no emergency services required",                                                      correct: false },
+      ],
+    },
+
+    // ⑨a NEW — ATC acknowledges crew's emergency-services request
+    // [user-input 2026-05-27]: After crew makes the request via
+    // `atc_emergency_services` step, ATC gives a direct ack confirming
+    // services will be standing by — closes the readback loop.
+    {
+      id: "atc_emergency_services_ack",
+      atMs: 342_500,
+      requiresStep: "atc_emergency_services",
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, Roger, emergency services standing by runway 28, full CFR, Category 3 confirmed.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — full readback confirming the ATC ack
+        { id: "a", label: "Roger emergency services standing by runway 28, Category 3 confirmed, IFLY101", correct: true  },
+        // Wrong — bare ack loses the confirmation detail
+        { id: "b", label: "Roger, IFLY101",                                                                  correct: false },
       ],
     },
 
