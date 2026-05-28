@@ -145,40 +145,62 @@ export default function PfdMockup({ state, scenario, elapsedMs }: { state?: Scen
     };
 
     // ── FMA ────────────────────────────────────────────────────────────────
+    // FCOM DSC-22-30-100: first line = engaged (green), second line = armed (blue),
+    // third line = special cues (LVR CLB / LVR MCT — white, flashing).
+    // MAN TOGA is white per FCOM (manual mode, not A/THR managed).
     const drawFMA = () => {
       const live = stateRef.current
         ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current)
         : null;
       const thrMode  = live?.thrMode  ?? "MAN TOGA";
+      const thrCue   = live?.thrCue;
       const vertMode = live?.vertMode ?? "SRS";
-      const latMode  = live?.latMode  ?? "RWY TRK";
+      const latMode  = live?.latMode  ?? "NAV";
+      const altitude = live?.altitude ?? 1500;
+      const onGround = altitude === 0;
 
-      const C_ACTIVE = "#00ff00";
-      const C_ARMED  = "#00bfff";  // FCOM blue for armed modes
-      const C_WHITE  = "#ffffff";
+      const C_ACTIVE = "#00ff00";  // engaged modes — green
+      const C_ARMED  = "#00bfff";  // armed modes — blue
+      const C_WHITE  = "#ffffff";  // manual modes + special cues — white
 
-      // Solid black background, uniform across rows — no gradient on active row,
-      // no horizontal divider between active and armed rows.
+      // MAN modes (MAN TOGA, MAN MCT, MAN GA SOFT) are white per FCOM.
+      // Managed modes (THR CLB, THR MCT, THR IDLE) are green.
+      const thrColor = thrMode.startsWith("MAN") ? C_WHITE : C_ACTIVE;
+
+      // Solid black background.
       ctx.fillStyle = "#000000"; ctx.fillRect(0, 0, W, FH);
 
       // Vertical column dividers only (FCOM-correct).
-      ctx.strokeStyle = "#555"; ctx.lineWidth = 1;
       [105, 210, 312, 418].forEach(x => line(x, 2, x, FH - 2, "#555", 1));
 
-      // Row 1 — ACTIVE modes (GREEN)
-      txt(thrMode,  52,  16, 14, C_ACTIVE, "center", true, 5);
-      txt(vertMode, 156, 16, 14, C_ACTIVE, "center", true, 5);
-      txt(latMode,  260, 16, 14, C_ACTIVE, "center", true, 5);
+      // Row 1 — ENGAGED modes (first line).
+      // Vertical and lateral modes only shown when airborne (altitude > 0).
+      // On ground they are ARMED (second line, blue) not yet engaged.
+      txt(thrMode, 52,  16, 14, thrColor, "center", true, 5);
+      if (!onGround) {
+        txt(vertMode, 156, 16, 14, C_ACTIVE, "center", true, 5);
+        txt(latMode,  260, 16, 14, C_ACTIVE, "center", true, 5);
+      }
 
-      // Engagement column — AP / FD / A/THR always visible (full column).
+      // Engagement column — AP / FD / A/THR.
       txt("AP1",    466, 13, 11, C_WHITE, "center", true);
       txt("1 FD 2", 466, 30, 11, C_WHITE, "center", true);
       txt("A/THR",  466, 47, 11, C_WHITE, "center", true);
 
-      // Row 2 — ARMED modes (BLUE).  Per FCOM: a mode that has already engaged
-      // is no longer shown as armed.  No ENG OUT badge on the FMA.
-      if (vertMode !== "CLB") txt("CLB", 156, 44, 12, C_ARMED, "center", true, 3);
-      if (latMode  !== "NAV") txt("NAV", 260, 44, 12, C_ARMED, "center", true, 3);
+      // Row 2 — ARMED modes (second line, blue) and thrust cues (third line, white flashing).
+      if (onGround) {
+        // Before liftoff: SRS and NAV are armed (blue).
+        txt("SRS", 156, 44, 12, C_ARMED, "center", true, 3);
+        if (latMode === "NAV") txt("NAV", 260, 44, 12, C_ARMED, "center", true, 3);
+      } else {
+        // Airborne: CLB is armed during SRS climb (altitude capture target is armed).
+        if (vertMode === "SRS") txt("CLB", 156, 44, 12, C_ARMED, "center", true, 3);
+        // LVR CLB or LVR MCT cue in thrust column — white, flashing at ~1 Hz.
+        if (thrCue) {
+          const flashOn = Math.floor(Date.now() / 500) % 2 === 0;
+          if (flashOn) txt(thrCue, 52, 44, 12, C_WHITE, "center", true, 3);
+        }
+      }
     };
 
     // ── ADI ────────────────────────────────────────────────────────────────

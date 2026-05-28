@@ -243,6 +243,8 @@ export type PFDSnapshot = {
   fmaPitch?: string;
   /** FMA column 3 — lateral mode, e.g. "NAV", "TRACK", "LOC" */
   fmaLateral?: string;
+  /** FMA col 1 third line — flashing white cue, e.g. "LVR CLB", "LVR MCT" */
+  fmaThrCue?: string;
   /** AP1 engaged */
   ap1?: boolean;
   /** AP2 engaged */

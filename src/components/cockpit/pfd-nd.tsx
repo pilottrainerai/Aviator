@@ -44,6 +44,7 @@ function buildAircraftStateFromPhase(phase: ScenarioPhase, s?: ScenarioState): A
     apEngaged: !!(pfd?.ap1 || pfd?.ap2),
     athrActive: pfd?.athr ?? defaultAircraftState.athrActive,
     thrMode: pfd?.fmaThrust ?? defaultAircraftState.thrMode,
+    thrCue: pfd?.fmaThrCue,
     vertMode: pfd?.fmaPitch ?? defaultAircraftState.vertMode,
     latMode: pfd?.fmaLateral ?? defaultAircraftState.latMode,
     masterWarn: !!s?.masterWarnActive || !!pfd?.flags?.some((flag) => /master warn/i.test(flag)),

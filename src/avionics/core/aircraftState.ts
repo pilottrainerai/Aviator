@@ -11,6 +11,7 @@ export interface AircraftState {
   apEngaged:     boolean;
   athrActive:    boolean;
   thrMode:       string;  // FMA col-1 label: 'MAN TOGA'|'MAN MCT'|'THR CLB'|'THR MCT'|'THR IDLE'|'TOGA LK'
+  thrCue?:       string;  // FMA col-1 third line cue (flashing white): 'LVR CLB'|'LVR MCT'
   vertMode:      string;  // FMA col-2 label: 'SRS'|'CLB'|'OP CLB'|'ALT'|'ALT*'|'V/S'
   latMode:       string;  // 'NAV' | 'HDG' | 'TRACK' | 'LOC'
   masterWarn:    boolean;
