@@ -21,7 +21,6 @@ import { DistractionModal } from "@/components/cockpit/distraction-modal";
 import { GlareshieldPanel } from "@/components/cockpit/glareshield-panel";
 import { FlightCheckPopup } from "@/components/cockpit/flight-check-popup";
 import { FirePanel } from "@/components/cockpit/fire-panel";
-import { FirePanel3D } from "@/components/cockpit/fire-panel-3d";
 import { SystemDisplay } from "@/components/cockpit/system-display";
 import { StatusPanel } from "@/components/cockpit/status-panel";
 import { getApplicableRequiredSteps, isStepApplicable } from "@/lib/scenarios/step-applicability";
@@ -84,12 +83,11 @@ type AtcPhase =
   | { kind: "standby"; d: ScenarioDistraction; resumesAt: number };
 
 // ── FirePanelContainer ────────────────────────────────────────────────────────
-// Wraps FirePanel (DOM) and FirePanel3D (Blender GLB) behind a toggle button.
-// The toggle state is persisted in localStorage so it survives page reloads.
-// FirePanel3D is only offered for legacy-mode scenarios (no engineDisplay DSL).
+// ── FirePanelContainer ────────────────────────────────────────────────────────
+// Renders the full 2D FirePanel (ENGINE DISPLAY + ACTION PANEL + thrust levers).
+// FirePanel3D is embedded *inside* FirePanel at the fire_pb control slot —
+// only the actual pushbutton cluster is 3D; everything else stays 2D.
 // ─────────────────────────────────────────────────────────────────────────────
-const FP3D_KEY = "firePanelMode"; // "dom" | "3d"
-
 function FirePanelContainer({
   scenario,
   state,
@@ -101,88 +99,9 @@ function FirePanelContainer({
   perform: (a: import("@/engine/events").PilotAction) => void;
   disabled?: boolean;
 }) {
-  const [use3D, setUse3D] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(FP3D_KEY) === "3d";
-  });
-
-  // Default to 3D for fire-panel capable scenarios so users consistently
-  // land on the Blender panel first after reloads/crashes.
-  useEffect(() => {
-    if (!scenario.steps.some(s => s.id === "eng1_fire_pb")) return;
-    setUse3D(true);
-    localStorage.setItem(FP3D_KEY, "3d");
-  }, [scenario]);
-
-  const toggle = () => {
-    const next = !use3D;
-    setUse3D(next);
-    localStorage.setItem(FP3D_KEY, next ? "3d" : "dom");
-  };
-
-  // FirePanel3D works for any ENG 1 FIRE scenario regardless of whether the
-  // scenario uses the engineDisplay DSL — that DSL drives the ECAM SD (SystemDisplay),
-  // not the fire panel itself.  Allow 3D toggle for all scenarios that have
-  // eng1_fire_pb as a step.
-  const can3D = scenario.steps.some(s => s.id === "eng1_fire_pb");
-
-  // Derive FirePanel3D props from scenario state
-  const fireDetected  = !!state.triggersFired["fire_warn"];
-  const firePbDone    = !!state.completedSteps["eng1_fire_pb"];
-  const agent1Disch   = !!state.completedSteps["agent1"];
-  const agent2Disch   = !!state.completedSteps["agent2"];
-  // agent2 becomes available once fire_persists_30s trigger fires (conditional branch)
-  const agent2Available = !!state.triggersFired["fire_persists_30s"] || agent1Disch;
-  const step = (id: string) => { if (!disabled) perform({ kind: "STEP", stepId: id }); };
-
   return (
-    <div
-      style={{
-        flex: use3D ? "0 0 230px" : "1 1 0",
-        minHeight: 0,
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-      }}
-    >
-      {/* Mode toggle — only shown when 3D is available */}
-      {can3D && (
-        <div style={{ position: "absolute", top: 4, right: 6, zIndex: 10 }}>
-          <button
-            onClick={toggle}
-            style={{
-              fontSize: "8px", fontFamily: "monospace", letterSpacing: "0.15em",
-              padding: "2px 6px", border: "1px solid #2A3448",
-              backgroundColor: use3D ? "#0E1A2C" : "transparent",
-              color: use3D ? "#00CFFF" : "#4A5570",
-              cursor: "pointer", textTransform: "uppercase",
-            }}
-          >
-            {use3D ? "3D ▣" : "3D ☐"}
-          </button>
-        </div>
-      )}
-
-      {can3D && use3D ? (
-        <FirePanel3D
-          fireDetected={fireDetected}
-          firePbDone={firePbDone}
-          agent1Disch={agent1Disch}
-          agent2Disch={agent2Disch}
-          agent2Available={agent2Available}
-          onPushFirePb={() => step("eng1_fire_pb")}
-          onPushAgent1={() => step("agent1")}
-          onPushAgent2={() => step("agent2")}
-        />
-      ) : (
-        <FirePanel
-          scenario={scenario}
-          state={state}
-          perform={perform}
-          disabled={disabled}
-        />
-      )}
+    <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <FirePanel scenario={scenario} state={state} perform={perform} disabled={disabled} />
     </div>
   );
 }

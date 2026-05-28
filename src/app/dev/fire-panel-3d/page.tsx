@@ -62,6 +62,12 @@ export default function FirePanel3DDevPage() {
           agent1Disch={agent1Disch}
           agent2Disch={agent2Disch}
           agent2Available={true}
+          activeStepId={
+            !firePbDone && fireDetected ? "eng1_fire_pb" :
+            firePbDone && !agent1Disch  ? "agent1" :
+            agent1Disch && !agent2Disch ? "agent2" :
+            undefined
+          }
           onFireDetect={() => setFireDetected(true)}
           onPushFirePb={() => setFirePbDone(true)}
           onPushAgent1={() => setAgent1Disch(true)}

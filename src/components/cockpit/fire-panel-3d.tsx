@@ -37,7 +37,7 @@
 // Camera: perspective fov 18, position [-0.005, 0.004, 0.3]
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
@@ -85,6 +85,12 @@ export interface FirePanel3DProps {
    * In scenario mode leave undefined — fire detection comes from the scenario.
    */
   onFireDetect?:    () => void;
+  /**
+   * The ECAM step currently awaiting a panel action. Drives glow cues so
+   * the panel highlights the correct button in sync with the procedure.
+   * Values: "eng1_fire_pb" | "agent1" | "agent2" | undefined
+   */
+  activeStepId?:    string;
 }
 
 // ── Helper: get first material on a mesh ─────────────────────────────────────
@@ -99,7 +105,11 @@ function FirePanelScene(props: FirePanel3DProps) {
   const {
     fireDetected, firePbDone, agent1Disch, agent2Disch,
     onPushFirePb, onPushAgent1, onPushAgent2, onFireDetect,
+    activeStepId,
   } = props;
+
+  // Touch-feel: timestamp (ms) of last click per pb, for brief press-in animation
+  const pressRef = useRef<Record<string, number>>({});
 
   const { scene } = useGLTF("/models/eng1_left_panel.glb");
 
@@ -241,7 +251,7 @@ function FirePanelScene(props: FirePanel3DProps) {
       // When fire clears, original diffuse colour is restored from originalColors.
       const bodyMat = getMat(firePbMesh);
       if (fireDetected) {
-        bodyMat.color.set(0, 0, 0);   // no diffuse — all light becomes pure emissive
+        bodyMat.color.set(0, 0, 0);
         bodyMat.emissive.copy(C3.red);
         bodyMat.emissiveIntensity = 3.0;
       } else {
@@ -281,13 +291,9 @@ function FirePanelScene(props: FirePanel3DProps) {
     em("ENG1_FireBar", C3.white, 4.0);
 
     // ── ENG1 wire guard — skill §5e hinge pivot math ──────────────────────
-    // skill §2a: guard MUST be lifted before FIRE pb is accessible.
-    // Hinge is at TOP EDGE, 15.2 mm above mesh origin in Blender local Y
-    // → GLTF local Z offset = −0.0152 m. Pivot math: Δy = −HINGE·sin(θ),
-    // Δz = HINGE·(cos(θ)−1). Target −120° = DOM panel rotateX(−120deg).
     const guardMesh = meshes["ENG1_Guard"];
     if (guardMesh) {
-      const HINGE_DIST  = 0.0152; // 15.2 mm centre→hinge in GLTF Z
+      const HINGE_DIST  = 0.0152;
       const TARGET_OPEN = -(Math.PI * 2) / 3; // −120°
       const lifted  = guardOpen || firePbDone;
       const targetX = lifted ? TARGET_OPEN : 0.0;
@@ -295,7 +301,6 @@ function FirePanelScene(props: FirePanel3DProps) {
       const θ  = guardMesh.rotation.x;
       const rp = restPositions["ENG1_Guard"];
       if (rp) {
-        // Pivot correction: Δy = −HINGE_DIST·sin(θ), Δz = HINGE_DIST·(cos(θ)−1)
         guardMesh.position.y = rp.y - HINGE_DIST * Math.sin(θ);
         guardMesh.position.z = rp.z + HINGE_DIST * (Math.cos(θ) - 1);
       }
@@ -323,25 +328,33 @@ function FirePanelScene(props: FirePanel3DProps) {
     em("ENG1_A2_DCbg", C3.off, 0);
     em("ENG1_A2_DC",   agent2Disch ? C3.amber : C3.off, agent2Disch ? 2.5 : 0);
 
-    // ── Teal rings — click affordance (not an FCOM indicator) ────────────
-    // Subtle pulse shows which AGENT pb is currently pressable.
-    em("ENG1_A1_TR", armed1 ? C3.white : C3.off, armed1 ? 0.40 + pulse * 0.30 : 0);
-    em("ENG1_A2_TR", armed2 ? C3.white : C3.off, armed2 ? 0.40 + pulse * 0.30 : 0);
+    // ── Teal rings — ECAM-linked affordance ──────────────────────────────
+    // Boost ring intensity when this pb is the active ECAM step
+    const a1isActive = activeStepId === "agent1";
+    const a2isActive = activeStepId === "agent2";
+    em("ENG1_A1_TR", armed1 ? C3.white : C3.off,
+      armed1 ? (a1isActive ? 0.7 + pulse * 1.1 : 0.40 + pulse * 0.30) : 0);
+    em("ENG1_A2_TR", armed2 ? C3.white : C3.off,
+      armed2 ? (a2isActive ? 0.7 + pulse * 1.1 : 0.40 + pulse * 0.30) : 0);
 
-    // ── AGENT pb bodies — skill §5d press-in axis = GLTF local Y ─────────
-    // skill §8 gotcha 2: press axis is GLTF local Y (Blender Z = depth).
-    // AGENT pbs press IN (−1 mm) when discharged (spring-loaded pb-sw).
+    // ── AGENT pb bodies — press-in with touch-feel spring-back ───────────
+    // Discharged: stays pressed in 1mm (permanent).
+    // Click: briefly presses in 4mm then springs back (150ms) — tactile feel.
     const a1body = meshes["ENG1_A1_Body"];
     if (a1body) {
       const restA1Y = restPositions["ENG1_A1_Body"]?.y ?? a1body.position.y;
-      a1body.position.y = THREE.MathUtils.lerp(a1body.position.y,
-        agent1Disch ? restA1Y - 0.001 : restA1Y, 0.12);
+      const a1pressElapsed = pressRef.current["A1"] ? Date.now() - pressRef.current["A1"] : 9999;
+      const a1pressT = Math.max(0, 1 - a1pressElapsed / 150); // 1→0 over 150ms
+      const a1offset = agent1Disch ? -0.001 : -0.004 * a1pressT;
+      a1body.position.y = THREE.MathUtils.lerp(a1body.position.y, restA1Y + a1offset, 0.18);
     }
     const a2body = meshes["ENG1_A2_Body"];
     if (a2body) {
       const restA2Y = restPositions["ENG1_A2_Body"]?.y ?? a2body.position.y;
-      a2body.position.y = THREE.MathUtils.lerp(a2body.position.y,
-        agent2Disch ? restA2Y - 0.001 : restA2Y, 0.12);
+      const a2pressElapsed = pressRef.current["A2"] ? Date.now() - pressRef.current["A2"] : 9999;
+      const a2pressT = Math.max(0, 1 - a2pressElapsed / 150);
+      const a2offset = agent2Disch ? -0.001 : -0.004 * a2pressT;
+      a2body.position.y = THREE.MathUtils.lerp(a2body.position.y, restA2Y + a2offset, 0.18);
     }
   });
 
@@ -389,19 +402,17 @@ function FirePanelScene(props: FirePanel3DProps) {
       return;
     }
 
-    // skill §0 rule 7: AGENT 1 only after 10-s arming window (ARM_MS).
-    // FCOM: "AGENT 1 AFTER 10 S → DISCH"
     const el1 = firePbWallMs ? Date.now() - firePbWallMs : 0;
     const isArmed1 = firePbDone && !agent1Disch && el1 >= ARM_MS;
     if (isA1Hit && isArmed1) {
+      pressRef.current["A1"] = Date.now(); // touch-feel spring-back
       onPushAgent1();
       return;
     }
 
-    // skill §0 rule 8: AGENT 2 only after AGENT 1 discharged.
-    // FCOM: "IF FIRE AFTER 30 S: AGENT 2 → DISCH"
     const isArmed2 = agent1Disch && !agent2Disch;
     if (isA2Hit && isArmed2) {
+      pressRef.current["A2"] = Date.now(); // touch-feel spring-back
       onPushAgent2();
     }
   };

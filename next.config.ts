@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["pixi.js"],
+  transpilePackages: ["pixi.js", "three", "@react-three/fiber", "@react-three/drei"],
   images: {
     remotePatterns: [
       {
