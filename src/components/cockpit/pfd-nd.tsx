@@ -164,7 +164,6 @@ const PF_RING_STYLE: React.CSSProperties = {
   alignItems: "flex-end",
   justifyContent: "center",
   paddingBottom: "8px",
-  animation: "pfRingPulse 1s ease-in-out infinite",
 };
 
 export function PfActionOverlay({
@@ -188,7 +187,6 @@ export function PfActionOverlay({
 
   return (
     <>
-      <style>{`@keyframes pfRingPulse{0%,100%{opacity:1;border-color:#00ff00}50%{opacity:.35;border-color:#00cc00}}`}</style>
       <div style={PF_RING_STYLE} onClick={onConfirm}>
         {coaching && (
           <div style={{
@@ -311,10 +309,11 @@ export function PfdCanvas({
 
 const ND_RANGE_OPTIONS = [5, 10, 20, 40] as const;
 
-export function NdCanvas({ state, scenario, elapsedMs }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number }) {
+export function NdCanvas({ state, scenario, elapsedMs, paused }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number; paused?: boolean }) {
   const mountRef   = useRef<HTMLDivElement>(null);
   const stateRef   = useRef<AircraftState>(buildAircraftState(state, scenario, elapsedMs));
   const cleanupRef = useRef<(() => void) | null>(null);
+  const pausedRef  = useRef(paused);
   // Hold the NDRenderer instance so the range-cycle effect can poke it.
   // Typed loosely because the renderer is imported asynchronously.
   const ndRef      = useRef<{ setRange: (nm: number) => void } | null>(null);
@@ -324,6 +323,7 @@ export function NdCanvas({ state, scenario, elapsedMs }: { state?: ScenarioState
   useEffect(() => {
     stateRef.current = buildAircraftState(state, scenario, elapsedMs);
   }, [elapsedMs, scenario, state]);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
 
   // Whenever the range index changes, push the new NM into the renderer.
   useEffect(() => {
@@ -364,7 +364,7 @@ export function NdCanvas({ state, scenario, elapsedMs }: { state?: ScenarioState
       ndRef.current = nd;
       app.stage.addChild(nd);
 
-      app.ticker.add(() => { nd.update(stateRef.current); });
+      app.ticker.add(() => { if (!pausedRef.current) nd.update(stateRef.current); });
 
       cleanupRef.current = () => {
         ndRef.current = null;

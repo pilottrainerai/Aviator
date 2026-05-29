@@ -582,10 +582,35 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
             {/* PFD + ND */}
             <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
               <div style={{ width: "380px", height: "380px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
-                <PfdMockup state={runner.state} scenario={scenario} elapsedMs={runner.elapsedMs} />
+                <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                  <PfdMockup
+                    state={runner.state}
+                    scenario={scenario}
+                    elapsedMs={runner.elapsedMs}
+                    paused={runner.paused}
+                    onPfAction={(phaseId) => {
+                      const phase = scenario.phases?.find(p => p.id === phaseId);
+                      if (phase?.pfAction?.stepId) {
+                        runner.perform({ kind: "STEP", stepId: phase.pfAction.stepId });
+                      }
+                    }}
+                  />
+                  {/* Dev-mode PAUSED badge on PFD */}
+                  {isDevMode && runner.paused && (
+                    <div style={{
+                      position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)",
+                      background: "rgba(255,215,0,0.15)", border: "1px solid #FFD700",
+                      color: "#FFD700", fontSize: "10px", fontFamily: "monospace",
+                      fontWeight: 700, letterSpacing: "0.12em", padding: "2px 10px",
+                      borderRadius: "3px", pointerEvents: "none",
+                    }}>
+                      ⏸ PAUSED
+                    </div>
+                  )}
+                </div>
               </div>
               <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
-                <NdCanvas state={runner.state} scenario={scenario} elapsedMs={runner.elapsedMs} />
+                <NdCanvas state={runner.state} scenario={scenario} elapsedMs={runner.elapsedMs} paused={runner.paused} />
               </div>
             </div>
             {/* Glareshield — compact strip */}

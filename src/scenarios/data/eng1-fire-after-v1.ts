@@ -1655,8 +1655,9 @@ export const eng1FireAfterV1: Scenario = {
       },
       pfAction: {
         label: "AP1 ENGAGE",
-        hint: "Press AP1 on FCU — then read FMA aloud: MAN TOGA — SRS — NAV — AP1",
-        coachMs: 6_000,
+        hint: "FCOM DSC-22-30-30: AP cannot engage below 100 ft. Above 100 ft — press AP1 on FCU, read FMA: MAN TOGA · SRS · NAV · AP1",
+        coachMs: 2_000,
+        stepId: "engage_ap_fma",
       },
     },
 
@@ -2056,6 +2057,7 @@ export const eng1FireAfterV1: Scenario = {
         label: "V/S ZERO",
         hint: "Push V/S knob on FCU to level off — FMA col 2 changes SRS → V/S = 0",
         coachMs: 8_000,
+        stepId: "level_off_maa",
       },
     },
 
@@ -2116,6 +2118,7 @@ export const eng1FireAfterV1: Scenario = {
         label: "LVR MCT → SET",
         hint: "Move live engine lever to MCT detent — then pull ALT knob for OP CLB",
         coachMs: 5_000,
+        stepId: "mct_open_clb",
       },
     },
 
@@ -2175,6 +2178,7 @@ export const eng1FireAfterV1: Scenario = {
         label: "OP CLB CONFIRM",
         hint: "Pull ALT knob on FCU — FMA col 2: OP CLB (green). A/THR now active.",
         coachMs: 5_000,
+        stepId: "mct_open_clb",
       },
     },
   ],

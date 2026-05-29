@@ -34,27 +34,50 @@ type PfdData = {
   ra: number;
 };
 
-export default function PfdMockup({ state, scenario, elapsedMs, onPfAction }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number; onPfAction?: (phaseId: string) => void } = {}) {
+export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paused }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number; onPfAction?: (phaseId: string) => void; paused?: boolean } = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef  = useRef(state);
   const scenarioRef = useRef(scenario);
   const elapsedMsRef = useRef(elapsedMs);
+  const pausedRef = useRef(paused);
 
-  // PF action overlay — pulsing green ring on PFD at key phases
+  // PF action overlay — pulsing green ring on PFD at key phases.
+  // Ring persists until the PF clicks it (completing the step), even if later
+  // phases become active. This lets the AP1 ENGAGE ring stay visible through
+  // the 400 ft gate rather than disappearing when the next phase starts.
   const [confirmedPhases, setConfirmedPhases] = useState<Set<string>>(new Set());
-  const activePhase  = getActiveScenarioPhase(scenario, elapsedMs);
-  const pfAction     = activePhase?.pfAction;
-  const needsConfirm = !!(pfAction && activePhase && !confirmedPhases.has(activePhase.id));
+
+  // Scan backwards through all phases reached so far; return the most recent
+  // one whose pfAction step has not yet been completed or confirmed.
+  const pendingPhase = (() => {
+    if (!scenario?.phases) return null;
+    for (let i = scenario.phases.length - 1; i >= 0; i--) {
+      const p = scenario.phases[i];
+      if (p.atMs > (elapsedMs ?? 0)) continue;           // not yet reached
+      if (!p.pfAction) continue;                          // no ring for this phase
+      if (confirmedPhases.has(p.id)) continue;            // PF already clicked it
+      const stepDone = p.pfAction.stepId
+        ? !!state?.completedSteps?.[p.pfAction.stepId]
+        : false;
+      if (stepDone) continue;                             // step completed another way
+      return p;
+    }
+    return null;
+  })();
+
+  const pfAction     = pendingPhase?.pfAction;
+  const needsConfirm = !!(pfAction && pendingPhase);
   const handleConfirm = useCallback(() => {
-    if (!activePhase || !pfAction) return;
-    setConfirmedPhases(prev => new Set(prev).add(activePhase.id));
-    onPfAction?.(activePhase.id);
-  }, [activePhase, pfAction, onPfAction]);
+    if (!pendingPhase || !pfAction) return;
+    setConfirmedPhases(prev => new Set(prev).add(pendingPhase.id));
+    onPfAction?.(pendingPhase.id);
+  }, [pendingPhase, pfAction, onPfAction]);
   // Keep latest scenario state available to the rAF loop without re-running
   // the whole effect on every state change.
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => { scenarioRef.current = scenario; }, [scenario]);
   useEffect(() => { elapsedMsRef.current = elapsedMs; }, [elapsedMs]);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -778,7 +801,7 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction }: { 
     let t = 0;
     let rafId = 0;
     const animate = () => {
-      t += 0.004;
+      if (!pausedRef.current) t += 0.004;   // freeze shimmer when paused
       const live = stateRef.current
         ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current)
         : null;

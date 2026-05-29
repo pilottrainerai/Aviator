@@ -353,5 +353,7 @@ export type ScenarioPhase = {
     hint: string;
     /** Delay before coaching text appears (default 8 000 ms) */
     coachMs?: number;
+    /** Step ID to complete when PF clicks the PFD ring */
+    stepId?: string;
   };
 };

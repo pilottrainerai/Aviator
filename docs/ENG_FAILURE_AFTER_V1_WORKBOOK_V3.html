@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENG FAILURE AFTER V1 — Workbook V3</title>
+<style>
+  :root {
+    --red:    #dc2626; --red-bg:    #fef2f2;
+    --amber:  #d97706; --amber-bg:  #fffbeb;
+    --blue:   #1d4ed8; --blue-bg:   #eff6ff;
+    --green:  #16a34a; --green-bg:  #f0fdf4;
+    --purple: #7c3aed; --purple-bg: #f5f3ff;
+    --teal:   #0d9488; --teal-bg:   #f0fdfa;
+    --gray:   #374151; --gray-bg:   #f9fafb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; background: #f3f4f6; color: #111; }
+  .topbar { background: #111827; color: #fff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .topbar h1 { font-size: 15px; font-weight: 700; letter-spacing: .5px; }
+  .topbar-meta { font-size: 11px; color: #9ca3af; margin-left: 16px; }
+  .topbar-right { display: flex; gap: 8px; align-items: center; }
+  .save-status { font-size: 11px; color: #6b7280; }
+  button.btn { padding: 5px 14px; border-radius: 5px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; }
+  button.btn-save { background: #2563eb; color: #fff; }
+  button.btn-export { background: #374151; color: #fff; }
+  button.btn-v2 { background: #7c3aed; color: #fff; }
+  .tabs { background: #1f2937; display: flex; padding: 0 20px; border-bottom: 2px solid #374151; }
+  .tab { padding: 9px 18px; color: #9ca3af; cursor: pointer; font-size: 12px; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+  .tab.active { color: #fff; border-bottom-color: #3b82f6; }
+  .tab:hover:not(.active) { color: #e5e7eb; }
+  .section { display: none; padding: 16px 20px; }
+  .section.active { display: block; }
+  .section-title { font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 20px; }
+  th { background: #1f2937; color: #e5e7eb; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; padding: 8px 10px; text-align: left; white-space: nowrap; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+  .cat-av  td:first-child { border-left: 4px solid var(--red);    background: var(--red-bg); }
+  .cat-ec  td:first-child { border-left: 4px solid var(--amber);  background: var(--amber-bg); }
+  .cat-atc td:first-child { border-left: 4px solid var(--blue);   background: var(--blue-bg); }
+  .cat-st  td:first-child { border-left: 4px solid var(--green);  background: var(--green-bg); }
+  .cat-pl  td:first-child { border-left: 4px solid var(--purple); background: var(--purple-bg); }
+  .cat-ap  td:first-child { border-left: 4px solid var(--teal);   background: var(--teal-bg); }
+  .chip { display: inline-block; padding: 2px 7px; border-radius: 3px; font-weight: 700; font-size: 10px; font-family: monospace; margin: 1px; }
+  .chip-pf  { background: #dbeafe; color: #1e40af; }
+  .chip-pm  { background: #dcfce7; color: #166534; }
+  .chip-av  { background: #fee2e2; color: #991b1b; }
+  .chip-ec  { background: #fef9c3; color: #854d0e; }
+  .chip-atc { background: #dbeafe; color: #1e3a8a; }
+  .chip-st  { background: #d1fae5; color: #065f46; }
+  .chip-pl  { background: #ede9fe; color: #5b21b6; }
+  .chip-ap  { background: #ccfbf1; color: #134e4a; }
+  .chip-fc  { background: #f3f4f6; color: #374151; }
+  .chip-hw  { background: #1f2937; color: #f9fafb; }
+  .chip-opt { background: #f5f3ff; color: #5b21b6; font-style: italic; }
+  .chip-warn { background: #dc2626; color: #fff; }
+  .chip-caut { background: #d97706; color: #fff; }
+  .chip-adv  { background: #1d4ed8; color: #fff; }
+  .editable { width: 100%; min-height: 36px; padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical; background: #fafafa; }
+  .editable:focus { outline: none; border-color: #3b82f6; background: #fff; }
+  select.flag-sel { padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 11px; background: #fff; cursor: pointer; }
+  .hint-text { font-size: 11px; color: #4b5563; line-height: 1.5; max-width: 320px; }
+  .atc-block { background: #eff6ff; border-left: 3px solid #2563eb; padding: 6px 10px; border-radius: 3px; margin-bottom: 6px; font-size: 12px; }
+  .atc-choice { padding: 3px 8px; border-radius: 3px; font-size: 11px; margin: 2px 0; }
+  .atc-choice.correct { background: #d1fae5; color: #065f46; }
+  .atc-choice.wrong   { background: #fee2e2; color: #991b1b; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 6px; padding: 12px 14px; border: 1px solid #e5e7eb; }
+  .card-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #6b7280; letter-spacing: .6px; }
+  .card-value { font-size: 22px; font-weight: 800; color: #111; margin-top: 2px; }
+  .card-sub { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  .timeline { position: relative; padding-left: 24px; }
+  .tl-item { position: relative; margin-bottom: 14px; }
+  .tl-item::before { content: ''; position: absolute; left: -18px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; }
+  .tl-item::after { content: ''; position: absolute; left: -14px; top: 16px; width: 2px; height: calc(100% + 4px); background: #e5e7eb; }
+  .tl-item:last-child::after { display: none; }
+  .tl-time { font-weight: 700; color: #1d4ed8; font-family: monospace; font-size: 12px; }
+  .tl-desc { font-size: 12px; color: #374151; }
+  .tl-effects { font-size: 11px; color: #6b7280; margin-top: 2px; font-style: italic; }
+  .phase-divider { background: #f9fafb; border-top: 2px solid #e5e7eb; }
+  .phase-divider td { font-weight: 700; color: #374151; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 5px 10px; }
+  .notes-list { margin: 0; padding-left: 14px; }
+  .notes-list li { font-size: 11px; color: #4b5563; line-height: 1.5; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1>ENG FAILURE AFTER V1 — Workbook V3</h1>
+    <span class="topbar-meta">VIDP RWY 28 · A320 FLEX thrust · Source: FCOM PRO-ABN-ENG + FCTM OP-020</span>
+  </div>
+  <div class="topbar-right">
+    <span class="save-status" id="saveStatus">Auto-save on</span>
+    <button class="btn btn-v2" onclick="window.open('procedure-previews/eng-failure-after-v1_PROCEDURE_PREVIEW_EDITABLE.html','_blank')">Open V2</button>
+    <button class="btn btn-save" onclick="saveAll()">Save</button>
+    <button class="btn btn-export" onclick="exportHTML()">Export HTML</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('summary',event)">Summary</div>
+  <div class="tab" onclick="showTab('procedure',event)">Procedure Flow</div>
+  <div class="tab" onclick="showTab('ecam',event)">ECAM / Triggers</div>
+  <div class="tab" onclick="showTab('atc',event)">ATC Distractions</div>
+  <div class="tab" onclick="showTab('status',event)">Status &amp; Decisions</div>
+  <div class="tab" onclick="showTab('phases',event)">Phase FMA</div>
+</div>
+
+<!-- SUMMARY -->
+<div class="section active" id="tab-summary">
+  <div class="cards">
+    <div class="card"><div class="card-label">Scenario</div><div class="card-value" style="font-size:16px;">ENG 1 FAIL</div><div class="card-sub">After V1 — flameout</div></div>
+    <div class="card"><div class="card-label">Airport / Rwy</div><div class="card-value" style="font-size:16px;">VIDP 28</div><div class="card-sub">Delhi · FLEX thrust T/O</div></div>
+    <div class="card"><div class="card-label">Alert Level</div><div class="card-value" style="color:var(--amber);font-size:16px;">MASTER CAUT</div><div class="card-sub">Single SC chime · AMBER</div></div>
+    <div class="card"><div class="card-label">Steps</div><div class="card-value">39</div><div class="card-sub">Procedure steps</div></div>
+    <div class="card"><div class="card-label">ATC Calls</div><div class="card-value">12</div><div class="card-sub">Distractions</div></div>
+    <div class="card"><div class="card-label">Urgency</div><div class="card-value" style="font-size:15px;">PAN PAN</div><div class="card-sub">No fire · No damage</div></div>
+  </div>
+
+  <div class="section-title">Situation Brief</div>
+  <div style="background:#fff;border-radius:6px;padding:14px 16px;border:1px solid #e5e7eb;margin-bottom:20px;font-size:12px;line-height:1.7;color:#374151;">
+    <strong>Situation:</strong> Departing VIDP RWY 28 in FLEX thrust. Two seconds after passing V1 at 145 kt, a MASTER CAUTION fires with a single chime — ECAM displays ENG 1 FAIL. No fire. The engine has flamed out. Asymmetric thrust demands immediate rudder correction.<br><br>
+    <strong>Job:</strong> V1 is passed — takeoff committed. Memory item: maintain direction. Follow SRS to V2+10. Run the ECAM at 400 ft: IGN → IDLE → 30 s relight wait → if none, MASTER OFF. Accelerate clean to green dot single-engine. FORDEC, declare PAN PAN, return VIDP.
+  </div>
+
+  <div class="section-title">Trigger Timeline</div>
+  <div class="timeline" style="margin-bottom:20px;">
+    <div class="tl-item">
+      <div class="tl-time">T+6s</div>
+      <div class="tl-desc"><strong>after_v1</strong> — V1 passed — committed to takeoff</div>
+      <div class="tl-effects">No ECAM effects — crew memory item gate only</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">T+8s</div>
+      <div class="tl-desc"><strong>engine_fail</strong> — ENG 1 FAIL — flameout, N2 decaying, asymmetric thrust</div>
+      <div class="tl-effects">SET_MASTER_CAUT · ADD_ECAM (ENG 1 FAIL, IGN, IDLE, MASTER OFF)</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">T+18s</div>
+      <div class="tl-desc"><strong>four_hundred_ft</strong> — 400 ft AGL — PF calls ECAM ACTIONS</div>
+      <div class="tl-effects">ADD_ECAM "400 FT — ECAM ACTIONS"</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">T+55s</div>
+      <div class="tl-desc"><strong>min_accel_alt</strong> — Engine-out acceleration altitude ~1000 ft AGL</div>
+      <div class="tl-effects">No ECAM effects — crew action gate</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">T+54s (after eng1_master_off +2s)</div>
+      <div class="tl-desc"><strong>secondary_failures</strong> — afterEffect on MASTER OFF</div>
+      <div class="tl-effects">ADD_ECAM (LAND ASAP, SECONDARY FAILURES, * HYD, * ELEC, * AIR BLEED) · SET_MASTER_CAUT</div>
+    </div>
+  </div>
+
+  <div class="section-title">Instructor Notes</div>
+  <table>
+    <thead><tr><th>#</th><th>Topic</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>CAUTION not Warning</td><td><textarea class="editable" data-key="note_0">ENG 1 FAIL = MASTER CAUTION (amber SC chime), NOT Master Warning. No FIRE, no CRC.</textarea></td></tr>
+      <tr><td>2</td><td>PAN PAN not MAYDAY</td><td><textarea class="editable" data-key="note_1">Engine failure without damage → PAN PAN × 3. Upgrade to MAYDAY only if condition worsens (fire, control issue).</textarea></td></tr>
+      <tr><td>3</td><td>Engine secured</td><td><textarea class="editable" data-key="note_2">ENGINE SECURED called after MASTER OFF (no fire, no damage). No FIRE pb, no AGENT.</textarea></td></tr>
+      <tr><td>4</td><td>Rudder trim</td><td><textarea class="editable" data-key="note_3">Apply ~2 units toward live engine. Reset to ZERO before approach thrust reduction — increased rudder force on landing.</textarea></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PROCEDURE FLOW -->
+<div class="section" id="tab-procedure">
+  <div class="section-title">Procedure Flow — 39 Steps</div>
+  <table id="procTable">
+    <thead>
+      <tr><th>#</th><th>ID</th><th>Group</th><th>Crew</th><th>Cat</th><th>Label</th><th>Action</th><th>Hint (first 150 chars)</th><th>Proposed Change</th><th>Flag</th></tr>
+    </thead>
+    <tbody id="procBody"></tbody>
+  </table>
+</div>
+
+<!-- ECAM / TRIGGERS -->
+<div class="section" id="tab-ecam">
+  <div class="section-title">Primary ECAM — engine_fail (T+8s) · MASTER CAUT (AMBER/SC)</div>
+  <table>
+    <thead><tr><th>ID</th><th>ECAM Line</th><th>Level</th></tr></thead>
+    <tbody>
+      <tr><td><code>eng1_fail</code></td><td>ENG 1 FAIL</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td><code>ecam_ign</code></td><td>ENG MODE SEL.....IGN</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td><code>ecam_idle</code></td><td>THR LEVER 1......IDLE</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td><code>ecam_master</code></td><td>ENG MASTER 1....OFF</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td><code>ecam_400ft</code></td><td>400 FT — ECAM ACTIONS (T+18s)</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">Secondary ECAM — secondary_failures (afterEffect on eng1_master_off +2s)</div>
+  <table>
+    <thead><tr><th>ID</th><th>ECAM Line</th><th>Level</th></tr></thead>
+    <tbody>
+      <tr><td><code>land_asap</code></td><td>LAND ASAP</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td><code>sec_fail_hdr</code></td><td>SECONDARY FAILURES</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+      <tr><td><code>hyd_g_pump</code></td><td>* HYD</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td><code>elec_gen1</code></td><td>* ELEC</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td><code>air_bleed1</code></td><td>* AIR BLEED</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td colspan="3" style="font-size:11px;color:#6b7280;font-style:italic;">SET_MASTER_CAUT (second amber caution for secondary failures)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ATC DISTRACTIONS -->
+<div class="section" id="tab-atc">
+  <div class="section-title">ATC Distractions — 12 calls · IFLY101 · Delhi Tower / Departure / Approach / Tower</div>
+  <table id="atcTable">
+    <thead><tr><th>#</th><th>Time / Gate</th><th>From</th><th>Message</th><th>Choices</th><th>Notes</th></tr></thead>
+    <tbody id="atcBody"></tbody>
+  </table>
+</div>
+
+<!-- STATUS & DECISIONS -->
+<div class="section" id="tab-status">
+  <div class="section-title">STATUS Page — FCOM PRO-ABN-ENG ENG SHUT DOWN</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:8px;">Limitations &amp; Directives</div>
+      <table>
+        <thead><tr><th>Line</th><th>Severity</th></tr></thead>
+        <tbody>
+          <tr><td>LAND ASAP</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+          <tr><td>ENG 1 SHUT DOWN</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+          <tr><td>APPR CAT . . . . CAT 1</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+          <tr><td>LDG DIST PROC . . . . APPLY</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+          <tr><td>FUEL CONSUMPT INCRSD</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+          <tr><td>FMS PRED UNRELIABLE</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:8px;">INOP SYS</div>
+      <table>
+        <thead><tr><th>System</th><th>Severity</th></tr></thead>
+        <tbody>
+          <tr><td>ENG 1 BLEED</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+          <tr><td>GEN 1</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+          <tr><td>G ENG 1 PUMP</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+          <tr><td>PACK 1</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+          <tr><td>MAIN GALLEY</td><td><span class="chip" style="background:#6b7280;color:#fff;">MEMO</span></td></tr>
+          <tr><td>CAT 3 DUAL</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+          <tr><td>STEEP APPR</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-title">Decisions</div>
+  <table>
+    <thead><tr><th>Option</th><th>Label</th><th>Description</th><th>Tone</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>LAND_ASAP</td><td><strong>LAND ASAP</strong></td><td>Land at nearest suitable aerodrome. FCOM ENG SHUT DOWN STATUS directive.</td><td><span class="chip chip-adv">PRIMARY</span></td><td><textarea class="editable" data-key="dec_0"></textarea></td></tr>
+      <tr><td>RETURN_TO_FIELD</td><td><strong>RETURN TO FIELD</strong></td><td>Return VIDP RWY 28 — nearest suitable, full CFR, LDA 4430 m adequate.</td><td><span class="chip chip-adv">PRIMARY</span></td><td><textarea class="editable" data-key="dec_1"></textarea></td></tr>
+      <tr><td>DIVERT</td><td><strong>DIVERT</strong></td><td>Divert to alternate — only if genuinely closer/more suitable than VIDP.</td><td><span class="chip chip-pm">SECONDARY</span></td><td><textarea class="editable" data-key="dec_2"></textarea></td></tr>
+      <tr><td>CONTINUE</td><td><strong>CONTINUE</strong></td><td>Press on to destination — not justified. LAND ASAP status, SE, secondary failures.</td><td><span class="chip chip-warn">DANGER</span></td><td><textarea class="editable" data-key="dec_3"></textarea></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PHASE FMA -->
+<div class="section" id="tab-phases">
+  <div class="section-title">Phase FMA Snapshots — 10 Phases (FCTM OP-020)</div>
+  <table id="phaseTable">
+    <thead>
+      <tr><th>Phase</th><th>Time</th><th>Label</th><th>PFD State</th><th>PF Task / Callouts</th><th>PM Task / Callouts</th><th>Notes</th></tr>
+    </thead>
+    <tbody id="phaseBody"></tbody>
+  </table>
+</div>
+
+<script>
+const LS_KEY = 'eng_failure_after_v1_workbook_v3';
+
+const steps = [
+  { n:1,  id:'v1_continue',                group:'flightcheck', crew:'PF', cat:'av', label:'V1 — CONTINUE TAKEOFF',         action:'COMMIT',   hw:false, req:'',                   hint:'V1 passed — takeoff is committed. Do NOT reduce thrust. Maintain directional control.' },
+  { n:2,  id:'maintain_direction',          group:'flightcheck', crew:'PF', cat:'av', label:'MAINTAIN DIRECTION — MEMORY',   action:'RUDDER',   hw:false, req:'v1_continue',        hint:'MEMORY ITEM: immediately apply rudder toward live engine (ENG 2 — right pedal). Target β = ZERO. Maintain runway heading.' },
+  { n:3,  id:'continue_rotation',           group:'flightcheck', crew:'PF', cat:'av', label:'ROTATION — VR 12.5°',           action:'ROTATE',   hw:false, req:'maintain_direction',  hint:'PF rotates at VR to 12.5° pitch, follows SRS targeting V2+10 kt. β = 0 maintained with rudder.' },
+  { n:4,  id:'positive_rate_gear_up',       group:'flightcheck', crew:'PM', cat:'av', label:'POSITIVE RATE — GEAR UP',       action:'CALL',     hw:false, req:'continue_rotation',   hint:"PM calls 'POSITIVE RATE'. PF: 'GEAR UP'. PM selects gear lever UP. Verify GEAR UP. PM: 'POSITIVE CLIMB'." },
+  { n:5,  id:'rudder_trim',                 group:'flightcheck', crew:'PF', cat:'av', label:'RUDDER TRIM',                   action:'APPLY',    hw:false, req:'continue_rotation',   hint:'FCTM: PF applies rudder trim toward live engine (~2 units toward ENG 2) above 150 kt. Reset to ZERO before approach.' },
+  { n:6,  id:'engage_ap_fma',               group:'flightcheck', crew:'PF', cat:'av', label:'AP1 ENGAGE — READ FMA',         action:'CONFIRM',  hw:false, req:'positive_rate_gear_up',hint:'PF engages AP1 at ~100 ft. Read FMA aloud: SRS — NAV — AP1 ENGAGED. AP holds SRS on engine-out performance.' },
+  { n:7,  id:'cancel_master_caut_initial',  group:'glareshield', crew:'PM', cat:'av', label:'MASTER CAUT',                   action:'CANCEL',   hw:true,  req:'',                   hint:'PM pushes amber MASTER CAUTION — silences single SC chime. ENG 1 FAIL = CAUTION (amber), not Warning (red).' },
+  { n:8,  id:'four_hundred_ft_cmd',         group:'flightcheck', crew:'PF', cat:'av', label:'400 FT — ECAM ACTIONS',         action:'ANNOUNCE', hw:false, req:'engage_ap_fma',       hint:"PF: 'ECAM ACTIONS' at 400 ft. PM acknowledges and begins ECAM procedure." },
+  { n:9,  id:'eng_mode_sel_ign',            group:'',            crew:'PM', cat:'ec', label:'ENG MODE SEL',                  action:'IGN',      hw:true,  req:'four_hundred_ft_cmd', hint:'PM: ENG MODE SEL → IGN. FCOM first step for ENG 1(2) FAIL. Selects continuous ignition — confirms FADEC relight attempt.' },
+  { n:10, id:'thr_lever_idle',              group:'',            crew:'PM', cat:'ec', label:'THR LEVER 1',                   action:'IDLE',     hw:true,  req:'eng_mode_sel_ign',    hint:'PM retards ENG 1 thrust lever to IDLE detent. FCOM step 2. Reduces fuel flow before 30 s relight countdown.' },
+  { n:11, id:'relight_wait',                group:'flightcheck', crew:'PM', cat:'ec', label:'RELIGHT — MONITOR 30 s',        action:'MONITOR',  hw:false, req:'thr_lever_idle',      hint:'FADEC attempts relight with continuous ignition. Monitor N2 and EGT. FCOM: if no relight after 30 s → ENG MASTER OFF.' },
+  { n:12, id:'eng1_master_off',             group:'',            crew:'PM', cat:'ec', label:'ENG 1 MASTER',                  action:'OFF',      hw:true,  req:'relight_wait',        hint:"PM: 'ENG 1 MASTER, CONFIRM OFF?' → PF: 'CONFIRM' → PM sets OFF. No relight after 30 s. No fire — no AGENT." },
+  { n:13, id:'cancel_master_caut',          group:'glareshield', crew:'PM', cat:'av', label:'MASTER CAUT',                   action:'CANCEL',   hw:true,  req:'',                   hint:'PM pushes MASTER CAUTION — silences SC chime for secondary failures (HYD, ELEC, AIR BLEED).' },
+  { n:14, id:'engine_secured_call',         group:'chclm',       crew:'PM', cat:'ec', label:'ENGINE SECURED',                action:'ANNOUNCE', hw:false, req:'eng1_master_off',     hint:"After ENG MASTER OFF (no fire, no damage), PM announces 'ENGINE SECURED'. PF acknowledges." },
+  { n:15, id:'announce_land_asap',          group:'chclm',       crew:'PF', cat:'ec', label:'LAND ASAP',                    action:'ANNOUNCE', hw:false, req:'engine_secured_call',  hint:"PF announces 'LAND ASAP' (amber on ECAM). Engine shutdown without damage — land nearest suitable. Amber = urgency." },
+  { n:16, id:'atc_pan_pan',                 group:'comms',       crew:'PM', cat:'atc',label:'PAN PAN',                      action:'DECLARE',  hw:false, req:'announce_land_asap',   hint:"'PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.'" },
+  { n:17, id:'tcas_ta',                     group:'',            crew:'PM', cat:'ec', label:'TCAS MODE SEL',                 action:'TA',       hw:true,  req:'eng1_master_off',     hint:'PM: TCAS MODE SEL → TA. FCOM ENG SHUT DOWN STATUS requirement — prevents RA on single-engine.' },
+  { n:18, id:'level_off_maa',               group:'',            crew:'PF', cat:'ec', label:'V/S 0 AT MAA',                 action:'SELECT',   hw:false, req:'eng1_master_off',     hint:'PF: at minimum acceleration altitude PUSH V/S knob → V/S 0. Aircraft levels off. Acceleration after engine secured.' },
+  { n:19, id:'accel_f_speed',               group:'',            crew:'PM', cat:'ec', label:'FLAPS 1 — F SPEED',            action:'SELECT',   hw:false, req:'level_off_maa',       hint:"PM: 'F SPEED'. PF: 'FLAPS 1'. PM checks AS, calls 'FLAPS 1', selects. Do not retract below F speed — VMCA margin." },
+  { n:20, id:'accel_s_speed',               group:'',            crew:'PM', cat:'ec', label:'FLAPS UP — S SPEED',           action:'SELECT',   hw:false, req:'accel_f_speed',       hint:"PM: 'S SPEED'. PF: 'FLAPS UP'. PM selects flap lever to 0. Aircraft now clean — accelerate to Green Dot." },
+  { n:21, id:'accel_green_dot',             group:'',            crew:'PF', cat:'ec', label:'MCT — GREEN DOT',              action:'SET',      hw:false, req:'accel_s_speed',       hint:'PF: when speed reaches Green Dot — set MCT on live engine (ENG 2). Climb at Green Dot single-engine.' },
+  { n:22, id:'ecam_secondary_read',         group:'chclm',       crew:'PM', cat:'ec', label:'ECAM — SECONDARY FAILURES',    action:'READ',     hw:false, req:'accel_green_dot',     hint:'PM reads secondary failures from SD. HYD G ENG1 PUMP LO PR. GEN 1 FAULT — BTC auto-closes. ENG 1 BLEED FAULT.' },
+  { n:23, id:'ecam_stop',                   group:'flightcheck', crew:'PF', cat:'ec', label:'STOP ECAM',                    action:'CALL',     hw:false, req:'ecam_secondary_read', hint:"PF calls 'STOP' — ECAM reading complete. All primary done, secondary failures read." },
+  { n:24, id:'normal_checklist_check',      group:'chclm',       crew:'PM', cat:'ec', label:'AFTER T/O CL',                 action:'COMPLETE', hw:false, req:'ecam_stop',           hint:'PM runs After Takeoff checklist. Note items already complete or N/A due to failure.' },
+  { n:25, id:'oeb_computer_check',          group:'flightcheck', crew:'PF', cat:'ec', label:'OEB / COMPUTER RESETS',        action:'CHECK',    hw:false, req:'normal_checklist_check',hint:'No resets required for pure flameout — awareness check only.' },
+  { n:26, id:'read_status',                 group:'flightcheck', crew:'PF', cat:'ec', label:'READ STATUS',                  action:'CALL',     hw:false, req:'oeb_computer_check',  hint:"PF: 'READ STATUS' — PM reads ECAM STATUS page aloud." },
+  { n:27, id:'crew_crosscheck',             group:'chclm',       crew:'PM', cat:'ec', label:'ECAM STATUS — PM READS',       action:'REVIEW',   hw:false, req:'read_status',         hint:'PM reads: ENG 1 SHUT DOWN, HYD G ENG1 PUMP LO PR, GEN 1 INOP, ENG 1 BLEED, PACK 1 MONITOR, CAT 1, MAX FL 250, TCAS TA.' },
+  { n:28, id:'ecam_completed',              group:'chclm',       crew:'PM', cat:'ec', label:'ECAM ACTIONS COMPLETED',       action:'ANNOUNCE', hw:false, req:'crew_crosscheck',     hint:"PM: 'ECAM ACTIONS COMPLETED.' All primary ECAM procedures complete, secondary failures reviewed, STATUS read." },
+  { n:29, id:'wx_request',                  group:'comms',       crew:'PM', cat:'pl', label:'WEATHER / ATIS',               action:'REQUEST',  hw:false, req:'ecam_completed',      hint:'PM requests weather and ATIS for VIDP. Confirm QNH, visibility, runway in use for ILS 28.' },
+  { n:30, id:'ldg_perf',                    group:'comms',       crew:'PF', cat:'pl', label:'LDG PERF',                     action:'CHECK',    hw:false, req:'wx_request',          hint:'SE approach: Vapp = Vref+5 kt. RWY 28 LDA 4430 m — factored SE dist ~2200 m — ADEQUATE.' },
+  { n:31, id:'fordec',                      group:'comms',       crew:'PF', cat:'pl', label:'FORDEC',                       action:'COMPLETE', hw:false, req:'ldg_perf',            hint:'PF leads FORDEC. F-ENG 1 flameout, no fire. VIDP 15 min. O-Return VIDP or divert. D-LAND ASAP VIDP RWY 28.' },
+  { n:32, id:'inform_atc_intentions',       group:'comms',       crew:'PM', cat:'atc',label:'INFORM ATC — INTENTIONS',      action:'CALL',     hw:false, req:'fordec',              hint:'PM informs Delhi Approach of return intentions. State decision to return VIDP RWY 28, request ILS vectors.' },
+  { n:33, id:'fmgc_prep',                   group:'comms',       crew:'PM', cat:'pl', label:'FMGC PREP',                    action:'COMPLETE', hw:false, req:'fordec',              hint:'PM: enter VIDP in DEST, RWY 28, ILS 110.30 / CRS 282. Vapp = Vref+5 kt. Check F-PLN fuel + ALTN.' },
+  { n:34, id:'nis_brief',                   group:'comms',       crew:'PM', cat:'pl', label:'NITS BRIEF',                   action:'CONFIRM',  hw:false, req:'fordec',              hint:'PM on interphone to SCCM. N-Engine failure, ENG 1 shut down, no fire. I-Returning VIDP RWY 28. T-15 min.' },
+  { n:35, id:'pax_pa',                      group:'comms',       crew:'PF', cat:'pl', label:'PASSENGER PA',                 action:'CONFIRM',  hw:false, req:'nis_brief',           hint:"PF PA: 'Returning to Delhi as a precaution. Remain seated with seatbelts fastened.'" },
+  { n:36, id:'go_around_review',            group:'comms',       crew:'PF', cat:'ap', label:'GO-AROUND REVIEW',             action:'CONFIRM',  hw:false, req:'fmgc_prep',           hint:'PF briefs SE go-around plan. TOGA on ENG 2 only — SRS — GEAR UP — V2+10 — clean — MCT at Green Dot. Fuel check.' },
+  { n:37, id:'atc_emergency_services',      group:'comms',       crew:'PM', cat:'atc',label:'ATC — EMERG SVCS',             action:'ADVISE',   hw:false, req:'go_around_review',    hint:"PM: 'PAN PAN IFLY101, request Category 3 emergency services runway 28. CFR, ambulances, medical standby. 186 POB.'" },
+  { n:38, id:'approach_brief',              group:'comms',       crew:'PF', cat:'ap', label:'APPROACH BRIEF',               action:'COMPLETE', hw:false, req:'atc_emergency_services',hint:'PF: ILS RWY 28 VIDP, SE CAT 1. DA 200 ft. Vapp Vref+5. HYD G ENG1 PUMP, GEN 1 INOP. Rudder trim reset before flare.' },
+  { n:39, id:'approach_prep',               group:'comms',       crew:'PM', cat:'ap', label:'APPROACH PREP',                action:'COMPLETE', hw:false, req:'approach_brief',      hint:'PM: ILS 28 freq 110.30 / CRS 282. BARO minima. Autobrake MED. Spoilers ARM. Reset rudder trim to zero.' },
+  { n:40, id:'approach_cl',                 group:'chclm',       crew:'PM', cat:'ec', label:'APPROACH CL',                  action:'COMPLETE', hw:false, req:'approach_prep',       hint:'PM runs approach checklist. BARO QNH, MDA 200 ft, Seatbelts ON, Autobrake MED, Spoilers ARM, Landing Lights ON.' },
+  { n:41, id:'landing_cl',                  group:'chclm',       crew:'PM', cat:'ec', label:'LANDING CL',                   action:'COMPLETE', hw:false, req:'approach_cl',         hint:'PM runs landing checklist at 1000 ft final. RUDDER TRIM ZERO confirmed before thrust reduction.' },
+];
+
+const atcCalls = [
+  { n:1,  id:'atc_handoff_to_departure',    time:'T+25s',  gate:'', from:'DELHI TOWER',    msg:'IFLY101, contact Delhi Departure 124.85.',
+    choices:[{t:'a',label:'Delhi Departure 124.85, IFLY101',correct:true},{t:'b',label:'Roger, IFLY101',correct:false},{t:'c',label:'Delhi Departure 124.95, IFLY101',correct:false}]},
+  { n:2,  id:'atc_radar_contact_pan_pan',   time:'T+42s',  gate:'', from:'DELHI DEPARTURE', msg:'IFLY101, Delhi Departure, radar contact.',
+    choices:[{t:'a',label:'PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, no fire, maintaining runway track, climbing 3 000 feet, standby',correct:true},{t:'b',label:'PAN PAN IFLY101, engine failure, returning immediate, request runway 28 ILS, full emergency',correct:false},{t:'c',label:'Maintaining runway track, climbing 3 000, IFLY101',correct:false},{t:'d',label:'MAYDAY MAYDAY MAYDAY, IFLY101, engine failure engine 1, no fire, maintaining runway track, climbing 3 000, standby',correct:false}]},
+  { n:3,  id:'atc_vectors_climb',           time:'T+70s',  gate:'', from:'DELHI DEPARTURE', msg:'IFLY101, roger PAN PAN, radar contact, continue runway track, climb 4 000 feet.',
+    choices:[{t:'a',label:'Continuing runway track, climbing 4 000, IFLY101',correct:true},{t:'b',label:'IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel',correct:false}]},
+  { n:4,  id:'atc_vectors_when_ready',      time:'T+105s', gate:'', from:'DELHI DEPARTURE', msg:'IFLY101, vectors available when ready, no reported traffic.',
+    choices:[{t:'a',label:'Continuing checklist, will advise, IFLY101',correct:true},{t:'b',label:'Unable at this time, request hold, will advise when ready for approach, IFLY101',correct:true},{t:'c',label:'IFLY101 returning Delhi, request runway 28 ILS',correct:false}]},
+  { n:5,  id:'atc_info_request_prompt',     time:'T+150s', gate:'crew_crosscheck', from:'DELHI APPROACH', msg:'IFLY101, Delhi Approach, advise any requirements for the approach and any assistance required.',
+    choices:[{t:'a',label:'Request latest Delhi weather, runway in use, NOTAMs, and expected approach type, IFLY101',correct:true},{t:'b',label:'Standby IFLY101',correct:false},{t:'c',label:'Request vectors ILS runway 28, IFLY101',correct:false}]},
+  { n:6,  id:'atc_provides_briefing_info',  time:'T+200s', gate:'', from:'DELHI APPROACH', msg:'IFLY101, roger standby. … Delhi wind 280 at 8, runway 28 in use, NOTAMs nil significant, expect ILS runway 28.',
+    choices:[{t:'a',label:'Wind 280 at 8, runway 28, ILS runway 28, no significant NOTAMs, IFLY101',correct:true},{t:'b',label:'Roger, IFLY101',correct:false},{t:'c',label:'Wind 280 at 8, runway 28, IFLY101',correct:false}]},
+  { n:7,  id:'atc_pob_fuel_services',       time:'T+225s', gate:'', from:'DELHI APPROACH', msg:'IFLY101, say persons on board, fuel endurance, and assistance required.',
+    choices:[{t:'a',label:'IFLY101, 186 persons on board, 8.4 tonnes fuel, endurance 3 hours, request full emergency services on the runway',correct:true},{t:'b',label:'Standby IFLY101',correct:false},{t:'c',label:'IFLY101, 186 POB, 8.4 tonnes, no emergency services required',correct:false}]},
+  { n:8,  id:'atc_ready_for_approach',      time:'T+250s', gate:'', from:'DELHI APPROACH', msg:'IFLY101, advise when ready for approach.',
+    choices:[{t:'a',label:'IFLY101 ready, request vectors for ILS runway 28',correct:true},{t:'b',label:'Ready, IFLY101',correct:false},{t:'c',label:'Standby IFLY101',correct:false}]},
+  { n:9,  id:'atc_cleared_approach',        time:'T+275s', gate:'', from:'DELHI APPROACH', msg:'IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 28 approach, contact Delhi Tower 118.10 when established.',
+    choices:[{t:'a',label:'Left heading 240, descend 3 000, cleared ILS runway 28, contact Tower 118.10 when established, IFLY101',correct:true},{t:'b',label:'Roger, IFLY101',correct:false},{t:'c',label:'Cleared ILS runway 28, IFLY101',correct:false}]},
+  { n:10, id:'atc_tower_contact',           time:'T+300s', gate:'', from:'DELHI TOWER',   msg:'IFLY101, Delhi Tower, continue ILS approach runway 28, report established.',
+    choices:[{t:'a',label:'Continuing ILS runway 28, will report established, IFLY101',correct:true},{t:'b',label:'Switching, IFLY101',correct:false}]},
+  { n:11, id:'atc_cleared_to_land',         time:'T+325s', gate:'', from:'DELHI TOWER',   msg:'IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.',
+    choices:[{t:'a',label:'Cleared to land runway 28, IFLY101',correct:true},{t:'b',label:'Roger, IFLY101',correct:false},{t:'c',label:'Cleared to land runway 29, IFLY101',correct:false}]},
+];
+
+const phases = [
+  { id:'v1_passed',        time:'T+6s',   label:'V1 PASSED — TAKEOFF COMMITTED',             speed:145, alt:0,    vs:0,    thrust:'MAN TOGA', pitch:'SRS',     lat:'RWY TRK', ap:'–', athr:'–', pf:'Maintain centreline with rudder, do NOT reduce thrust, prepare to rotate at VR.', pm:'Monitor airspeed, call VR, watch for tyre/directional problem.' },
+  { id:'eng1_fail',        time:'T+8s',   label:'ENG 1 FAIL — ASYMMETRIC THRUST',            speed:147, alt:0,    vs:0,    thrust:'MAN TOGA', pitch:'SRS',     lat:'RWY TRK', ap:'–', athr:'–', pf:'MEMORY ITEM: apply right rudder to zero β. Do NOT pull back, do NOT reduce thrust.', pm:'Identify ECAM — ENG 1 FAIL. Do NOT touch MASTER CAUT yet. Call VR.' },
+  { id:'rotation',         time:'T+10s',  label:'ROTATION — VR 12.5°',                       speed:152, alt:50,   vs:800,  thrust:'MAN TOGA', pitch:'SRS',     lat:'RWY TRK', ap:'–', athr:'–', pf:'Rotate smoothly to 12.5° pitch, follow FD, target V2+10. Hold right rudder — β = 0.', pm:"Call 'POSITIVE RATE'. Watch VSI and altimeter." },
+  { id:'gear_up_ap1',      time:'T+14s',  label:'GEAR UP — AP1 ENGAGED',                     speed:163, alt:120,  vs:1800, thrust:'MAN TOGA', pitch:'SRS',     lat:'NAV',     ap:'AP1', athr:'–', pf:'Engage AP1. Read FMA aloud. Apply rudder trim ~2 units right. Monitor SRS V2+10.', pm:'Confirm gear up / 3 off. Cancel MASTER CAUTION once AP stable.' },
+  { id:'ecam_actions_start',time:'T+18s', label:'400 FT — ECAM ACTIONS START',               speed:170, alt:400,  vs:2000, thrust:'MAN TOGA', pitch:'SRS',     lat:'NAV',     ap:'AP1', athr:'–', pf:"Call 'ECAM ACTIONS'. Monitor FD, speed, altitude.", pm:'Acknowledge ECAM ACTIONS. Begin ENG MODE SEL → IGN.' },
+  { id:'ecam_ign_idle',    time:'T+20s',  label:'ECAM — MODE SEL IGN / THR LEVER IDLE',      speed:175, alt:550,  vs:2000, thrust:'MAN TOGA', pitch:'SRS',     lat:'NAV',     ap:'AP1', athr:'–', pf:'Monitor altitude, speed, SRS guidance. Confirm each ECAM step.', pm:'Set ENG MODE SEL to IGN. Retard ENG 1 THR LEVER to IDLE. Start 30-s relight timer.' },
+  { id:'relight_monitor',  time:'T+22s',  label:'RELIGHT MONITOR — 30 SECONDS',              speed:180, alt:800,  vs:1800, thrust:'MAN TOGA', pitch:'SRS',     lat:'NAV',     ap:'AP1', athr:'–', pf:'Aviate — let PM run relight monitor.', pm:'Watch SD ENG page: N2, EGT, FF on ENG 1. After 30 s no relight — call ENG MASTER OFF.' },
+  { id:'master_off_secondary',time:'T+52s',label:'ENG 1 MASTER OFF — SECONDARY FAILURES',   speed:188, alt:950,  vs:1600, thrust:'MAN TOGA', pitch:'SRS',     lat:'NAV',     ap:'AP1', athr:'–', pf:'Monitor aircraft — AP holding SRS. Confirm ENG MASTER OFF.', pm:'Set ENG MASTER 1 OFF. Call ENGINE SECURED. Cancel second MASTER CAUT. Note HYD/ELEC/AIR BLEED.' },
+  { id:'accel_altitude',   time:'T+55s',  label:'ENG-OUT ACCELERATION ALTITUDE',             speed:195, alt:1000, vs:0,    thrust:'MAN TOGA', pitch:'ALT',     lat:'NAV',     ap:'AP1', athr:'–', pf:'At eng-out acc alt: push OP CLB / V/S 0. Call flap retraction at F speed. Monitor VMCA margin.', pm:'Call F speed and S speed. Select flap lever on PF command. Monitor speed vs VMCA.' },
+  { id:'se_climb',         time:'T+75s',  label:'MCT SET — SINGLE-ENGINE CLIMB AT GREEN DOT',speed:215, alt:2000, vs:800,  thrust:'MAN MCT',  pitch:'CLB',     lat:'NAV',     ap:'AP1', athr:'–', pf:'Set MCT on ENG 2 at Green Dot. Monitor CLB. Prepare for FORDEC and LAND ASAP decision.', pm:'Confirm ECAM ACTIONS COMPLETED. Read STATUS page. TCAS TA confirmed. Begin FORDEC.' },
+];
+
+function catChip(cat) {
+  const map = {av:'chip-av',ec:'chip-ec',atc:'chip-atc',st:'chip-st',pl:'chip-pl',ap:'chip-ap'};
+  const labels = {av:'AVIATE',ec:'ECAM',atc:'ATC',st:'STATUS',pl:'PLAN',ap:'APPROACH'};
+  return `<span class="chip ${map[cat]||'chip-fc'}">${labels[cat]||cat.toUpperCase()}</span>`;
+}
+
+function buildProcedureTable() {
+  const tb = document.getElementById('procBody');
+  const saved = loadData();
+  steps.forEach(s => {
+    const hintShort = s.hint.length > 150 ? s.hint.slice(0,150)+'…' : s.hint;
+    const crewChip = `<span class="chip chip-${s.crew.toLowerCase()}">${s.crew}</span>`;
+    const groupChip = s.group ? `<span class="chip chip-fc">${s.group}</span>` : '';
+    const hwChip = s.hw ? `<span class="chip chip-hw">HW</span>` : '';
+    const reqStr = s.req ? `<span style="font-size:10px;color:#6b7280;">→ ${s.req}</span>` : '';
+    const changeKey = `proc_change_${s.id}`;
+    const flagKey = `proc_flag_${s.id}`;
+    const changeVal = saved[changeKey] || '';
+    const flagVal = saved[flagKey] || '';
+    const tr = document.createElement('tr');
+    tr.className = `cat-${s.cat}`;
+    tr.innerHTML = `
+      <td style="font-weight:700;font-family:monospace;">${s.n}</td>
+      <td><code style="font-size:10px;">${s.id}</code></td>
+      <td>${groupChip}</td>
+      <td>${crewChip}</td>
+      <td>${catChip(s.cat)}</td>
+      <td><strong>${s.label}</strong>${reqStr ? '<br>'+reqStr : ''}</td>
+      <td><span class="chip chip-fc">${s.action}</span>${hwChip}</td>
+      <td><span class="hint-text">${hintShort}</span></td>
+      <td><textarea class="editable" data-key="${changeKey}">${changeVal}</textarea></td>
+      <td><select class="flag-sel" data-key="${flagKey}">
+        <option value=""${flagVal===''?' selected':''}>–</option>
+        <option value="critical"${flagVal==='critical'?' selected':''}>🔴 Critical</option>
+        <option value="review"${flagVal==='review'?' selected':''}>🟡 Review</option>
+        <option value="ok"${flagVal==='ok'?' selected':''}>✅ OK</option>
+      </select></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function buildAtcTable() {
+  const tb = document.getElementById('atcBody');
+  const saved = loadData();
+  atcCalls.forEach(c => {
+    const gateStr = c.gate ? `<span class="chip chip-pl">gate: ${c.gate}</span>` : '';
+    const noteKey = `atc_note_${c.id}`;
+    const noteVal = saved[noteKey] || '';
+    const choicesHtml = c.choices.map(ch =>
+      `<div class="atc-choice ${ch.correct?'correct':'wrong'}">${ch.correct?'✓':'✗'} ${ch.label}</div>`
+    ).join('');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:700;">${c.n}</td>
+      <td><span style="font-family:monospace;font-size:11px;">${c.time}</span><br>${gateStr}</td>
+      <td><strong>${c.from}</strong></td>
+      <td><div class="atc-block">${c.msg}</div></td>
+      <td>${choicesHtml}</td>
+      <td><textarea class="editable" data-key="${noteKey}">${noteVal}</textarea></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function buildPhaseTable() {
+  const tb = document.getElementById('phaseBody');
+  const saved = loadData();
+  phases.forEach((p, i) => {
+    const noteKey = `phase_note_${p.id}`;
+    const noteVal = saved[noteKey] || '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:700;font-family:monospace;font-size:10px;">${p.id}</td>
+      <td style="font-family:monospace;font-size:11px;">${p.time}</td>
+      <td><strong>${p.label}</strong></td>
+      <td style="font-size:11px;">
+        <div>SPD: <strong>${p.speed}</strong> kt · ALT: <strong>${p.alt}</strong> ft</div>
+        <div>V/S: ${p.vs} fpm · AP: ${p.ap}</div>
+        <div>THR: <span class="chip chip-fc">${p.thrust}</span> PITCH: <span class="chip chip-fc">${p.pitch}</span> LAT: <span class="chip chip-fc">${p.lat}</span></div>
+      </td>
+      <td style="font-size:11px;"><span class="chip chip-pf">PF</span> ${p.pf}</td>
+      <td style="font-size:11px;"><span class="chip chip-pm">PM</span> ${p.pm}</td>
+      <td><textarea class="editable" data-key="${noteKey}">${noteVal}</textarea></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function showTab(name, ev) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (ev && ev.currentTarget) ev.currentTarget.classList.add('active');
+}
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch(e) { return {}; }
+}
+
+function saveAll() {
+  const data = {};
+  document.querySelectorAll('[data-key]').forEach(el => { data[el.dataset.key] = el.value; });
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
+  const s = document.getElementById('saveStatus');
+  s.textContent = 'Saved ✓ ' + new Date().toLocaleTimeString();
+  setTimeout(() => s.textContent = 'Auto-save on', 2000);
+}
+
+function loadAll() {
+  const data = loadData();
+  document.querySelectorAll('[data-key]').forEach(el => {
+    if (data[el.dataset.key] !== undefined) el.value = data[el.dataset.key];
+  });
+}
+
+function exportHTML() {
+  const blob = new Blob([document.documentElement.outerHTML], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ENG_FAILURE_AFTER_V1_WORKBOOK_V3_export.html';
+  a.click();
+}
+
+let autoSaveTimer;
+document.addEventListener('input', () => {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => { saveAll(); }, 800);
+});
+
+buildProcedureTable();
+buildAtcTable();
+buildPhaseTable();
+loadAll();
+</script>
+</body>
+</html>

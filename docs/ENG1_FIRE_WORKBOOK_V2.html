@@ -1,0 +1,808 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>ENG1 FIRE Workbook V2</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>
+body{font-family:Helvetica,Arial,sans-serif;margin:16px;color:#111;background:#f0f4f8}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:18px 0 6px;padding-left:4px;border-left:4px solid #94a3b8}
+.meta{color:#555;font-size:11px;margin:2px 0}
+.note{background:#eef6ff;border:1px solid #c7ddff;padding:8px 12px;border-radius:6px;margin:8px 0;font-size:12px}
+.toolbar{position:sticky;top:0;z-index:50;background:#fff;border:1px solid #dbe3ee;border-radius:8px;padding:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+button{border:1px solid #b8c5d8;background:#f3f7fd;color:#0f172a;border-radius:5px;padding:5px 10px;cursor:pointer;font-weight:600;font-size:12px}
+button:hover{background:#e2ecff}
+.small{font-size:11px;color:#475569}
+.tbl{overflow:auto;border:1px solid #d4dbe5;border-radius:8px;background:#fff;margin-bottom:16px}
+table{border-collapse:collapse;width:100%;table-layout:fixed;margin:0}
+th,td{border:1px solid #c8d1de;padding:5px 7px;vertical-align:top;font-size:11px;word-wrap:break-word}
+th{background:#eaf0f8;text-align:left;font-size:11px;position:sticky;top:0;z-index:2}
+.pre{white-space:pre-wrap}
+.ed{background:#fffef5}.ed:focus{outline:2px solid #3b82f6;outline-offset:-2px;background:#fff}
+
+/* Category colors */
+.cat-av{background:#fef2f2;border-left:4px solid #dc2626}
+.cat-ec{background:#fffbeb;border-left:4px solid #d97706}
+.cat-at{background:#eff6ff;border-left:4px solid #2563eb}
+.cat-st{background:#f0fdf4;border-left:4px solid #16a34a}
+.cat-pl{background:#f5f3ff;border-left:4px solid #7c3aed}
+.cat-ap{background:#f0fdfa;border-left:4px solid #0d9488}
+
+/* Code chips */
+.chip{display:inline-block;padding:2px 6px;border-radius:3px;font-weight:700;font-size:11px;letter-spacing:.3px;font-family:monospace}
+.chip-av{background:#dc2626;color:#fff}
+.chip-ec{background:#d97706;color:#fff}
+.chip-at{background:#2563eb;color:#fff}
+.chip-st{background:#16a34a;color:#fff}
+.chip-pl{background:#7c3aed;color:#fff}
+.chip-ap{background:#0d9488;color:#fff}
+.chip-gl{background:#64748b;color:#fff}
+
+/* FMA cells */
+.fma{font-family:monospace;font-size:10px;letter-spacing:.2px}
+.fw{color:#fff;background:#222;padding:1px 3px;border-radius:2px;font-size:9px}
+.fg{color:#00c000;font-weight:700}
+.fb{color:#00aaff;font-weight:700}
+.fam{color:#888;font-size:9px}
+
+/* Arrow connector */
+.arr{color:#94a3b8;font-size:11px}
+.par{color:#9333ea;font-size:10px;font-style:italic}
+
+/* Phase FMA table specific */
+.fma-col1{color:#ffffff;background:#1e293b;padding:1px 3px;border-radius:2px;font-size:9px;font-weight:700}
+.fma-col2{color:#4ade80;font-weight:700;font-size:10px}
+.fma-col2b{color:#60a5fa;font-weight:700;font-size:10px}
+.fma-col3{color:#4ade80;font-weight:700;font-size:10px}
+.fma-col3b{color:#60a5fa;font-weight:700;font-size:10px}
+.fma-cue{color:#fff;font-style:italic;font-size:9px}
+</style>
+</head><body>
+<h1>ENG1 FIRE after V1 — Workbook V2</h1>
+<div class="meta">Updated: 2026-05-29 · Branch: feat/hyd-panel-next · Baseline: eng1-fire-after-v1.ts</div>
+<div class="meta">13 phases · 39 steps · 12 ATC distractions · FCOM DSC-22-30 FMA sequence complete</div>
+
+<div class="note">
+<strong>Legend — Category bands:</strong>
+<span class="chip chip-av">AV</span> AVIATE &nbsp;
+<span class="chip chip-ec">EC</span> ECAM &nbsp;
+<span class="chip chip-gl">GL</span> GLARESHIELD &nbsp;
+<span class="chip chip-at">AT</span> ATC/COMMS &nbsp;
+<span class="chip chip-st">ST</span> STATUS/CHKLM &nbsp;
+<span class="chip chip-pl">PL</span> PLAN &nbsp;
+<span class="chip chip-ap">AP</span> APPROACH &nbsp; | &nbsp;
+<strong>FMA:</strong> <code>col1|col2|col3</code> · <code>▾</code>=armed(blue) · <code>↑MCT</code>=LVR MCT flash(white) · <code>MAN TOGA</code>=white/manual · <code>MCT</code>=THR MCT green
+</div>
+
+<div class="toolbar">
+  <button onclick="saveLocal()">Save Local</button>
+  <button onclick="loadLocal()">Load Local</button>
+  <button onclick="clearLocal()">Clear Local</button>
+  <button onclick="exportJson()">Export JSON</button>
+  <button onclick="importJson()">Import JSON</button>
+  <button onclick="exportHtml()">Export HTML</button>
+  <span class="small" id="status">Ready</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 0 — PROCEDURE SEQUENCE FLOW
+     ═══════════════════════════════════════════════════════════════ -->
+<h2>0) Procedure Sequence Flow</h2>
+<div class="note" style="font-size:11px">
+  <strong>Seq Flow →</strong> Each row shows the step SHORT CODE, category, crew, what UNLOCKS it (gate), the FMA state at execution time, any concurrent ATC event, and editable fields.<br>
+  Parallel tracks: after ENGINE SECURED — <span style="color:#7c3aed">MAYD track (PM comms)</span> runs alongside <span style="color:#0d9488">MAA/ACCEL/MCT track (PF aviate)</span>.
+</div>
+<div class="tbl"><table>
+<thead><tr>
+  <th style="width:5%">Code</th>
+  <th style="width:3%">Cat</th>
+  <th style="width:3%">Crew</th>
+  <th style="width:11%">Gate (requires)</th>
+  <th style="width:15%">FMA at execution</th>
+  <th style="width:14%">Concurrent ATC</th>
+  <th style="width:19%">Current Description</th>
+  <th style="width:15%">Proposed Change</th>
+  <th style="width:7%">Flag</th>
+  <th style="width:8%">Step ID</th>
+</tr></thead>
+<tbody>
+
+<!-- ── AVIATE ── -->
+<tr class="cat-av"><td><span class="chip chip-av">CONT</span></td><td>AV</td><td>PF</td>
+  <td>none (fire fires at T+8s)</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fb">SRS▾</span> | <span class="fb">NAV▾</span><br><span class="fam">(armed, on ground)</span></td>
+  <td>—</td>
+  <td>PF maintains rotation at V2+10. Do NOT reduce thrust. Follow FD/SRS.</td>
+  <td class="ed" contenteditable="true" data-key="sf-cont-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-cont-flag"></td>
+  <td><code>continue_rotation</code></td></tr>
+
+<tr class="cat-av"><td><span class="chip chip-av">GU</span></td><td>AV</td><td>PM/PF</td>
+  <td>CONT</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">NAV</span><br><span class="fam">(active, airborne)</span></td>
+  <td>⚠ <em>TOWER HANDOFF fires ~T+27s</em> → STBY expected</td>
+  <td>PM calls 'POSITIVE CLIMB'. PF: 'GEAR UP'. PM selects gear lever UP.</td>
+  <td class="ed" contenteditable="true" data-key="sf-gu-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-gu-flag"></td>
+  <td><code>positive_rate_gear_up</code></td></tr>
+
+<tr class="cat-av"><td><span class="chip chip-av">AP1</span></td><td>AV</td><td>PF</td>
+  <td>GU</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">NAV</span><br><span class="fam">(~100 ft, AP1 engaged)</span></td>
+  <td>STBY (handoff active)</td>
+  <td>PF engages AP1 at ~100 ft. Reads FMA aloud: MAN TOGA — SRS — NAV — AP1.</td>
+  <td class="ed" contenteditable="true" data-key="sf-ap1-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-ap1-flag"></td>
+  <td><code>engage_ap_fma</code></td></tr>
+
+<tr class="cat-gl"><td><span class="chip chip-gl">MWC</span></td><td>GL</td><td>PM</td>
+  <td>(any time, hw)</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">NAV</span><br><span class="fam">(~120 ft)</span></td>
+  <td>—</td>
+  <td>PM pushes MASTER WARN glareshield light — silences CRC. No ECAM action yet.</td>
+  <td class="ed" contenteditable="true" data-key="sf-mwc-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-mwc-flag"></td>
+  <td><code>cancel_master_warn</code></td></tr>
+
+<tr class="cat-av"><td><span class="chip chip-av">400</span></td><td>AV</td><td>PM</td>
+  <td>AP1 + MWC</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span><br><span class="fam">(400 ft, PF selects TRK)</span></td>
+  <td>—</td>
+  <td>PM: 'AVIATE COMPLETE — NAVIGATE SID/EO.' PF orders 'ECAM ACTIONS'. PF selects RWY TRK at 400 ft.</td>
+  <td class="ed" contenteditable="true" data-key="sf-400-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-400-flag"></td>
+  <td><code>four_hundred_ft_cmd</code></td></tr>
+
+<!-- ── ECAM ── -->
+<tr class="cat-ec"><td><span class="chip chip-ec">THR</span></td><td>EC</td><td>PM</td>
+  <td>400</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span><br><span class="fam">(~600 ft)</span></td>
+  <td>—</td>
+  <td>ECAM Step 1: PM retards ENG 1 THR lever → IDLE.</td>
+  <td class="ed" contenteditable="true" data-key="sf-thr-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-thr-flag"></td>
+  <td><code>thr_lever_idle</code></td></tr>
+
+<tr class="cat-ec"><td><span class="chip chip-ec">MSTR</span></td><td>EC</td><td>PM</td>
+  <td>THR</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>ECAM Step 2: PM 'ENG 1 MASTER CONFIRM OFF?' → PF 'CONFIRM' → PM sets OFF.</td>
+  <td class="ed" contenteditable="true" data-key="sf-mstr-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-mstr-flag"></td>
+  <td><code>eng1_master_off</code></td></tr>
+
+<tr class="cat-ec"><td><span class="chip chip-ec">FIRE</span></td><td>EC</td><td>PM</td>
+  <td>MSTR</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span><br><span class="fam">(~750 ft)</span></td>
+  <td>—</td>
+  <td>ECAM Step 3: 'ENG 1 FIRE P/B CONFIRM PUSH?' → CONFIRM → push. Arms squibs, closes HYD/bleed SOV, cuts IDG.</td>
+  <td class="ed" contenteditable="true" data-key="sf-fire-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-fire-flag"></td>
+  <td><code>eng1_fire_pb</code></td></tr>
+
+<tr class="cat-gl"><td><span class="chip chip-gl">MCC</span></td><td>GL</td><td>PM</td>
+  <td>(hw, after FIRE pb)</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>PM pushes MASTER CAUT light — silences SC chime from secondary cautions (HYD/ELEC/AIR).</td>
+  <td class="ed" contenteditable="true" data-key="sf-mcc-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-mcc-flag"></td>
+  <td><code>cancel_master_caut</code></td></tr>
+
+<tr class="cat-ec"><td><span class="chip chip-ec">AGT1</span></td><td>EC</td><td>PM</td>
+  <td>FIRE</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span><br><span class="fam">(~1050 ft, 10s after FIRE)</span></td>
+  <td>—</td>
+  <td>ECAM Step 4: AGENT 1 DISCH — wait 10 s for N1 decay, then discharge.</td>
+  <td class="ed" contenteditable="true" data-key="sf-agt1-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-agt1-flag"></td>
+  <td><code>agent1</code></td></tr>
+
+<tr class="cat-ec"><td><span class="chip chip-ec">AGT2</span></td><td>EC</td><td>PM</td>
+  <td>AGT1 + fire_persists_30s</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span><br><span class="fam">(conditional)</span></td>
+  <td>—</td>
+  <td>ECAM Step 5 (conditional): if FIRE WARN persists 30 s after AGT1 → discharge AGENT 2. Last bottle.</td>
+  <td class="ed" contenteditable="true" data-key="sf-agt2-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-agt2-flag"></td>
+  <td><code>agent2</code></td></tr>
+
+<tr class="cat-ec"><td><span class="chip chip-ec">SEC</span></td><td>EC</td><td>PM</td>
+  <td>AGT1 + fire_extinguished</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span><br><span class="fam">(~1450 ft)</span></td>
+  <td>—</td>
+  <td>PM announces 'ENGINE SECURED — PRIMARY ECAM ACTIONS COMPLETE'. PF acknowledges.</td>
+  <td class="ed" contenteditable="true" data-key="sf-sec-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-sec-flag"></td>
+  <td><code>engine_secured</code></td></tr>
+
+<!-- ── PARALLEL SPLIT: MAYD track (comms) || MAA track (aviate) ── -->
+<tr><td colspan="10" style="background:#f8f0ff;text-align:center;font-size:11px;color:#7c3aed;font-style:italic;padding:4px">
+  ↙ PARALLEL SPLIT after SEC ↙ &nbsp;|&nbsp; Left track: LAND → MAYD → ATC sequence (PM comms) &nbsp;|&nbsp; Right track: MAA → ACCEL → MCT (PF aviate)
+</td></tr>
+
+<!-- ── COMMS TRACK ── -->
+<tr class="cat-at"><td><span class="chip chip-ec">LAND</span></td><td>EC</td><td>PF</td>
+  <td>SEC</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>PF announces 'LAND ASAP' (red on ECAM). Commits to return VIDP. Cue to declare MAYDAY.</td>
+  <td class="ed" contenteditable="true" data-key="sf-land-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-land-flag"></td>
+  <td><code>announce_land_asap</code></td></tr>
+
+<tr class="cat-at"><td><span class="chip chip-at">MAYD</span></td><td>AT</td><td>PM</td>
+  <td>LAND</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">SRS</span> | <span class="fg">RWY TRK</span></td>
+  <td>① radar contact → MAYDAY call<br>② DEP ack → crew readback<br>③ climb 4000 → crew readback</td>
+  <td>PM declares: 'MAYDAY ×3, IFLY101, engine fire ENG 1, maintaining runway track, climbing 3000 ft, STANDBY.'</td>
+  <td class="ed" contenteditable="true" data-key="sf-mayd-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-mayd-flag"></td>
+  <td><code>mayday_atc</code></td></tr>
+
+<!-- ── AVIATE TRACK ── -->
+<tr class="cat-av"><td><span class="chip chip-av">MAA</span></td><td>AV</td><td>PF</td>
+  <td>SEC (parallel to MAYD)</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">V/S=0</span> | <span class="fg">RWY TRK</span><br><span class="fam">(~2300 ft, PF pushes V/S)</span></td>
+  <td>—</td>
+  <td>PF pushes V/S knob at MAA (~2300 ft AMSL). FMA: SRS → V/S=0. No LVR MCT yet — flaps retracting.</td>
+  <td class="ed" contenteditable="true" data-key="sf-maa-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-maa-flag"></td>
+  <td><code>level_off_maa</code></td></tr>
+
+<tr class="cat-av"><td><span class="chip chip-av">ACCL</span></td><td>AV</td><td>PF</td>
+  <td>MAA</td>
+  <td class="fma"><span class="fw">MAN TOGA</span> | <span class="fg">V/S=0</span> | <span class="fg">RWY TRK</span><br><span class="fam">(F speed → S speed → Flap 0)</span></td>
+  <td>—</td>
+  <td>PF calls 'FLAPS 1' at F speed, 'FLAPS UP' at S speed. PM checks, repeats, selects. Accel toward green dot.</td>
+  <td class="ed" contenteditable="true" data-key="sf-accl-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-accl-flag"></td>
+  <td><code>accel_clean</code></td></tr>
+
+<tr class="cat-av"><td><span class="chip chip-av">MCT</span></td><td>AV</td><td>PF</td>
+  <td>ACCL</td>
+  <td class="fma"><span class="fw">MAN TOGA</span><span class="fam"> + </span><span class="fw">↑LVR MCT</span> | <span class="fg">V/S=0</span> | <span class="fg">RWY TRK</span><br><span class="fam">→ becomes: </span><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>At green dot + CONFIG CLEAN: LVR MCT flashes white (FCOM DSC-22-20-60-40). PF pulls ALT → OP CLB. PF sets MCT → THR MCT.</td>
+  <td class="ed" contenteditable="true" data-key="sf-mct-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-mct-flag"></td>
+  <td><code>mct_open_clb</code></td></tr>
+
+<!-- ── REJOIN ── -->
+<tr><td colspan="10" style="background:#f0fdf4;text-align:center;font-size:11px;color:#16a34a;font-style:italic;padding:4px">
+  ↗ TRACKS REJOIN: MAYD complete + MCT/OP CLB established → STATUS / CHECKLIST sequence ↗
+</td></tr>
+
+<!-- ── STATUS / CHECKLISTS ── -->
+<tr class="cat-st"><td><span class="chip chip-st">SECF</span></td><td>ST</td><td>PM</td>
+  <td>MAYD</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>④ DEP: 'vectors available when ready' → crew: 'continuing checklist, STBY'</td>
+  <td>PM reads secondary failures aloud from SD: HYD G ENG1 pump LO PR, GEN 1 FAULT, ENG 1 BLEED FAULT. PF cross-checks.</td>
+  <td class="ed" contenteditable="true" data-key="sf-secf-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-secf-flag"></td>
+  <td><code>announce_sec_failures</code></td></tr>
+
+<tr class="cat-st"><td><span class="chip chip-st">STAT</span></td><td>ST</td><td>PM</td>
+  <td>SECF</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>PM announces 'STATUS' when STATUS page appears on ECAM.</td>
+  <td class="ed" contenteditable="true" data-key="sf-stat-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-stat-flag"></td>
+  <td><code>announce_status</code></td></tr>
+
+<tr class="cat-st"><td><span class="chip chip-st">STOP</span></td><td>ST</td><td>PF</td>
+  <td>STAT</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>PF orders 'STOP ECAM'. PM stops ECAM actions. Normal checklist + OEB before reading STATUS.</td>
+  <td class="ed" contenteditable="true" data-key="sf-stop-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-stop-flag"></td>
+  <td><code>stop_ecam</code></td></tr>
+
+<tr class="cat-st"><td><span class="chip chip-st">ATCL</span></td><td>ST</td><td>PM</td>
+  <td>STOP</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>PF calls for After Takeoff CL. PM runs checklist — note PACK 1 FAULT, GEN 1 INOP items N/A or complete.</td>
+  <td class="ed" contenteditable="true" data-key="sf-atcl-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-atcl-flag"></td>
+  <td><code>after_takeoff_cl</code></td></tr>
+
+<tr class="cat-st"><td><span class="chip chip-st">OEB</span></td><td>ST</td><td>PF</td>
+  <td>ATCL</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>PF: 'Any OEB? Any COMPUTER RESETS?' — PM checks QRH table. If none: 'NO APPLICABLE OEB OR RESET.'</td>
+  <td class="ed" contenteditable="true" data-key="sf-oeb-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-oeb-flag"></td>
+  <td><code>oeb_check</code></td></tr>
+
+<tr class="cat-st"><td><span class="chip chip-st">RSTS</span></td><td>ST</td><td>PF</td>
+  <td>OEB</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>PF: 'READ STATUS'. PM reads STATUS page aloud. PF: 'CHECKED' after each item.</td>
+  <td class="ed" contenteditable="true" data-key="sf-rsts-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-rsts-flag"></td>
+  <td><code>read_status</code></td></tr>
+
+<tr class="cat-st"><td><span class="chip chip-st">SRDA</span></td><td>ST</td><td>PM</td>
+  <td>RSTS</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>PM reads STATUS items: ENG1 SHUT DOWN · APPR CAT1 · HYD G LO PR · GEN1 INOP · ENG1 BLEED · LDG DIST · MAX FL250.</td>
+  <td class="ed" contenteditable="true" data-key="sf-srda-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-srda-flag"></td>
+  <td><code>status_read_aloud</code></td></tr>
+
+<tr class="cat-st"><td><span class="chip chip-st">XCK</span></td><td>ST</td><td>PM</td>
+  <td>SRDA</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>—</td>
+  <td>PM: 'ECAM ACTIONS COMPLETE.' PF acknowledges. All primary + secondary + STATUS actions done.</td>
+  <td class="ed" contenteditable="true" data-key="sf-xck-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-xck-flag"></td>
+  <td><code>crew_crosscheck</code></td></tr>
+
+<!-- ── PLAN ── -->
+<tr class="cat-pl"><td><span class="chip chip-pl">WX</span></td><td>PL</td><td>PM</td>
+  <td>XCK</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">OP CLB</span> | <span class="fg">RWY TRK</span></td>
+  <td>⑤ APPR: 'advise requirements' → crew: 'request latest weather'<br>⑥ APPR delivers weather → crew readback</td>
+  <td>PM requests latest Delhi weather from Approach: wind, QNH, temp, vis, RVR, runway in use.</td>
+  <td class="ed" contenteditable="true" data-key="sf-wx-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-wx-flag"></td>
+  <td><code>wx_request</code></td></tr>
+
+<tr class="cat-pl"><td><span class="chip chip-pl">PERF</span></td><td>PL</td><td>PF</td>
+  <td>WX</td>
+  <td class="fma"><span class="fg">THR MCT</span> | <span class="fg">ALT*</span> | <span class="fg">RWY TRK</span><br><span class="fam">(*or OP CLB/managed)</span></td>
+  <td>⑦ APPR: 'POB, fuel, assistance?' → 186 POB · 8.4t · FULL CFR</td>
+  <td>SE approach Vapp+5 kt. RWY 28 LDA 4430 m, factored SE dist ~2200 m — ADEQUATE. Set Vapp + LW on MCDU.</td>
+  <td class="ed" contenteditable="true" data-key="sf-perf-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-perf-flag"></td>
+  <td><code>ldg_perf</code></td></tr>
+
+<tr class="cat-pl"><td><span class="chip chip-pl">FORD</span></td><td>PL</td><td>PF</td>
+  <td>PERF</td>
+  <td class="fma"><span class="fam">managed alt segment</span></td>
+  <td>—</td>
+  <td>PF leads FORDEC. F-O-R-D-E-C. Decision: LAND ASAP — return VIDP RWY 28, full CFR. PM confirms.</td>
+  <td class="ed" contenteditable="true" data-key="sf-ford-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-ford-flag"></td>
+  <td><code>fordec</code></td></tr>
+
+<!-- FORD splits into INTC + FMGC + NIS in parallel -->
+<tr><td colspan="10" style="background:#f5f3ff;text-align:center;font-size:11px;color:#7c3aed;font-style:italic;padding:4px">
+  ↙ After FORD: INTC (PM→ATC) · FMGC (PM) · NIS→PAX→COMP (comms) — run in parallel ↙
+</td></tr>
+
+<tr class="cat-at"><td><span class="chip chip-at">INTC</span></td><td>AT</td><td>PM</td>
+  <td>FORD</td>
+  <td class="fma"><span class="fam">managed</span></td>
+  <td>⑤ APPR: 'advise requirements' fires here</td>
+  <td>PM advises ATC of FORDEC outcome: 'IFLY101, returning VIDP RWY 28, will advise when ready for approach.'</td>
+  <td class="ed" contenteditable="true" data-key="sf-intc-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-intc-flag"></td>
+  <td><code>intention_to_atc</code></td></tr>
+
+<tr class="cat-pl"><td><span class="chip chip-pl">FMGC</span></td><td>PL</td><td>PM</td>
+  <td>FORD</td>
+  <td class="fma"><span class="fam">managed</span></td>
+  <td>—</td>
+  <td>PM enters VIDP in DEST, selects RWY 28, inserts ILS 110.30 / CRS 282. Sets Vapp = Vref+5 kt SE. PF confirms.</td>
+  <td class="ed" contenteditable="true" data-key="sf-fmgc-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-fmgc-flag"></td>
+  <td><code>fmgc_prep</code></td></tr>
+
+<tr class="cat-pl"><td><span class="chip chip-pl">NIS</span></td><td>PL</td><td>PM</td>
+  <td>FORD</td>
+  <td class="fma"><span class="fam">managed</span></td>
+  <td>—</td>
+  <td>Interphone to SCCM — NATURE / INTENTIONS / TIME (~15 min) / SPECIAL per FCTM.</td>
+  <td class="ed" contenteditable="true" data-key="sf-nis-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-nis-flag"></td>
+  <td><code>nis_brief</code></td></tr>
+
+<tr class="cat-pl"><td><span class="chip chip-pl">PAX</span></td><td>PL</td><td>PF</td>
+  <td>NIS</td>
+  <td class="fma"><span class="fam">managed</span></td>
+  <td>—</td>
+  <td>Captain PA: 'Ladies and gentlemen, we are returning to Delhi as a precaution. Remain seated, seatbelts fastened.'</td>
+  <td class="ed" contenteditable="true" data-key="sf-pax-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-pax-flag"></td>
+  <td><code>pax_pa</code></td></tr>
+
+<tr class="cat-pl"><td><span class="chip chip-pl">COMP</span></td><td>PL</td><td>PM</td>
+  <td>PAX (optional)</td>
+  <td class="fma"><span class="fam">managed</span></td>
+  <td>—</td>
+  <td>OPTIONAL: ACARS/VHF to OPS — MAYDAY declared, ENG 1 FIRE, returning VIDP, request CFR + ground support.</td>
+  <td class="ed" contenteditable="true" data-key="sf-comp-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-comp-flag"></td>
+  <td><code>company_notify</code></td></tr>
+
+<!-- ── APPROACH ── -->
+<tr class="cat-ap"><td><span class="chip chip-ap">PREP</span></td><td>AP</td><td>PM</td>
+  <td>FMGC</td>
+  <td class="fma"><span class="fam">managed/vectors</span></td>
+  <td>⑨ APPR: 'advise when ready for approach' → crew: 'IFLY101 ready, request vectors ILS 28'</td>
+  <td>PM sets ILS RWY 28 110.30 / CRS 282. BARO minima 200 ft. Autobrake MED. Spoilers ARM. Landing lights ON.</td>
+  <td class="ed" contenteditable="true" data-key="sf-prep-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-prep-flag"></td>
+  <td><code>approach_prep</code></td></tr>
+
+<tr class="cat-ap"><td><span class="chip chip-ap">AES</span></td><td>AP</td><td>PM</td>
+  <td>PREP</td>
+  <td class="fma"><span class="fam">managed/vectors</span></td>
+  <td>⑧ APPR: 'CFR CAT3 confirmed' → crew readback</td>
+  <td>PM advises ATC: 'Request CAT3 emergency services RWY 28 — CFR, ambulances, medical standby.'</td>
+  <td class="ed" contenteditable="true" data-key="sf-aes-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-aes-flag"></td>
+  <td><code>atc_emergency_services</code></td></tr>
+
+<tr class="cat-ap"><td><span class="chip chip-ap">BREF</span></td><td>AP</td><td>PF</td>
+  <td>AES</td>
+  <td class="fma"><span class="fam">vectors/ILS</span></td>
+  <td>⑩ APPR: 'Hdg 240 / 3000 ft / cleared ILS 28 / Tower 118.10' → crew full readback</td>
+  <td>PF briefs: ILS RWY 28 VIDP, OEI CAT1. DA 200 ft. Vapp+5 kt. STATUS items: APPR CAT1 / HYD / GEN. GA briefed.</td>
+  <td class="ed" contenteditable="true" data-key="sf-bref-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-bref-flag"></td>
+  <td><code>approach_brief</code></td></tr>
+
+<tr class="cat-ap"><td><span class="chip chip-ap">GAR</span></td><td>AP</td><td>PF</td>
+  <td>BREF</td>
+  <td class="fma"><span class="fam">ILS intercept</span></td>
+  <td>—</td>
+  <td>PF briefs GA plan (TOGA ENG2 only, SRS, GEAR UP, V2+10) and confirms fuel vs DEST+ALTN+FINAL.</td>
+  <td class="ed" contenteditable="true" data-key="sf-gar-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-gar-flag"></td>
+  <td><code>go_around_review</code></td></tr>
+
+<tr class="cat-ap"><td><span class="chip chip-ap">APPCL</span></td><td>AP</td><td>PM</td>
+  <td>GAR</td>
+  <td class="fma"><span class="fam">ILS / LOC·G/S</span></td>
+  <td>⑪ TOWER: 'continue ILS 28, report established' → crew readback</td>
+  <td>PM runs approach checklist. OEI technique: no early gear down (high power); rudder trim reset; autoland available.</td>
+  <td class="ed" contenteditable="true" data-key="sf-appcl-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-appcl-flag"></td>
+  <td><code>approach_cl</code></td></tr>
+
+<tr class="cat-ap"><td><span class="chip chip-ap">LNDCL</span></td><td>AP</td><td>PM</td>
+  <td>APPCL</td>
+  <td class="fma"><span class="fam">LOC·G/S (1000 ft)</span></td>
+  <td>⑫ TOWER: 'RWY 28 cleared to land, CFR in position' → crew readback</td>
+  <td>PM runs landing checklist at 1000 ft final: GEAR DN 3 GRN · FLAPS FULL · SPOILERS ARM · AUTOBRAKE MED.</td>
+  <td class="ed" contenteditable="true" data-key="sf-lndcl-new"></td>
+  <td class="ed" contenteditable="true" data-key="sf-lndcl-flag"></td>
+  <td><code>landing_cl</code></td></tr>
+
+</tbody></table></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 1 — PHASE FMA TIMELINE (13 phases)
+     ═══════════════════════════════════════════════════════════════ -->
+<h2>1) Phase FMA Timeline — 13 Phases (FCOM DSC-22-30)</h2>
+<div class="note" style="font-size:11px">
+  <strong>FMA Row layout (A320):</strong> Row 1 = Engaged (green) · Row 2 = Armed (blue) · Row 3 = Cue (white flash)<br>
+  <strong>White:</strong> MAN TOGA · LVR MCT (flash) &nbsp; <strong>Green:</strong> THR MCT · SRS · CLB · OP CLB · V/S=0 · NAV · RWY TRK &nbsp; <strong>Blue:</strong> SRS(arm) · NAV(arm)
+</div>
+<div class="tbl"><table>
+<thead><tr>
+  <th style="width:3%">#</th>
+  <th style="width:12%">Phase ID</th>
+  <th style="width:5%">atMs</th>
+  <th style="width:5%">Spd kt</th>
+  <th style="width:5%">Alt ft</th>
+  <th style="width:5%">V/S</th>
+  <th style="width:20%">FMA Col1 / Col2 / Col3</th>
+  <th style="width:5%">Row2 Armed</th>
+  <th style="width:4%">AP1</th>
+  <th style="width:4%">A/THR</th>
+  <th style="width:10%">ND mode/range</th>
+  <th style="width:12%">Key change at this phase</th>
+  <th style="width:10%">Proposed</th>
+</tr></thead>
+<tbody>
+<tr><td>1</td><td>v1_passed</td>
+  <td class="ed" contenteditable="true" data-key="ph-1-atMs">6000</td>
+  <td class="ed" contenteditable="true" data-key="ph-1-spd">145</td>
+  <td class="ed" contenteditable="true" data-key="ph-1-alt">0</td>
+  <td class="ed" contenteditable="true" data-key="ph-1-vs">0</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fb">SRS▾</span> / <span class="fb">NAV▾</span></td>
+  <td><span class="fb">SRS · NAV</span> (blue, armed)</td>
+  <td>—</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-1-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-1-chg">V1 passed — both engines TOGA — ground roll</td>
+  <td class="ed" contenteditable="true" data-key="ph-1-prop"></td></tr>
+
+<tr><td>2</td><td>fire_detected</td>
+  <td class="ed" contenteditable="true" data-key="ph-2-atMs">8000</td>
+  <td class="ed" contenteditable="true" data-key="ph-2-spd">147</td>
+  <td class="ed" contenteditable="true" data-key="ph-2-alt">0</td>
+  <td class="ed" contenteditable="true" data-key="ph-2-vs">0</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fb">SRS▾</span> / <span class="fb">NAV▾</span></td>
+  <td><span class="fb">SRS · NAV</span></td>
+  <td>—</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-2-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-2-chg">MASTER WARN · CRC · ENG1 FIRE detected</td>
+  <td class="ed" contenteditable="true" data-key="ph-2-prop"></td></tr>
+
+<tr><td>3</td><td>rotation</td>
+  <td class="ed" contenteditable="true" data-key="ph-3-atMs">10000</td>
+  <td class="ed" contenteditable="true" data-key="ph-3-spd">152</td>
+  <td class="ed" contenteditable="true" data-key="ph-3-alt">50</td>
+  <td class="ed" contenteditable="true" data-key="ph-3-vs">900</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fg">SRS</span> / <span class="fg">NAV</span></td>
+  <td><span class="fb">CLB</span> (armed)</td>
+  <td>—</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-3-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-3-chg">Rotation — SRS/NAV now active (green). Gear UP.</td>
+  <td class="ed" contenteditable="true" data-key="ph-3-prop"></td></tr>
+
+<tr><td>4</td><td>gear_up_ap1</td>
+  <td class="ed" contenteditable="true" data-key="ph-4-atMs">14000</td>
+  <td class="ed" contenteditable="true" data-key="ph-4-spd">163</td>
+  <td class="ed" contenteditable="true" data-key="ph-4-alt">120</td>
+  <td class="ed" contenteditable="true" data-key="ph-4-vs">1900</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fg">SRS</span> / <span class="fg">NAV</span></td>
+  <td><span class="fb">CLB</span> (armed)</td>
+  <td>AP1✓</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-4-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-4-chg">AP1 engaged ~100ft. NAV active — below 400ft, RWY TRK NOT yet selected.</td>
+  <td class="ed" contenteditable="true" data-key="ph-4-prop"></td></tr>
+
+<tr><td>5</td><td>ecam_actions_start</td>
+  <td class="ed" contenteditable="true" data-key="ph-5-atMs">18000</td>
+  <td class="ed" contenteditable="true" data-key="ph-5-spd">170</td>
+  <td class="ed" contenteditable="true" data-key="ph-5-alt">400</td>
+  <td class="ed" contenteditable="true" data-key="ph-5-vs">2000</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fg">SRS</span> / <span class="fg">RWY TRK</span></td>
+  <td><span class="fb">CLB</span> (armed)</td>
+  <td>AP1✓</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-5-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-5-chg">400 ft — PF selects RWY TRK. ECAM actions begin.</td>
+  <td class="ed" contenteditable="true" data-key="ph-5-prop"></td></tr>
+
+<tr><td>6</td><td>ecam_thr_master_off</td>
+  <td class="ed" contenteditable="true" data-key="ph-6-atMs">22000</td>
+  <td class="ed" contenteditable="true" data-key="ph-6-spd">178</td>
+  <td class="ed" contenteditable="true" data-key="ph-6-alt">600</td>
+  <td class="ed" contenteditable="true" data-key="ph-6-vs">2000</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fg">SRS</span> / <span class="fg">RWY TRK</span></td>
+  <td><span class="fb">CLB</span></td>
+  <td>AP1✓</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-6-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-6-chg">THR IDLE + MASTER OFF. N1 decaying.</td>
+  <td class="ed" contenteditable="true" data-key="ph-6-prop"></td></tr>
+
+<tr><td>7</td><td>fire_pb_pushed</td>
+  <td class="ed" contenteditable="true" data-key="ph-7-atMs">26000</td>
+  <td class="ed" contenteditable="true" data-key="ph-7-spd">185</td>
+  <td class="ed" contenteditable="true" data-key="ph-7-alt">750</td>
+  <td class="ed" contenteditable="true" data-key="ph-7-vs">1900</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fg">SRS</span> / <span class="fg">RWY TRK</span></td>
+  <td><span class="fb">CLB</span></td>
+  <td>AP1✓</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-7-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-7-chg">FIRE PB pushed — squibs armed · HYD/bleed/IDG isolated. SEC failures appear.</td>
+  <td class="ed" contenteditable="true" data-key="ph-7-prop"></td></tr>
+
+<tr><td>8</td><td>agent1_disch</td>
+  <td class="ed" contenteditable="true" data-key="ph-8-atMs">36000</td>
+  <td class="ed" contenteditable="true" data-key="ph-8-spd">195</td>
+  <td class="ed" contenteditable="true" data-key="ph-8-alt">1050</td>
+  <td class="ed" contenteditable="true" data-key="ph-8-vs">1800</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fg">SRS</span> / <span class="fg">RWY TRK</span></td>
+  <td><span class="fb">CLB</span></td>
+  <td>AP1✓</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-8-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-8-chg">AGENT 1 discharged — 10s after FIRE PB. 30s monitoring starts.</td>
+  <td class="ed" contenteditable="true" data-key="ph-8-prop"></td></tr>
+
+<tr><td>9</td><td>fire_extinguished_after_agent1</td>
+  <td class="ed" contenteditable="true" data-key="ph-9-atMs">41000</td>
+  <td class="ed" contenteditable="true" data-key="ph-9-spd">202</td>
+  <td class="ed" contenteditable="true" data-key="ph-9-alt">1250</td>
+  <td class="ed" contenteditable="true" data-key="ph-9-vs">1700</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fg">SRS</span> / <span class="fg">RWY TRK</span></td>
+  <td><span class="fb">CLB</span></td>
+  <td>AP1✓</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-9-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-9-chg">FIRE WARN extinguished — single bottle success. AGT2 not required.</td>
+  <td class="ed" contenteditable="true" data-key="ph-9-prop"></td></tr>
+
+<tr><td>10</td><td>engine_secured</td>
+  <td class="ed" contenteditable="true" data-key="ph-10-atMs">46000</td>
+  <td class="ed" contenteditable="true" data-key="ph-10-spd">208</td>
+  <td class="ed" contenteditable="true" data-key="ph-10-alt">1450</td>
+  <td class="ed" contenteditable="true" data-key="ph-10-vs">1650</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fg">SRS</span> / <span class="fg">RWY TRK</span></td>
+  <td><span class="fb">CLB</span></td>
+  <td>AP1✓</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-10-nd">ARC / 10nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-10-chg">ENGINE SECURED. PM announces. PF: LAND ASAP. Parallel: MAA + MAYD tracks begin.</td>
+  <td class="ed" contenteditable="true" data-key="ph-10-prop"></td></tr>
+
+<tr style="background:#fefce8"><td>11</td><td>accel_level_off</td>
+  <td class="ed" contenteditable="true" data-key="ph-11-atMs">58000</td>
+  <td class="ed" contenteditable="true" data-key="ph-11-spd">185</td>
+  <td class="ed" contenteditable="true" data-key="ph-11-alt">2300</td>
+  <td class="ed" contenteditable="true" data-key="ph-11-vs">0</td>
+  <td><span class="fw">MAN TOGA</span> / <span class="fg">V/S=0</span> / <span class="fg">RWY TRK</span></td>
+  <td>— (no arm)</td>
+  <td>AP1✓</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-11-nd">ARC / 20nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-11-chg">MAA: PF pushes V/S. SRS→V/S=0. NO LVR MCT yet — flaps retracting. F-speed → S-speed.</td>
+  <td class="ed" contenteditable="true" data-key="ph-11-prop"></td></tr>
+
+<tr style="background:#fefce8"><td>12</td><td>green_dot_lvr_mct</td>
+  <td class="ed" contenteditable="true" data-key="ph-12-atMs">65000</td>
+  <td class="ed" contenteditable="true" data-key="ph-12-spd">210</td>
+  <td class="ed" contenteditable="true" data-key="ph-12-alt">2300</td>
+  <td class="ed" contenteditable="true" data-key="ph-12-vs">0</td>
+  <td><span class="fw">MAN TOGA</span> + <span style="color:#fff;background:#444;padding:1px 3px;border-radius:2px;font-size:9px">↑LVR MCT</span> / <span class="fg">V/S=0</span> / <span class="fg">RWY TRK</span></td>
+  <td>LVR MCT flashing (white, row 3 col1)</td>
+  <td>AP1✓</td><td>—</td>
+  <td class="ed" contenteditable="true" data-key="ph-12-nd">ARC / 20nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-12-chg">Green dot + CONFIG CLEAN. FCOM DSC-22-20-60-40: LVR MCT flashes white. Pull ALT → OP CLB, set MCT.</td>
+  <td class="ed" contenteditable="true" data-key="ph-12-prop"></td></tr>
+
+<tr style="background:#f0fdf4"><td>13</td><td>op_clb_climb</td>
+  <td class="ed" contenteditable="true" data-key="ph-13-atMs">70000</td>
+  <td class="ed" contenteditable="true" data-key="ph-13-spd">215</td>
+  <td class="ed" contenteditable="true" data-key="ph-13-alt">2500</td>
+  <td class="ed" contenteditable="true" data-key="ph-13-vs">700</td>
+  <td><span class="fg">THR MCT</span> / <span class="fg">OP CLB</span> / <span class="fg">RWY TRK</span></td>
+  <td>— (all active)</td>
+  <td>AP1✓</td><td>A/THR✓</td>
+  <td class="ed" contenteditable="true" data-key="ph-13-nd">ARC / 20nm</td>
+  <td class="ed" contenteditable="true" data-key="ph-13-chg">MCT set + ALT pulled. A/THR active. Final OEI takeoff segment. After T/O CL next.</td>
+  <td class="ed" contenteditable="true" data-key="ph-13-prop"></td></tr>
+
+</tbody></table></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 2 — ECAM TEXT MATRIX
+     ═══════════════════════════════════════════════════════════════ -->
+<h2>2) ECAM Text Matrix</h2>
+<div class="tbl"><table>
+<thead><tr><th style="width:5%">#</th><th style="width:15%">ECAM ID</th><th style="width:8%">Level</th><th style="width:38%">Current Text</th><th style="width:17%">Proposed New</th><th style="width:17%">Change Required</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>eng1_fire</td><td>warning</td><td>ENG 1 FIRE</td><td class="ed" contenteditable="true" data-key="ecam-0-new"></td><td class="ed" contenteditable="true" data-key="ecam-0-chg"></td></tr>
+<tr><td>2</td><td>ecam_thr</td><td>advisory</td><td>THR LEVER (ENG 1)......IDLE</td><td class="ed" contenteditable="true" data-key="ecam-1-new"></td><td class="ed" contenteditable="true" data-key="ecam-1-chg"></td></tr>
+<tr><td>3</td><td>ecam_master</td><td>advisory</td><td>ENG 1 MASTER...........OFF</td><td class="ed" contenteditable="true" data-key="ecam-2-new"></td><td class="ed" contenteditable="true" data-key="ecam-2-chg"></td></tr>
+<tr><td>4</td><td>ecam_fire_pb</td><td>advisory</td><td>ENG 1 FIRE P/B.........PUSH</td><td class="ed" contenteditable="true" data-key="ecam-3-new"></td><td class="ed" contenteditable="true" data-key="ecam-3-chg"></td></tr>
+<tr><td>5</td><td>ecam_agent1</td><td>advisory</td><td>AGENT 1 AFTER 10 S....DISCH</td><td class="ed" contenteditable="true" data-key="ecam-4-new"></td><td class="ed" contenteditable="true" data-key="ecam-4-chg"></td></tr>
+<tr><td>6</td><td>ecam_atc</td><td>advisory</td><td>ATC..................NOTIFY</td><td class="ed" contenteditable="true" data-key="ecam-5-new"></td><td class="ed" contenteditable="true" data-key="ecam-5-chg"></td></tr>
+<tr><td>7</td><td>ecam_if_persist</td><td>remark</td><td>·IF FIRE WARN AFTER 30 S:</td><td class="ed" contenteditable="true" data-key="ecam-6-new"></td><td class="ed" contenteditable="true" data-key="ecam-6-chg"></td></tr>
+<tr><td>8</td><td>ecam_agent2</td><td>advisory</td><td>  AGENT 2.............DISCH</td><td class="ed" contenteditable="true" data-key="ecam-7-new"></td><td class="ed" contenteditable="true" data-key="ecam-7-chg"></td></tr>
+<tr><td>9</td><td>land_asap</td><td>warning</td><td>LAND ASAP</td><td class="ed" contenteditable="true" data-key="ecam-8-new"></td><td class="ed" contenteditable="true" data-key="ecam-8-chg"></td></tr>
+<tr><td>10</td><td>ecam_400ft</td><td>advisory</td><td>400 FT — ECAM ACTIONS</td><td class="ed" contenteditable="true" data-key="ecam-9-new"></td><td class="ed" contenteditable="true" data-key="ecam-9-chg"></td></tr>
+<tr><td>11</td><td>sec_hyd</td><td>caution</td><td>* HYD</td><td class="ed" contenteditable="true" data-key="ecam-10-new"></td><td class="ed" contenteditable="true" data-key="ecam-10-chg"></td></tr>
+<tr><td>12</td><td>sec_elec</td><td>caution</td><td>* ELEC</td><td class="ed" contenteditable="true" data-key="ecam-11-new"></td><td class="ed" contenteditable="true" data-key="ecam-11-chg"></td></tr>
+<tr><td>13</td><td>sec_air_bleed</td><td>caution</td><td>* AIR BLEED</td><td class="ed" contenteditable="true" data-key="ecam-12-new"></td><td class="ed" contenteditable="true" data-key="ecam-12-chg"></td></tr>
+</tbody></table></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 3 — ATC COMMUNICATION MATRIX
+     ═══════════════════════════════════════════════════════════════ -->
+<h2>3) ATC Communication Matrix (12 distractions)</h2>
+<div class="tbl"><table>
+<thead><tr><th style="width:4%">#</th><th style="width:5%">Ref</th><th style="width:18%">Event ID</th><th style="width:7%">atMs floor</th><th style="width:15%">Real gate (requiresStep)</th><th style="width:8%">From</th><th style="width:31%">ATC Message</th><th style="width:12%">Proposed Change</th></tr></thead>
+<tbody>
+<tr><td>①</td><td>STBY</td><td>atc_handoff_to_departure</td><td>27,500</td><td>continue_rotation</td><td>DELHI TOWER</td><td class="pre">IFLY101, contact Delhi Departure 124.85.</td><td class="ed" contenteditable="true" data-key="atc-1-new"></td></tr>
+<tr><td>②</td><td>MAYD</td><td>atc_radar_contact_mayday</td><td>5,000</td><td>mayday_atc</td><td>DELHI DEPARTURE</td><td class="pre">IFLY101, Delhi Departure, radar contact.</td><td class="ed" contenteditable="true" data-key="atc-2-new"></td></tr>
+<tr><td>③</td><td>MAYD</td><td>atc_vectors_climb</td><td>15,000</td><td>mayday_atc</td><td>DELHI DEPARTURE</td><td class="pre">IFLY101, roger MAYDAY, radar contact, continue runway track, climb 4 000 feet.</td><td class="ed" contenteditable="true" data-key="atc-3-new"></td></tr>
+<tr><td>④</td><td>SECF</td><td>atc_vectors_when_ready</td><td>5,000</td><td>announce_sec_failures</td><td>DELHI DEPARTURE</td><td class="pre">IFLY101, vectors available when ready, no reported traffic.</td><td class="ed" contenteditable="true" data-key="atc-4-new"></td></tr>
+<tr><td>⑤</td><td>INTC</td><td>atc_info_request_prompt</td><td>5,000</td><td>intention_to_atc</td><td>DELHI APPROACH</td><td class="pre">IFLY101, Delhi Approach, advise any requirements for the approach and any assistance required.</td><td class="ed" contenteditable="true" data-key="atc-5-new"></td></tr>
+<tr><td>⑥</td><td>WX</td><td>atc_provides_briefing_info</td><td>5,000</td><td>wx_request</td><td>DELHI APPROACH</td><td class="pre">IFLY101, roger standby. … Delhi wind 280 at 8, runway 28 in use, NOTAMs nil significant, expect ILS runway 28.</td><td class="ed" contenteditable="true" data-key="atc-6-new"></td></tr>
+<tr><td>⑦</td><td>PERF</td><td>atc_pob_fuel_services</td><td>5,000</td><td>ldg_perf</td><td>DELHI APPROACH</td><td class="pre">IFLY101, say persons on board, fuel endurance, and assistance required.</td><td class="ed" contenteditable="true" data-key="atc-7-new"></td></tr>
+<tr><td>⑧</td><td>AES</td><td>atc_emergency_services_ack</td><td>5,000</td><td>atc_emergency_services</td><td>DELHI APPROACH</td><td class="pre">IFLY101, Roger, emergency services standing by runway 28, full CFR, Category 3 confirmed.</td><td class="ed" contenteditable="true" data-key="atc-8-new"></td></tr>
+<tr><td>⑨</td><td>PREP</td><td>atc_ready_for_approach</td><td>5,000</td><td>approach_prep</td><td>DELHI APPROACH</td><td class="pre">IFLY101, advise when ready for approach.</td><td class="ed" contenteditable="true" data-key="atc-9-new"></td></tr>
+<tr><td>⑩</td><td>BREF</td><td>atc_cleared_approach</td><td>5,000</td><td>approach_brief</td><td>DELHI APPROACH</td><td class="pre">IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 28 approach, contact Delhi Tower 118.10 when established.</td><td class="ed" contenteditable="true" data-key="atc-10-new"></td></tr>
+<tr><td>⑪</td><td>APPCL</td><td>atc_tower_contact</td><td>5,000</td><td>approach_cl</td><td>DELHI TOWER</td><td class="pre">IFLY101, Delhi Tower, continue ILS approach runway 28, report established.</td><td class="ed" contenteditable="true" data-key="atc-11-new"></td></tr>
+<tr><td>⑫</td><td>LNDCL</td><td>atc_cleared_to_land</td><td>5,000</td><td>landing_cl</td><td>DELHI TOWER</td><td class="pre">IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.</td><td class="ed" contenteditable="true" data-key="atc-12-new"></td></tr>
+</tbody></table></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 4 — TRIGGER TIMELINE
+     ═══════════════════════════════════════════════════════════════ -->
+<h2>4) Trigger Timeline</h2>
+<div class="tbl"><table>
+<thead><tr><th style="width:5%">#</th><th style="width:20%">Trigger ID</th><th style="width:8%">atMs</th><th style="width:45%">Description</th><th style="width:22%">Proposed Change</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>after_v1</td><td>6,000</td><td>V1 passed — committed to takeoff, rotation in progress</td><td class="ed" contenteditable="true" data-key="trig-1-new"></td></tr>
+<tr><td>2</td><td>fire_warn</td><td>8,000</td><td>ENG 1 FIRE — MASTER WARN, CRC, fire light on FIRE panel, ECAM ENG 1 FIRE red</td><td class="ed" contenteditable="true" data-key="trig-2-new"></td></tr>
+<tr><td>3</td><td>four_hundred_ft</td><td>18,000</td><td>400 ft AGL — PM announces 'ECAM ACTIONS', procedure begins</td><td class="ed" contenteditable="true" data-key="trig-3-new"></td></tr>
+<tr><td>4</td><td>min_accel_alt</td><td>55,000</td><td>Minimum Acceleration Altitude ~1500 ft AGL — informational marker only, no ECAM</td><td class="ed" contenteditable="true" data-key="trig-4-new"></td></tr>
+</tbody></table></div>
+
+
+<script>
+const STORAGE_KEY = 'eng1_fire_workbook_v2';
+const LEGACY = ['eng1_fire_essential_editable_v3'];
+
+function allEd() { return Array.from(document.querySelectorAll('[contenteditable="true"]')); }
+function setStatus(m) { const el = document.getElementById('status'); if (el) el.textContent = m; }
+function collect() {
+  const p = {};
+  allEd().forEach(td => { p[td.dataset.key] = td.innerText; });
+  return p;
+}
+function saveLocal(silent) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(collect()));
+  if (!silent) setStatus('Saved ' + new Date().toLocaleTimeString());
+}
+function loadLocal() {
+  const keys = [STORAGE_KEY].concat(LEGACY);
+  for (const k of keys) {
+    const raw = localStorage.getItem(k);
+    if (!raw) continue;
+    try {
+      const p = JSON.parse(raw);
+      if (p && typeof p === 'object') {
+        allEd().forEach(td => { if (p[td.dataset.key] !== undefined) td.innerText = p[td.dataset.key]; });
+        setStatus('Loaded from ' + k);
+        return;
+      }
+    } catch(e) {}
+  }
+  setStatus('No saved data found');
+}
+function clearLocal() {
+  [STORAGE_KEY].concat(LEGACY).forEach(k => localStorage.removeItem(k));
+  allEd().forEach(td => td.innerText = '');
+  setStatus('Cleared');
+}
+function exportHtml() {
+  saveLocal(true);
+  const clone = document.documentElement.cloneNode(true);
+  clone.querySelectorAll('[contenteditable="true"]').forEach(td => td.removeAttribute('contenteditable'));
+  const blob = new Blob(['<!doctype html>\n' + clone.outerHTML], { type: 'text/html' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'ENG1_FIRE_WORKBOOK_V2_EDITED.html'; a.click(); URL.revokeObjectURL(a.href);
+  setStatus('Exported HTML');
+}
+function exportJson() {
+  saveLocal(true);
+  const blob = new Blob([JSON.stringify(collect(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'ENG1_FIRE_WORKBOOK_V2_DATA.json'; a.click(); URL.revokeObjectURL(a.href);
+  setStatus('Exported JSON');
+}
+function importJson() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'application/json,.json';
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const p = JSON.parse(String(reader.result || '{}'));
+        if (!p || typeof p !== 'object') throw new Error();
+        allEd().forEach(td => { const v = p[td.dataset.key]; if (v != null) td.innerText = String(v); });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+        setStatus('Imported JSON');
+      } catch(e) { setStatus('Import failed — invalid JSON'); }
+    };
+    reader.readAsText(file);
+  });
+  input.click();
+}
+let _saveTimer = null;
+document.addEventListener('input', ev => {
+  if (ev.target && ev.target.matches && ev.target.matches('[contenteditable="true"]')) {
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => saveLocal(true), 600);
+  }
+});
+window.addEventListener('beforeunload', () => saveLocal(true));
+loadLocal();
+</script>
+</body></html>
