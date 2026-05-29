@@ -329,7 +329,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "announce_land_asap",
       label: "LAND ASAP",
       action: "ANNOUNCE",
-      hint: "PF announces 'LAND ASAP' (red on ECAM) — this is the cue to declare MAYDAY to ATC (next step). Crew commits to land at the nearest suitable airport with full emergency services. [fcom:L94604 RED LAND ASAP / abnormal-procs:L229-231]",
+      hint: "PF announces 'LAND ASAP' (red on ECAM) — cue to declare MAYDAY on current frequency. PM cross-checks that MAYDAY is the next call. [fcom:L94604 RED LAND ASAP / abnormal-procs:L229-231]",
       variant: "warning",
       crew: "PF",
       group: "chclm",
@@ -345,7 +345,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "mayday_atc",
       label: "MAYDAY",
       action: "DECLARE",
-      hint: "Call ATC: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' Brief — declare, state, standby. No intentions yet.",
+      hint: "Call on CURRENT frequency (Tower if handoff not yet accepted): 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' Brief — declare, state, standby. No intentions yet. ATC will acknowledge and hold for intentions; crew advises 'will advise intentions shortly' once workload eases.",
       variant: "warning",
       crew: "PM",
       group: "comms",
@@ -880,7 +880,7 @@ export const eng1FireAfterV1: Scenario = {
       standbyResurfaceMs: 25_000,
       choices: [
         // Correct — full readback of the clearance elements
-        { id: "a", label: "Continuing runway track, climbing 4 000, IFLY101",                correct: true  },
+        { id: "a", label: "Continuing runway track, climbing 4 000, will advise intentions shortly, IFLY101", correct: true  },
         // Wrong — premature intentions before workload eased
         { id: "b", label: "IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel", correct: false },
       ],
@@ -1653,6 +1653,11 @@ export const eng1FireAfterV1: Scenario = {
         items: ["FIRE panel — ENG 1 FIRE light still illuminated (red)"],
         notes: ["No overhead procedure action until 400 ft ECAM gate"],
       },
+      pfAction: {
+        label: "AP1 ENGAGE",
+        hint: "Press AP1 on FCU — then read FMA aloud: MAN TOGA — SRS — NAV — AP1",
+        coachMs: 6_000,
+      },
     },
 
     // ── PHASE 5 — 400 FT / ECAM ACTIONS START (T+18s) ──────────────────────
@@ -2047,6 +2052,11 @@ export const eng1FireAfterV1: Scenario = {
         items: ["No new overhead actions — all ENG FIRE panel items already completed"],
         notes: ["After Takeoff CL follows after MCT / OP CLB phase"],
       },
+      pfAction: {
+        label: "V/S ZERO",
+        hint: "Push V/S knob on FCU to level off — FMA col 2 changes SRS → V/S = 0",
+        coachMs: 8_000,
+      },
     },
 
     // ── PHASE 12 — GREEN DOT / LVR MCT FLASH (T+65s) ────────────────────────
@@ -2102,6 +2112,11 @@ export const eng1FireAfterV1: Scenario = {
         items: ["All fire panel actions complete"],
         notes: ["Next: PF pulls ALT knob → OP CLB engages → FMA changes to THR MCT / OP CLB"],
       },
+      pfAction: {
+        label: "LVR MCT → SET",
+        hint: "Move live engine lever to MCT detent — then pull ALT knob for OP CLB",
+        coachMs: 5_000,
+      },
     },
 
     // ── PHASE 13 — THR MCT / OP CLB — FINAL TAKEOFF SEGMENT (T+70s) ────────
@@ -2155,6 +2170,11 @@ export const eng1FireAfterV1: Scenario = {
       overhead: {
         items: ["All fire panel actions complete"],
         notes: ["Final takeoff segment — OEI climb at MCT to assigned altitude"],
+      },
+      pfAction: {
+        label: "OP CLB CONFIRM",
+        hint: "Pull ALT knob on FCU — FMA col 2: OP CLB (green). A/THR now active.",
+        coachMs: 5_000,
       },
     },
   ],

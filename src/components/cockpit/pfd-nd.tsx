@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
 import type { Scenario, ScenarioPhase } from "@/scenarios/types";
 import { defaultAircraftState, type AircraftState } from "@/avionics/core/aircraftState";
@@ -8,7 +8,7 @@ import { defaultAircraftState, type AircraftState } from "@/avionics/core/aircra
 // ENG 1 FIRE after V1 — scenario-phase flight model
 // Each completed step advances the aircraft to a physically accurate snapshot.
 // Values match FCTM OP-020 technique and FCOM SRS/CLB performance data for VIDP ISA.
-function getActiveScenarioPhase(scenario?: Scenario, elapsedMs?: number): ScenarioPhase | null {
+export function getActiveScenarioPhase(scenario?: Scenario, elapsedMs?: number): ScenarioPhase | null {
   if (!scenario?.phases?.length || elapsedMs == null) return null;
 
   let active: ScenarioPhase | null = null;
@@ -42,7 +42,8 @@ function buildAircraftStateFromPhase(phase: ScenarioPhase, s?: ScenarioState): A
     selectedAlt: pfd?.targetAltitude ?? defaultAircraftState.selectedAlt,
     selectedHdg: heading,
     apEngaged: !!(pfd?.ap1 || pfd?.ap2),
-    athrActive: pfd?.athr ?? defaultAircraftState.athrActive,
+    athrActive: pfd?.athr === true,
+    athrArmed:  pfd?.athr === false,
     thrMode: pfd?.fmaThrust ?? defaultAircraftState.thrMode,
     thrCue: pfd?.fmaThrCue,
     vertMode: pfd?.fmaPitch ?? defaultAircraftState.vertMode,
@@ -150,17 +151,101 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
   };
 }
 
+// ─── PFD Action Overlay ────────────────────────────────────────────────────────
+// Green pulsing ring + coaching hint when the active phase has a pfAction.
+
+const PF_RING_STYLE: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  border: "3px solid #00ff00",
+  boxSizing: "border-box",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "flex-end",
+  justifyContent: "center",
+  paddingBottom: "8px",
+  animation: "pfRingPulse 1s ease-in-out infinite",
+};
+
+export function PfActionOverlay({
+  label,
+  hint,
+  coachMs = 8_000,
+  onConfirm,
+}: {
+  label: string;
+  hint: string;
+  coachMs?: number;
+  onConfirm: () => void;
+}) {
+  const [coaching, setCoaching] = useState(false);
+
+  useEffect(() => {
+    setCoaching(false);
+    const t = setTimeout(() => setCoaching(true), coachMs);
+    return () => clearTimeout(t);
+  }, [coachMs, label]);
+
+  return (
+    <>
+      <style>{`@keyframes pfRingPulse{0%,100%{opacity:1;border-color:#00ff00}50%{opacity:.35;border-color:#00cc00}}`}</style>
+      <div style={PF_RING_STYLE} onClick={onConfirm}>
+        {coaching && (
+          <div style={{
+            background: "rgba(0,0,0,0.88)",
+            border: "1px solid #00ff00",
+            color: "#00ff00",
+            fontSize: "11px",
+            fontFamily: "monospace",
+            padding: "5px 10px",
+            borderRadius: "4px",
+            textAlign: "center",
+            maxWidth: "90%",
+            lineHeight: 1.4,
+          }}>
+            PF ACTION: {label}
+            <div style={{ color: "#aaa", fontSize: "10px", marginTop: "2px" }}>{hint}</div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 // ─── PFD Canvas ────────────────────────────────────────────────────────────────
 
-export function PfdCanvas({ state, scenario, elapsedMs }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number }) {
+export function PfdCanvas({
+  state,
+  scenario,
+  elapsedMs,
+  onPfAction,
+}: {
+  state?: ScenarioState;
+  scenario?: Scenario;
+  elapsedMs?: number;
+  onPfAction?: (phaseId: string) => void;
+}) {
   const mountRef  = useRef<HTMLDivElement>(null);
   const stateRef  = useRef<AircraftState>(buildAircraftState(state, scenario, elapsedMs));
   const cleanupRef = useRef<(() => void) | null>(null);
+
+  // Track which phases the PF has already confirmed so the ring doesn't reappear.
+  const [confirmedPhases, setConfirmedPhases] = useState<Set<string>>(new Set());
 
   // Keep stateRef in sync with React props
   useEffect(() => {
     stateRef.current = buildAircraftState(state, scenario, elapsedMs);
   }, [elapsedMs, scenario, state]);
+
+  const activePhase  = getActiveScenarioPhase(scenario, elapsedMs);
+  const pfAction     = activePhase?.pfAction;
+  const needsConfirm = !!(pfAction && activePhase && !confirmedPhases.has(activePhase.id));
+
+  const handleConfirm = useCallback(() => {
+    if (!activePhase || !pfAction) return;
+    setConfirmedPhases(prev => new Set(prev).add(activePhase.id));
+    onPfAction?.(activePhase.id);
+  }, [activePhase, pfAction, onPfAction]);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -207,7 +292,19 @@ export function PfdCanvas({ state, scenario, elapsedMs }: { state?: ScenarioStat
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <div ref={mountRef} style={{ width: "100%", height: "100%" }} />;
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <div ref={mountRef} style={{ width: "100%", height: "100%" }} />
+      {needsConfirm && pfAction && (
+        <PfActionOverlay
+          label={pfAction.label}
+          hint={pfAction.hint}
+          coachMs={pfAction.coachMs}
+          onConfirm={handleConfirm}
+        />
+      )}
+    </div>
+  );
 }
 
 // ─── ND Canvas ─────────────────────────────────────────────────────────────────
@@ -296,12 +393,22 @@ export function NdCanvas({ state, scenario, elapsedMs }: { state?: ScenarioState
 
 // ─── Exported composite ────────────────────────────────────────────────────────
 
-export function PfdNd({ state, scenario, elapsedMs }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number }) {
+export function PfdNd({
+  state,
+  scenario,
+  elapsedMs,
+  onPfAction,
+}: {
+  state?: ScenarioState;
+  scenario?: Scenario;
+  elapsedMs?: number;
+  onPfAction?: (phaseId: string) => void;
+}) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="border border-[var(--color-border)] bg-black overflow-hidden"
            style={{ aspectRatio: "1", maxHeight: "280px" }}>
-        <PfdCanvas state={state} scenario={scenario} elapsedMs={elapsedMs} />
+        <PfdCanvas state={state} scenario={scenario} elapsedMs={elapsedMs} onPfAction={onPfAction} />
       </div>
       <div className="border border-[var(--color-border)] bg-black overflow-hidden"
            style={{ aspectRatio: "1", maxHeight: "280px" }}>

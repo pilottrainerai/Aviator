@@ -9,7 +9,8 @@ export interface AircraftState {
   selectedAlt:   number;
   selectedHdg:   number;
   apEngaged:     boolean;
-  athrActive:    boolean;
+  athrActive:    boolean;  // A/THR actively managing thrust (green in FMA col 5)
+  athrArmed?:    boolean;  // A/THR pb pressed but levers in manual detent (blue in FMA col 5)
   thrMode:       string;  // FMA col-1 label: 'MAN TOGA'|'MAN MCT'|'THR CLB'|'THR MCT'|'THR IDLE'|'TOGA LK'
   thrCue?:       string;  // FMA col-1 third line cue (flashing white): 'LVR CLB'|'LVR MCT'
   vertMode:      string;  // FMA col-2 label: 'SRS'|'CLB'|'OP CLB'|'ALT'|'ALT*'|'V/S'

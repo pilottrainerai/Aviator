@@ -13,10 +13,10 @@
 //   ILS info     — bottom-left frequency / dist block
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
 import type { Scenario } from "@/scenarios/types";
-import { buildAircraftState } from "@/components/cockpit/pfd-nd";
+import { buildAircraftState, getActiveScenarioPhase, PfActionOverlay } from "@/components/cockpit/pfd-nd";
 
 type PfdData = {
   pitch: number; roll: number;
@@ -34,11 +34,22 @@ type PfdData = {
   ra: number;
 };
 
-export default function PfdMockup({ state, scenario, elapsedMs }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number } = {}) {
+export default function PfdMockup({ state, scenario, elapsedMs, onPfAction }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number; onPfAction?: (phaseId: string) => void } = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef  = useRef(state);
   const scenarioRef = useRef(scenario);
   const elapsedMsRef = useRef(elapsedMs);
+
+  // PF action overlay — pulsing green ring on PFD at key phases
+  const [confirmedPhases, setConfirmedPhases] = useState<Set<string>>(new Set());
+  const activePhase  = getActiveScenarioPhase(scenario, elapsedMs);
+  const pfAction     = activePhase?.pfAction;
+  const needsConfirm = !!(pfAction && activePhase && !confirmedPhases.has(activePhase.id));
+  const handleConfirm = useCallback(() => {
+    if (!activePhase || !pfAction) return;
+    setConfirmedPhases(prev => new Set(prev).add(activePhase.id));
+    onPfAction?.(activePhase.id);
+  }, [activePhase, pfAction, onPfAction]);
   // Keep latest scenario state available to the rAF loop without re-running
   // the whole effect on every state change.
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -183,9 +194,14 @@ export default function PfdMockup({ state, scenario, elapsedMs }: { state?: Scen
       }
 
       // Engagement column — AP / FD / A/THR.
-      txt("AP1",    466, 13, 11, C_WHITE, "center", true);
+      // AP1 only shown when autopilot is engaged (after PF presses AP1 on FCU).
+      if (live?.apEngaged) txt("AP1", 466, 13, 11, C_WHITE, "center", true);
       txt("1 FD 2", 466, 30, 11, C_WHITE, "center", true);
-      txt("A/THR",  466, 47, 11, C_WHITE, "center", true);
+      // A/THR: GREEN when actively managing thrust (levers at managed detent),
+      //        CYAN when armed (pb pressed, levers at TOGA = MAN TOGA on col 1),
+      //        not shown when A/THR off.
+      if (live?.athrActive)     txt("A/THR", 466, 47, 11, C_ACTIVE, "center", true);
+      else if (live?.athrArmed) txt("A/THR", 466, 47, 11, C_ARMED,  "center", true);
 
       // Row 2 — ARMED modes (second line, blue) and thrust cues (third line, white flashing).
       if (onGround) {
@@ -816,10 +832,17 @@ export default function PfdMockup({ state, scenario, elapsedMs }: { state?: Scen
   //   • Wired (with `state`) — fills its parent container slot in the runner
   if (state) {
     return (
-      <canvas
-        ref={canvasRef}
-        style={{ display: "block", width: "100%", height: "100%" }}
-      />
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
+        {needsConfirm && pfAction && (
+          <PfActionOverlay
+            label={pfAction.label}
+            hint={pfAction.hint}
+            coachMs={pfAction.coachMs}
+            onConfirm={handleConfirm}
+          />
+        )}
+      </div>
     );
   }
   return (

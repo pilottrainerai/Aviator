@@ -751,17 +751,22 @@ export class PFDRenderer extends Container {
     // Col 4 — approach capabilities (blank during climb; CAT 1/2/3 shown on approach)
     const apprCap = '';
 
-    // Col 5 — AP/FD engagement (white) + A/THR armed (cyan sub-row)
-    // FCOM format: "AP1 FD1" when AP engaged, "1FD2" when FDs only
-    const apfdLabel = s.apEngaged ? 'AP1 FD1' : '1FD2';
-    const athrSub   = s.athrActive ? 'A/THR' : '';
+    // Col 5 — AP/FD engagement (white) + A/THR status
+    // FCOM: "AP1 FD1" top row when AP engaged (white box drawn around col 5)
+    //       "1FD2" top row when FDs only, no AP
+    //       "A/THR" sub-row: GREEN when active (levers at managed detent),
+    //                        CYAN when armed (pb pressed, levers at TOGA/manual)
+    //                        blank when A/THR off
+    const apfdLabel  = s.apEngaged ? 'AP1 FD1' : '1FD2';
+    const athrSub    = (s.athrActive || s.athrArmed) ? 'A/THR' : '';
+    const athrColor  = s.athrActive ? C.green : C.cyan;  // green=active, cyan=armed
 
     const cols: Array<{ top: string; topColor: number; sub: string; subColor: number }> = [
-      { top: s.thrMode,  topColor: thrColor,  sub: '',       subColor: C.cyan },
-      { top: s.vertMode, topColor: C.green,   sub: vertSub,  subColor: C.cyan },
-      { top: s.latMode,  topColor: C.green,   sub: '',       subColor: C.cyan },
-      { top: apprCap,    topColor: C.white,   sub: '',       subColor: C.cyan },
-      { top: apfdLabel,  topColor: C.white,   sub: athrSub,  subColor: C.cyan },
+      { top: s.thrMode,  topColor: thrColor,  sub: '',      subColor: C.cyan },
+      { top: s.vertMode, topColor: C.green,   sub: vertSub, subColor: C.cyan },
+      { top: s.latMode,  topColor: C.green,   sub: '',      subColor: C.cyan },
+      { top: apprCap,    topColor: C.white,   sub: '',      subColor: C.cyan },
+      { top: apfdLabel,  topColor: C.white,   sub: athrSub, subColor: athrColor },
     ];
 
     cols.forEach((col, i) => {

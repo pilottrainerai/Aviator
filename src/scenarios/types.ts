@@ -341,4 +341,17 @@ export type ScenarioPhase = {
   atc?: ATCChannel;
   /** Overhead panel state */
   overhead?: OverheadSnapshot;
+  /**
+   * PF action confirmation overlay on the PFD canvas.
+   * When set, the PFD shows a pulsing green ring. After coachMs the ring
+   * shows a coaching hint. PF clicks the PFD to confirm the action.
+   */
+  pfAction?: {
+    /** Short label on the PFD overlay, e.g. "V/S ZERO" or "AP1 ENGAGE" */
+    label: string;
+    /** Coaching text shown after coachMs if PF has not clicked yet */
+    hint: string;
+    /** Delay before coaching text appears (default 8 000 ms) */
+    coachMs?: number;
+  };
 };
