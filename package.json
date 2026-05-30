@@ -11,7 +11,11 @@
     "test": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "snapshot:copilot": "zsh ./saved_versions/session_snapshot.sh --agent copilot",
+    "snapshot:claude": "zsh ./saved_versions/session_snapshot.sh --agent claude",
+    "recover:copilot": "zsh ./saved_versions/recover_agent.sh copilot",
+    "recover:claude": "zsh ./saved_versions/recover_agent.sh claude"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.2.7",
