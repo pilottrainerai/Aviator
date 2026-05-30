@@ -21,6 +21,11 @@ latest="saved_versions/LATEST_${agent_upper}_CONTEXT.txt"
   echo "Generated: $(date)"
   echo "Repo: $ROOT_DIR"
   echo
+
+  echo "=== RECENT COMMITS ==="
+  git log --oneline -10 || true
+  echo
+
   echo "=== GIT OVERVIEW ==="
   git remote -v || true
   echo
@@ -28,14 +33,31 @@ latest="saved_versions/LATEST_${agent_upper}_CONTEXT.txt"
   echo
   git status --short --branch || true
   echo
+
   echo "=== CHANGED FILES (STAT) ==="
   git diff --stat || true
   echo
+
   echo "=== FULL DIFF ==="
   git diff || true
   echo
+
   echo "=== TOP FILES ==="
   find src .github -type f 2>/dev/null | head -n 120 || true
+  echo
+
+  echo "=== MEMORY INDEX ==="
+  MEMORY_DIR="$HOME/.claude/projects/-Users-rohitsharma/memory"
+  if [[ -f "$MEMORY_DIR/MEMORY.md" ]]; then
+    cat "$MEMORY_DIR/MEMORY.md"
+  else
+    echo "(no memory index found at $MEMORY_DIR/MEMORY.md)"
+  fi
+  echo
+
+  echo "=== CLAUDE.md ==="
+  [[ -f "$ROOT_DIR/CLAUDE.md" ]] && cat "$ROOT_DIR/CLAUDE.md" || echo "(none)"
+  echo
 } > "$out"
 
 cp "$out" "$latest"
