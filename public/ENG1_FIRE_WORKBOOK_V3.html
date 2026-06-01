@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENG 1 FIRE — Workbook V3</title>
+<style>
+  :root {
+    --red:    #dc2626; --red-bg:    #fef2f2;
+    --amber:  #d97706; --amber-bg:  #fffbeb;
+    --blue:   #1d4ed8; --blue-bg:   #eff6ff;
+    --green:  #16a34a; --green-bg:  #f0fdf4;
+    --purple: #7c3aed; --purple-bg: #f5f3ff;
+    --teal:   #0d9488; --teal-bg:   #f0fdfa;
+    --gray:   #374151; --gray-bg:   #f9fafb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; background: #f3f4f6; color: #111; }
+
+  /* ── Top bar ── */
+  .topbar { background: #111827; color: #fff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .topbar h1 { font-size: 15px; font-weight: 700; letter-spacing: .5px; }
+  .topbar-meta { font-size: 11px; color: #9ca3af; margin-left: 16px; }
+  .topbar-right { display: flex; gap: 8px; align-items: center; }
+  .save-status { font-size: 11px; color: #6b7280; }
+  button.btn { padding: 5px 14px; border-radius: 5px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; }
+  button.btn-save { background: #2563eb; color: #fff; }
+  button.btn-export { background: #374151; color: #fff; }
+  button.btn-v2 { background: #7c3aed; color: #fff; }
+
+  /* ── Tab navigation ── */
+  .tabs { background: #1f2937; display: flex; padding: 0 20px; border-bottom: 2px solid #374151; }
+  .tab { padding: 9px 18px; color: #9ca3af; cursor: pointer; font-size: 12px; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+  .tab.active { color: #fff; border-bottom-color: #3b82f6; }
+  .tab:hover:not(.active) { color: #e5e7eb; }
+
+  /* ── Section body ── */
+  .section { display: none; padding: 16px 20px; }
+  .section.active { display: block; }
+  .section-title { font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 20px; }
+  th { background: #1f2937; color: #e5e7eb; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; padding: 8px 10px; text-align: left; white-space: nowrap; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+
+  /* ── Category row colours ── */
+  .cat-av  td:first-child { border-left: 4px solid var(--red);    background: var(--red-bg); }
+  .cat-ec  td:first-child { border-left: 4px solid var(--amber);  background: var(--amber-bg); }
+  .cat-atc td:first-child { border-left: 4px solid var(--blue);   background: var(--blue-bg); }
+  .cat-st  td:first-child { border-left: 4px solid var(--green);  background: var(--green-bg); }
+  .cat-pl  td:first-child { border-left: 4px solid var(--purple); background: var(--purple-bg); }
+  .cat-ap  td:first-child { border-left: 4px solid var(--teal);   background: var(--teal-bg); }
+
+  /* ── Chips ── */
+  .chip { display: inline-block; padding: 2px 7px; border-radius: 3px; font-weight: 700; font-size: 10px; font-family: monospace; margin: 1px; }
+  .chip-pf  { background: #dbeafe; color: #1e40af; }
+  .chip-pm  { background: #dcfce7; color: #166534; }
+  .chip-av  { background: #fee2e2; color: #991b1b; }
+  .chip-ec  { background: #fef9c3; color: #854d0e; }
+  .chip-atc { background: #dbeafe; color: #1e3a8a; }
+  .chip-st  { background: #d1fae5; color: #065f46; }
+  .chip-pl  { background: #ede9fe; color: #5b21b6; }
+  .chip-ap  { background: #ccfbf1; color: #134e4a; }
+  .chip-fc  { background: #f3f4f6; color: #374151; }
+  .chip-hw  { background: #1f2937; color: #f9fafb; }
+  .chip-cr  { background: #fce7f3; color: #9d174d; }
+  .chip-opt { background: #f5f3ff; color: #5b21b6; font-style: italic; }
+  .chip-warn { background: #dc2626; color: #fff; }
+  .chip-caut { background: #d97706; color: #fff; }
+  .chip-adv  { background: #1d4ed8; color: #fff; }
+
+  /* ── Editable cells ── */
+  .editable { width: 100%; min-height: 36px; padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical; background: #fafafa; }
+  .editable:focus { outline: none; border-color: #3b82f6; background: #fff; }
+  select.flag-sel { padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 11px; background: #fff; cursor: pointer; }
+
+  /* ── FMA cell ── */
+  .fma { font-family: monospace; font-size: 11px; line-height: 1.6; white-space: pre; background: #000; color: #00ff00; padding: 4px 8px; border-radius: 3px; display: inline-block; }
+  .fma-cyan { color: #00bfff; }
+  .fma-white { color: #fff; }
+  .fma-amber { color: #d97706; }
+
+  /* ── Hint cell ── */
+  .hint-text { font-size: 11px; color: #4b5563; line-height: 1.5; max-width: 320px; }
+  .hint-text strong { color: #111; }
+
+  /* ── ATC call blocks ── */
+  .atc-block { background: #eff6ff; border-left: 3px solid #2563eb; padding: 6px 10px; border-radius: 3px; margin-bottom: 6px; font-size: 12px; }
+  .atc-block .from { font-weight: 700; color: #1e40af; font-size: 11px; }
+  .atc-choice { padding: 3px 8px; border-radius: 3px; font-size: 11px; margin: 2px 0; }
+  .atc-choice.correct { background: #d1fae5; color: #065f46; }
+  .atc-choice.wrong   { background: #fee2e2; color: #991b1b; }
+
+  /* ── Summary cards ── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 6px; padding: 12px 14px; border: 1px solid #e5e7eb; }
+  .card-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #6b7280; letter-spacing: .6px; }
+  .card-value { font-size: 22px; font-weight: 800; color: #111; margin-top: 2px; }
+  .card-sub { font-size: 11px; color: #6b7280; margin-top: 2px; }
+
+  /* ── Trigger timeline ── */
+  .timeline { position: relative; padding-left: 24px; }
+  .tl-item { position: relative; margin-bottom: 14px; }
+  .tl-item::before { content: ''; position: absolute; left: -18px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; }
+  .tl-item::after { content: ''; position: absolute; left: -14px; top: 16px; width: 2px; height: calc(100% + 4px); background: #e5e7eb; }
+  .tl-item:last-child::after { display: none; }
+  .tl-time { font-weight: 700; color: #1d4ed8; font-family: monospace; font-size: 12px; }
+  .tl-desc { font-size: 12px; color: #374151; }
+  .tl-effects { font-size: 11px; color: #6b7280; margin-top: 2px; font-style: italic; }
+
+  /* ── Phase band ── */
+  .phase-divider { background: #f9fafb; border-top: 2px solid #e5e7eb; }
+  .phase-divider td { font-weight: 700; color: #374151; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 5px 10px; }
+
+  /* ── Parallel band ── */
+  .parallel-note { background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 4px; padding: 6px 10px; margin: 6px 0; font-size: 11px; color: #0369a1; }
+
+  /* ── Notes list ── */
+  .notes-list { margin: 0; padding-left: 14px; }
+  .notes-list li { font-size: 11px; color: #4b5563; line-height: 1.5; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1>ENG 1 FIRE AFTER V1 — Workbook V3</h1>
+    <span class="topbar-meta">VIDP RWY 28 · A320 ~77 t · ISA · Source: FCOM PRO-ABN-ENG + FCTM OP-020</span>
+  </div>
+  <div class="topbar-right">
+    <span class="save-status" id="saveStatus">Auto-save on</span>
+    <button class="btn btn-v2" onclick="window.open('ENG1_FIRE_WORKBOOK_V2.html','_blank')">Open V2</button>
+    <button class="btn btn-save" onclick="saveAll()">Save</button>
+    <button class="btn btn-export" onclick="exportHTML()">Export HTML</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('summary')">Summary</div>
+  <div class="tab" onclick="showTab('procedure')">Procedure Flow</div>
+  <div class="tab" onclick="showTab('ecam')">ECAM / Triggers</div>
+  <div class="tab" onclick="showTab('atc')">ATC Distractions</div>
+  <div class="tab" onclick="showTab('status')">Status &amp; Decisions</div>
+  <div class="tab" onclick="showTab('phases')">Phase FMA</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ SUMMARY -->
+<div class="section active" id="tab-summary">
+  <p class="section-title">Scenario Overview</p>
+
+  <div class="cards">
+    <div class="card"><div class="card-label">Total Steps</div><div class="card-value">33</div><div class="card-sub">incl. flightcheck, glareshield, comms, chclm</div></div>
+    <div class="card"><div class="card-label">ATC Distractions</div><div class="card-value">12</div><div class="card-sub">① Tower handoff → ⑫ Cleared to land</div></div>
+    <div class="card"><div class="card-label">Triggers</div><div class="card-value">4</div><div class="card-sub">after_v1, fire_warn, four_hundred_ft, min_accel_alt</div></div>
+    <div class="card"><div class="card-label">Status Items</div><div class="card-value">14</div><div class="card-sub">Left col: limitations / Right col: INOP SYS</div></div>
+    <div class="card"><div class="card-label">PF Actions (PFD ring)</div><div class="card-value">4</div><div class="card-sub">AP1 · V/S 0 · LVR MCT · OP CLB</div></div>
+    <div class="card"><div class="card-label">Scenario File</div><div class="card-value" style="font-size:11px;margin-top:4px;">eng1-fire-after-v1.ts</div><div class="card-sub">src/scenarios/data/</div></div>
+  </div>
+
+  <p class="section-title">Situation Brief</p>
+  <div style="background:#fff;border-radius:6px;padding:14px 16px;border:1px solid #e5e7eb;margin-bottom:16px;font-size:13px;line-height:1.7;max-width:800px;">
+    <strong>Situation:</strong> Departing runway 28 at New Delhi Indira Gandhi (VIDP). Two seconds after passing V1 at 145 kt, a MASTER WARNING fires and the ECAM displays ENG 1 FIRE. Climbing through approximately 400 ft AGL with gear retracting.<br><br>
+    <strong>Job:</strong> PF — Aviate: maintain V2+10, engage AP1, command ECAM ACTIONS. PM — Execute ECAM procedure in order. Both — LAND ASAP decision.
+  </div>
+
+  <p class="section-title">Trigger Timeline</p>
+  <div style="background:#fff;border-radius:6px;padding:14px 16px;border:1px solid #e5e7eb;margin-bottom:16px;max-width:700px;">
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-time">T+6 000 ms</div>
+        <div class="tl-desc"><strong>after_v1</strong> — V1 passed, committed to takeoff, rotation in progress</div>
+        <div class="tl-effects">No effects (gate trigger)</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-time">T+8 000 ms</div>
+        <div class="tl-desc"><strong>fire_warn</strong> — ENG 1 FIRE, MASTER WARN, CRC, fire light on FIRE panel</div>
+        <div class="tl-effects">SET_MASTER_WARN true · ADD_ECAM (ENG 1 FIRE + full ECAM tree + LAND ASAP)</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-time">T+18 000 ms</div>
+        <div class="tl-desc"><strong>four_hundred_ft</strong> — 400 ft AGL, ECAM ACTIONS begin</div>
+        <div class="tl-effects">ADD_ECAM "400 FT — ECAM ACTIONS"</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-time">T+55 000 ms</div>
+        <div class="tl-desc"><strong>min_accel_alt</strong> — Minimum Acceleration Altitude ~1500 ft</div>
+        <div class="tl-effects">No effects (informational gate)</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Workbook Notes</p>
+  <table>
+    <thead><tr><th width="30%">Area</th><th>Note / Question</th><th width="18%">Flag</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Overall V3 Notes</strong></td>
+        <td><textarea class="editable" data-key="summary_overall" rows="3" placeholder="General notes on this version…"></textarea></td>
+        <td><select class="flag-sel" data-key="summary_overall_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      </tr>
+      <tr><td><strong>Changes from V2</strong></td>
+        <td><textarea class="editable" data-key="summary_v2diff" rows="3" placeholder="What changed since V2?&#10;• A/THR now cyan (armed) / green (active)&#10;• AP1 only appears when engaged&#10;• PFD interactive ring on PfdMockup…"></textarea></td>
+        <td><select class="flag-sel" data-key="summary_v2diff_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ PROCEDURE -->
+<div class="section" id="tab-procedure">
+  <p class="section-title">Procedure Flow — All Steps</p>
+
+  <div class="parallel-note">Parallel tracks run SIMULTANEOUSLY after ENGINE SECURED: <strong>PF aviate track</strong> (MAA → ACCEL → MCT) runs alongside <strong>PM comms track</strong> (MAYD → SEC-FAIL → STATUS). Steps are gated on the slower of the two where they converge.</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th width="4%">#</th>
+        <th width="8%">ID</th>
+        <th width="8%">Group</th>
+        <th width="5%">Crew</th>
+        <th width="8%">Category</th>
+        <th width="10%">Label / Action</th>
+        <th width="22%">Hint (current)</th>
+        <th width="23%">Proposed Change</th>
+        <th width="6%">Flag</th>
+        <th width="6%">Requires</th>
+      </tr>
+    </thead>
+    <tbody id="procedureBody">
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ ECAM -->
+<div class="section" id="tab-ecam">
+  <p class="section-title">ECAM Messages (fire_warn trigger)</p>
+  <table>
+    <thead><tr><th width="5%">Order</th><th width="14%">ID</th><th width="40%">Line</th><th width="10%">Level</th><th width="25%">Proposed Change</th><th width="6%">Flag</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>eng1_fire</code></td><td><strong>ENG 1 FIRE</strong></td><td><span class="chip chip-warn">WARNING</span></td><td><textarea class="editable" data-key="ecam_eng1_fire" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="ecam_eng1_fire_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>2</td><td><code>ecam_thr</code></td><td>THR LEVER (ENG 1)......IDLE</td><td><span class="chip chip-adv">ADVISORY</span></td><td><textarea class="editable" data-key="ecam_thr" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="ecam_thr_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>3</td><td><code>ecam_master</code></td><td>ENG 1 MASTER...........OFF</td><td><span class="chip chip-adv">ADVISORY</span></td><td><textarea class="editable" data-key="ecam_master" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="ecam_master_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>4</td><td><code>ecam_fire_pb</code></td><td>ENG 1 FIRE P/B.........PUSH</td><td><span class="chip chip-adv">ADVISORY</span></td><td><textarea class="editable" data-key="ecam_fire_pb" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="ecam_fire_pb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>5</td><td><code>ecam_agent1</code></td><td>AGENT 1 AFTER 10 S....DISCH</td><td><span class="chip chip-adv">ADVISORY</span></td><td><textarea class="editable" data-key="ecam_agent1" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="ecam_agent1_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>6</td><td><code>ecam_atc</code></td><td>ATC..................NOTIFY</td><td><span class="chip chip-adv">ADVISORY</span></td><td><textarea class="editable" data-key="ecam_atc" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="ecam_atc_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>7</td><td><code>ecam_if_persist</code></td><td>·IF FIRE WARN AFTER 30 S:</td><td><span class="chip" style="background:#f3f4f6;color:#374151">REMARK</span></td><td><textarea class="editable" data-key="ecam_persist" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="ecam_persist_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>8</td><td><code>ecam_agent2</code></td><td>&nbsp;&nbsp;AGENT 2.............DISCH</td><td><span class="chip chip-adv">ADVISORY</span></td><td><textarea class="editable" data-key="ecam_agent2" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="ecam_agent2_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>9</td><td><code>land_asap</code></td><td><strong>LAND ASAP</strong></td><td><span class="chip chip-warn">WARNING</span></td><td><textarea class="editable" data-key="ecam_land_asap" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="ecam_land_asap_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+    </tbody>
+  </table>
+
+  <p class="section-title">Secondary Failures (afterEffect of eng1_fire_pb, T+2 s)</p>
+  <table>
+    <thead><tr><th>ID</th><th>Line</th><th>Level</th><th>Proposed Change</th><th>Flag</th></tr></thead>
+    <tbody>
+      <tr><td><code>sec_hyd</code></td><td>* HYD</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="sec_hyd" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="sec_hyd_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td><code>sec_elec</code></td><td>* ELEC</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="sec_elec" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="sec_elec_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td><code>sec_air_bleed</code></td><td>* AIR BLEED</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="sec_air" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="sec_air_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ ATC -->
+<div class="section" id="tab-atc">
+  <p class="section-title">ATC Distractions — 12 Calls</p>
+  <table>
+    <thead>
+      <tr>
+        <th width="4%">No.</th>
+        <th width="10%">ID</th>
+        <th width="12%">Gate (step)</th>
+        <th width="12%">From</th>
+        <th width="18%">ATC Message</th>
+        <th width="18%">Choices</th>
+        <th width="20%">Proposed Change</th>
+        <th width="6%">Flag</th>
+      </tr>
+    </thead>
+    <tbody id="atcBody"></tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ STATUS -->
+<div class="section" id="tab-status">
+  <p class="section-title">STATUS Page Items</p>
+  <table>
+    <thead><tr><th width="5%">Col</th><th width="12%">ID</th><th width="35%">Line</th><th width="10%">Severity</th><th width="30%">Proposed Change</th><th width="8%">Flag</th></tr></thead>
+    <tbody>
+      <tr class="phase-divider"><td colspan="6">LEFT COLUMN — Limitations &amp; Directives</td></tr>
+      <tr><td>L</td><td><code>st_eng1</code></td><td>ENG 1 SHUT DOWN</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_eng1" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_eng1_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>L</td><td><code>st_avoid_ice</code></td><td>AVOID ICING CONDITIONS</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_ice" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_ice_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>L</td><td><code>st_appr</code></td><td>APPR CAT . . . . CAT 1</td><td><span class="chip chip-adv">ADVISORY</span></td><td><textarea class="editable" data-key="st_appr" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_appr_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>L</td><td><code>st_ldg_dist</code></td><td>LDG DIST PROC . . . . APPLY</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_ldg" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_ldg_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>L</td><td><code>st_fuel_incr</code></td><td>FUEL CONSUMPT INCRSD</td><td><span class="chip chip-adv">ADVISORY</span></td><td><textarea class="editable" data-key="st_fuel" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_fuel_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>L</td><td><code>st_fms</code></td><td>FMS PRED UNRELIABLE</td><td><span class="chip chip-adv">ADVISORY</span></td><td><textarea class="editable" data-key="st_fms" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_fms_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr class="phase-divider"><td colspan="6">RIGHT COLUMN — INOP SYS</td></tr>
+      <tr><td>R</td><td><code>st_inop_cat3</code></td><td>CAT 3 DUAL</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_cat3" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_cat3_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>R</td><td><code>st_inop_bleed</code></td><td>ENG 1 BLEED</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_bleed" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_bleed_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>R</td><td><code>st_inop_pack</code></td><td>PACK 1</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_pack" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_pack_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>R</td><td><code>st_inop_galley</code></td><td>MAIN GALLEY</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_galley" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_galley_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>R</td><td><code>st_inop_gen</code></td><td>GEN 1</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_gen" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_gen_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>R</td><td><code>st_inop_pump</code></td><td>G ENG 1 PUMP</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_pump" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_pump_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>R</td><td><code>st_inop_ice</code></td><td>WING A. ICE</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_ice2" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_ice2_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td>R</td><td><code>st_inop_steep</code></td><td>STEEP APPR</td><td><span class="chip chip-caut">CAUTION</span></td><td><textarea class="editable" data-key="st_steep" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="st_steep_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+    </tbody>
+  </table>
+
+  <p class="section-title">Strategic Decisions</p>
+  <table>
+    <thead><tr><th>Value</th><th>Label</th><th>Tone</th><th>Description</th><th>Proposed Change</th><th>Flag</th></tr></thead>
+    <tbody>
+      <tr><td><code>LAND_ASAP</code></td><td><strong>LAND ASAP</strong></td><td><span class="chip" style="background:#dbeafe;color:#1e40af">primary</span></td><td class="hint-text">Land at nearest suitable aerodrome with full emergency fire services. FCOM directive for confirmed engine fire.</td><td><textarea class="editable" data-key="dec_land_asap" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="dec_land_asap_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td><code>RETURN_TO_FIELD</code></td><td><strong>RETURN TO FIELD</strong></td><td><span class="chip" style="background:#dbeafe;color:#1e40af">primary</span></td><td class="hint-text">Return to VIDP — valid if nearest suitable option. RWY 28 LDA 4430 m adequate for SE landing.</td><td><textarea class="editable" data-key="dec_return" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="dec_return_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td><code>DIVERT</code></td><td><strong>DIVERT</strong></td><td><span class="chip" style="background:#f3f4f6;color:#374151">secondary</span></td><td class="hint-text">Divert to planned alternate — only if genuinely closer than departure field.</td><td><textarea class="editable" data-key="dec_divert" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="dec_divert_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+      <tr><td><code>CONTINUE</code></td><td><strong>CONTINUE</strong></td><td><span class="chip chip-warn">danger</span></td><td class="hint-text">Press on to destination — NOT appropriate. Engine shut down; SE flight to destination cannot be justified.</td><td><textarea class="editable" data-key="dec_cont" rows="2" placeholder="…"></textarea></td><td><select class="flag-sel" data-key="dec_cont_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ PHASES -->
+<div class="section" id="tab-phases">
+  <p class="section-title">Phase FMA Timeline (13 phases)</p>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:12px;">Phases drive PFD/ND state, PF action ring, and cockpit channel annotations. A/THR cyan = armed (phases 1-12), green = active (phase 13).</p>
+  <table>
+    <thead>
+      <tr>
+        <th width="4%">Ph</th>
+        <th width="12%">ID</th>
+        <th width="10%">atMs</th>
+        <th width="16%">Col 1 Thrust</th>
+        <th width="12%">Col 2 Vertical</th>
+        <th width="10%">Col 3 Lateral</th>
+        <th width="14%">Col 4/5 Engmt</th>
+        <th width="6%">AP</th>
+        <th width="8%">PFD Ring</th>
+        <th width="8%">Proposed Change</th>
+        <th width="6%">Flag</th>
+      </tr>
+    </thead>
+    <tbody id="phaseBody"></tbody>
+  </table>
+</div>
+
+<script>
+const LS_KEY = 'eng1_fire_workbook_v3';
+
+// ── Step data ──────────────────────────────────────────────────────────────
+const steps = [
+  // AVIATE / FLIGHTCHECK
+  { n:1,  id:'continue_rotation',    group:'flightcheck', crew:'PF', cat:'av',  label:'CONTINUE ROTATION',         action:'V2+10',    hw:false, opt:false, req:'—',                      hint:'PF maintains normal takeoff rotation and climb. Do NOT reduce thrust. Follow FD/SRS, hold V2+10, and keep runway track stable.' },
+  { n:2,  id:'positive_rate_gear_up',group:'flightcheck', crew:'PM', cat:'av',  label:'POSITIVE CLIMB — GEAR UP',   action:'CALL',     hw:false, opt:false, req:'continue_rotation',      hint:'PM calls POSITIVE CLIMB. PF responds GEAR UP. PM selects gear lever UP. Verify positive climb and GEAR UP indication.' },
+  { n:3,  id:'engage_ap_fma',        group:'flightcheck', crew:'PF', cat:'av',  label:'AP1 ENGAGE — READ FMA',      action:'CONFIRM',  hw:false, opt:false, req:'positive_rate_gear_up',  hint:'PF: engage AP1 at ~100 ft once flight path stable. Read FMA aloud and announce A/THR.' },
+  // GLARESHIELD
+  { n:4,  id:'cancel_master_warn',   group:'glareshield', crew:'PM', cat:'av',  label:'MASTER WARN',                action:'CANCEL',   hw:true,  opt:false, req:'—',                      hint:'PM cancels MASTER WARN FIRST — pushes glareshield light to silence CRC and reset the red light.' },
+  { n:5,  id:'four_hundred_ft_cmd',  group:'flightcheck', crew:'PM', cat:'av',  label:'400 FT — ECAM ACTIONS',      action:'ANNOUNCE', hw:false, opt:false, req:'engage_ap_fma + cancel_master_warn', hint:'At 400 ft AGL with flight path stabilised, PM confirms failure, reads ECAM title. PF orders ECAM ACTIONS.' },
+  // ECAM PROCEDURE
+  { n:6,  id:'thr_lever_idle',       group:'procedure',   crew:'PM', cat:'ec',  label:'THR LEVER 1',                action:'IDLE',     hw:true,  opt:false, req:'four_hundred_ft_cmd',    hint:'PM retards ENG 1 thrust lever to IDLE. Reduces thrust before fuel isolation.' },
+  { n:7,  id:'eng1_master_off',      group:'procedure',   crew:'PM', cat:'ec',  label:'ENG 1 MASTER',               action:'OFF',      hw:true,  opt:false, req:'thr_lever_idle',         hint:'PM: ENG 1 MASTER, CONFIRM OFF? → PF: CONFIRM → PM sets OFF. Closes LP + HP fuel shut-off valves.' },
+  { n:8,  id:'eng1_fire_pb',         group:'procedure',   crew:'PM', cat:'ec',  label:'ENG 1 FIRE P/B',             action:'PUSH',     hw:true,  opt:false, req:'eng1_master_off',        hint:'PM: ENG 1 FIRE P/B, CONFIRM PUSH? → PF: CONFIRM → PM pushes. Arms squibs, closes bleed + HYD SOV, cuts FADEC.' },
+  { n:9,  id:'cancel_master_caut',   group:'glareshield', crew:'PM', cat:'ec',  label:'MASTER CAUT',                action:'CANCEL',   hw:true,  opt:false, req:'—',                      hint:'PM pushes MASTER CAUTION light — silences single-chime, resets amber light.' },
+  { n:10, id:'agent1',               group:'procedure',   crew:'PM', cat:'ec',  label:'AGENT 1',                    action:'DISCH',    hw:true,  opt:false, req:'eng1_fire_pb',           hint:'PM waits ECAM 10 s countdown after FIRE pb — N1 decay maximises agent concentration. Then discharge.' },
+  { n:11, id:'agent2',               group:'procedure',   crew:'PM', cat:'ec',  label:'AGENT 2',                    action:'DISCH',    hw:true,  opt:true,  req:'agent1 + fire_persists_30s', hint:'PM: wait 30 s after AGENT 1 — IF FIRE WARN persists, discharge AGENT 2. Last bottle, no restart possible.' },
+  // POST-ECAM (parallel tracks)
+  { n:12, id:'engine_secured',       group:'chclm',       crew:'PM', cat:'ec',  label:'ENGINE SECURED',             action:'ANNOUNCE', hw:false, opt:false, req:'agent1 + fire_extinguished', hint:'Once fire light is out and engine secured, PM announces ENGINE SECURED and PRIMARY ECAM ACTIONS COMPLETE.' },
+  { n:13, id:'announce_land_asap',   group:'chclm',       crew:'PF', cat:'av',  label:'LAND ASAP',                  action:'ANNOUNCE', hw:false, opt:false, req:'engine_secured',         hint:'PF announces LAND ASAP (red on ECAM) — cue to declare MAYDAY on current frequency. PM cross-checks that MAYDAY is the next call.' },
+  { n:14, id:'mayday_atc',           group:'comms',       crew:'PM', cat:'atc', label:'MAYDAY',                     action:'DECLARE',  hw:false, opt:false, req:'announce_land_asap',     hint:'Call on CURRENT frequency (Tower if handoff not yet accepted): MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' },
+  // PF AVIATE TRACK (parallel)
+  { n:15, id:'level_off_maa',        group:'procedure',   crew:'PF', cat:'av',  label:'V/S 0 AT MAA',               action:'SELECT',   hw:false, opt:false, req:'engine_secured',         hint:'PF: at minimum acceleration altitude (~2300 ft AMSL), push V/S knob → FMA col 2 changes SRS → V/S = 0.' },
+  { n:16, id:'accel_clean',          group:'procedure',   crew:'PF', cat:'av',  label:'ACCEL / CLEAN',              action:'CONFIRM',  hw:false, opt:false, req:'level_off_maa',          hint:'PF calls FLAPS 1 at F speed and FLAPS UP at S speed; PM checks speed, repeats callouts, selects accordingly.' },
+  { n:17, id:'mct_open_clb',         group:'procedure',   crew:'PF', cat:'av',  label:'MCT / OPEN CLB',             action:'SELECT',   hw:false, opt:false, req:'accel_clean',            hint:'At green dot: LVR MCT flashes white. PF moves live lever to MCT. Pulls ALT knob → OP CLB. FMA: THR MCT · OP CLB · NAV · AP1 · A/THR.' },
+  // PM COMMS TRACK (parallel)
+  { n:18, id:'announce_sec_failures',group:'chclm',       crew:'PM', cat:'ec',  label:'SECONDARY FAILURES',         action:'READ',     hw:false, opt:false, req:'mayday_atc',             hint:'PM reads secondary system failures from SD after engine secured. PF cross-checks and acknowledges each item.' },
+  { n:19, id:'announce_status',      group:'chclm',       crew:'PM', cat:'st',  label:'STATUS — ANNOUNCE',          action:'ANNOUNCE', hw:false, opt:false, req:'announce_sec_failures',  hint:'When STATUS page appears: PM announces STATUS.' },
+  { n:20, id:'stop_ecam',            group:'chclm',       crew:'PF', cat:'st',  label:'STOP ECAM',                  action:'ORDER',    hw:false, opt:false, req:'announce_status',        hint:'PF: STOP ECAM — PM stops ECAM actions. Ask for After Takeoff CL, OEB, computer resets.' },
+  { n:21, id:'after_takeoff_cl',     group:'chclm',       crew:'PM', cat:'st',  label:'AFTER TAKEOFF CL',           action:'COMPLETE', hw:false, opt:false, req:'stop_ecam',              hint:'PF: Any NORMAL CHECKLIST? — PM runs After Takeoff checklist.' },
+  { n:22, id:'oeb_check',            group:'chclm',       crew:'PF', cat:'st',  label:'OEB / COMPUTER RESETS',      action:'CHECK',    hw:false, opt:false, req:'after_takeoff_cl',       hint:'PF: Any OEB? Any COMPUTER RESETS? — PM checks QRH reset table.' },
+  { n:23, id:'read_status',          group:'chclm',       crew:'PF', cat:'st',  label:'READ STATUS',                action:'CALL',     hw:false, opt:false, req:'oeb_check',              hint:'PF: READ STATUS — PM reads the ECAM STATUS page aloud.' },
+  { n:24, id:'status_read_aloud',    group:'chclm',       crew:'PM', cat:'st',  label:'ECAM STATUS — PM READS',     action:'REVIEW',   hw:false, opt:false, req:'read_status',            hint:'PM reads STATUS page aloud, item by item. PF: CHECKED after each item.' },
+  { n:25, id:'crew_crosscheck',      group:'chclm',       crew:'PM', cat:'st',  label:'ECAM ACTIONS COMPLETE',      action:'ANNOUNCE', hw:false, opt:false, req:'status_read_aloud',      hint:'PM: ECAM ACTIONS COMPLETE. PF acknowledges.' },
+  // CRM PLANNING
+  { n:26, id:'wx_request',           group:'comms',       crew:'PM', cat:'pl',  label:'WX / ATIS',                  action:'REQUEST',  hw:false, opt:false, req:'crew_crosscheck',        hint:'PM requests latest weather from Delhi Approach: wind, QNH, temp, vis, RVR RWY 28.' },
+  { n:27, id:'ldg_perf',             group:'comms',       crew:'PF', cat:'pl',  label:'LDG PERF',                   action:'CHECK',    hw:false, opt:false, req:'wx_request',             hint:'SE approach: Vapp +5 kt. RWY 28 VIDP LDA 4430 m / factored SE dist ~2200 m — ADEQUATE.' },
+  { n:28, id:'fordec',               group:'comms',       crew:'PF', cat:'pl',  label:'FORDEC',                     action:'COMPLETE', hw:false, opt:false, req:'ldg_perf',               hint:'PF leads FORDEC discussion. PM cross-checks each element. Agree and commit to decision.' },
+  { n:29, id:'intention_to_atc',     group:'comms',       crew:'PM', cat:'atc', label:'INTENTION — ATC',            action:'ADVISE',   hw:false, opt:false, req:'fordec',                 hint:'PM advises ATC of FORDEC outcome: returning to VIDP for landing runway 28, will advise when ready for approach.' },
+  { n:30, id:'fmgc_prep',            group:'comms',       crew:'PM', cat:'pl',  label:'FMGC PREP',                  action:'COMPLETE', hw:false, opt:false, req:'fordec',                 hint:'PM: enter VIDP in DEST, select RWY 28, insert ILS 110.30/CRS 282. Set Vapp = Vref+5 kt.' },
+  { n:31, id:'nis_brief',            group:'comms',       crew:'PM', cat:'pl',  label:'NITS BRIEF',                 action:'CONFIRM',  hw:false, opt:false, req:'fordec',                 hint:'Interphone to SCCM — NATURE: engine fire. INTENTIONS: landing VIDP RWY 28. TIME: ~15 min. SPECIAL: emergency/precautionary.' },
+  { n:32, id:'pax_pa',               group:'comms',       crew:'PF', cat:'pl',  label:'PASSENGER PA',               action:'CONFIRM',  hw:false, opt:false, req:'nis_brief',              hint:'PA: Ladies and gentlemen, this is your Captain. We are returning to Delhi as a precaution. Remain seated.' },
+  { n:33, id:'company_notify',       group:'comms',       crew:'PM', cat:'pl',  label:'OPS NOTIFY',                 action:'CONFIRM',  hw:false, opt:true,  req:'pax_pa',                 hint:'ACARS or VHF: OPS, IFLY101, MAYDAY declared, ENG 1 FIRE, returning VIDP RWY 28, request CFR + ground support.' },
+  // APPROACH
+  { n:34, id:'approach_prep',        group:'comms',       crew:'PM', cat:'ap',  label:'APPROACH PREP',              action:'COMPLETE', hw:false, opt:false, req:'fmgc_prep',              hint:'PM: set ILS RWY 28 freq 110.30/CRS 282. BARO minima 200 ft/QNH set. Autobrake MED. Spoilers ARM.' },
+  { n:35, id:'atc_emergency_services',group:'comms',      crew:'PM', cat:'atc', label:'ATC — EMERG SVCS',           action:'ADVISE',   hw:false, opt:false, req:'approach_prep',          hint:'PM advises ATC: IFLY101, request Category 3 emergency services on runway 28. CFR vehicles, ambulances, medical standby.' },
+  { n:36, id:'approach_brief',       group:'comms',       crew:'PF', cat:'ap',  label:'APPROACH BRIEF',             action:'COMPLETE', hw:false, opt:false, req:'atc_emergency_services',  hint:'PF briefs: ILS RWY 28 VIDP, single-engine CAT 1. DA 200 ft. Vapp +5 kt. Non-normal items from STATUS. Go-around briefed.' },
+  { n:37, id:'go_around_review',     group:'comms',       crew:'PF', cat:'ap',  label:'GO-AROUND REVIEW',           action:'CONFIRM',  hw:false, opt:false, req:'approach_brief',         hint:'PF briefs go-around plan and confirms fuel state is adequate for alternate if approach is missed.' },
+  { n:38, id:'approach_cl',          group:'chclm',       crew:'PM', cat:'ap',  label:'APPROACH CL',                action:'COMPLETE', hw:false, opt:false, req:'go_around_review',       hint:'PM runs approach checklist. Call each item, PF cross-checks and responds.' },
+  { n:39, id:'landing_cl',           group:'chclm',       crew:'PM', cat:'ap',  label:'LANDING CL',                 action:'COMPLETE', hw:false, opt:false, req:'approach_cl',            hint:'PM runs landing checklist at 1000 ft on final. PF confirms each item.' },
+];
+
+const catLabels = { av:'AVIATE', ec:'ECAM', atc:'ATC', st:'STATUS', pl:'PLAN', ap:'APPROACH' };
+const catChipClass = { av:'chip-av', ec:'chip-ec', atc:'chip-atc', st:'chip-st', pl:'chip-pl', ap:'chip-ap' };
+const rowCatClass = { av:'cat-av', ec:'cat-ec', atc:'cat-atc', st:'cat-st', pl:'cat-pl', ap:'cat-ap' };
+
+function buildProcedureTable() {
+  const tbody = document.getElementById('procedureBody');
+  let html = '';
+  let lastCat = '';
+  steps.forEach(s => {
+    if (s.cat !== lastCat) {
+      const labels = { av:'AVIATE / FLIGHTCHECK / GLARESHIELD', ec:'ECAM PROCEDURE + POST-ECAM', atc:'ATC COMMS', st:'STATUS PAGE REVIEW', pl:'CRM PLANNING (FORDEC / COMMS)', ap:'APPROACH & LANDING' };
+      html += `<tr class="phase-divider"><td colspan="10">${labels[s.cat] || s.cat.toUpperCase()}</td></tr>`;
+      lastCat = s.cat;
+    }
+    const crewChip = s.crew === 'PF' ? '<span class="chip chip-pf">PF</span>' : '<span class="chip chip-pm">PM</span>';
+    const hwChip   = s.hw  ? '<span class="chip chip-hw">HW</span>' : '';
+    const optChip  = s.opt ? '<span class="chip chip-opt">OPT</span>' : '';
+    const catChip  = `<span class="chip ${catChipClass[s.cat]}">${catLabels[s.cat]}</span>`;
+    const groupChip = `<span class="chip chip-fc">${s.group}</span>`;
+    const key = `step_${s.id}`;
+    html += `<tr class="${rowCatClass[s.cat]}">
+      <td>${s.n}</td>
+      <td><code style="font-size:10px">${s.id}</code></td>
+      <td>${groupChip}</td>
+      <td>${crewChip}</td>
+      <td>${catChip}</td>
+      <td><strong>${s.label}</strong><br><span style="color:#6b7280;font-size:10px">${s.action}</span>${hwChip}${optChip}</td>
+      <td class="hint-text">${s.hint.substring(0,160)}${s.hint.length>160?'…':''}</td>
+      <td><textarea class="editable" data-key="${key}" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="${key}_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">${s.req}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ── ATC data ──────────────────────────────────────────────────────────────
+const atcCalls = [
+  { n:'①', id:'atc_handoff_to_departure', gate:'continue_rotation', from:'DELHI TOWER',    msg:'IFLY101, contact Delhi Departure 124.85.',
+    choices:[{t:'Delhi Departure 124.85, IFLY101',c:true},{t:'Roger, IFLY101',c:false},{t:'Delhi Departure 124.95, IFLY101',c:false},{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, standby',c:false}] },
+  { n:'②', id:'atc_radar_contact_mayday', gate:'mayday_atc', from:'DELHI DEPARTURE', msg:'IFLY101, Delhi Departure, radar contact.',
+    choices:[{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, standby',c:true},{t:'MAYDAY IFLY101, engine fire, returning immediate, request runway 28 ILS, full emergency',c:false},{t:'Maintaining runway track, climbing 3 000, IFLY101',c:false}] },
+  { n:'③', id:'atc_vectors_climb', gate:'mayday_atc (+15s)', from:'DELHI DEPARTURE', msg:'IFLY101, roger MAYDAY, radar contact, continue runway track, climb 4 000 feet.',
+    choices:[{t:'Continuing runway track, climbing 4 000, will advise intentions shortly, IFLY101',c:true},{t:'IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel',c:false}] },
+  { n:'④', id:'atc_vectors_when_ready', gate:'announce_sec_failures', from:'DELHI DEPARTURE', msg:'IFLY101, vectors available when ready, no reported traffic.',
+    choices:[{t:'Continuing checklist, will advise, IFLY101',c:true},{t:'Unable at this time, request hold, will advise when ready for approach, IFLY101',c:true},{t:'IFLY101 returning Delhi, request runway 28 ILS',c:false}] },
+  { n:'⑤', id:'atc_info_request_prompt', gate:'intention_to_atc', from:'DELHI APPROACH', msg:'IFLY101, Delhi Approach, advise any requirements for the approach and any assistance required.',
+    choices:[{t:'Request latest Delhi weather, runway in use, NOTAMs, and expected approach type, IFLY101',c:true},{t:'Standby IFLY101',c:false},{t:'Request vectors ILS runway 28, IFLY101',c:false}] },
+  { n:'⑥', id:'atc_provides_briefing_info', gate:'wx_request', from:'DELHI APPROACH', msg:'IFLY101, roger standby. … Delhi wind 280 at 8, runway 28 in use, NOTAMs nil significant, expect ILS runway 28.',
+    choices:[{t:'Wind 280 at 8, runway 28, ILS runway 28, no significant NOTAMs, IFLY101',c:true},{t:'Roger, IFLY101',c:false},{t:'Wind 280 at 8, runway 28, IFLY101',c:false}] },
+  { n:'⑦', id:'atc_pob_fuel_services', gate:'ldg_perf', from:'DELHI APPROACH', msg:'IFLY101, say persons on board, fuel endurance, and assistance required.',
+    choices:[{t:'IFLY101, 186 persons on board, 8.4 tonnes fuel, endurance 3 hours, request full emergency services on the runway',c:true},{t:'Standby IFLY101',c:false},{t:'IFLY101, 186 POB, 8.4 tonnes, no emergency services required',c:false}] },
+  { n:'⑧', id:'atc_emergency_services_ack', gate:'atc_emergency_services', from:'DELHI APPROACH', msg:'IFLY101, Roger, emergency services standing by runway 28, full CFR, Category 3 confirmed.',
+    choices:[{t:'Roger emergency services standing by runway 28, Category 3 confirmed, IFLY101',c:true},{t:'Roger, IFLY101',c:false}] },
+  { n:'⑨', id:'atc_ready_for_approach', gate:'approach_prep', from:'DELHI APPROACH', msg:'IFLY101, advise when ready for approach.',
+    choices:[{t:'IFLY101 ready, request vectors for ILS runway 28',c:true},{t:'Ready, IFLY101',c:false},{t:'Standby IFLY101',c:false}] },
+  { n:'⑩', id:'atc_cleared_approach', gate:'approach_brief', from:'DELHI APPROACH', msg:'IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 28 approach, contact Delhi Tower 118.10 when established.',
+    choices:[{t:'Left heading 240, descend 3 000, cleared ILS runway 28, contact Tower 118.10 when established, IFLY101',c:true},{t:'Roger, IFLY101',c:false},{t:'Cleared ILS runway 28, IFLY101',c:false}] },
+  { n:'⑪', id:'atc_tower_contact', gate:'approach_cl', from:'DELHI TOWER', msg:'IFLY101, Delhi Tower, continue ILS approach runway 28, report established.',
+    choices:[{t:'Continuing ILS runway 28, will report established, IFLY101',c:true},{t:'Switching, IFLY101',c:false}] },
+  { n:'⑫', id:'atc_cleared_to_land', gate:'landing_cl', from:'DELHI TOWER', msg:'IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.',
+    choices:[{t:'Cleared to land runway 28, IFLY101',c:true},{t:'Roger, IFLY101',c:false},{t:'Cleared to land runway 29, IFLY101',c:false}] },
+];
+
+function buildAtcTable() {
+  const tbody = document.getElementById('atcBody');
+  let html = '';
+  atcCalls.forEach(a => {
+    const choicesHtml = a.choices.map(c =>
+      `<div class="atc-choice ${c.c?'correct':'wrong'}">${c.c?'✔':'✘'} ${c.t}</div>`
+    ).join('');
+    const key = `atc_${a.id}`;
+    html += `<tr>
+      <td style="font-weight:700;font-size:16px">${a.n}</td>
+      <td><code style="font-size:10px">${a.id}</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">${a.gate}</span></td>
+      <td><span class="chip chip-atc">${a.from}</span></td>
+      <td class="hint-text">"${a.msg}"</td>
+      <td>${choicesHtml}</td>
+      <td><textarea class="editable" data-key="${key}" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="${key}_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ── Phase data ──────────────────────────────────────────────────────────────
+const phases = [
+  { n:1,  id:'taxi_ready',          atMs:'0',      col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'cyan',  col3:'RWY',    ap:false,  ring:null },
+  { n:2,  id:'v1_rotate',           atMs:'6 000',  col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'cyan',  col3:'RWY',    ap:false,  ring:null },
+  { n:3,  id:'fire_detected',       atMs:'8 000',  col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'green', col3:'NAV',    ap:false,  ring:null },
+  { n:4,  id:'gear_up_ap1',         atMs:'14 000', col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'green', col3:'NAV',    ap:true,   ring:'AP1 ENGAGE' },
+  { n:5,  id:'ecam_actions_start',  atMs:'18 000', col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'green', col3:'NAV',    ap:true,   ring:null },
+  { n:6,  id:'thr_lever_idle_ph',   atMs:'25 000', col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'green', col3:'NAV',    ap:true,   ring:null },
+  { n:7,  id:'master_off_ph',       atMs:'32 000', col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'green', col3:'NAV',    ap:true,   ring:null },
+  { n:8,  id:'fire_pb_ph',          atMs:'40 000', col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'green', col3:'NAV',    ap:true,   ring:null },
+  { n:9,  id:'agent1_ph',           atMs:'50 000', col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'green', col3:'NAV',    ap:true,   ring:null },
+  { n:10, id:'engine_secured_ph',   atMs:'60 000', col1:'MAN TOGA',  col1c:'white', col2:'SRS',     col2c:'green', col3:'NAV',    ap:true,   ring:null },
+  { n:11, id:'accel_level_off',     atMs:'75 000', col1:'MAN TOGA',  col1c:'white', col2:'V/S=0',   col2c:'green', col3:'NAV',    ap:true,   ring:'V/S ZERO' },
+  { n:12, id:'green_dot_lvr_mct',   atMs:'95 000', col1:'LVR MCT',   col1c:'white', col2:'V/S=0',   col2c:'green', col3:'NAV',    ap:true,   ring:'LVR MCT → SET' },
+  { n:13, id:'op_clb_climb',        atMs:'100 000',col1:'THR MCT',   col1c:'green', col2:'OP CLB',  col2c:'green', col3:'NAV',    ap:true,   ring:'OP CLB CONFIRM' },
+];
+
+function buildPhaseTable() {
+  const tbody = document.getElementById('phaseBody');
+  let html = '';
+  phases.forEach(p => {
+    const athrRow1 = (p.n <= 12) ? '<span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span>'
+                                  : '<span style="color:#00ff00;font-family:monospace;font-size:10px">A/THR (green=active)</span>';
+    const ap5 = p.ap ? '<span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span>' : '<span style="color:#9ca3af;font-family:monospace;font-size:10px">1FD2</span>';
+    const col1color = p.col1c === 'white' ? '#fff' : p.col1c === 'green' ? '#00ff00' : '#d97706';
+    const col2color = p.col2c === 'cyan' ? '#00bfff' : '#00ff00';
+    const ringCell = p.ring ? `<span class="chip" style="background:#14532d;color:#86efac;font-size:10px">${p.ring}</span>` : '<span style="color:#6b7280;font-size:11px">—</span>';
+    const key = `phase_${p.id}`;
+    html += `<tr>
+      <td>${p.n}</td>
+      <td><code style="font-size:10px">${p.id}</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">${p.atMs} ms</td>
+      <td><span style="color:${col1color};font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">${p.col1}</span></td>
+      <td><span style="color:${col2color};font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">${p.col2}</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td>${ap5}<br>${athrRow1}</td>
+      <td>${p.ap ? '✔ AP1' : '✘'}</td>
+      <td>${ringCell}</td>
+      <td><textarea class="editable" data-key="${key}" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="${key}_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ── LocalStorage persistence ───────────────────────────────────────────────
+function getStoredData() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; }
+}
+function saveAll() {
+  const data = {};
+  document.querySelectorAll('[data-key]').forEach(el => {
+    data[el.dataset.key] = el.tagName === 'SELECT' ? el.value : el.value;
+  });
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
+  document.getElementById('saveStatus').textContent = 'Saved ' + new Date().toLocaleTimeString();
+}
+function loadAll() {
+  const data = getStoredData();
+  document.querySelectorAll('[data-key]').forEach(el => {
+    if (data[el.dataset.key] !== undefined) el.value = data[el.dataset.key];
+  });
+}
+function exportHTML() {
+  saveAll();
+  const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'ENG1_FIRE_WORKBOOK_V3_EDITED.html'; a.click();
+}
+
+// ── Auto-save ──────────────────────────────────────────────────────────────
+let autoSaveTimer;
+document.addEventListener('input', () => {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => { saveAll(); }, 800);
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+buildProcedureTable();
+buildAtcTable();
+buildPhaseTable();
+loadAll();
+</script>
+</body>
+</html>
