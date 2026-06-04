@@ -43,3 +43,9 @@ next-env.d.ts
 # claude code local settings
 .claude/settings.local.json
 .env*.local
+
+# IDE
+.vscode/
+
+# Reference manuals (belong in ~/.claude/manuals/a320/, not the repo)
+*.pdf
