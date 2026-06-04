@@ -156,11 +156,15 @@ export const eng1FireAfterV1: Scenario = {
     // Sequential steps — each requires the previous. PM works through in order.
 
     // ── 1 ── FCOM: "THR LEVER (AFFECTED) → IDLE"
+    // FCTM AOP-30-20 THRUST LEVER RULE: PF is the only crew member who
+    // operates thrust levers.  PM reads the ECAM step and announces it;
+    // PF then confirms the correct lever and retards it.
+    // Callout: PM: "THR LEVER 1 — IDLE" → PF: "THR LEVER 1, CONFIRM IDLE?" → PM: "CONFIRM" → PF retards.
     {
       id: "thr_lever_idle",
       label: "THR LEVER 1",
       action: "IDLE",
-      hint: "FCTM AOP-30-20 THRUST LEVER RULE: PM announces 'THR LEVER 1 — IDLE'. PF confirms correct lever: 'THR LEVER 1, CONFIRM IDLE?' → PM: 'CONFIRM' → PF retards lever. PM must NOT operate thrust levers.",
+      hint: "FCTM AOP-30-20 THRUST LEVER RULE: PM announces 'THR LEVER 1 — IDLE'. PF confirms correct lever: 'THR LEVER 1, CONFIRM IDLE?' → PM: 'CONFIRM' → PF retards lever. PM must NOT operate thrust levers. Reduces thrust before fuel/engine isolation.",
       variant: "switch",
       crew: "PF",
       hardware: true,
@@ -245,7 +249,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "agent1",
       label: "AGENT 1",
       action: "DISCH",
-      hint: "RED GUARD — irreversible. Wait ECAM 10 s countdown (N1 decay maximises concentration). FCTM AOP-30-20: PM lifts guard, announces 'AGENT 1 — DISCHARGE, CONFIRM?' → PF: 'CONFIRM' → PM discharges. FCOM PRO-ABN-ENG: AGENT 1 AFTER 10 S — DISCH.",
+      hint: "RED GUARD — irreversible. Wait ECAM 10 s countdown (N1 decay maximises agent concentration). FCTM AOP-30-20: PM lifts guard, announces 'AGENT 1 — DISCHARGE, CONFIRM?' → PF: 'CONFIRM' → PM discharges. FCOM PRO-ABN-ENG: AGENT 1 AFTER 10 S — DISCH.",
       variant: "caution",
       requires: ["eng1_fire_pb"],
       crew: "PM",
@@ -277,7 +281,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "agent2",
       label: "AGENT 2",
       action: "DISCH",
-      hint: "RED GUARD — irreversible — LAST BOTTLE. FCOM: only if FIRE WARNING persists 30 s after AGENT 1. FCTM AOP-30-20: PM lifts guard, announces 'FIRE WARNING STILL ACTIVE — AGENT 2, DISCHARGE, CONFIRM?' → PF: 'CONFIRM' → PM discharges. No extinguisher remaining after this.",
+      hint: "RED GUARD — irreversible — LAST BOTTLE. FCOM: only if FIRE WARNING persists 30 s after AGENT 1. FCTM AOP-30-20: PM lifts guard, announces 'FIRE WARNING STILL ACTIVE — AGENT 2, DISCHARGE, CONFIRM?' → PF: 'CONFIRM' → PM discharges. No extinguisher remaining after this — no engine restart possible.",
       variant: "caution",
       requires: ["agent1"],
       requiresTrigger: "fire_persists_30s",
@@ -313,7 +317,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "engine_secured",
       label: "ENGINE SECURED",
       action: "ANNOUNCE",
-      hint: "Once the fire light is out and the engine is secured, PM announces 'ENGINE SECURED' and 'PRIMARY ECAM ACTIONS COMPLETE'. PF acknowledges before acceleration.",
+      hint: "IF FIRE PERSISTS 30 s after AGENT 1: PM discharges AGENT 2 (last bottle). Once fire extinguished (FIRE pb light off, ENG MASTER FIRE light off): PM announces 'ENGINE SECURED, PRIMARY ECAM ACTIONS COMPLETE'. PF acknowledges. PM then calls ATC: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 4 000 ft, following engine fire procedure.'",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
@@ -345,7 +349,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "mayday_atc",
       label: "MAYDAY",
       action: "DECLARE",
-      hint: "Call on CURRENT frequency (Tower if handoff not yet accepted): 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' Brief — declare, state, standby. No intentions yet. ATC will acknowledge and hold for intentions; crew advises 'will advise intentions shortly' once workload eases.",
+      hint: "CONDITIONAL — skip if MAYDAY was already declared during engine_secured step. If not yet declared: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 4 000 ft, standby.' Brief — declare, state, standby. No intentions yet. ATC will acknowledge and hold for intentions; crew advises 'will advise intentions shortly' once workload eases.",
       variant: "warning",
       crew: "PM",
       group: "comms",
@@ -386,7 +390,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "level_off_maa",
       label: "V/S 0 AT MAA",
       action: "SELECT",
-      hint: "PF: at minimum acceleration altitude (~2300 ft AMSL given VIDP elev ~777 ft), push V/S knob → FMA col 2 changes from SRS to 'V/S = 0' in green (FCOM DSC-22-30-10: FMA displays 'V/S = 0' when V/S is nulled). A/THR maintains target speed. Thrust stays in TOGA detent. [fctm:L12872-73 'push ALT pb or push the V/S knob to level off']",
+      hint: "NOT BEFORE: engine secured AND MAA reached (VIDP elev 777 ft + 1 500 ft = ~2 300 ft AMSL). PF pushes V/S knob → FMA col 2 changes SRS → 'V/S = 0' (green) [FCOM DSC-22-30-10]. Both crew confirm VS ZERO selected and indicated. A/THR holds speed; thrust stays in TOGA detent. Aircraft levels off; begin accel + flap retraction. [fctm:L12872-73]",
       variant: "switch",
       requires: ["engine_secured"],
       crew: "PF",
