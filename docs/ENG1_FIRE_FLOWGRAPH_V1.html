@@ -175,7 +175,7 @@ const nodes = [
   {id:'atc_radar_mayday',  type:'atc',     x:COL.atc,  y:1708, w:SW,h:SH, label:'② TWR ACK + HANDOVER',     sub:'TWR: MAYDAY ack → "contact Departure 124.85"', req:['mayday_atc']},
   {id:'pm_dep_initial_call',type:'step',   x:COL.pm,   y:1734, w:NW,h:NH, label:'PM CALLS DEPARTURE',        sub:'PM · 124.85 · "IFLY101 MAYDAY · ENG fire · hdg + alt"', req:['atc_radar_mayday']},
   {id:'atc_vectors_clb',   type:'atc',     x:COL.atc,  y:1760, w:SW,h:SH, label:'③ DEP: MAYDAY CONFIRM',    sub:'DEP: radar contact · MAYDAY ack · continue track · climb 4000', req:['pm_dep_initial_call']},
-  {id:'atc_pob_rwy_ask',   type:'atc',     x:COL.atc,  y:1780, w:SW,h:SH, label:'[D2] DEP: POB + RWY? — STANDBY', sub:'DEP: say POB + runway in use → PM: "STANDBY, IFLY101"', req:['mayday_atc']},
+  {id:'atc_pob_rwy_ask',   type:'atc',     x:COL.atc,  y:1780, w:SW,h:SH, label:'[D2] DEP: POB + ENDURANCE?',    sub:'DEP: say POB and endurance → PM: "STANDBY, IFLY101"', req:['atc_vectors_clb']},
   {id:'announce_sec_failures',type:'step', x:COL.pm,   y:1818, w:NW,h:NH, label:'SECONDARY FAILURES',        sub:'PM · ECAM — read from SD (HYD/ELEC/AIR)', req:['mayday_atc']},
   {id:'atc_vectors_rdy',   type:'atc',     x:COL.atc,  y:1818, w:SW,h:SH, label:'[D1] DEP: VECTORS AVAIL',  sub:'DEP: "vectors available when ready" → PM: "STANDBY, IFLY101"', req:['atc_vectors_clb']},
   {id:'announce_status',   type:'step',    x:COL.pm,   y:1928, w:NW,h:NH, label:'STATUS — ANNOUNCE',         sub:'PM · STATUS — announce when page appears', req:['announce_sec_failures']},
@@ -196,11 +196,11 @@ const nodes = [
 
   // POST-FORDEC PARALLEL — 3 threads simultaneously
   {id:'intention_to_atc',  type:'step',    x:COL.pm,   y:3032, w:NW,h:NH, label:'INTENTION → ATC',           sub:'PM · ATC — returning VIDP RWY 28', req:['fordec']},
-  {id:'fmgc_prep',         type:'step',    x:COL.ctr,  y:3032, w:NW,h:NH, label:'FMGC PREP',                 sub:'PM · PLAN — DEST VIDP / RWY 28 / ILS 110.30', req:['fordec']},
-  {id:'nis_brief',         type:'step',    x:COL.pf,   y:3032, w:NW,h:NH, label:'NITS BRIEF',                sub:'PM · PLAN — cabin interphone (N·I·T·S)', req:['fordec']},
+  {id:'fmgc_prep',         type:'step',    x:COL.ctr,  y:3032, w:NW,h:NH, label:'FMGC PREP',                 sub:'PM · PLAN — DEST VIDP / RWY 28 / ILS 110.30', req:['intention_to_atc']},
+  {id:'nis_brief',         type:'step',    x:COL.pf,   y:3032, w:NW,h:NH, label:'NITS BRIEF',                sub:'PM · PLAN — cabin interphone (N·I·T·S)', req:['intention_to_atc']},
   {id:'pax_pa',            type:'step',    x:COL.pf,   y:3142, w:NW,h:NH, label:'PASSENGER PA',              sub:'PF · PLAN — precautionary return to Delhi', req:['nis_brief']},
   {id:'approach_prep',     type:'step',    x:COL.ctr,  y:3142, w:NW,h:NH, label:'APPROACH PREP',             sub:'PM · APPROACH — ILS 110.30/282, BARO, AUTOBRK MED', req:['fmgc_prep']},
-  {id:'atc_emergency_services',type:'step',x:COL.pm,   y:3142, w:NW,h:NH, label:'ATC — EMERG SVCS',          sub:'PM · ATC — IFLY101 returning VIDP RWY 28 · Cat 3 CFR + ambulance + emerg svcs RWY 28 · [POB] POB', req:['intention_to_atc']},
+  {id:'atc_emergency_services',type:'step',x:COL.pm,   y:3142, w:NW,h:NH, label:'ATC — EMERG SVCS',          sub:'PM · ATC — request Cat 3 CFR + ambulance + emerg svcs RWY 28 · [POB] POB', req:['nis_brief']},
   {id:'atc_rdy_appr',      type:'atc',     x:COL.atc,  y:3142, w:SW,h:SH, label:'⑨ READY APPROACH',         sub:'APP: advise when ready for approach', req:['approach_prep']},
 
   {id:'company_notify',    type:'step',    x:COL.pf,   y:3252, w:NW,h:NH, label:'OPS NOTIFY [OPT]',          sub:'PM · PLAN — ACARS/VHF MAYDAY + CFR request', req:['pax_pa']},
@@ -212,7 +212,7 @@ const nodes = [
   {id:'approach_cl',       type:'step',    x:COL.ctr,  y:3582, w:NW,h:NH, label:'APPROACH CL',               sub:'PM · APPROACH — BARO/DH/BELTS/AUTOBRK/SPOILERS', req:['go_around_review']},
   {id:'pm_req_vectors',    type:'step',    x:COL.pm,   y:3600, w:NW,h:NH, label:'REQUEST VECTORS',           sub:'PM · ATC — ready · request ILS vectors RWY 28', req:['approach_cl']},
   {id:'atc_clrd_appr',     type:'atc',     x:COL.atc,  y:3640, w:SW,h:SH, label:'⑩ CLEARED APPROACH',       sub:'APP: hdg 240, descend 3000, cleared ILS RWY 28', req:['pm_req_vectors']},
-  {id:'atc_tower_cont',    type:'atc',     x:COL.atc,  y:3582, w:SW,h:SH, label:'⑪ TOWER CONTACT',          sub:'TWR: continue ILS RWY 28, report established', req:['approach_cl']},
+  {id:'atc_tower_cont',    type:'atc',     x:COL.atc,  y:3582, w:SW,h:SH, label:'⑪ TOWER CONTACT',          sub:'TWR: continue ILS RWY 28, report established', req:['atc_clrd_appr']},
   {id:'landing_cl',        type:'step',    x:COL.ctr,  y:3692, w:NW,h:NH, label:'LANDING CL',                sub:'PM · APPROACH — GEAR/FLAPS/SPOILERS/AUTOBRK/CABIN', req:['approach_cl']},
   {id:'atc_cleared_land',  type:'atc',     x:COL.atc,  y:3692, w:SW,h:SH, label:'⑫ CLEARED TO LAND',        sub:'TWR: RWY 28 cleared to land, wind 280/8', req:['landing_cl']},
 ];
@@ -261,7 +261,7 @@ KEY ELEMENTS:
 NOTE: No "returning to Delhi" or runway request in initial MAYDAY.
       Intentions stated later after FORDEC (see INTENTION → ATC node).
 
-AFTER MAYDAY: wait for Tower ACK before switching to Departure 124.85.`,
+`,
 
   atc_radar_mayday:`③ TOWER ACKNOWLEDGES → HANDOVER → PM CHANGES FREQUENCY
 ─────────────────────────────────────────
@@ -321,18 +321,19 @@ WHY repeat MAYDAY on Departure:
 PM readback to Tower before switching:
   "MAYDAY acknowledged, Departure 124.85, IFLY101"`,
 
-  atc_pob_rwy_ask:`[D2] DEPARTURE — POB + RUNWAY IN USE?
+  atc_pob_rwy_ask:`[D2] DEPARTURE — POB + ENDURANCE?
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
+TRIGGER: After DEP confirms MAYDAY on 124.85 (distractor)
 
-DEP: "IFLY101, say persons on board and runway in use."
+DEP: "IFLY101, say persons on board and endurance."
 
 PM response:
   → "STANDBY, IFLY101"
 
-WHY STANDBY: ECAM actions ongoing — workload too high to answer.
-             PM will provide POB + endurance after hold established
-             (see ENDURANCE + POB node).`,
+WHY STANDBY: ECAM checklist still running — workload too high.
+             PM gives POB + fuel endurance after ECAM complete
+             (see ENDURANCE + POB node — JOIN gate).`,
 
   atc_vectors_rdy:`[D1] DEPARTURE — VECTORS AVAILABLE
 ─────────────────────────────────────────
@@ -454,12 +455,12 @@ TRANSMISSION:
 NOTE: Intention only — no emergency services request yet.
       Full emergency services request is the NEXT call (see EMERG SVCS node).`,
 
-  atc_emergency_services:`PM — COMPREHENSIVE EMERGENCY SERVICES REQUEST
+  atc_emergency_services:`PM — EMERGENCY SERVICES REQUEST
 ─────────────────────────────────────────
-TRIGGER: After stating intention (intention_to_atc)
+TRIGGER: After NITS brief complete (intention already stated to ATC)
          [simulation-placeholder — ICAO Doc 9432 format]
 
-TRANSMISSION (ONE comprehensive call):
+TRANSMISSION:
 "IFLY101 — request Cat 3 crash fire rescue on runway 28.
  Request ambulance and medical services on standby.
  [POB] persons on board."
@@ -467,11 +468,11 @@ TRANSMISSION (ONE comprehensive call):
 KEY ELEMENTS:
   Cat 3 CFR     — crash fire rescue category (engine fire / foam)
   Ambulance     — medical on standby at runway threshold
-  POB           — if not already given to ATC
-  ONE CALL      — PM states everything in one transmission
+  POB           — stated here if not already given
+  ONE CALL      — emergency services only; intention was already stated
 
-NOTE: PM has already informed ATC of nature (engine fire) + intention.
-      This call covers fire + medical + POB in one go.
+NOTE: Intention (returning VIDP RWY 28) was the PREVIOUS call.
+      This call is emergency services only — do not repeat intention.
       ATC responds with full confirmation (see ⑧ EMSVCS ACK).`,
 
   atc_emsvcs_ack:`⑧ DEPARTURE — EMERGENCY SERVICES CONFIRMED
