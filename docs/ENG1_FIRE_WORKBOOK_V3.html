@@ -121,6 +121,37 @@
   /* ── Notes list ── */
   .notes-list { margin: 0; padding-left: 14px; }
   .notes-list li { font-size: 11px; color: #4b5563; line-height: 1.5; font-family: monospace; }
+
+  /* ── Flow graph ── */
+  .flow-filter { padding: 4px 12px; border-radius: 4px; border: 1px solid #e5e7eb; cursor: pointer; font-size: 11px; font-weight: 700; background: #f9fafb; color: #374151; }
+  .flow-filter.active { background: #1f2937; color: #fff; border-color: #1f2937; }
+  .flow-filter:hover:not(.active) { background: #f3f4f6; }
+  .chip-trigger { background: #fee2e2; color: #991b1b; }
+  .chip-ecam    { background: #fef9c3; color: #854d0e; }
+  .chip-fma     { background: #d1fae5; color: #065f46; }
+  .chip-atc     { background: #dbeafe; color: #1e3a8a; }
+  .chip-pfd     { background: #ccfbf1; color: #134e4a; }
+  .chip-step    { background: #ede9fe; color: #5b21b6; }
+  .flow-req { font-size: 10px; font-family: monospace; color: #374151; }
+  .flow-req span { display: inline-block; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 3px; padding: 1px 5px; margin: 1px; }
+  .flow-effects { font-size: 11px; color: #4b5563; line-height: 1.5; }
+  .flow-payload { font-size: 11px; font-family: monospace; font-weight: 600; color: #111; }
+
+  /* ── Parallel track row banding ── */
+  tr[data-track="batch:fire_warn"]    td:first-child { border-left: 4px solid #dc2626; }
+  tr[data-track="batch:sec_fail"]     td:first-child { border-left: 4px solid #d97706; }
+  tr[data-track="pf_aviate"]          td:first-child { border-left: 4px solid #1d4ed8; }
+  tr[data-track="pm_comms"]           td:first-child { border-left: 4px solid #16a34a; }
+  tr[data-track="post_fordec"]        td:first-child { border-left: 4px solid #7c3aed; }
+  tr[data-track="approach"]           td:first-child { border-left: 4px solid #0d9488; }
+  .chip-track-fire  { background:#fee2e2; color:#991b1b; font-size:9px; }
+  .chip-track-sec   { background:#fef9c3; color:#854d0e; font-size:9px; }
+  .chip-track-pf    { background:#dbeafe; color:#1e3a8a; font-size:9px; }
+  .chip-track-pm    { background:#d1fae5; color:#065f46; font-size:9px; }
+  .chip-track-ford  { background:#ede9fe; color:#5b21b6; font-size:9px; }
+  .chip-track-appr  { background:#ccfbf1; color:#134e4a; font-size:9px; }
+  .chip-join        { background:#fbbf24; color:#78350f; font-size:9px; font-weight:800; }
+  .chip-batch       { background:#f87171; color:#7f1d1d; font-size:9px; font-weight:800; }
 </style>
 </head>
 <body>
@@ -132,7 +163,7 @@
   </div>
   <div class="topbar-right">
     <span class="save-status" id="saveStatus">Auto-save on</span>
-    <button class="btn btn-v2" onclick="window.open('ENG1_FIRE_WORKBOOK_V2.html','_blank')">Open V2</button>
+    <span style="font-size:11px;color:#6b7280;padding:5px 10px;background:#374151;border-radius:5px">V2 archived</span>
     <button class="btn btn-save" onclick="saveAll()">Save</button>
     <button class="btn btn-export" onclick="exportHTML()">Export HTML</button>
   </div>
@@ -145,6 +176,7 @@
   <div class="tab" onclick="showTab('atc')">ATC Distractions</div>
   <div class="tab" onclick="showTab('status')">Status &amp; Decisions</div>
   <div class="tab" onclick="showTab('phases')">Phase FMA</div>
+  <div class="tab" onclick="showTab('flow')">Flow Graph</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ SUMMARY -->
@@ -152,7 +184,7 @@
   <p class="section-title">Scenario Overview</p>
 
   <div class="cards">
-    <div class="card"><div class="card-label">Total Steps</div><div class="card-value">33</div><div class="card-sub">incl. flightcheck, glareshield, comms, chclm</div></div>
+    <div class="card"><div class="card-label">Total Steps</div><div class="card-value">39</div><div class="card-sub">incl. flightcheck, glareshield, comms, chclm, approach</div></div>
     <div class="card"><div class="card-label">ATC Distractions</div><div class="card-value">12</div><div class="card-sub">① Tower handoff → ⑫ Cleared to land</div></div>
     <div class="card"><div class="card-label">Triggers</div><div class="card-value">4</div><div class="card-sub">after_v1, fire_warn, four_hundred_ft, min_accel_alt</div></div>
     <div class="card"><div class="card-label">Status Items</div><div class="card-value">14</div><div class="card-sub">Left col: limitations / Right col: INOP SYS</div></div>
@@ -217,16 +249,17 @@
   <table>
     <thead>
       <tr>
-        <th width="4%">#</th>
-        <th width="8%">ID</th>
-        <th width="8%">Group</th>
-        <th width="5%">Crew</th>
-        <th width="8%">Category</th>
-        <th width="10%">Label / Action</th>
-        <th width="22%">Hint (current)</th>
-        <th width="23%">Proposed Change</th>
-        <th width="6%">Flag</th>
-        <th width="6%">Requires</th>
+        <th width="3%">#</th>
+        <th width="7%">ID</th>
+        <th width="6%">Group</th>
+        <th width="4%">Crew</th>
+        <th width="7%">Category</th>
+        <th width="9%">Label / Action</th>
+        <th width="14%">Hint (current)</th>
+        <th width="16%">Notes / Detail</th>
+        <th width="14%">Proposed Change</th>
+        <th width="5%">Flag</th>
+        <th width="5%">Requires</th>
       </tr>
     </thead>
     <tbody id="procedureBody">
@@ -344,6 +377,56 @@
   </table>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════════ FLOW GRAPH -->
+<div class="section" id="tab-flow">
+  <p class="section-title">Flow Graph — All Nodes (Triggers · ECAM · Steps · FMA · ATC · PFD Actions)</p>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:10px;">Every element in the scenario as a single flat graph. <strong>Nothing moves unless all upstream nodes are satisfied.</strong> Use as the source of truth — edit here, then push to TypeScript.</p>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+    <span style="font-size:11px;color:#6b7280;font-weight:700;margin-right:4px;">FILTER:</span>
+    <button class="flow-filter active" data-type="all"     onclick="filterFlow(this,'all')">ALL</button>
+    <button class="flow-filter"        data-type="trigger" onclick="filterFlow(this,'trigger')">TRIGGER</button>
+    <button class="flow-filter"        data-type="step"    onclick="filterFlow(this,'step')">STEP</button>
+    <button class="flow-filter"        data-type="ecam"    onclick="filterFlow(this,'ecam')">ECAM</button>
+    <button class="flow-filter"        data-type="fma"     onclick="filterFlow(this,'fma')">FMA</button>
+    <button class="flow-filter"        data-type="atc"     onclick="filterFlow(this,'atc')">ATC</button>
+    <button class="flow-filter"        data-type="pfd"     onclick="filterFlow(this,'pfd')">PFD ACTION</button>
+  </div>
+
+  <!-- ── Parallel tracks legend ─────────────────────────────────────────── -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-start;">
+    <span style="font-size:11px;color:#6b7280;font-weight:700;padding-top:3px;white-space:nowrap;">TRACKS:</span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <span class="chip chip-track-fire" style="padding:3px 8px;">⚡ BATCH — fire_warn</span>
+      <span class="chip chip-track-sec"  style="padding:3px 8px;">⚡ BATCH — sec failures</span>
+      <span class="chip chip-track-pf"   style="padding:3px 8px;">✈ PF AVIATE</span>
+      <span class="chip chip-track-pm"   style="padding:3px 8px;">📻 PM COMMS</span>
+      <span class="chip chip-track-ford" style="padding:3px 8px;">⊕ POST-FORDEC ∥</span>
+      <span class="chip chip-track-appr" style="padding:3px 8px;">▼ APPROACH SEQ</span>
+      <span class="chip chip-join"       style="padding:3px 8px;">JOIN — ALL req must complete</span>
+      <span class="chip chip-batch"      style="padding:3px 8px;">BATCH — fires simultaneously</span>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th width="3%">#</th>
+        <th width="9%">ID</th>
+        <th width="6%">Type</th>
+        <th width="7%">Time / Gate</th>
+        <th width="13%">Requires ↑ (all must be done)</th>
+        <th width="12%">Track / Batch</th>
+        <th width="20%">Effects → (what fires / changes)</th>
+        <th width="18%">Payload (crew sees)</th>
+        <th width="8%">Proposed Change</th>
+        <th width="4%">Flag</th>
+      </tr>
+    </thead>
+    <tbody id="flowBody"></tbody>
+  </table>
+</div>
+
 <script>
 const LS_KEY = 'eng1_fire_workbook_v3';
 
@@ -357,7 +440,7 @@ const steps = [
   { n:4,  id:'cancel_master_warn',   group:'glareshield', crew:'PM', cat:'av',  label:'MASTER WARN',                action:'CANCEL',   hw:true,  opt:false, req:'—',                      hint:'PM cancels MASTER WARN FIRST — pushes glareshield light to silence CRC and reset the red light.' },
   { n:5,  id:'four_hundred_ft_cmd',  group:'flightcheck', crew:'PM', cat:'av',  label:'400 FT — ECAM ACTIONS',      action:'ANNOUNCE', hw:false, opt:false, req:'engage_ap_fma + cancel_master_warn', hint:'At 400 ft AGL with flight path stabilised, PM confirms failure, reads ECAM title. PF orders ECAM ACTIONS.' },
   // ECAM PROCEDURE
-  { n:6,  id:'thr_lever_idle',       group:'procedure',   crew:'PM', cat:'ec',  label:'THR LEVER 1',                action:'IDLE',     hw:true,  opt:false, req:'four_hundred_ft_cmd',    hint:'PM retards ENG 1 thrust lever to IDLE. Reduces thrust before fuel isolation.' },
+  { n:6,  id:'thr_lever_idle',       group:'procedure',   crew:'PF', cat:'ec',  label:'THR LEVER 1',                action:'IDLE',     hw:true,  opt:false, req:'four_hundred_ft_cmd',    hint:'FCTM AOP-30-20 THRUST LEVER RULE: PM announces THR LEVER 1—IDLE. PF confirms correct lever: THR LEVER 1, CONFIRM IDLE? → PM: CONFIRM → PF retards lever. PM must NOT operate thrust levers. Reduces thrust before fuel/engine isolation.', notes:[] },
   { n:7,  id:'eng1_master_off',      group:'procedure',   crew:'PM', cat:'ec',  label:'ENG 1 MASTER',               action:'OFF',      hw:true,  opt:false, req:'thr_lever_idle',         hint:'PM: ENG 1 MASTER, CONFIRM OFF? → PF: CONFIRM → PM sets OFF. Closes LP + HP fuel shut-off valves.' },
   { n:8,  id:'eng1_fire_pb',         group:'procedure',   crew:'PM', cat:'ec',  label:'ENG 1 FIRE P/B',             action:'PUSH',     hw:true,  opt:false, req:'eng1_master_off',        hint:'PM: ENG 1 FIRE P/B, CONFIRM PUSH? → PF: CONFIRM → PM pushes. Arms squibs, closes bleed + HYD SOV, cuts FADEC.' },
   { n:9,  id:'cancel_master_caut',   group:'glareshield', crew:'PM', cat:'ec',  label:'MASTER CAUT',                action:'CANCEL',   hw:true,  opt:false, req:'—',                      hint:'PM pushes MASTER CAUTION light — silences single-chime, resets amber light.' },
@@ -366,36 +449,36 @@ const steps = [
   // POST-ECAM (parallel tracks)
   { n:12, id:'engine_secured',       group:'chclm',       crew:'PM', cat:'ec',  label:'ENGINE SECURED',             action:'ANNOUNCE', hw:false, opt:false, req:'agent1 + fire_extinguished', hint:'Once fire light is out and engine secured, PM announces ENGINE SECURED and PRIMARY ECAM ACTIONS COMPLETE.' },
   { n:13, id:'announce_land_asap',   group:'chclm',       crew:'PF', cat:'av',  label:'LAND ASAP',                  action:'ANNOUNCE', hw:false, opt:false, req:'engine_secured',         hint:'PF announces LAND ASAP (red on ECAM) — cue to declare MAYDAY on current frequency. PM cross-checks that MAYDAY is the next call.' },
-  { n:14, id:'mayday_atc',           group:'comms',       crew:'PM', cat:'atc', label:'MAYDAY',                     action:'DECLARE',  hw:false, opt:false, req:'announce_land_asap',     hint:'Call on CURRENT frequency (Tower if handoff not yet accepted): MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' },
+  { n:14, id:'mayday_atc',           group:'comms',       crew:'PM', cat:'atc', label:'MAYDAY',                     action:'DECLARE',  hw:false, opt:false, req:'announce_land_asap',     hint:'Call on CURRENT frequency (Tower if handoff not yet accepted): MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.', notes:['MAYDAY × 3','Callsign','Nature: engine fire engine 1','Position / heading / altitude','STANDBY — defer intentions and POB/fuel until workload eases'] },
   // PF AVIATE TRACK (parallel)
   { n:15, id:'level_off_maa',        group:'procedure',   crew:'PF', cat:'av',  label:'V/S 0 AT MAA',               action:'SELECT',   hw:false, opt:false, req:'engine_secured',         hint:'PF: at minimum acceleration altitude (~2300 ft AMSL), push V/S knob → FMA col 2 changes SRS → V/S = 0.' },
   { n:16, id:'accel_clean',          group:'procedure',   crew:'PF', cat:'av',  label:'ACCEL / CLEAN',              action:'CONFIRM',  hw:false, opt:false, req:'level_off_maa',          hint:'PF calls FLAPS 1 at F speed and FLAPS UP at S speed; PM checks speed, repeats callouts, selects accordingly.' },
   { n:17, id:'mct_open_clb',         group:'procedure',   crew:'PF', cat:'av',  label:'MCT / OPEN CLB',             action:'SELECT',   hw:false, opt:false, req:'accel_clean',            hint:'At green dot: LVR MCT flashes white. PF moves live lever to MCT. Pulls ALT knob → OP CLB. FMA: THR MCT · OP CLB · NAV · AP1 · A/THR.' },
   // PM COMMS TRACK (parallel)
-  { n:18, id:'announce_sec_failures',group:'chclm',       crew:'PM', cat:'ec',  label:'SECONDARY FAILURES',         action:'READ',     hw:false, opt:false, req:'mayday_atc',             hint:'PM reads secondary system failures from SD after engine secured. PF cross-checks and acknowledges each item.' },
+  { n:18, id:'announce_sec_failures',group:'chclm',       crew:'PM', cat:'ec',  label:'SECONDARY FAILURES',         action:'READ',     hw:false, opt:false, req:'mayday_atc',             hint:'PM reads secondary system failures from SD after engine secured. PF cross-checks and acknowledges each item.', notes:['HYD G ENG1 PUMP...LO PR — Green sys ENG1 pump SOV closed by FIRE pb. PTU may transfer YELLOW→GREEN.','GEN 1 FAULT.........OFF — IDG1 deactivated by FIRE pb. BTC auto-closes, AC BUS 1 fed by GEN 2.','ENG 1 BLEED......FAULT — ENG 1 bleed SOV closed by FIRE pb. XBLEED AUTO opens, PACK 1 monitor.'] },
   { n:19, id:'announce_status',      group:'chclm',       crew:'PM', cat:'st',  label:'STATUS — ANNOUNCE',          action:'ANNOUNCE', hw:false, opt:false, req:'announce_sec_failures',  hint:'When STATUS page appears: PM announces STATUS.' },
   { n:20, id:'stop_ecam',            group:'chclm',       crew:'PF', cat:'st',  label:'STOP ECAM',                  action:'ORDER',    hw:false, opt:false, req:'announce_status',        hint:'PF: STOP ECAM — PM stops ECAM actions. Ask for After Takeoff CL, OEB, computer resets.' },
-  { n:21, id:'after_takeoff_cl',     group:'chclm',       crew:'PM', cat:'st',  label:'AFTER TAKEOFF CL',           action:'COMPLETE', hw:false, opt:false, req:'stop_ecam',              hint:'PF: Any NORMAL CHECKLIST? — PM runs After Takeoff checklist.' },
+  { n:21, id:'after_takeoff_cl',     group:'chclm',       crew:'PM', cat:'st',  label:'AFTER TAKEOFF CL',           action:'COMPLETE', hw:false, opt:false, req:'stop_ecam',              hint:'PF: Any NORMAL CHECKLIST? — PM runs After Takeoff checklist.', notes:['PACKS ............. CHECK (single pack ops — PACK 2 AUTO)','SEAT BELTS ........ ON','LANDING GEAR ...... UP / 3 OFF','ENGINE MODE SEL ... IGN (already set per ECAM)','FLAPS ............. 0 (clean / as required)'] },
   { n:22, id:'oeb_check',            group:'chclm',       crew:'PF', cat:'st',  label:'OEB / COMPUTER RESETS',      action:'CHECK',    hw:false, opt:false, req:'after_takeoff_cl',       hint:'PF: Any OEB? Any COMPUTER RESETS? — PM checks QRH reset table.' },
-  { n:23, id:'read_status',          group:'chclm',       crew:'PF', cat:'st',  label:'READ STATUS',                action:'CALL',     hw:false, opt:false, req:'oeb_check',              hint:'PF: READ STATUS — PM reads the ECAM STATUS page aloud.' },
-  { n:24, id:'status_read_aloud',    group:'chclm',       crew:'PM', cat:'st',  label:'ECAM STATUS — PM READS',     action:'REVIEW',   hw:false, opt:false, req:'read_status',            hint:'PM reads STATUS page aloud, item by item. PF: CHECKED after each item.' },
+  { n:23, id:'read_status',          group:'chclm',       crew:'PF', cat:'st',  label:'READ STATUS',                action:'CALL',     hw:false, opt:false, req:'oeb_check',              hint:'PF: READ STATUS — PM reads the ECAM STATUS page aloud.', notes:['Reference: QRH ABNORMAL — ONE ENG INOPERATIVE supplementary procedure (SE flight management — drift-down, perf, fuel).','Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING procedure (approach planning — Vapp, flap setting, autobrake, EO go-around).'] },
+  { n:24, id:'status_read_aloud',    group:'chclm',       crew:'PM', cat:'st',  label:'ECAM STATUS — PM READS',     action:'REVIEW',   hw:false, opt:false, req:'read_status',            hint:'PM reads STATUS page aloud, item by item. PF: CHECKED after each item.', notes:['ENG 1 SHUT DOWN','AGENT 1 DISCH / AGENT 2 DISCH (both bottles used)','ENG 1 FIRE DET ... DEGRADED (single loop remaining)','HYD G ENG1 PUMP LO PR','GEN 1 INOP','ENG 1 BLEED FAULT','PACK 1 ........... MONITOR (single pack ops)','APPR CAT 1 (degraded approach capability)','MAX FL 250 (single-engine ceiling)','TCAS .............. TA only'] },
   { n:25, id:'crew_crosscheck',      group:'chclm',       crew:'PM', cat:'st',  label:'ECAM ACTIONS COMPLETE',      action:'ANNOUNCE', hw:false, opt:false, req:'status_read_aloud',      hint:'PM: ECAM ACTIONS COMPLETE. PF acknowledges.' },
   // CRM PLANNING
   { n:26, id:'wx_request',           group:'comms',       crew:'PM', cat:'pl',  label:'WX / ATIS',                  action:'REQUEST',  hw:false, opt:false, req:'crew_crosscheck',        hint:'PM requests latest weather from Delhi Approach: wind, QNH, temp, vis, RVR RWY 28.' },
   { n:27, id:'ldg_perf',             group:'comms',       crew:'PF', cat:'pl',  label:'LDG PERF',                   action:'CHECK',    hw:false, opt:false, req:'wx_request',             hint:'SE approach: Vapp +5 kt. RWY 28 VIDP LDA 4430 m / factored SE dist ~2200 m — ADEQUATE.' },
-  { n:28, id:'fordec',               group:'comms',       crew:'PF', cat:'pl',  label:'FORDEC',                     action:'COMPLETE', hw:false, opt:false, req:'ldg_perf',               hint:'PF leads FORDEC discussion. PM cross-checks each element. Agree and commit to decision.' },
+  { n:28, id:'fordec',               group:'comms',       crew:'PF', cat:'pl',  label:'FORDEC',                     action:'COMPLETE', hw:false, opt:false, req:'ldg_perf',               hint:'PF leads FORDEC discussion. PM cross-checks each element. Agree and commit to decision.', notes:['F — FACTS: ENG 1 fire secured. Single engine. VIDP 15 min. RWY 28 LDA 4430 m. Full CFR on field.','O — OPTIONS: ① Return VIDP RWY 28  ② Divert nearest alternate  ③ Continue (NOT viable)','R — RISKS & BENEFITS: VIDP = known field, full CFR, adequate LDA. Divert = longer flight, unfamiliar.','D — DECISION: LAND ASAP — return VIDP RWY 28 with full emergency declared.','E — EXECUTION: ILS RWY 28, Cat 1, SE approach Vapp+5 kt, full emergency, CFR standing by.','C — CHECK-BACK: PM confirms AGREED — LAND VIDP RWY 28, FULL EMERGENCY'] },
   { n:29, id:'intention_to_atc',     group:'comms',       crew:'PM', cat:'atc', label:'INTENTION — ATC',            action:'ADVISE',   hw:false, opt:false, req:'fordec',                 hint:'PM advises ATC of FORDEC outcome: returning to VIDP for landing runway 28, will advise when ready for approach.' },
   { n:30, id:'fmgc_prep',            group:'comms',       crew:'PM', cat:'pl',  label:'FMGC PREP',                  action:'COMPLETE', hw:false, opt:false, req:'fordec',                 hint:'PM: enter VIDP in DEST, select RWY 28, insert ILS 110.30/CRS 282. Set Vapp = Vref+5 kt.' },
-  { n:31, id:'nis_brief',            group:'comms',       crew:'PM', cat:'pl',  label:'NITS BRIEF',                 action:'CONFIRM',  hw:false, opt:false, req:'fordec',                 hint:'Interphone to SCCM — NATURE: engine fire. INTENTIONS: landing VIDP RWY 28. TIME: ~15 min. SPECIAL: emergency/precautionary.' },
+  { n:31, id:'nis_brief',            group:'comms',       crew:'PM', cat:'pl',  label:'NITS BRIEF',                 action:'CONFIRM',  hw:false, opt:false, req:'fordec',                 hint:'Interphone to SCCM — NATURE: engine fire. INTENTIONS: landing VIDP RWY 28. TIME: ~15 min. SPECIAL: emergency/precautionary.', notes:['N — NATURE: Engine fire, ENG 1 shut down, aircraft serviceable','I — INTENTIONS: Returning and landing runway 28 Delhi VIDP','T — TIME: Approximately 15 minutes to landing','S — SPECIAL: Crew at stations. Precautionary or emergency landing per Captain\'s decision.'] },
   { n:32, id:'pax_pa',               group:'comms',       crew:'PF', cat:'pl',  label:'PASSENGER PA',               action:'CONFIRM',  hw:false, opt:false, req:'nis_brief',              hint:'PA: Ladies and gentlemen, this is your Captain. We are returning to Delhi as a precaution. Remain seated.' },
   { n:33, id:'company_notify',       group:'comms',       crew:'PM', cat:'pl',  label:'OPS NOTIFY',                 action:'CONFIRM',  hw:false, opt:true,  req:'pax_pa',                 hint:'ACARS or VHF: OPS, IFLY101, MAYDAY declared, ENG 1 FIRE, returning VIDP RWY 28, request CFR + ground support.' },
   // APPROACH
   { n:34, id:'approach_prep',        group:'comms',       crew:'PM', cat:'ap',  label:'APPROACH PREP',              action:'COMPLETE', hw:false, opt:false, req:'fmgc_prep',              hint:'PM: set ILS RWY 28 freq 110.30/CRS 282. BARO minima 200 ft/QNH set. Autobrake MED. Spoilers ARM.' },
   { n:35, id:'atc_emergency_services',group:'comms',      crew:'PM', cat:'atc', label:'ATC — EMERG SVCS',           action:'ADVISE',   hw:false, opt:false, req:'approach_prep',          hint:'PM advises ATC: IFLY101, request Category 3 emergency services on runway 28. CFR vehicles, ambulances, medical standby.' },
-  { n:36, id:'approach_brief',       group:'comms',       crew:'PF', cat:'ap',  label:'APPROACH BRIEF',             action:'COMPLETE', hw:false, opt:false, req:'atc_emergency_services',  hint:'PF briefs: ILS RWY 28 VIDP, single-engine CAT 1. DA 200 ft. Vapp +5 kt. Non-normal items from STATUS. Go-around briefed.' },
-  { n:37, id:'go_around_review',     group:'comms',       crew:'PF', cat:'ap',  label:'GO-AROUND REVIEW',           action:'CONFIRM',  hw:false, opt:false, req:'approach_brief',         hint:'PF briefs go-around plan and confirms fuel state is adequate for alternate if approach is missed.' },
-  { n:38, id:'approach_cl',          group:'chclm',       crew:'PM', cat:'ap',  label:'APPROACH CL',                action:'COMPLETE', hw:false, opt:false, req:'go_around_review',       hint:'PM runs approach checklist. Call each item, PF cross-checks and responds.' },
-  { n:39, id:'landing_cl',           group:'chclm',       crew:'PM', cat:'ap',  label:'LANDING CL',                 action:'COMPLETE', hw:false, opt:false, req:'approach_cl',            hint:'PM runs landing checklist at 1000 ft on final. PF confirms each item.' },
+  { n:36, id:'approach_brief',       group:'comms',       crew:'PF', cat:'ap',  label:'APPROACH BRIEF',             action:'COMPLETE', hw:false, opt:false, req:'atc_emergency_services',  hint:'PF briefs: ILS RWY 28 VIDP, single-engine CAT 1. DA 200 ft. Vapp +5 kt. Non-normal items from STATUS. Go-around briefed.', notes:['Reference: FCTM PR-AEP-ENG ONE ENGINE INOPERATIVE — LANDING [fctm:L13250-13265]','Key items: autoland available with OEI; slip → blue beta target above threshold thrust; do NOT lower gear too early (high power needed); reset rudder trim to zero before thrust reduction.'] },
+  { n:37, id:'go_around_review',     group:'comms',       crew:'PF', cat:'ap',  label:'GO-AROUND REVIEW',           action:'CONFIRM',  hw:false, opt:false, req:'approach_brief',         hint:'PF briefs go-around plan and confirms fuel state is adequate for alternate if approach is missed.', notes:['GO-AROUND: TOGA (ENG 2 only) — SRS engages — positive climb GEAR UP — maintain V2+10','FMA: TOGA → SRS / NAV / AP1 — monitor and call FMA at each transition','FUEL CHECK: confirm total fuel vs [DEST + ALTN + FINAL RESERVE]. If marginal — LAND VIDP.','RUNWAY VACATION: vacate via first available exit (Golf / Foxtrot). Brake to stop if needed.','Emergency services attend runway — do NOT delay evacuation call if required.'] },
+  { n:38, id:'approach_cl',          group:'chclm',       crew:'PM', cat:'ap',  label:'APPROACH CL',                action:'COMPLETE', hw:false, opt:false, req:'go_around_review',       hint:'PM runs approach checklist. Call each item, PF cross-checks and responds.', notes:['BARO ................. QNH SET','MDA/DH ............... 200 ft SET','SEAT BELTS ........... ON','AUTOBRAKE ............ MED','SPOILERS ............. ARM (green)','LANDING LIGHTS ....... ON','APPROACH USING HIGHEST LEVEL OF AUTOMATION'] },
+  { n:39, id:'landing_cl',           group:'chclm',       crew:'PM', cat:'ap',  label:'LANDING CL',                 action:'COMPLETE', hw:false, opt:false, req:'approach_cl',            hint:'PM runs landing checklist at 1000 ft on final. PF confirms each item.', notes:['GEAR ................. DOWN — 3 GREEN','FLAPS ................ FULL (or as required)','SPOILERS ............. ARM (green)','AUTOBRAKE ............ MED (SET)','CABIN ................ ADVISED','STANDARD CALLOUTS: 1000 ft / 500 ft / 100 ft / 50-40-30-20-10 RETARD'] },
 ];
 
 const catLabels = { av:'AVIATE', ec:'ECAM', atc:'ATC', st:'STATUS', pl:'PLAN', ap:'APPROACH' };
@@ -409,7 +492,7 @@ function buildProcedureTable() {
   steps.forEach(s => {
     if (s.cat !== lastCat) {
       const labels = { av:'AVIATE / FLIGHTCHECK / GLARESHIELD', ec:'ECAM PROCEDURE + POST-ECAM', atc:'ATC COMMS', st:'STATUS PAGE REVIEW', pl:'CRM PLANNING (FORDEC / COMMS)', ap:'APPROACH & LANDING' };
-      html += `<tr class="phase-divider"><td colspan="10">${labels[s.cat] || s.cat.toUpperCase()}</td></tr>`;
+      html += `<tr class="phase-divider"><td colspan="11">${labels[s.cat] || s.cat.toUpperCase()}</td></tr>`;
       lastCat = s.cat;
     }
     const crewChip = s.crew === 'PF' ? '<span class="chip chip-pf">PF</span>' : '<span class="chip chip-pm">PM</span>';
@@ -418,6 +501,9 @@ function buildProcedureTable() {
     const catChip  = `<span class="chip ${catChipClass[s.cat]}">${catLabels[s.cat]}</span>`;
     const groupChip = `<span class="chip chip-fc">${s.group}</span>`;
     const key = `step_${s.id}`;
+    const notesHtml = (s.notes && s.notes.length > 0)
+      ? '<ul class="notes-list">' + s.notes.map(n => `<li>${n}</li>`).join('') + '</ul>'
+      : '—';
     html += `<tr class="${rowCatClass[s.cat]}">
       <td>${s.n}</td>
       <td><code style="font-size:10px">${s.id}</code></td>
@@ -425,7 +511,8 @@ function buildProcedureTable() {
       <td>${crewChip}</td>
       <td>${catChip}</td>
       <td><strong>${s.label}</strong><br><span style="color:#6b7280;font-size:10px">${s.action}</span>${hwChip}${optChip}</td>
-      <td class="hint-text">${s.hint.substring(0,160)}${s.hint.length>160?'…':''}</td>
+      <td class="hint-text">${s.hint}</td>
+      <td>${notesHtml}</td>
       <td><textarea class="editable" data-key="${key}" rows="3" placeholder="Proposed change…"></textarea></td>
       <td><select class="flag-sel" data-key="${key}_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">${s.req}</td>
@@ -529,6 +616,210 @@ function buildPhaseTable() {
   tbody.innerHTML = html;
 }
 
+// ── Flow graph node data ───────────────────────────────────────────────────
+// Types: trigger | ecam | step | fma | atc | pfd
+// requires: array of upstream node IDs — ALL must be satisfied before this fires
+// effects:  what this node causes downstream
+// payload:  what the crew sees / hears
+const flowNodes = [
+  // ── TRIGGERS ──────────────────────────────────────────────────────────────
+  { id:'after_v1',          type:'trigger', t:'T+6 000 ms',     req:['—'],                                    track:null,             batch:null,           effects:'Gate only — V1 committed, rotation begins',                                    payload:'V1 PASSED' },
+  { id:'fire_warn',         type:'trigger', t:'T+8 000 ms',     req:['after_v1'],                             track:null,             batch:'batch:fire_warn', effects:'SET_MASTER_WARN · ADD_ECAM (all 7 lines below simultaneously) · CRC',        payload:'ENG 1 FIRE detected' },
+  { id:'four_hundred_ft',   type:'trigger', t:'T+18 000 ms',    req:['fire_warn'],                            track:null,             batch:null,           effects:'ADD_ECAM "400 FT — ECAM ACTIONS" · opens ECAM gate',                           payload:'400 ft AGL — ECAM ACTIONS' },
+  { id:'fire_extinguished', type:'trigger', t:'on agent disch',  req:['agent1'],                              track:null,             batch:null,           effects:'CLEAR_ECAM (eng1_fire) · engine_secured gate opens',                            payload:'Fire light out — engine secured' },
+  { id:'fire_persists_30s', type:'trigger', t:'fire_warn+30 s',  req:['agent1'],                              track:null,             batch:null,           effects:'Opens AGENT 2 ECAM line',                                                      payload:'Fire warning still active after 30 s' },
+  { id:'min_accel_alt',     type:'trigger', t:'T+55 000 ms',    req:['four_hundred_ft'],                      track:null,             batch:null,           effects:'Informational gate — MAA reached',                                             payload:'Minimum Acceleration Altitude ~1 500 ft' },
+  { id:'atc_notified',      type:'trigger', t:'mayday_atc+1.5s', req:['mayday_atc'],                         track:'pm_comms',        batch:null,           effects:'CLEAR_ECAM (ecam_atc)',                                                         payload:'ECAM ATC NOTIFY cleared' },
+
+  // ── ECAM LINES ── all 7 primary lines fire simultaneously on fire_warn ─────
+  { id:'ecam_eng1_fire',    type:'ecam',    t:'on fire_warn',   req:['fire_warn'],                            track:'batch:fire_warn', batch:'batch:fire_warn', effects:'Drives MASTER WARN · opens ECAM ACTIONS sequence',                        payload:'ENG 1 FIRE  [WARNING — red]' },
+  { id:'ecam_thr',          type:'ecam',    t:'on fire_warn',   req:['fire_warn'],                            track:'batch:fire_warn', batch:'batch:fire_warn', effects:'Cleared by step thr_lever_idle',                                           payload:'THR LEVER (ENG 1)......IDLE' },
+  { id:'ecam_master',       type:'ecam',    t:'on fire_warn',   req:['fire_warn'],                            track:'batch:fire_warn', batch:'batch:fire_warn', effects:'Cleared by step eng1_master_off',                                          payload:'ENG 1 MASTER...........OFF' },
+  { id:'ecam_fire_pb',      type:'ecam',    t:'on fire_warn',   req:['fire_warn'],                            track:'batch:fire_warn', batch:'batch:fire_warn', effects:'Cleared by step eng1_fire_pb · triggers sec failures batch +2 s',          payload:'ENG 1 FIRE P/B.........PUSH' },
+  { id:'ecam_agent1',       type:'ecam',    t:'on fire_warn',   req:['fire_warn'],                            track:'batch:fire_warn', batch:'batch:fire_warn', effects:'Cleared by step agent1',                                                   payload:'AGENT 1 AFTER 10 S....DISCH' },
+  { id:'ecam_atc',          type:'ecam',    t:'on fire_warn',   req:['fire_warn'],                            track:'batch:fire_warn', batch:'batch:fire_warn', effects:'Cleared by trigger atc_notified (1.5 s after mayday_atc)',                 payload:'ATC..................NOTIFY' },
+  { id:'ecam_land_asap',    type:'ecam',    t:'on fire_warn',   req:['fire_warn'],                            track:'batch:fire_warn', batch:'batch:fire_warn', effects:'Drives LAND ASAP decision — remains until landing',                        payload:'LAND ASAP  [WARNING — red]' },
+  { id:'ecam_if_persist',   type:'ecam',    t:'fire_warn+30 s', req:['fire_persists_30s'],                    track:null,              batch:null,           effects:'Reveals AGENT 2 line',                                                         payload:'· IF FIRE WARN AFTER 30 S:' },
+  { id:'ecam_agent2',       type:'ecam',    t:'conditional',    req:['ecam_if_persist','fire_persists_30s'],  track:null,              batch:null,           effects:'Cleared by step agent2',                                                       payload:'  AGENT 2.............DISCH' },
+  // ── secondary failures batch — all 3 fire simultaneously +2 s after fire_pb
+  { id:'sec_hyd',           type:'ecam',    t:'eng1_fire_pb+2s', req:['eng1_fire_pb'],                        track:'batch:sec_fail', batch:'batch:sec_fail', effects:'Displayed on SD simultaneously with sec_elec + sec_air_bleed',              payload:'* HYD G ENG1 PUMP LO PR  [CAUTION]' },
+  { id:'sec_elec',          type:'ecam',    t:'eng1_fire_pb+2s', req:['eng1_fire_pb'],                        track:'batch:sec_fail', batch:'batch:sec_fail', effects:'Displayed on SD simultaneously with sec_hyd + sec_air_bleed',               payload:'* ELEC / GEN 1 FAULT  [CAUTION]' },
+  { id:'sec_air_bleed',     type:'ecam',    t:'eng1_fire_pb+2s', req:['eng1_fire_pb'],                        track:'batch:sec_fail', batch:'batch:sec_fail', effects:'Displayed on SD simultaneously with sec_hyd + sec_elec',                    payload:'* AIR BLEED / ENG 1 BLEED FAULT  [CAUTION]' },
+
+  // ── PFD ACTIONS ────────────────────────────────────────────────────────────
+  { id:'pfa_ap1',           type:'pfd',     t:'phase 4',        req:['positive_rate_gear_up'],                track:'pf_aviate',       batch:null,           effects:'Green pulsing ring on PFD · coach hint after 8 s',                            payload:'AP1 ENGAGE' },
+  { id:'pfa_vs_zero',       type:'pfd',     t:'phase 11',       req:['engine_secured'],                       track:'pf_aviate',       batch:null,           effects:'Green pulsing ring on PFD · coach hint after 8 s',                            payload:'V/S ZERO AT MAA — push V/S knob' },
+  { id:'pfa_lvr_mct',       type:'pfd',     t:'phase 12',       req:['accel_clean'],                          track:'pf_aviate',       batch:null,           effects:'Green pulsing ring on PFD · FMA col 1 flashes LVR MCT white',                 payload:'LVR MCT → SET' },
+  { id:'pfa_op_clb',        type:'pfd',     t:'phase 13',       req:['mct_open_clb'],                         track:'pf_aviate',       batch:null,           effects:'Green pulsing ring on PFD · FMA col 2 changes V/S→OP CLB',                   payload:'OP CLB CONFIRM — pull ALT knob' },
+
+  // ── FMA STATES ─────────────────────────────────────────────────────────────
+  { id:'fma_01',            type:'fma',     t:'T=0',            req:['—'],                                    track:null,              batch:null,           effects:'SRS armed (cyan), TOGA set, RWY TRK mode',                                    payload:'MAN TOGA | SRS cyan | RWY | no AP | A/THR armed' },
+  { id:'fma_02',            type:'fma',     t:'T+6 000 ms',     req:['after_v1'],                             track:null,              batch:null,           effects:'Rotation — FMA frozen in takeoff config',                                     payload:'MAN TOGA | SRS cyan | RWY | no AP | A/THR armed' },
+  { id:'fma_03',            type:'fma',     t:'T+8 000 ms',     req:['fire_warn'],                            track:'batch:fire_warn', batch:'batch:fire_warn', effects:'NAV captured, SRS active green — fires with all ECAM lines',              payload:'MAN TOGA | SRS green | NAV | no AP | A/THR armed' },
+  { id:'fma_04',            type:'fma',     t:'T+14 000 ms',    req:['engage_ap_fma'],                        track:'pf_aviate',       batch:null,           effects:'AP1 annunciated — crew confirmed engagement',                                  payload:'MAN TOGA | SRS green | NAV | AP1 FD1 | A/THR armed' },
+  { id:'fma_05',            type:'fma',     t:'T+18 000 ms',    req:['four_hundred_ft'],                      track:null,              batch:null,           effects:'400 ft gate — ECAM ACTIONS begin',                                            payload:'MAN TOGA | SRS green | NAV | AP1 | A/THR armed' },
+  { id:'fma_06',            type:'fma',     t:'T+25 000 ms',    req:['thr_lever_idle'],                       track:null,              batch:null,           effects:'ENG 1 TL retarded to IDLE',                                                   payload:'MAN TOGA | SRS green | NAV | AP1 | A/THR armed' },
+  { id:'fma_07',            type:'fma',     t:'T+32 000 ms',    req:['eng1_master_off'],                      track:null,              batch:null,           effects:'LP + HP fuel SOVs closed',                                                    payload:'MAN TOGA | SRS green | NAV | AP1 | A/THR armed' },
+  { id:'fma_08',            type:'fma',     t:'T+40 000 ms',    req:['eng1_fire_pb'],                         track:null,              batch:null,           effects:'Bleed + HYD SOVs closed · squibs armed · FADEC cut',                          payload:'MAN TOGA | SRS green | NAV | AP1 | A/THR armed' },
+  { id:'fma_09',            type:'fma',     t:'T+50 000 ms',    req:['agent1'],                               track:null,              batch:null,           effects:'Agent 1 discharged — waiting fire_extinguished',                              payload:'MAN TOGA | SRS green | NAV | AP1 | A/THR armed' },
+  { id:'fma_10',            type:'fma',     t:'T+60 000 ms',    req:['engine_secured'],                       track:null,              batch:null,           effects:'Engine secured — PF AVIATE + PM COMMS parallel tracks OPEN simultaneously',   payload:'MAN TOGA | SRS green | NAV | AP1 | A/THR armed' },
+  { id:'fma_11',            type:'fma',     t:'T+75 000 ms',    req:['level_off_maa'],                        track:'pf_aviate',       batch:null,           effects:'V/S 0 selected — level off at MAA',                                           payload:'MAN TOGA | V/S=0 green | NAV | AP1 | A/THR armed' },
+  { id:'fma_12',            type:'fma',     t:'T+95 000 ms',    req:['accel_clean'],                          track:'pf_aviate',       batch:null,           effects:'Green dot reached — LVR MCT flashes white on FMA',                            payload:'LVR MCT white | V/S=0 green | NAV | AP1 | A/THR armed' },
+  { id:'fma_13',            type:'fma',     t:'T+100 000 ms',   req:['mct_open_clb'],                         track:'pf_aviate',       batch:null,           effects:'OP CLB + THR MCT active — A/THR transitions armed→active',                    payload:'THR MCT green | OP CLB green | NAV | AP1 | A/THR active' },
+
+  // ── ATC CALLS ──────────────────────────────────────────────────────────────
+  { id:'atc_handoff',       type:'atc',     t:'T+27 500 ms',    req:['continue_rotation'],                    track:null,              batch:null,           effects:'STANDBY expected during ECAM · resurfaces T+52 500 ms',                       payload:'DELHI TWR: IFLY101, contact Delhi Departure 124.85.' },
+  { id:'atc_radar_mayday',  type:'atc',     t:'on mayday_atc',  req:['mayday_atc'],                           track:'pm_comms',        batch:null,           effects:'MAYDAY readback required',                                                     payload:'DELHI DEP: IFLY101, Delhi Departure, radar contact.' },
+  { id:'atc_vectors_clb',   type:'atc',     t:'mayday_atc+15s', req:['mayday_atc'],                           track:'pm_comms',        batch:null,           effects:'Climb clearance readback + continue runway track',                             payload:'DELHI DEP: Roger MAYDAY, continue runway track, climb 4 000 ft.' },
+  { id:'atc_vectors_rdy',   type:'atc',     t:'on step',        req:['announce_sec_failures'],                track:'pm_comms',        batch:null,           effects:'Crew continues checklist or requests hold',                                    payload:'DELHI DEP: Vectors available when ready.' },
+  { id:'atc_info_req',      type:'atc',     t:'on step',        req:['intention_to_atc'],                     track:'post_fordec',     batch:null,           effects:'WX + approach requirements request expected',                                  payload:'DELHI APP: Advise any requirements for approach.' },
+  { id:'atc_wx_brief',      type:'atc',     t:'on step',        req:['wx_request'],                           track:'post_fordec',     batch:null,           effects:'Wind / QNH / runway readback expected',                                       payload:'DELHI APP: Wind 280/8, RWY 28, expect ILS RWY 28.' },
+  { id:'atc_pob_fuel',      type:'atc',     t:'on step',        req:['ldg_perf'],                             track:'post_fordec',     batch:null,           effects:'POB / fuel / emergency services response expected',                            payload:'DELHI APP: Say POB, fuel endurance, assistance required.' },
+  { id:'atc_emsvcs_ack',    type:'atc',     t:'on step',        req:['atc_emergency_services'],               track:'approach',        batch:null,           effects:'Category 3 CFR confirmed readback',                                            payload:'DELHI APP: Emergency services standing by RWY 28, Cat 3 confirmed.' },
+  { id:'atc_rdy_appr',      type:'atc',     t:'on step',        req:['approach_prep'],                        track:'approach',        batch:null,           effects:'Request ILS vectors + advise ready',                                          payload:'DELHI APP: Advise when ready for approach.' },
+  { id:'atc_clrd_appr',     type:'atc',     t:'on step',        req:['approach_brief'],                       track:'approach',        batch:null,           effects:'Full approach clearance readback required',                                    payload:'DELHI APP: Left hdg 240, descend 3 000, cleared ILS RWY 28.' },
+  { id:'atc_tower_cont',    type:'atc',     t:'on step',        req:['approach_cl'],                          track:'approach',        batch:null,           effects:'Established report to Tower 118.10',                                          payload:'DELHI TWR: Continue ILS RWY 28, report established.' },
+  { id:'atc_cleared_land',  type:'atc',     t:'on step',        req:['landing_cl'],                           track:'approach',        batch:null,           effects:'Landing clearance readback',                                                  payload:'DELHI TWR: RWY 28 cleared to land, wind 280/8, emergency services in position.' },
+];
+
+// ── Parallel track definitions ─────────────────────────────────────────────
+// track: nodes that can ALL progress simultaneously within the same track
+// join:  a node where two or more tracks MUST BOTH finish before moving forward
+const parallelTracks = {
+  'batch:fire_warn': { label:'BATCH — fire_warn fires all at once', chipClass:'chip-track-fire', desc:'trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC' },
+  'batch:sec_fail':  { label:'BATCH — fire_pb +2 s',                chipClass:'chip-track-sec',  desc:'eng1_fire_pb afterEffect → sec failures appear simultaneously on SD' },
+  'pf_aviate':       { label:'PF AVIATE TRACK',                     chipClass:'chip-track-pf',   desc:'runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT' },
+  'pm_comms':        { label:'PM COMMS TRACK',                      chipClass:'chip-track-pm',   desc:'runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS' },
+  'post_fordec':     { label:'POST-FORDEC PARALLEL',                chipClass:'chip-track-ford', desc:'after FORDEC agreed: intention_to_atc + fmgc_prep + nis_brief all run simultaneously' },
+  'approach':        { label:'APPROACH SEQUENCE',                   chipClass:'chip-track-appr', desc:'single chain after post_fordec converges: prep → brief → CL → land CL' },
+};
+
+// ── Batch groups — what fires simultaneously ────────────────────────────────
+const batchGroups = {
+  'batch:fire_warn': ['ecam_eng1_fire','ecam_thr','ecam_master','ecam_fire_pb','ecam_agent1','ecam_atc','ecam_land_asap','fma_03'],
+  'batch:sec_fail':  ['sec_hyd','sec_elec','sec_air_bleed'],
+  'post_fordec':     ['intention_to_atc','fmgc_prep','nis_brief'],
+};
+
+// ── Step → track mapping (steps don't carry track natively) ────────────────
+const stepTrackMap = {
+  // PF AVIATE parallel track (runs after engine_secured alongside PM COMMS)
+  level_off_maa:         'pf_aviate',
+  accel_clean:           'pf_aviate',
+  mct_open_clb:          'pf_aviate',
+  // PM COMMS parallel track
+  mayday_atc:            'pm_comms',
+  announce_sec_failures: 'pm_comms',
+  announce_status:       'pm_comms',
+  stop_ecam:             'pm_comms',
+  after_takeoff_cl:      'pm_comms',
+  oeb_check:             'pm_comms',
+  read_status:           'pm_comms',
+  status_read_aloud:     'pm_comms',
+  crew_crosscheck:       'pm_comms',
+  // POST-FORDEC parallel (3 threads simultaneously after FORDEC agreed)
+  intention_to_atc:      'post_fordec',
+  fmgc_prep:             'post_fordec',
+  nis_brief:             'post_fordec',
+  pax_pa:                'post_fordec',
+  company_notify:        'post_fordec',
+  // APPROACH sequence (single chain)
+  approach_prep:         'approach',
+  atc_emergency_services:'approach',
+  approach_brief:        'approach',
+  go_around_review:      'approach',
+  approach_cl:           'approach',
+  landing_cl:            'approach',
+};
+
+const flowTypeChip = {
+  trigger: '<span class="chip chip-trigger">TRIGGER</span>',
+  ecam:    '<span class="chip chip-ec">ECAM</span>',
+  step:    '<span class="chip chip-step">STEP</span>',
+  fma:     '<span class="chip chip-fma">FMA</span>',
+  atc:     '<span class="chip chip-atc">ATC</span>',
+  pfd:     '<span class="chip chip-ap">PFD</span>',
+};
+
+function buildFlowTable() {
+  const tbody = document.getElementById('flowBody');
+  let html = '';
+  let n = 0;
+
+  // Combine non-step nodes + steps (converted to same shape)
+  const stepNodes = steps.map(s => ({
+    id: s.id, type: 'step', t: s.group,
+    req: s.req ? s.req.split(/\s*\+\s*|\s+/) : ['—'],
+    track: stepTrackMap[s.id] || null,
+    batch: null,
+    effects: `Crew: ${s.crew} · Cat: ${s.cat.toUpperCase()}${s.hw ? ' · HW' : ''}${s.opt ? ' · OPT' : ''}`,
+    payload: `${s.label} — ${s.action}`,
+  }));
+
+  const allNodes = [
+    ...flowNodes.filter(n => n.type === 'trigger'),
+    ...flowNodes.filter(n => n.type === 'ecam'),
+    ...stepNodes,
+    ...flowNodes.filter(n => n.type === 'fma'),
+    ...flowNodes.filter(n => n.type === 'atc'),
+    ...flowNodes.filter(n => n.type === 'pfd'),
+  ];
+
+  allNodes.forEach(node => {
+    n++;
+    const reqList = node.req || ['—'];
+    const reqHtml = reqList.map(r => r === '—' ? '<span style="color:#9ca3af">—</span>' : `<code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">${r}</code>`).join(' ');
+    const isJoin  = reqList.filter(r => r !== '—').length > 1;
+    const key = `flow_${node.id}`;
+
+    // ── Track / Batch cell ──────────────────────────────────────────────────
+    let trackHtml = '';
+    const trk = node.track;
+    const bat = node.batch;
+    if (bat && bat !== trk) {
+      // Node belongs to a batch group AND a separate track (e.g. ecam lines in batch:fire_warn)
+      const bDef = parallelTracks[bat];
+      if (bDef) trackHtml += `<span class="chip ${bDef.chipClass}">BATCH</span> `;
+    }
+    if (trk) {
+      const tDef = parallelTracks[trk];
+      if (tDef) trackHtml += `<span class="chip ${tDef.chipClass}" title="${tDef.desc}">${tDef.label}</span>`;
+    } else if (bat && !trk) {
+      // Batch-only (trigger node that fires the batch)
+      const bDef = parallelTracks[bat];
+      if (bDef) trackHtml += `<span class="chip ${bDef.chipClass}" title="${bDef.desc}">⚡ ${bDef.label}</span>`;
+    }
+    if (isJoin) {
+      trackHtml += ` <span class="chip chip-join" title="JOIN — all upstream requires must complete">JOIN</span>`;
+    }
+    if (!trackHtml) trackHtml = '<span style="color:#d1d5db">—</span>';
+
+    html += `<tr data-flow-type="${node.type}" data-track="${trk || bat || ''}">
+      <td style="color:#9ca3af;font-size:11px">${n}</td>
+      <td><code style="font-size:10px">${node.id}</code></td>
+      <td>${flowTypeChip[node.type] || ''}</td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">${node.t}</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6">${reqHtml}</td>
+      <td style="font-size:11px;line-height:1.6">${trackHtml}</td>
+      <td class="flow-effects">${node.effects}</td>
+      <td class="flow-payload">${node.payload}</td>
+      <td><textarea class="editable" data-key="${key}" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="${key}_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+let _flowFilter = 'all';
+function filterFlow(btn, type) {
+  _flowFilter = type;
+  document.querySelectorAll('.flow-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#flowBody tr').forEach(row => {
+    row.style.display = (type === 'all' || row.dataset.flowType === type) ? '' : 'none';
+  });
+}
+
 // ── Tab switching ──────────────────────────────────────────────────────────
 function showTab(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -573,6 +864,7 @@ document.addEventListener('input', () => {
 buildProcedureTable();
 buildAtcTable();
 buildPhaseTable();
+buildFlowTable();
 loadAll();
 </script>
 </body>

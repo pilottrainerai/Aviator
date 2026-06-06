@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ENG 1 FIRE — Flow Graph V1</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0e1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+#topbar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(10,14,26,.96);backdrop-filter:blur(8px);display:flex;align-items:center;gap:8px;padding:5px 12px;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap}
+#topbar h1{font-size:12px;font-weight:700;color:#e2e8f0;letter-spacing:.5px;white-space:nowrap}
+.sep{color:rgba(255,255,255,.15)}
+.tbtn{padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#94a3b8;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap}
+.tbtn:hover{background:rgba(255,255,255,.1);color:#e2e8f0}
+.tbtn.active{background:rgba(99,102,241,.25);border-color:rgba(99,102,241,.5);color:#a5b4fc}
+.tbtn.day{background:rgba(251,191,36,.15);border-color:rgba(251,191,36,.4);color:#fbbf24}
+#canvasWrap{position:fixed;top:32px;left:0;right:0;bottom:0;overflow:hidden}
+#mainSvg{width:100%;height:100%;display:block;cursor:default}
+#noteOverlay{position:absolute;display:none;z-index:60;pointer-events:auto;background:rgba(10,14,26,.97);border:1px solid rgba(99,102,241,.5);border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,.7);padding:8px;min-width:200px}
+#noteLabelRow{display:flex;align-items:center;gap:6px;margin-bottom:5px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,.08)}
+#noteLabel{font-size:10px;font-weight:700;color:#64748b;flex:1;font-family:monospace}
+#noteClose{cursor:pointer;font-size:13px;color:#475569;background:none;border:none;padding:0 2px;line-height:1}
+#noteClose:hover{color:#e2e8f0}
+#noteTA{width:100%;min-height:90px;background:transparent;border:none;color:#e2e8f0;font-size:11px;font-family:inherit;resize:vertical;outline:none;line-height:1.6}
+#legend{position:fixed;bottom:10px;left:10px;z-index:50;background:rgba(10,14,26,.92);border:1px solid rgba(255,255,255,.07);border-radius:6px;padding:7px 9px;font-size:10px;color:#64748b;line-height:1.9}
+.lrow{display:flex;align-items:center;gap:5px}
+.lbar{width:3px;height:11px;border-radius:2px;flex-shrink:0}
+#hint{position:fixed;bottom:10px;right:10px;z-index:50;font-size:10px;color:#334155;text-align:right;line-height:1.8;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <h1>ENG 1 FIRE — Flow Graph V1</h1>
+  <span class="sep">|</span>
+  <span style="font-size:10px;color:#475569">87 nodes · all V3 content · click node = edit notes</span>
+  <span class="sep">|</span>
+  <span style="font-size:10px;color:#475569">FILTER:</span>
+  <button class="tbtn active" onclick="setFilter('all',this)">ALL</button>
+  <button class="tbtn" onclick="setFilter('trigger',this)">TRIGGER</button>
+  <button class="tbtn" onclick="setFilter('step',this)">STEP</button>
+  <button class="tbtn" onclick="setFilter('ecam',this)">ECAM</button>
+  <button class="tbtn" onclick="setFilter('fma',this)">FMA</button>
+  <button class="tbtn" onclick="setFilter('atc',this)">ATC</button>
+  <button class="tbtn" onclick="setFilter('pfd',this)">PFD</button>
+  <span class="sep">|</span>
+  <button class="tbtn" id="dayBtn" onclick="toggleDay()">☀ DAY</button>
+  <button class="tbtn" onclick="resetView()">⌖ RESET</button>
+  <button class="tbtn" onclick="saveHTML()" title="Save notes baked into this HTML file">💾 SAVE HTML</button>
+  <button class="tbtn" onclick="undoLast()" title="Undo last note change (Ctrl+Z)">↩ UNDO</button>
+  <button class="tbtn" onclick="exportJSON()" title="Export notes as JSON">↓ JSON</button>
+  <span class="sep">|</span>
+  <span id="saveStatus" style="font-size:10px;color:#475569">auto-save on</span>
+</div>
+
+<div id="canvasWrap">
+  <svg id="mainSvg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="rgba(255,255,255,.22)"/>
+      </marker>
+    </defs>
+    <g id="gWorld"></g>
+  </svg>
+</div>
+
+<div id="noteOverlay">
+  <div id="noteLabelRow">
+    <span id="noteLabel">node_id</span>
+    <button id="noteClose" onclick="closeNote()">✕</button>
+  </div>
+  <div id="connInfo" style="font-size:10px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.08);line-height:1.8;display:none"></div>
+  <textarea id="noteTA" rows="5" placeholder="Procedure notes · ATC script · Callouts · Hints…&#10;&#10;Saves automatically to localStorage."></textarea>
+</div>
+
+<!-- Edge tooltip -->
+<div id="edgeTip" style="position:fixed;display:none;z-index:80;background:rgba(10,14,26,.95);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:3px 8px;font-size:10px;color:#94a3b8;pointer-events:none;font-family:monospace;white-space:nowrap"></div>
+
+<div id="legend">
+  <div class="lrow"><div class="lbar" style="background:#f87171"></div>TRIGGER</div>
+  <div class="lrow"><div class="lbar" style="background:#a78bfa"></div>STEP</div>
+  <div class="lrow"><div class="lbar" style="background:#fb923c"></div>ECAM</div>
+  <div class="lrow"><div class="lbar" style="background:#34d399"></div>FMA</div>
+  <div class="lrow"><div class="lbar" style="background:#22d3ee"></div>ATC</div>
+  <div class="lrow"><div class="lbar" style="background:#818cf8"></div>PFD</div>
+  <div style="margin-top:5px;border-top:1px solid rgba(255,255,255,.06);padding-top:5px">
+  <div class="lrow"><div class="lbar" style="background:#fbbf24"></div>← requires (hover)</div>
+  <div class="lrow"><div class="lbar" style="background:#34d399"></div>→ feeds into (hover)</div>
+  <div style="margin-top:3px;font-size:9px;color:#334155">● = has notes · hover node = trace</div>
+  </div>
+</div>
+<div id="hint">Scroll=pan · Ctrl+Scroll=zoom · Click=notes · Esc=close · Ctrl+Z=undo</div>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────────────
+const NOTES_KEY = 'flowgraph_notes_v1';
+const VP_KEY    = 'flowgraph_vp_v1';
+const NW=168, NH=52, SW=142, SH=40;
+const COL = { fma:10, pf:182, ctr:374, pm:566, atc:758, ecam:920 };
+const TC = { trigger:'#f87171', step:'#a78bfa', ecam:'#fb923c', fma:'#34d399', atc:'#22d3ee', pfd:'#818cf8' };
+
+// ── ALL 87 NODES ──────────────────────────────────────────────────────────
+const nodes = [
+  // PHASE 0 — INITIAL
+  {id:'fma_01',            type:'fma',     x:COL.fma,  y:40,   w:SW,h:SH, label:'FMA 01',                    sub:'MAN TOGA | SRS cyan | RWY | no AP | A/THR armed', req:['—']},
+  {id:'after_v1',          type:'trigger', x:COL.ctr,  y:40,   w:NW,h:NH, label:'after_v1',                  sub:'V1 PASSED · T+6 000 ms · gate trigger', req:['—']},
+
+  // PHASE 1 — FIRE WARN + ECAM BATCH (7 lines simultaneous)
+  {id:'fma_02',            type:'fma',     x:COL.fma,  y:148,  w:SW,h:SH, label:'FMA 02',                    sub:'MAN TOGA | SRS cyan | RWY | no AP', req:['after_v1']},
+  {id:'fire_warn',         type:'trigger', x:COL.ctr,  y:148,  w:NW,h:NH, label:'fire_warn',                 sub:'ENG 1 FIRE detected · T+8 000 ms · batch:fire_warn', req:['after_v1']},
+  {id:'cancel_master_warn',type:'step',    x:COL.pm,   y:148,  w:NW,h:NH, label:'MASTER WARN → CANCEL',      sub:'PM · HW · glareshield (concurrent)', req:['—']},
+  {id:'ecam_eng1_fire',    type:'ecam',    x:COL.ecam, y:130,  w:SW,h:SH, label:'ENG 1 FIRE',                sub:'WARNING [red] batch:fire_warn', req:['fire_warn']},
+  {id:'ecam_thr',          type:'ecam',    x:COL.ecam, y:182,  w:SW,h:SH, label:'THR LEVER 1 … IDLE',        sub:'ADVISORY batch:fire_warn', req:['fire_warn']},
+  {id:'ecam_master',       type:'ecam',    x:COL.ecam, y:234,  w:SW,h:SH, label:'ENG 1 MASTER … OFF',        sub:'ADVISORY batch:fire_warn', req:['fire_warn']},
+  {id:'ecam_fire_pb',      type:'ecam',    x:COL.ecam, y:286,  w:SW,h:SH, label:'ENG 1 FIRE P/B … PUSH',     sub:'ADVISORY batch:fire_warn', req:['fire_warn']},
+  {id:'ecam_agent1_line',  type:'ecam',    x:COL.ecam, y:338,  w:SW,h:SH, label:'AGENT 1 AFTER 10S',         sub:'ADVISORY batch:fire_warn', req:['fire_warn']},
+  {id:'ecam_atc_line',     type:'ecam',    x:COL.ecam, y:390,  w:SW,h:SH, label:'ATC … NOTIFY',              sub:'ADVISORY batch:fire_warn', req:['fire_warn']},
+  {id:'ecam_land_asap',    type:'ecam',    x:COL.ecam, y:442,  w:SW,h:SH, label:'LAND ASAP',                 sub:'WARNING [red] batch:fire_warn', req:['fire_warn']},
+  {id:'fma_03',            type:'fma',     x:COL.fma,  y:200,  w:SW,h:SH, label:'FMA 03',                    sub:'MAN TOGA | SRS green | NAV | no AP', req:['fire_warn']},
+
+  // PHASE 2 — FLIGHTCHECK
+  {id:'continue_rotation', type:'step',    x:COL.ctr,  y:268,  w:NW,h:NH, label:'CONTINUE ROTATION',         sub:'PF · AVIATE — V2+10 / FD bars / SRS', req:['after_v1']},
+  {id:'atc_handoff',       type:'atc',     x:COL.atc,  y:268,  w:SW,h:SH, label:'① TWR: CHANGEOVER 124.85',  sub:'TWR: contact Departure 124.85 → PM: STANDBY', req:['continue_rotation']},
+  {id:'positive_rate_gear_up',type:'step', x:COL.ctr,  y:372,  w:NW,h:NH, label:'POSITIVE CLIMB — GEAR UP',  sub:'PM · AVIATE — CALL + select UP', req:['continue_rotation']},
+  {id:'pfa_ap1',           type:'pfd',     x:COL.pf,   y:372,  w:NW,h:SH, label:'PFD: AP1 ENGAGE',           sub:'Green pulsing ring · phase 4', req:['positive_rate_gear_up']},
+  {id:'engage_ap_fma',     type:'step',    x:COL.ctr,  y:476,  w:NW,h:NH, label:'AP1 ENGAGE — READ FMA',     sub:'PF · AVIATE — confirm A/THR armed', req:['positive_rate_gear_up']},
+  {id:'fma_04',            type:'fma',     x:COL.fma,  y:476,  w:SW,h:SH, label:'FMA 04',                    sub:'MAN TOGA | SRS green | NAV | AP1 FD1 | A/THR', req:['engage_ap_fma']},
+
+  // PHASE 3 — 400 FT GATE + ECAM PROCEDURE
+  {id:'four_hundred_ft',   type:'trigger', x:COL.ctr,  y:590,  w:NW,h:NH, label:'four_hundred_ft',           sub:'T+18 000 ms · 400 ft AGL · opens ECAM gate', req:['fire_warn']},
+  {id:'fma_05',            type:'fma',     x:COL.fma,  y:590,  w:SW,h:SH, label:'FMA 05',                    sub:'MAN TOGA | SRS green | NAV | AP1 | A/THR', req:['four_hundred_ft']},
+  {id:'four_hundred_ft_cmd',type:'step',   x:COL.ctr,  y:700,  w:NW,h:NH, label:'400 FT — ECAM ACTIONS',    sub:'PM · AVIATE — ANNOUNCE [JOIN]', req:['engage_ap_fma','cancel_master_warn']},
+  {id:'thr_lever_idle',    type:'step',    x:COL.ctr,  y:812,  w:NW,h:NH, label:'THR LEVER 1 → IDLE',        sub:'PF · ECAM — HW · confirm before retard', req:['four_hundred_ft_cmd']},
+  {id:'fma_06',            type:'fma',     x:COL.fma,  y:812,  w:SW,h:SH, label:'FMA 06',                    sub:'ENG1 TL at IDLE · SRS green | NAV | AP1', req:['thr_lever_idle']},
+  {id:'eng1_master_off',   type:'step',    x:COL.ctr,  y:924,  w:NW,h:NH, label:'ENG 1 MASTER → OFF',        sub:'PM · ECAM — HW · LP+HP SOVs close', req:['thr_lever_idle']},
+  {id:'fma_07',            type:'fma',     x:COL.fma,  y:924,  w:SW,h:SH, label:'FMA 07',                    sub:'LP+HP fuel SOVs closed', req:['eng1_master_off']},
+  {id:'eng1_fire_pb',      type:'step',    x:COL.ctr,  y:1036, w:NW,h:NH, label:'ENG 1 FIRE P/B → PUSH',     sub:'PM · ECAM — HW · arms squibs, closes bleed+HYD', req:['eng1_master_off']},
+  {id:'fma_08',            type:'fma',     x:COL.fma,  y:1036, w:SW,h:SH, label:'FMA 08',                    sub:'Bleed+HYD SOVs · squibs armed · FADEC cut', req:['eng1_fire_pb']},
+  // Secondary failures — batch:sec_fail +2s after fire_pb
+  {id:'sec_hyd',           type:'ecam',    x:COL.ecam, y:1006, w:SW,h:SH, label:'* HYD G ENG1 PUMP',         sub:'LO PR [CAUTION] +2s batch:sec_fail', req:['eng1_fire_pb']},
+  {id:'sec_elec',          type:'ecam',    x:COL.ecam, y:1058, w:SW,h:SH, label:'* ELEC / GEN 1 FAULT',      sub:'CAUTION +2s batch:sec_fail', req:['eng1_fire_pb']},
+  {id:'sec_air_bleed',     type:'ecam',    x:COL.ecam, y:1110, w:SW,h:SH, label:'* AIR BLEED FAULT',         sub:'ENG 1 BLEED FAULT +2s batch:sec_fail', req:['eng1_fire_pb']},
+  {id:'cancel_master_caut',type:'step',    x:COL.pm,   y:1036, w:NW,h:NH, label:'MASTER CAUT → CANCEL',      sub:'PM · ECAM — HW (concurrent)', req:['—']},
+  {id:'agent1',            type:'step',    x:COL.ctr,  y:1148, w:NW,h:NH, label:'AGENT 1 → DISCH',           sub:'PM · ECAM — HW · wait 10s for N1 decay', req:['eng1_fire_pb']},
+  {id:'fma_09',            type:'fma',     x:COL.fma,  y:1148, w:SW,h:SH, label:'FMA 09',                    sub:'Agent 1 disch · MAN TOGA | SRS green | AP1', req:['agent1']},
+
+  // FIRE OUTCOME BRANCH
+  {id:'fire_extinguished', type:'trigger', x:COL.ctr,  y:1264, w:NW,h:NH, label:'fire_extinguished',         sub:'Fire light OUT — on agent discharge', req:['agent1']},
+  {id:'fire_persists_30s', type:'trigger', x:COL.pm,   y:1264, w:NW,h:NH, label:'fire_persists_30s',         sub:'Fire warn STILL ACTIVE after 30 s', req:['agent1']},
+  {id:'min_accel_alt',     type:'trigger', x:COL.pf,   y:1264, w:NW,h:NH, label:'min_accel_alt',             sub:'MAA ~1 500 ft · T+55 000 ms · info gate', req:['four_hundred_ft']},
+  {id:'ecam_if_persist',   type:'ecam',    x:COL.ecam, y:1264, w:SW,h:SH, label:'· IF FIRE WARN 30 S:',      sub:'conditional remark', req:['fire_persists_30s']},
+  {id:'ecam_agent2',       type:'ecam',    x:COL.ecam, y:1316, w:SW,h:SH, label:'AGENT 2 … DISCH',           sub:'conditional line', req:['ecam_if_persist']},
+  {id:'agent2',            type:'step',    x:COL.pm,   y:1374, w:NW,h:NH, label:'AGENT 2 → DISCH [OPT]',     sub:'PM · ECAM — HW · if fire persists 30s', req:['agent1','fire_persists_30s']},
+  {id:'atc_notified',      type:'trigger', x:COL.pf,   y:1374, w:NW,h:NH, label:'atc_notified',              sub:'ATC NOTIFY cleared · 1.5s after MAYDAY', req:['mayday_atc']},
+
+  // ENGINE SECURED — JOIN
+  {id:'engine_secured',    type:'step',    x:COL.ctr,  y:1488, w:NW,h:NH, label:'ENGINE SECURED',            sub:'PM · ECAM — ANNOUNCE [JOIN: agent1+fire out]', req:['agent1','fire_extinguished']},
+  {id:'fma_10',            type:'fma',     x:COL.fma,  y:1488, w:SW,h:SH, label:'FMA 10',                    sub:'PF AVIATE + PM COMMS tracks open simultaneously', req:['engine_secured']},
+  {id:'announce_land_asap',type:'step',    x:COL.ctr,  y:1598, w:NW,h:NH, label:'LAND ASAP',                 sub:'PF · AVIATE — announce (ECAM directive)', req:['engine_secured']},
+
+  // PF AVIATE PARALLEL TRACK
+  {id:'level_off_maa',     type:'step',    x:COL.pf,   y:1708, w:NW,h:NH, label:'V/S 0 AT MAA',              sub:'PF · AVIATE — push V/S knob at ~2300 ft AMSL', req:['engine_secured']},
+  {id:'pfa_vs_zero',       type:'pfd',     x:COL.fma,  y:1708, w:SW,h:SH, label:'PFD: V/S ZERO',             sub:'Green ring · phase 11', req:['engine_secured']},
+  {id:'fma_11',            type:'fma',     x:COL.fma,  y:1760, w:SW,h:SH, label:'FMA 11',                    sub:'MAN TOGA | V/S=0 green | NAV | AP1 | A/THR', req:['level_off_maa']},
+  {id:'accel_clean',       type:'step',    x:COL.pf,   y:1818, w:NW,h:NH, label:'ACCEL / CLEAN',             sub:'PF · AVIATE — FLAPS 1@F · FLAPS 0@S speed', req:['level_off_maa']},
+  {id:'pfa_lvr_mct',       type:'pfd',     x:COL.fma,  y:1828, w:SW,h:SH, label:'PFD: LVR MCT',              sub:'Green ring · phase 12', req:['accel_clean']},
+  {id:'fma_12',            type:'fma',     x:COL.fma,  y:1878, w:SW,h:SH, label:'FMA 12',                    sub:'LVR MCT white | V/S=0 | NAV | AP1 | A/THR', req:['accel_clean']},
+  {id:'mct_open_clb',      type:'step',    x:COL.pf,   y:1928, w:NW,h:NH, label:'MCT / OPEN CLB',            sub:'PF · AVIATE — live lever MCT + pull ALT knob', req:['accel_clean']},
+  {id:'pfa_op_clb',        type:'pfd',     x:COL.fma,  y:1938, w:SW,h:SH, label:'PFD: OP CLB',               sub:'Green ring · phase 13 · THR MCT active', req:['mct_open_clb']},
+  {id:'fma_13',            type:'fma',     x:COL.fma,  y:1988, w:SW,h:SH, label:'FMA 13',                    sub:'THR MCT green | OP CLB green | NAV | AP1 | A/THR active', req:['mct_open_clb']},
+
+  // PM COMMS PARALLEL TRACK
+  {id:'mayday_atc',        type:'step',    x:COL.pm,   y:1708, w:NW,h:NH, label:'MAYDAY — ALT + HDG',        sub:'PM · TOWER freq · MAYDAY×3 + callsign + nature + hdg + alt', req:['announce_land_asap']},
+  {id:'atc_radar_mayday',  type:'atc',     x:COL.atc,  y:1708, w:SW,h:SH, label:'② TWR ACK + HANDOVER',     sub:'TWR: MAYDAY ack → go Departure 124.85 → PM changes over', req:['mayday_atc']},
+  {id:'atc_vectors_clb',   type:'atc',     x:COL.atc,  y:1760, w:SW,h:SH, label:'③ DEP: MAYDAY CONFIRM',    sub:'DEP: radar contact · MAYDAY ack · continue track · climb 4000', req:['mayday_atc']},
+  {id:'announce_sec_failures',type:'step', x:COL.pm,   y:1818, w:NW,h:NH, label:'SECONDARY FAILURES',        sub:'PM · ECAM — read from SD (HYD/ELEC/AIR)', req:['mayday_atc']},
+  {id:'atc_vectors_rdy',   type:'atc',     x:COL.atc,  y:1818, w:SW,h:SH, label:'④ VECTORS READY',          sub:'DEP: vectors available when ready', req:['announce_sec_failures']},
+  {id:'announce_status',   type:'step',    x:COL.pm,   y:1928, w:NW,h:NH, label:'STATUS — ANNOUNCE',         sub:'PM · STATUS — announce when page appears', req:['announce_sec_failures']},
+  {id:'stop_ecam',         type:'step',    x:COL.pm,   y:2038, w:NW,h:NH, label:'STOP ECAM',                 sub:'PF · STATUS — order, then After T/O CL', req:['announce_status']},
+  {id:'after_takeoff_cl',  type:'step',    x:COL.pm,   y:2148, w:NW,h:NH, label:'AFTER TAKEOFF CL',          sub:'PM · STATUS — COMPLETE (PACKS/BELTS/GEAR/ENG MODE/FLAPS)', req:['stop_ecam']},
+  {id:'oeb_check',         type:'step',    x:COL.pm,   y:2258, w:NW,h:NH, label:'OEB / COMPUTER RESETS',     sub:'PF · STATUS — check QRH reset table', req:['after_takeoff_cl']},
+  {id:'read_status',       type:'step',    x:COL.pm,   y:2368, w:NW,h:NH, label:'READ STATUS',               sub:'PF · STATUS — call, PM reads aloud', req:['oeb_check']},
+  {id:'status_read_aloud', type:'step',    x:COL.pm,   y:2478, w:NW,h:NH, label:'ECAM STATUS — PM READS',    sub:'PM · STATUS — review item by item, PF: CHECKED', req:['read_status']},
+  {id:'crew_crosscheck',   type:'step',    x:COL.pm,   y:2588, w:NW,h:NH, label:'ECAM ACTIONS COMPLETE',     sub:'PM · STATUS — announce, PF acknowledges', req:['status_read_aloud']},
+
+  // JOIN — both parallel tracks converge here
+  {id:'wx_request',        type:'step',    x:COL.ctr,  y:2700, w:NW,h:NH, label:'WX / ATIS REQUEST',         sub:'PM · PLAN — request from Delhi Approach', req:['crew_crosscheck']},
+  {id:'ldg_perf',          type:'step',    x:COL.ctr,  y:2810, w:NW,h:NH, label:'LDG PERF CHECK',            sub:'PF · PLAN — Vapp+5 kt, RWY 28 LDA 4430 m adequate', req:['wx_request']},
+  {id:'atc_pob_fuel',      type:'atc',     x:COL.atc,  y:2810, w:SW,h:SH, label:'⑦ POB / FUEL',             sub:'APP: say POB, fuel endurance, assistance', req:['ldg_perf']},
+  {id:'fordec',            type:'step',    x:COL.ctr,  y:2920, w:NW,h:NH, label:'FORDEC',                    sub:'PF · PLAN — F·O·R·D·E·C decision', req:['ldg_perf']},
+
+  // POST-FORDEC PARALLEL — 3 threads simultaneously
+  {id:'intention_to_atc',  type:'step',    x:COL.pm,   y:3032, w:NW,h:NH, label:'INTENTION → ATC',           sub:'PM · ATC — returning VIDP RWY 28', req:['fordec']},
+  {id:'fmgc_prep',         type:'step',    x:COL.ctr,  y:3032, w:NW,h:NH, label:'FMGC PREP',                 sub:'PM · PLAN — DEST VIDP / RWY 28 / ILS 110.30', req:['fordec']},
+  {id:'nis_brief',         type:'step',    x:COL.pf,   y:3032, w:NW,h:NH, label:'NITS BRIEF',                sub:'PM · PLAN — cabin interphone (N·I·T·S)', req:['fordec']},
+  {id:'atc_info_req',      type:'atc',     x:COL.atc,  y:3032, w:SW,h:SH, label:'⑤ INFO REQUEST',           sub:'APP: advise requirements for approach', req:['intention_to_atc']},
+  {id:'atc_wx_brief',      type:'atc',     x:COL.atc,  y:3084, w:SW,h:SH, label:'⑥ WX BRIEF',               sub:'APP: wind 280/8, RWY 28, ILS RWY 28', req:['wx_request']},
+
+  {id:'pax_pa',            type:'step',    x:COL.pf,   y:3142, w:NW,h:NH, label:'PASSENGER PA',              sub:'PF · PLAN — precautionary return to Delhi', req:['nis_brief']},
+  {id:'approach_prep',     type:'step',    x:COL.ctr,  y:3142, w:NW,h:NH, label:'APPROACH PREP',             sub:'PM · APPROACH — ILS 110.30/282, BARO, AUTOBRK MED', req:['fmgc_prep']},
+  {id:'atc_emergency_services',type:'step',x:COL.pm,   y:3142, w:NW,h:NH, label:'ATC — EMERG SVCS',          sub:'PM · ATC — request Cat 3 CFR on RWY 28', req:['approach_prep']},
+  {id:'atc_rdy_appr',      type:'atc',     x:COL.atc,  y:3142, w:SW,h:SH, label:'⑨ READY APPROACH',         sub:'APP: advise when ready for approach', req:['approach_prep']},
+
+  {id:'company_notify',    type:'step',    x:COL.pf,   y:3252, w:NW,h:NH, label:'OPS NOTIFY [OPT]',          sub:'PM · PLAN — ACARS/VHF MAYDAY + CFR request', req:['pax_pa']},
+  {id:'atc_emsvcs_ack',    type:'atc',     x:COL.atc,  y:3194, w:SW,h:SH, label:'⑧ EMSVCS ACK',             sub:'APP: Cat 3 CFR confirmed RWY 28', req:['atc_emergency_services']},
+
+  // APPROACH SEQUENCE
+  {id:'approach_brief',    type:'step',    x:COL.ctr,  y:3362, w:NW,h:NH, label:'APPROACH BRIEF',            sub:'PF · APPROACH — ILS RWY 28, OEI CAT 1, Vapp+5', req:['atc_emergency_services']},
+  {id:'atc_clrd_appr',     type:'atc',     x:COL.atc,  y:3362, w:SW,h:SH, label:'⑩ CLEARED APPROACH',       sub:'APP: hdg 240, descend 3000, cleared ILS RWY 28', req:['approach_brief']},
+  {id:'go_around_review',  type:'step',    x:COL.ctr,  y:3472, w:NW,h:NH, label:'GO-AROUND REVIEW',          sub:'PF · APPROACH — TOGA ENG2 only / SRS / V2+10', req:['approach_brief']},
+  {id:'approach_cl',       type:'step',    x:COL.ctr,  y:3582, w:NW,h:NH, label:'APPROACH CL',               sub:'PM · APPROACH — BARO/DH/BELTS/AUTOBRK/SPOILERS', req:['go_around_review']},
+  {id:'atc_tower_cont',    type:'atc',     x:COL.atc,  y:3582, w:SW,h:SH, label:'⑪ TOWER CONTACT',          sub:'TWR: continue ILS RWY 28, report established', req:['approach_cl']},
+  {id:'landing_cl',        type:'step',    x:COL.ctr,  y:3692, w:NW,h:NH, label:'LANDING CL',                sub:'PM · APPROACH — GEAR/FLAPS/SPOILERS/AUTOBRK/CABIN', req:['approach_cl']},
+  {id:'atc_cleared_land',  type:'atc',     x:COL.atc,  y:3692, w:SW,h:SH, label:'⑫ CLEARED TO LAND',        sub:'TWR: RWY 28 cleared to land, wind 280/8', req:['landing_cl']},
+];
+
+// ── DEFAULT NOTES (from V3 workbook) ──────────────────────────────────────
+const DEFAULT_NOTES = {
+
+  atc_handoff:`① TOWER CHANGEOVER
+─────────────────────────────────────────
+TOWER: "IFLY101, contact Delhi Departure 124.85"
+
+PM response (workload high — ECAM running):
+  → "STANDBY, IFLY101"
+  → PM will declare MAYDAY on Tower freq FIRST before switching
+
+WHY STANDBY, not immediate changeover:
+  Crew is inside ECAM procedure. Acknowledging + switching
+  immediately could cause a frequency gap during MAYDAY.
+  Declare on current freq, get Tower ACK, then change over.`,
+
+  mayday_atc:`② PM DECLARES MAYDAY — on TOWER frequency
+─────────────────────────────────────────
+TRANSMISSION (on 118.10 TOWER):
+
+"MAYDAY MAYDAY MAYDAY
+ IFLY101
+ Engine fire engine one
+ Maintaining runway track, heading 280,
+ Climbing through [ALT] feet
+ STANDBY"
+
+KEY ELEMENTS:
+  MAYDAY × 3           — declare distress
+  Callsign             — IFLY101
+  Nature               — engine fire engine one (not "engine fire")
+  Navigation info      — HDG 280 + current altitude climbing through
+  STANDBY              — defer intentions / POB / fuel until workload eases
+
+AFTER MAYDAY SENT → wait for Tower ACK before switching.`,
+
+  atc_radar_mayday:`③ TOWER ACKNOWLEDGES → HANDOVER → PM CHANGES FREQUENCY
+─────────────────────────────────────────
+TOWER: "IFLY101, MAYDAY acknowledged.
+        Contact Delhi Departure 124.85.
+        Emergency services alerted."
+
+PM readback + frequency change:
+  "MAYDAY acknowledged, Departure 124.85, IFLY101"
+  → PM selects 124.85 on VHF 1
+
+ON DEPARTURE (124.85):
+  PM transmits full MAYDAY again on new frequency:
+  "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one,
+   maintaining runway track, heading 280,
+   climbing through [ALT], STANDBY"
+
+WHY repeat on Departure:
+  Departure has no record of the MAYDAY from Tower freq.
+  Must re-establish distress status on new channel.`,
+
+  atc_vectors_clb:`④ DEPARTURE RADAR — MAYDAY CONFIRMED + INSTRUCTIONS
+─────────────────────────────────────────
+DEPARTURE: "IFLY101, Delhi Departure, radar contact.
+            MAYDAY acknowledged.
+            Continue runway track, climb 4000 feet,
+            QNH 1013."
+
+PM READBACK:
+  "Radar contact, MAYDAY acknowledged.
+   Continuing runway track, climbing 4000,
+   QNH 1013, will advise intentions shortly,
+   IFLY101"
+
+PM may add: "Continuing checklist, will advise"
+if vectors or further instructions come early.
+
+→ Departure now owns the MAYDAY. Crew continues ECAM.`,
+
+  thr_lever_idle:`FCTM AOP-30-20 THRUST LEVER RULE:
+PM: "THR LEVER 1 — IDLE"
+PF: "THR LEVER 1, CONFIRM IDLE?"
+PM: "CONFIRM"
+PF retards lever 1 to IDLE.
+PM MUST NOT operate thrust levers.`,
+
+  mayday_atc:`MAYDAY × 3
+CALLSIGN: IFLY101
+NATURE: engine fire engine 1
+POSITION: maintaining runway track, climbing [ALT]
+STANDBY
+
+→ Transmit on CURRENT frequency (Tower if handoff not accepted)
+→ Do NOT give POB/fuel until workload eases`,
+
+  fordec:`F — FACTS: ENG 1 fire secured. Single engine.
+   VIDP 15 min. RWY 28 LDA 4430 m. Full CFR on field.
+O — OPTIONS:
+   ① Return VIDP RWY 28 (recommended)
+   ② Divert nearest alternate
+   ③ Continue (NOT viable)
+R — RISKS/BENEFITS: VIDP = known field, full CFR, adequate LDA.
+D — DECISION: LAND ASAP — return VIDP RWY 28 full emergency.
+E — EXECUTION: ILS RWY 28, CAT 1, SE Vapp+5 kt, full emergency.
+C — CHECK-BACK: PM confirms AGREED — LAND VIDP RWY 28`,
+
+  engine_secured:`Once fire light OUT and engine isolated:
+PM: "ENGINE SECURED"
+PM: "PRIMARY ECAM ACTIONS COMPLETE"
+→ Opens PF AVIATE + PM COMMS parallel tracks simultaneously`,
+
+  announce_sec_failures:`HYD G ENG1 PUMP … LO PR
+→ Green sys pump SOV closed by FIRE pb
+→ PTU may transfer YELLOW→GREEN
+
+GEN 1 FAULT … OFF
+→ IDG1 deactivated by FIRE pb
+→ BTC auto-closes, AC BUS 1 fed by GEN 2
+
+ENG 1 BLEED … FAULT
+→ ENG 1 bleed SOV closed by FIRE pb
+→ XBLEED AUTO opens, monitor PACK 1`,
+
+  status_read_aloud:`ENG 1 SHUT DOWN
+AGENT 1 DISCH / AGENT 2 DISCH
+ENG 1 FIRE DET … DEGRADED (single loop)
+HYD G ENG1 PUMP LO PR
+GEN 1 INOP
+ENG 1 BLEED FAULT
+PACK 1 … MONITOR (single pack ops)
+APPR CAT 1 (degraded approach)
+MAX FL 250 (single-engine ceiling)
+TCAS … TA only`,
+
+  after_takeoff_cl:`PACKS ………… CHECK (single pack — PACK 2 AUTO)
+SEAT BELTS …… ON
+LANDING GEAR … UP / 3 OFF
+ENGINE MODE … IGN (per ECAM)
+FLAPS ………… 0 (clean / as required)`,
+
+  nis_brief:`N — NATURE: Engine fire, ENG 1 shut down, a/c serviceable
+I — INTENTIONS: Returning and landing RWY 28 Delhi VIDP
+T — TIME: ~15 minutes to landing
+S — SPECIAL: Crew at stations. Emergency/precautionary landing.`,
+
+  approach_brief:`ILS RWY 28 VIDP · single-engine CAT 1
+DA 200 ft / QNH … SET
+Vapp = Vref+5 kt
+Non-normal STATUS items applied
+Autobrake MED · Spoilers ARM
+
+FCTM PR-AEP-ENG OEI LANDING:
+→ slip → blue beta target above threshold thrust
+→ Do NOT lower gear too early (high power needed)
+→ Reset rudder trim to zero before thrust reduction`,
+
+  go_around_review:`GO-AROUND: TOGA (ENG 2 only) → SRS engages
+Positive climb → GEAR UP → maintain V2+10
+FMA: TOGA→SRS/NAV/AP1 — call FMA at each transition
+
+FUEL CHECK: confirm total vs [DEST+ALTN+FINAL RESERVE]
+RUNWAY VACATION: first available exit (Golf/Foxtrot)
+Emergency services attend — do NOT delay evacuation call`,
+
+  approach_cl:`BARO ………… QNH SET
+MDA/DH ……… 200 ft SET
+SEAT BELTS … ON
+AUTOBRAKE … MED
+SPOILERS …… ARM (green)
+LANDING LIGHTS … ON
+USE HIGHEST LEVEL OF AUTOMATION`,
+
+  landing_cl:`GEAR …………… DOWN — 3 GREEN
+FLAPS …………… FULL (or as required)
+SPOILERS ……… ARM (green)
+AUTOBRAKE …… MED (SET)
+CABIN …………… ADVISED
+CALLOUTS: 1000/500/100/50-40-30-20-10 RETARD`,
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let nodeNotes = {};
+try { nodeNotes = JSON.parse(localStorage.getItem(NOTES_KEY)||'{}'); } catch{}
+// Always apply latest defaults — overwrite nodes whose saved value equals old placeholder text
+const ATC_NODES = ['atc_handoff','mayday_atc','atc_radar_mayday','atc_vectors_clb'];
+nodes.forEach(n => {
+  const forceRefresh = ATC_NODES.includes(n.id) && (!nodeNotes[n.id] || nodeNotes[n.id].length < 40);
+  if ((nodeNotes[n.id] === undefined || forceRefresh) && DEFAULT_NOTES[n.id]) {
+    nodeNotes[n.id] = DEFAULT_NOTES[n.id];
+  }
+});
+localStorage.setItem(NOTES_KEY, JSON.stringify(nodeNotes));
+
+let _savedVp = {x:60, y:50, scale:1};
+try { const s=localStorage.getItem(VP_KEY); if(s){ _savedVp=JSON.parse(s); } } catch{}
+const vp = {x:_savedVp.x, y:_savedVp.y, scale:_savedVp.scale};
+let selected = null;
+let panStart = null;
+let nodeFilter = 'all';
+let dayMode = false;
+const svgNS = 'http://www.w3.org/2000/svg';
+// undo stack — each entry: {nodeId, before, after}
+const undoStack = [];
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+const byId = {};
+nodes.forEach(n => byId[n.id]=n);
+
+function svgEl(tag, attrs, parent){
+  const e = document.createElementNS(svgNS, tag);
+  for(const [k,v] of Object.entries(attrs||{})) e.setAttribute(k,v);
+  if(parent) parent.appendChild(e);
+  return e;
+}
+function nW(n){ return n.w||NW; }
+function nH(n){ return n.h||NH; }
+function nCX(n){ return n.x+nW(n)/2; }
+function nBot(n){ return n.y+nH(n); }
+
+function buildEdges(){
+  const edges=[];
+  nodes.forEach(n => {
+    (n.req||[]).forEach(r => {
+      if(r==='—') return;
+      if(byId[r]) edges.push({from:r, to:n.id});
+    });
+  });
+  return edges;
+}
+
+const joinSet = new Set();
+nodes.forEach(n => {
+  const vr = (n.req||[]).filter(r=>r!=='—');
+  if(vr.length>1) joinSet.add(n.id);
+});
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+function render(){
+  const gw = document.getElementById('gWorld');
+  gw.innerHTML = '';
+
+  const bg      = dayMode ? 'rgba(248,250,252,.96)' : 'rgba(16,20,36,.95)';
+  const border  = dayMode ? 'rgba(0,0,0,.12)'       : 'rgba(255,255,255,.08)';
+  const textCol = dayMode ? '#1e293b'                : '#e2e8f0';
+  const subCol  = dayMode ? '#64748b'                : '#64748b';
+  const edgeCol = dayMode ? 'rgba(0,0,0,.15)'        : 'rgba(255,255,255,.18)';
+  const joinCol = dayMode ? 'rgba(234,179,8,.8)'     : 'rgba(251,191,36,.75)';
+
+  // Lane backgrounds
+  const gL=svgEl('g',{},gw);
+  [
+    {x:COL.pf-6, y:1690, w:NW+12, h:1928+NH-1690+24, c:'rgba(96,165,250,.04)',   s:'rgba(96,165,250,.14)',  lbl:'PF AVIATE'},
+    {x:COL.pm-6, y:1690, w:NW+12, h:2588+NH-1690+24, c:'rgba(192,132,252,.04)', s:'rgba(192,132,252,.14)', lbl:'PM COMMS'},
+    {x:COL.pf-6, y:3010, w:COL.pm+NW-COL.pf+12, h:3252+NH-3010+24, c:'rgba(251,191,36,.03)', s:'rgba(251,191,36,.12)', lbl:'POST-FORDEC ∥'},
+    {x:COL.ctr-6,y:3340, w:NW+12, h:3692+NH-3340+24, c:'rgba(52,211,153,.03)',  s:'rgba(52,211,153,.12)',  lbl:'APPROACH'},
+  ].forEach(ld=>{
+    svgEl('rect',{x:ld.x,y:ld.y,width:ld.w,height:ld.h,fill:ld.c,stroke:ld.s,'stroke-width':'1','stroke-dasharray':'6,4',rx:'8'},gL);
+    const t=svgEl('text',{x:ld.x+7,y:ld.y+13,fill:ld.s,'font-size':'9','font-weight':'700','font-family':'monospace','letter-spacing':'1'},gL);
+    t.textContent=ld.lbl;
+  });
+
+  // Edges
+  const gE=svgEl('g',{'id':'gEdges'},gw);
+  const edges=buildEdges();
+  edges.forEach(e=>{
+    const s=byId[e.from], d=byId[e.to];
+    if(!s||!d) return;
+    const sHide=nodeFilter!=='all'&&s.type!==nodeFilter;
+    const dHide=nodeFilter!=='all'&&d.type!==nodeFilter;
+    if(sHide&&dHide) return;
+    const sx=nCX(s), sy=nBot(s), dx=nCX(d), dy=d.y;
+    const mY=(sy+dy)/2;
+    const isJ=joinSet.has(e.to);
+    const p=svgEl('path',{
+      d:`M${sx},${sy} C${sx},${mY} ${dx},${mY} ${dx},${dy}`,
+      fill:'none', stroke:isJ?joinCol:edgeCol, 'stroke-width':isJ?'1.5':'1',
+      'stroke-dasharray':isJ?'4,3':'none',
+      'marker-end':'url(#arr)',
+      'data-from':e.from, 'data-to':e.to,
+      style:'pointer-events:stroke',
+    },gE);
+    // Edge hover tooltip
+    p.addEventListener('mouseenter', ev=>{
+      const tip=document.getElementById('edgeTip');
+      tip.textContent=`${e.from}  →  ${e.to}`;
+      tip.style.display='block';
+      tip.style.left=(ev.clientX+12)+'px'; tip.style.top=(ev.clientY-6)+'px';
+    });
+    p.addEventListener('mousemove', ev=>{
+      const tip=document.getElementById('edgeTip');
+      tip.style.left=(ev.clientX+12)+'px'; tip.style.top=(ev.clientY-6)+'px';
+    });
+    p.addEventListener('mouseleave',()=>{ document.getElementById('edgeTip').style.display='none'; });
+  });
+
+  // Nodes
+  const gN=svgEl('g',{'id':'gNodes'},gw);
+  nodes.forEach(n=>{
+    const hide=nodeFilter!=='all'&&n.type!==nodeFilter;
+    const g=svgEl('g',{'data-id':n.id,opacity:hide?'0.1':'1',style:'cursor:pointer'},gN);
+    g.addEventListener('click', ev=>{ ev.stopPropagation(); selectNode(n.id); });
+    g.addEventListener('mouseenter', ()=>highlightNode(n.id));
+    g.addEventListener('mouseleave', ()=>clearHighlight());
+
+    const color=TC[n.type]||'#94a3b8';
+    const w=nW(n), h=nH(n), x=n.x, y=n.y;
+    const isSel=n.id===selected;
+    const hasNote=!!nodeNotes[n.id];
+
+    // Shadow for selected
+    if(isSel){
+      svgEl('rect',{x:x-2,y:y-2,width:w+4,height:h+4,rx:'7',fill:'none',
+        stroke:color,'stroke-width':'2',opacity:'0.7'},g);
+    }
+    // Card background
+    svgEl('rect',{x,y,width:w,height:h,rx:'5',fill:bg,stroke:border,'stroke-width':'1'},g);
+    // Left accent bar
+    svgEl('rect',{x,y:y+3,width:3,height:h-6,rx:'1.5',fill:color},g);
+    // Notes dot (top-right)
+    if(hasNote){
+      svgEl('circle',{cx:x+w-5,cy:y+5,r:'3',fill:color,opacity:'0.75'},g);
+    }
+    // JOIN badge
+    if(joinSet.has(n.id)){
+      svgEl('rect',{x:x+w-26,y:y+h-14,width:24,height:12,rx:'3',fill:'rgba(251,191,36,.15)',stroke:'rgba(251,191,36,.4)','stroke-width':'1'},g);
+      const jt=svgEl('text',{x:x+w-14,y:y+h-5,'font-size':'7','font-weight':'800',fill:'#fbbf24','text-anchor':'middle'},g);
+      jt.textContent='JOIN';
+    }
+    // ID label
+    const idT=svgEl('text',{x:x+10,y:y+13,'font-size':'9','font-weight':'700','font-family':'monospace',fill:color,'letter-spacing':'0.2'},g);
+    idT.textContent=n.id.length>22?n.id.slice(0,22):n.id;
+    // Main label
+    const mlT=svgEl('text',{x:x+10,y:y+26,'font-size':'10','font-weight':'600',fill:textCol},g);
+    mlT.textContent=n.label.length>24?n.label.slice(0,24):n.label;
+    // Sub label (only for taller nodes)
+    if(h>=NH && n.sub){
+      const maxC=Math.floor((w-18)/5.4);
+      const slT=svgEl('text',{x:x+10,y:y+39,'font-size':'9',fill:subCol},g);
+      slT.textContent=n.sub.length>maxC?n.sub.slice(0,maxC)+'…':n.sub;
+    }
+  });
+}
+
+// ── VIEW ──────────────────────────────────────────────────────────────────
+function applyVp(){
+  document.getElementById('gWorld').setAttribute('transform',
+    `translate(${vp.x},${vp.y}) scale(${vp.scale})`);
+  localStorage.setItem(VP_KEY, JSON.stringify({x:vp.x,y:vp.y,scale:vp.scale}));
+  positionNote();
+}
+
+function resetView(){ vp.x=60; vp.y=50; vp.scale=1; applyVp(); }
+
+// ── HOVER HIGHLIGHT ────────────────────────────────────────────────────────
+function highlightNode(hoverId){
+  const upstream=new Set(), downstream=new Set(), upEdges=[], downEdges=[];
+  document.querySelectorAll('#gEdges > path').forEach(p=>{
+    const f=p.dataset.from, t=p.dataset.to;
+    if(t===hoverId){ upstream.add(f); upEdges.push(p); }
+    if(f===hoverId){ downstream.add(t); downEdges.push(p); }
+  });
+  // Dim all nodes and edges
+  document.querySelectorAll('#gNodes > g').forEach(g=>{
+    const id=g.dataset.id;
+    g.style.opacity=(id===hoverId||upstream.has(id)||downstream.has(id))?'1':'0.08';
+  });
+  document.querySelectorAll('#gEdges > path').forEach(p=>{ p.style.opacity='0.04'; p.style.stroke=''; p.style.strokeWidth=''; });
+  // Highlight upstream (amber) and downstream (green)
+  upEdges.forEach(p=>{ p.style.opacity='1'; p.style.stroke='#fbbf24'; p.style.strokeWidth='2'; });
+  downEdges.forEach(p=>{ p.style.opacity='1'; p.style.stroke='#34d399'; p.style.strokeWidth='2'; });
+}
+
+function clearHighlight(){
+  document.querySelectorAll('#gNodes > g').forEach(g=>{ g.style.opacity=''; });
+  document.querySelectorAll('#gEdges > path').forEach(p=>{ p.style.opacity=''; p.style.stroke=''; p.style.strokeWidth=''; });
+}
+
+// Build a reverse-lookup map: which nodes require THIS node
+const requiredBy = {};
+nodes.forEach(n=>{
+  (n.req||[]).forEach(r=>{
+    if(r==='—') return;
+    if(!requiredBy[r]) requiredBy[r]=[];
+    requiredBy[r].push(n.id);
+  });
+});
+
+// ── NOTE OVERLAY ──────────────────────────────────────────────────────────
+function positionNote(){
+  const ov=document.getElementById('noteOverlay');
+  if(!selected){ ov.style.display='none'; return; }
+  const n=byId[selected];
+  if(!n){ ov.style.display='none'; return; }
+  const svgEl2=document.getElementById('mainSvg');
+  const svgR=svgEl2.getBoundingClientRect();
+  const wrapR=document.getElementById('canvasWrap').getBoundingClientRect();
+  const sx=(svgR.left-wrapR.left)+vp.x+n.x*vp.scale;
+  const sy=(svgR.top-wrapR.top)+vp.y+(n.y+nH(n))*vp.scale+4;
+  const ow=Math.max(nW(n)*vp.scale, 220);
+  ov.style.left=Math.max(4,Math.min(sx,wrapR.width-ow-8))+'px';
+  ov.style.top=Math.min(sy,wrapR.height-200)+'px';
+  ov.style.width=ow+'px';
+  ov.style.display='block';
+  document.getElementById('noteLabel').textContent=selected;
+  document.getElementById('noteTA').value=nodeNotes[selected]||'';
+  // Connection info
+  const n2=byId[selected];
+  const ci=document.getElementById('connInfo');
+  const validReq=(n2.req||[]).filter(r=>r!=='—');
+  const feeds=requiredBy[selected]||[];
+  let ciHtml='';
+  if(validReq.length){
+    ciHtml+=`<span style="color:#fbbf24;font-weight:700">← REQUIRES:</span> `
+      +validReq.map(r=>`<span style="color:#fbbf24;font-family:monospace;opacity:.85">${r}</span>`).join(' + ')+'<br>';
+  }
+  if(feeds.length){
+    ciHtml+=`<span style="color:#34d399;font-weight:700">→ FEEDS INTO:</span> `
+      +feeds.map(f=>`<span style="color:#34d399;font-family:monospace;opacity:.85">${f}</span>`).join(' · ');
+  }
+  ci.innerHTML=ciHtml||'<span style="color:#475569">no connections</span>';
+  ci.style.display='block';
+}
+
+function selectNode(id){
+  if(selected===id){ closeNote(); return; }
+  selected=id;
+  render(); applyVp();
+}
+
+function closeNote(){
+  selected=null;
+  render(); applyVp();
+  document.getElementById('noteOverlay').style.display='none';
+}
+
+let _noteBeforeEdit = null;
+document.getElementById('noteTA').addEventListener('focus',()=>{
+  _noteBeforeEdit = document.getElementById('noteTA').value;
+});
+document.getElementById('noteTA').addEventListener('blur',()=>{
+  if(!selected) return;
+  const after = document.getElementById('noteTA').value;
+  if(_noteBeforeEdit !== after){
+    undoStack.push({nodeId:selected, before:_noteBeforeEdit, after});
+    if(undoStack.length > 50) undoStack.shift();
+  }
+  _noteBeforeEdit = null;
+});
+let _saveTimer;
+document.getElementById('noteTA').addEventListener('input',()=>{
+  if(!selected) return;
+  nodeNotes[selected]=document.getElementById('noteTA').value;
+  localStorage.setItem(NOTES_KEY,JSON.stringify(nodeNotes));
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(()=>{
+    const s=document.getElementById('saveStatus');
+    s.textContent='saved '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    s.style.color='#34d399';
+    setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; }, 2200);
+  }, 600);
+});
+
+// ── PAN / ZOOM ────────────────────────────────────────────────────────────
+const mainSvg=document.getElementById('mainSvg');
+
+mainSvg.addEventListener('wheel',e=>{
+  e.preventDefault();
+  if(e.ctrlKey||e.metaKey){
+    const r=mainSvg.getBoundingClientRect();
+    const cx=e.clientX-r.left, cy=e.clientY-r.top;
+    const f=e.deltaY<0?1.10:0.91;
+    const ns=Math.max(0.07,Math.min(5,vp.scale*f));
+    vp.x=cx-(cx-vp.x)*ns/vp.scale;
+    vp.y=cy-(cy-vp.y)*ns/vp.scale;
+    vp.scale=ns;
+  } else {
+    vp.x-=e.deltaX;
+    vp.y-=e.deltaY;
+  }
+  applyVp();
+},{passive:false});
+
+mainSvg.addEventListener('pointerdown',e=>{
+  if(e.target===mainSvg||e.target.tagName==='svg'){
+    panStart={x:e.clientX-vp.x, y:e.clientY-vp.y};
+    mainSvg.setPointerCapture(e.pointerId);
+  }
+});
+mainSvg.addEventListener('pointermove',e=>{
+  if(!panStart) return;
+  vp.x=e.clientX-panStart.x;
+  vp.y=e.clientY-panStart.y;
+  applyVp();
+});
+mainSvg.addEventListener('pointerup',()=>{ panStart=null; });
+mainSvg.addEventListener('click',e=>{
+  if(e.target===mainSvg) closeNote();
+});
+
+// Touch pinch-to-zoom
+let _tt={}, _pd=0;
+mainSvg.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  Array.from(e.changedTouches).forEach(t=>{ _tt[t.identifier]={x:t.clientX,y:t.clientY}; });
+  const ids=Object.keys(_tt);
+  if(ids.length===2){ const a=_tt[ids[0]],b=_tt[ids[1]]; _pd=Math.hypot(b.x-a.x,b.y-a.y); }
+},{passive:false});
+mainSvg.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    const t=e.touches[0], prev=_tt[t.identifier];
+    if(prev){ vp.x+=t.clientX-prev.x; vp.y+=t.clientY-prev.y; applyVp(); }
+    _tt[t.identifier]={x:t.clientX,y:t.clientY};
+  } else if(e.touches.length===2){
+    const t0=e.touches[0],t1=e.touches[1];
+    const nd=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);
+    if(_pd>0){
+      const cx=(t0.clientX+t1.clientX)/2, cy=(t0.clientY+t1.clientY)/2;
+      const r=mainSvg.getBoundingClientRect();
+      const lx=cx-r.left, ly=cy-r.top;
+      const f=nd/_pd;
+      const ns=Math.max(0.07,Math.min(5,vp.scale*f));
+      vp.x=lx-(lx-vp.x)*ns/vp.scale;
+      vp.y=ly-(ly-vp.y)*ns/vp.scale;
+      vp.scale=ns; applyVp();
+    }
+    _pd=nd;
+    _tt[t0.identifier]={x:t0.clientX,y:t0.clientY};
+    _tt[t1.identifier]={x:t1.clientX,y:t1.clientY};
+  }
+},{passive:false});
+mainSvg.addEventListener('touchend',e=>{
+  Array.from(e.changedTouches).forEach(t=>delete _tt[t.identifier]);
+  if(Object.keys(_tt).length<2) _pd=0;
+},{passive:false});
+
+// ── FILTER ────────────────────────────────────────────────────────────────
+function setFilter(f,btn){
+  nodeFilter=f;
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render(); applyVp();
+}
+
+// ── DAY MODE ──────────────────────────────────────────────────────────────
+function toggleDay(){
+  dayMode=!dayMode;
+  document.getElementById('dayBtn').classList.toggle('day',dayMode);
+  document.body.style.background=dayMode?'#f1f5f9':'#0a0e1a';
+  document.getElementById('legend').style.background=dayMode?'rgba(248,250,252,.95)':'rgba(10,14,26,.92)';
+  document.getElementById('legend').style.color=dayMode?'#475569':'#64748b';
+  document.getElementById('hint').style.color=dayMode?'#94a3b8':'#334155';
+  // Update arrow marker color
+  document.querySelector('#arr path').setAttribute('fill', dayMode?'rgba(0,0,0,.2)':'rgba(255,255,255,.22)');
+  document.getElementById('noteOverlay').style.background=dayMode?'rgba(248,250,252,.97)':'rgba(10,14,26,.97)';
+  document.getElementById('noteTA').style.color=dayMode?'#1e293b':'#e2e8f0';
+  render(); applyVp();
+}
+
+// ── SAVE HTML — bakes current notes into the file itself ──────────────────
+function saveHTML(){
+  // Build a JS object literal string of current notes to replace DEFAULT_NOTES
+  const entries = Object.entries(nodeNotes)
+    .map(([k,v]) => `  ${JSON.stringify(k)}:${JSON.stringify(v)}`)
+    .join(',\n');
+  const newDefault = `const DEFAULT_NOTES = {\n${entries}\n};`;
+  let html = document.documentElement.outerHTML;
+  // Replace the DEFAULT_NOTES block
+  html = html.replace(/const DEFAULT_NOTES = \{[\s\S]*?\};/, newDefault);
+  // Also bake the current vp so the view is restored
+  html = html.replace(
+    /let _savedVp = \{x:60, y:50, scale:1\};/,
+    `let _savedVp = ${JSON.stringify({x:Math.round(vp.x),y:Math.round(vp.y),scale:Math.round(vp.scale*1000)/1000})};`
+  );
+  const blob=new Blob([html],{type:'text/html'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='ENG1_FIRE_FLOWGRAPH_V1_SAVED.html'; a.click();
+  const s=document.getElementById('saveStatus');
+  s.textContent='HTML saved ✓'; s.style.color='#34d399';
+  setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; }, 2500);
+}
+
+// ── UNDO — revert last note change ────────────────────────────────────────
+function undoLast(){
+  const entry=undoStack.pop();
+  if(!entry){
+    const s=document.getElementById('saveStatus');
+    s.textContent='nothing to undo'; s.style.color='#f87171';
+    setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; }, 1800);
+    return;
+  }
+  nodeNotes[entry.nodeId]=entry.before;
+  localStorage.setItem(NOTES_KEY,JSON.stringify(nodeNotes));
+  if(selected===entry.nodeId) document.getElementById('noteTA').value=entry.before||'';
+  render(); applyVp();
+  const s=document.getElementById('saveStatus');
+  s.textContent=`undid: ${entry.nodeId}`; s.style.color='#fbbf24';
+  setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; }, 2000);
+}
+
+// ── EXPORT JSON ───────────────────────────────────────────────────────────
+function exportJSON(){
+  const out={scenario:'ENG1_FIRE_AFTER_V1',exported:new Date().toISOString(),notes:{}};
+  nodes.forEach(n=>{ if(nodeNotes[n.id]) out.notes[n.id]=nodeNotes[n.id]; });
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='ENG1_FIRE_FLOWGRAPH_NOTES.json'; a.click();
+}
+
+// ── KEYBOARD ──────────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeNote();
+  if((e.ctrlKey||e.metaKey)&&e.key==='0'){ e.preventDefault(); resetView(); }
+  // Ctrl+Z when textarea not focused = undo last note change
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&document.activeElement!==document.getElementById('noteTA')){
+    e.preventDefault(); undoLast();
+  }
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+render();
+applyVp();
+</script>
+</body>
+</html>
