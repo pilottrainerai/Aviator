@@ -542,9 +542,9 @@ const atcCalls = [
   { n:'⑩', id:'atc_cleared_approach', gate:'approach_brief', from:'DELHI APPROACH', msg:'IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 28 approach, contact Delhi Tower 118.10 when established.',
     choices:[{t:'Left heading 240, descend 3 000, cleared ILS runway 28, contact Tower 118.10 when established, IFLY101',c:true},{t:'Roger, IFLY101',c:false},{t:'Cleared ILS runway 28, IFLY101',c:false}] },
   { n:'⑪', id:'atc_tower_contact', gate:'atc_cleared_approach', from:'DELHI TOWER', msg:'IFLY101, Delhi Tower, continue ILS approach runway 28, report established.',
-    choices:[{t:'Continuing ILS runway 28, will report established, IFLY101',c:true},{t:'Switching, IFLY101',c:false}] },
+    choices:[{t:'Wilco, will report established runway 28, IFLY101',c:true},{t:'Continuing ILS runway 28, will report established, IFLY101',c:false},{t:'Switching, IFLY101',c:false}] },
   { n:'⑫', id:'atc_cleared_to_land', gate:'landing_cl', from:'DELHI TOWER', msg:'IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.',
-    choices:[{t:'Cleared to land runway 28, IFLY101',c:true},{t:'Roger, IFLY101',c:false},{t:'Cleared to land runway 29, IFLY101',c:false}] },
+    choices:[{t:'Cleared to land runway 28, IFLY101',c:true},{t:'Cleared to land runway 28, wind 280/8, IFLY101',c:false},{t:'Roger, IFLY101',c:false}] },
 ];
 
 function buildAtcTable() {
