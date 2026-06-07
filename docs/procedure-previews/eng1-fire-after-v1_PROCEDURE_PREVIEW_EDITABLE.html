@@ -1,0 +1,523 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>eng1-fire-after-v1 Procedure Preview (Editable)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{--bg:#f3f6fb;--ink:#0f172a;--muted:#475569;--panel:#ffffff;--line:#cbd5e1;--head:#e5edf8;--edit:#fff8db;--accent:#2563eb}
+    body{margin:20px;font-family:Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    h1{margin:0 0 4px;font-size:24px}
+    .sub{font-size:12px;color:var(--muted);margin-bottom:12px}
+    .toolbar{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;z-index:3}
+    button{border:1px solid #9db4d6;background:#eaf1ff;color:#0f172a;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer}
+    button:hover{background:#dce8ff}
+    .status{font-size:12px;color:var(--muted)}
+    .card{margin-top:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:auto}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th,td{border:1px solid var(--line);padding:7px 8px;font-size:11px;vertical-align:top;word-wrap:break-word}
+    th{background:var(--head);text-align:left;position:sticky;top:44px;z-index:2}
+    .editable{background:var(--edit)}
+    .editable:focus{outline:2px solid var(--accent);outline-offset:-2px;background:#fff}
+    .wrap{white-space:pre-wrap}
+  </style>
+</head>
+<body>
+  <h1>eng1-fire-after-v1 - Procedure Draft Preview</h1>
+  <div class="sub">Generated from src/scenarios/data/eng1-fire-after-v1.ts using current pilot trainer step logic.</div>
+  <div class="toolbar">
+    <button onclick="saveLocal()">Save Local</button>
+    <button onclick="loadLocal()">Load Local</button>
+    <button onclick="clearLocal()">Clear Local</button>
+    <button onclick="exportHtml()">Export HTML</button>
+    <span class="status" id="status">Ready</span>
+  </div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:4%">Seq</th>
+          <th style="width:10%">Step ID</th>
+          <th style="width:13%">Current Label</th>
+          <th style="width:8%">Speaker</th>
+          <th style="width:15%">Current Logic Gate</th>
+          <th style="width:22%">Current Hint / Behavior</th>
+          <th style="width:12%">Proposed Procedure Text</th>
+          <th style="width:8%">Expected Action (Draft)</th>
+          <th style="width:8%">Change Required</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>continue_rotation</td>
+          <td>CONTINUE ROTATION</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF maintains normal takeoff rotation and climb. Do NOT reduce thrust. Follow FD/SRS, hold V2+10, and keep runway track stable.</td>
+          <td class="editable" contenteditable="true" data-key="proc-0-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-0-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-0-change"></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>positive_rate_gear_up</td>
+          <td>POSITIVE CLIMB — GEAR UP</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM calls 'POSITIVE CLIMB'. PF responds 'GEAR UP'. PM selects gear lever UP. Verify positive climb and GEAR UP indication.</td>
+          <td class="editable" contenteditable="true" data-key="proc-1-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-1-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-1-change"></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>engage_ap_fma</td>
+          <td>AP1 ENGAGE — READ FMA</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: engage AP1 at ~100 ft once flight path stable. Read FMA aloud and announce A/THR. Engine is still running with fire warning — no special beta/trim/A/THR monitoring (those apply only after engine master shutdown — see abnormal-procs.txt L541-543).</td>
+          <td class="editable" contenteditable="true" data-key="proc-2-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-2-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-2-change"></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>cancel_master_warn</td>
+          <td>MASTER WARN</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM cancels MASTER WARN FIRST — pushes glareshield light to silence CRC and reset the red light. ECAM procedure stays displayed. Aviate continues; no ECAM actions until 400 ft and flight path stabilised.</td>
+          <td class="editable" contenteditable="true" data-key="proc-3-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-3-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-3-change"></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>four_hundred_ft_cmd</td>
+          <td>400 FT — AVIATE COMPLETE, ECAM ACTIONS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">At 400 ft AGL with the flight path stabilised, PM confirms the failure and reads the ECAM title. PF then orders 'ECAM ACTIONS'. Master Warning must be cancelled first.</td>
+          <td class="editable" contenteditable="true" data-key="proc-4-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-4-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-4-change"></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>thr_lever_idle</td>
+          <td>THR LEVER 1</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM retards ENG 1 thrust lever to IDLE. Reduces thrust before fuel isolation.</td>
+          <td class="editable" contenteditable="true" data-key="proc-5-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-5-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-5-change"></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>eng1_master_off</td>
+          <td>ENG 1 MASTER</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: 'ENG 1 MASTER, CONFIRM OFF?' — PF: 'CONFIRM' — PM sets OFF. Closes LP + HP fuel shut-off valves.</td>
+          <td class="editable" contenteditable="true" data-key="proc-6-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-6-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-6-change"></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>eng1_fire_pb</td>
+          <td>ENG 1 FIRE P/B</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: 'ENG 1 FIRE P/B, CONFIRM PUSH?' — PF: 'CONFIRM' — PM pushes. Arms squibs, closes bleed + HYD SOV, cuts FADEC.</td>
+          <td class="editable" contenteditable="true" data-key="proc-7-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-7-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-7-change"></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>cancel_master_caut</td>
+          <td>MASTER CAUT</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM pushes MASTER CAUTION light — silences single-chime, resets amber light. Secondary cautions remain on ECAM.</td>
+          <td class="editable" contenteditable="true" data-key="proc-8-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-8-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-8-change"></td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td>agent1</td>
+          <td>AGENT 1</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM waits ECAM 10 s countdown after FIRE pb — N1 decay maximises agent concentration. Then discharge.</td>
+          <td class="editable" contenteditable="true" data-key="proc-9-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-9-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-9-change"></td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td>agent2</td>
+          <td>AGENT 2</td>
+          <td></td>
+          <td class="wrap">requiresTrigger: fire_persists_30s</td>
+          <td class="wrap">PM: wait 30 s after AGENT 1 — IF FIRE WARN persists, discharge AGENT 2.  Last bottle, no restart possible after.</td>
+          <td class="editable" contenteditable="true" data-key="proc-10-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-10-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-10-change"></td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td>engine_secured</td>
+          <td>ENGINE SECURED</td>
+          <td></td>
+          <td class="wrap">requiresTrigger: fire_extinguished</td>
+          <td class="wrap">Once the fire light is out and the engine is secured, PM announces 'ENGINE SECURED' and 'PRIMARY ECAM ACTIONS COMPLETE'. PF acknowledges before acceleration.</td>
+          <td class="editable" contenteditable="true" data-key="proc-11-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-11-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-11-change"></td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td>announce_land_asap</td>
+          <td>LAND ASAP</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF announces 'LAND ASAP' (red on ECAM) — this is the cue to declare MAYDAY to ATC (next step). Crew commits to land at the nearest suitable airport with full emergency services. [fcom:L94604 RED LAND ASAP / abnormal-procs:L229-231]</td>
+          <td class="editable" contenteditable="true" data-key="proc-12-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-12-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-12-change"></td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td>mayday_atc</td>
+          <td>MAYDAY</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">Call ATC: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, STANDBY.' Brief — declare, state, standby. No intentions yet.</td>
+          <td class="editable" contenteditable="true" data-key="proc-13-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-13-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-13-change"></td>
+        </tr>
+        <tr>
+          <td>15</td>
+          <td>level_off_maa</td>
+          <td>V/S 0 AT MAA</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: at minimum acceleration altitude (~2300 ft AMSL given VIDP elev ~777 ft), push V/S knob → V/S 0 in the FCU window. FMA vertical mode changes from SRS to V/S; A/THR maintains target speed. Thrust stays in TOGA detent. [fctm:L12872-73 'push ALT pb or push the V/S knob to level off']</td>
+          <td class="editable" contenteditable="true" data-key="proc-14-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-14-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-14-change"></td>
+        </tr>
+        <tr>
+          <td>16</td>
+          <td>accel_clean</td>
+          <td>ACCEL / CLEAN</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF calls 'FLAPS 1' at F speed and 'FLAPS UP' at S speed; PM checks speed, repeats callouts, selects accordingly. Continue acceleration toward green dot — MCT/OPEN CLB transition is handled in the next step. [fctm:L12872-76 ACCELERATION SEGMENT]</td>
+          <td class="editable" contenteditable="true" data-key="proc-15-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-15-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-15-change"></td>
+        </tr>
+        <tr>
+          <td>17</td>
+          <td>mct_open_clb</td>
+          <td>MCT / OPEN CLB</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">At green dot speed: 'LVR MCT' flashes amber on FMA (triggered when speed index reaches green dot). PF moves thrust levers from CL to MCT detent (if already at FLX/MCT, recycle CL→MCT to re-arm). PF pulls ALT knob → OPEN CLB engages. FMA: THR MCT / OP CLB. [fctm:L12879-12882]</td>
+          <td class="editable" contenteditable="true" data-key="proc-16-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-16-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-16-change"></td>
+        </tr>
+        <tr>
+          <td>18</td>
+          <td>announce_sec_failures</td>
+          <td>ECAM — SECONDARY FAILURES</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM reads secondary system failures from SD after engine secured. PF cross-checks and acknowledges each item.</td>
+          <td class="editable" contenteditable="true" data-key="proc-17-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-17-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-17-change"></td>
+        </tr>
+        <tr>
+          <td>19</td>
+          <td>announce_status</td>
+          <td>STATUS — ANNOUNCE</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">When STATUS page appears: PM announces 'STATUS' to indicate the ECAM has reached the STATUS phase.</td>
+          <td class="editable" contenteditable="true" data-key="proc-18-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-18-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-18-change"></td>
+        </tr>
+        <tr>
+          <td>20</td>
+          <td>stop_ecam</td>
+          <td>STOP ECAM</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: 'STOP ECAM' — PM stops ECAM actions. PF asks for After Takeoff Checklist, any computer resets, and any OEB review before reading STATUS.</td>
+          <td class="editable" contenteditable="true" data-key="proc-19-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-19-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-19-change"></td>
+        </tr>
+        <tr>
+          <td>21</td>
+          <td>after_takeoff_cl</td>
+          <td>AFTER TAKEOFF CL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: 'Any NORMAL CHECKLIST?' — PM runs After Takeoff checklist. Note items already complete or N/A due to failure.</td>
+          <td class="editable" contenteditable="true" data-key="proc-20-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-20-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-20-change"></td>
+        </tr>
+        <tr>
+          <td>22</td>
+          <td>oeb_check</td>
+          <td>OEB / COMPUTER RESETS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: 'Any OEB? Any COMPUTER RESETS?' — PM checks for applicable OEB items and required computer resets per QRH reset table. Don't apply resets from memory. If none — 'NO APPLICABLE OEB OR RESET.'</td>
+          <td class="editable" contenteditable="true" data-key="proc-21-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-21-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-21-change"></td>
+        </tr>
+        <tr>
+          <td>23</td>
+          <td>read_status</td>
+          <td>READ STATUS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF: 'READ STATUS' — PM reads the ECAM STATUS page aloud. PF cross-checks each item.</td>
+          <td class="editable" contenteditable="true" data-key="proc-22-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-22-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-22-change"></td>
+        </tr>
+        <tr>
+          <td>24</td>
+          <td>status_read_aloud</td>
+          <td>ECAM STATUS — PM READS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM reads STATUS page aloud, item by item. PF: 'CHECKED' after each item. APPR PROC, INOP SYS (red), and any conditional procedure are reviewed for workload.</td>
+          <td class="editable" contenteditable="true" data-key="proc-23-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-23-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-23-change"></td>
+        </tr>
+        <tr>
+          <td>25</td>
+          <td>crew_crosscheck</td>
+          <td>ECAM ACTIONS COMPLETE</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: 'ECAM ACTIONS COMPLETE.' PF acknowledges. Primary ECAM actions, secondary failures, and STATUS review are all complete.</td>
+          <td class="editable" contenteditable="true" data-key="proc-24-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-24-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-24-change"></td>
+        </tr>
+        <tr>
+          <td>26</td>
+          <td>wx_request</td>
+          <td>WX / ATIS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM requests latest weather from Delhi Approach: wind dir/speed, QNH, temp, vis, RVR RWY 28.</td>
+          <td class="editable" contenteditable="true" data-key="proc-25-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-25-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-25-change"></td>
+        </tr>
+        <tr>
+          <td>27</td>
+          <td>ldg_perf</td>
+          <td>LDG PERF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">SE approach: Vapp +5 kt. RWY 28 VIDP LDA 4430 m / factored SE dist ~2200 m — ADEQUATE. Set Vapp + LW on MCDU.</td>
+          <td class="editable" contenteditable="true" data-key="proc-26-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-26-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-26-change"></td>
+        </tr>
+        <tr>
+          <td>28</td>
+          <td>fordec</td>
+          <td>FORDEC</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF leads FORDEC discussion. PM cross-checks each element. Agree and commit to decision, then advise ATC of the selected operational intention when workload permits.</td>
+          <td class="editable" contenteditable="true" data-key="proc-27-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-27-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-27-change"></td>
+        </tr>
+        <tr>
+          <td>29</td>
+          <td>intention_to_atc</td>
+          <td>INTENTION — ATC</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM advises ATC of the FORDEC outcome: 'IFLY101, intentions: returning to VIDP for landing runway 28, will advise when ready for approach.' Expect ATC ack and possible follow-up on POB/fuel/endurance.</td>
+          <td class="editable" contenteditable="true" data-key="proc-28-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-28-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-28-change"></td>
+        </tr>
+        <tr>
+          <td>30</td>
+          <td>fmgc_prep</td>
+          <td>FMGC PREP</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: enter VIDP in DEST, select RWY 28, insert ILS 110.30 / CRS 282. Set Vapp = Vref+5 kt (SE). Check F-PLN fuel + ALTN. PF confirms on MCDU.</td>
+          <td class="editable" contenteditable="true" data-key="proc-29-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-29-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-29-change"></td>
+        </tr>
+        <tr>
+          <td>31</td>
+          <td>nis_brief</td>
+          <td>NITS BRIEF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">Interphone to SCCM — NATURE: engine fire, ENG 1 shut down. INTENTIONS: landing VIDP RWY 28. TIME: approx 15 min. SPECIAL: precautionary or emergency landing per Captain's decision.</td>
+          <td class="editable" contenteditable="true" data-key="proc-30-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-30-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-30-change"></td>
+        </tr>
+        <tr>
+          <td>32</td>
+          <td>pax_pa</td>
+          <td>PASSENGER PA</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PA: 'Ladies and gentlemen, this is your Captain. We are returning to Delhi as a precaution. Remain seated, seatbelts fastened.'</td>
+          <td class="editable" contenteditable="true" data-key="proc-31-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-31-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-31-change"></td>
+        </tr>
+        <tr>
+          <td>33</td>
+          <td>company_notify</td>
+          <td>OPS NOTIFY</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">ACARS or VHF: 'OPS, IFLY101, MAYDAY declared, ENG 1 FIRE, returning VIDP RWY 28, request CFR + ground support.'</td>
+          <td class="editable" contenteditable="true" data-key="proc-32-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-32-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-32-change"></td>
+        </tr>
+        <tr>
+          <td>34</td>
+          <td>approach_prep</td>
+          <td>APPROACH PREP</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM: set ILS RWY 28 freq 110.30 / CRS 282. BARO minima 200 ft / QNH set. Autobrake MED. Spoilers ARM. Landing lights ON. Confirm seat belts.</td>
+          <td class="editable" contenteditable="true" data-key="proc-33-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-33-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-33-change"></td>
+        </tr>
+        <tr>
+          <td>35</td>
+          <td>atc_emergency_services</td>
+          <td>ATC — EMERG SVCS</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM advises ATC: 'IFLY101, request Category 3 emergency services on runway 28. Require CFR vehicles, ambulances, and medical standby.' Expect ATC readback/confirmation of services.</td>
+          <td class="editable" contenteditable="true" data-key="proc-34-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-34-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-34-change"></td>
+        </tr>
+        <tr>
+          <td>36</td>
+          <td>approach_brief</td>
+          <td>APPROACH BRIEF</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF briefs: ILS RWY 28 VIDP, single-engine CAT 1. DA 200 ft. Vapp +5 kt. Non-normal items from STATUS: APPR CAT 1, HYD GRN LO PR, GEN 1 INOP. Go-around briefed. Reference QRH ONE ENG INOPERATIVE LANDING procedure.</td>
+          <td class="editable" contenteditable="true" data-key="proc-35-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-35-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-35-change"></td>
+        </tr>
+        <tr>
+          <td>37</td>
+          <td>go_around_review</td>
+          <td>GO-AROUND REVIEW</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PF briefs go-around plan and confirms fuel state is adequate for alternate if approach is missed.</td>
+          <td class="editable" contenteditable="true" data-key="proc-36-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-36-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-36-change"></td>
+        </tr>
+        <tr>
+          <td>38</td>
+          <td>approach_cl</td>
+          <td>APPROACH CL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM runs approach checklist. Call each item, PF cross-checks and responds. CRITICAL: apply FCTM PR-AEP-ENG ONE ENGINE INOPERATIVE — LANDING technique alongside: autoland is available with OEI; trim to keep slip indication centred (yellow → blue beta target above threshold thrust); do NOT select gear down too early (high power needed to maintain level flight); rudder trim reset to zero in later approach phase before thrust reduction. [fctm:L13250-13265 PR-AEP-ENG-00018104]</td>
+          <td class="editable" contenteditable="true" data-key="proc-37-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-37-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-37-change"></td>
+        </tr>
+        <tr>
+          <td>39</td>
+          <td>landing_cl</td>
+          <td>LANDING CL</td>
+          <td></td>
+          <td class="wrap">none</td>
+          <td class="wrap">PM runs landing checklist at 1000 ft on final. PF confirms each item. Cross-check standard callouts throughout approach.</td>
+          <td class="editable" contenteditable="true" data-key="proc-38-draft"></td>
+          <td class="editable" contenteditable="true" data-key="proc-38-action"></td>
+          <td class="editable" contenteditable="true" data-key="proc-38-change"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'proc_preview_eng1-fire-after-v1';
+    function allEditable(){ return Array.from(document.querySelectorAll('[contenteditable="true"]')); }
+    function setStatus(msg){ const el=document.getElementById('status'); if (el) el.textContent = msg; }
+    function saveLocal(){
+      const data = {};
+      allEditable().forEach(td => data[td.dataset.key] = td.innerText);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      setStatus('Saved locally at ' + new Date().toLocaleTimeString());
+    }
+    function loadLocal(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { setStatus('No local save found'); return; }
+      const data = JSON.parse(raw);
+      allEditable().forEach(td => { if (data[td.dataset.key] !== undefined) td.innerText = data[td.dataset.key]; });
+      setStatus('Loaded local data');
+    }
+    function clearLocal(){
+      localStorage.removeItem(STORAGE_KEY);
+      allEditable().forEach(td => td.innerText = '');
+      setStatus('Cleared local data');
+    }
+    function exportHtml(){
+      saveLocal();
+      const clone = document.documentElement.cloneNode(true);
+      clone.querySelectorAll('[contenteditable="true"]').forEach(td => td.removeAttribute('contenteditable'));
+      const serialized = '<!doctype html>\n' + clone.outerHTML;
+      const blob = new Blob([serialized], {type:'text/html'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'eng1-fire-after-v1_PROCEDURE_PREVIEW_EDITED.html';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setStatus('Exported HTML file');
+    }
+    window.addEventListener('beforeunload', saveLocal);
+    loadLocal();
+  </script>
+</body>
+</html>

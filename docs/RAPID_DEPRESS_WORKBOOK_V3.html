@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAPID DECOMPRESSION — Workbook V3</title>
+<style>
+  :root { --red:#dc2626;--red-bg:#fef2f2;--amber:#d97706;--amber-bg:#fffbeb;--blue:#1d4ed8;--blue-bg:#eff6ff;--green:#16a34a;--green-bg:#f0fdf4;--purple:#7c3aed;--purple-bg:#f5f3ff;--teal:#0d9488;--teal-bg:#f0fdfa;--gray:#374151;--gray-bg:#f9fafb; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:#f3f4f6;color:#111;}
+  .topbar{background:#111827;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+  .topbar h1{font-size:15px;font-weight:700;letter-spacing:.5px;}
+  .topbar-meta{font-size:11px;color:#9ca3af;margin-left:16px;}
+  .topbar-right{display:flex;gap:8px;align-items:center;}
+  .save-status{font-size:11px;color:#6b7280;}
+  button.btn{padding:5px 14px;border-radius:5px;border:none;cursor:pointer;font-size:12px;font-weight:600;}
+  button.btn-save{background:#2563eb;color:#fff;}
+  button.btn-export{background:#374151;color:#fff;}
+  button.btn-v2{background:#7c3aed;color:#fff;}
+  .tabs{background:#1f2937;display:flex;padding:0 20px;border-bottom:2px solid #374151;}
+  .tab{padding:9px 18px;color:#9ca3af;cursor:pointer;font-size:12px;font-weight:600;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;}
+  .tab.active{color:#fff;border-bottom-color:#3b82f6;}
+  .tab:hover:not(.active){color:#e5e7eb;}
+  .section{display:none;padding:16px 20px;}
+  .section.active{display:block;}
+  .section-title{font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;border-bottom:2px solid #e5e7eb;padding-bottom:6px;}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:20px;}
+  th{background:#1f2937;color:#e5e7eb;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:8px 10px;text-align:left;white-space:nowrap;}
+  td{padding:7px 10px;border-bottom:1px solid #f3f4f6;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#fafafa;}
+  .cat-av td:first-child{border-left:4px solid var(--red);background:var(--red-bg);}
+  .cat-ec td:first-child{border-left:4px solid var(--amber);background:var(--amber-bg);}
+  .cat-atc td:first-child{border-left:4px solid var(--blue);background:var(--blue-bg);}
+  .cat-st td:first-child{border-left:4px solid var(--green);background:var(--green-bg);}
+  .cat-pl td:first-child{border-left:4px solid var(--purple);background:var(--purple-bg);}
+  .cat-ap td:first-child{border-left:4px solid var(--teal);background:var(--teal-bg);}
+  .chip{display:inline-block;padding:2px 7px;border-radius:3px;font-weight:700;font-size:10px;font-family:monospace;margin:1px;}
+  .chip-pf{background:#dbeafe;color:#1e40af;} .chip-pm{background:#dcfce7;color:#166534;}
+  .chip-av{background:#fee2e2;color:#991b1b;} .chip-ec{background:#fef9c3;color:#854d0e;}
+  .chip-atc{background:#dbeafe;color:#1e3a8a;} .chip-st{background:#d1fae5;color:#065f46;}
+  .chip-pl{background:#ede9fe;color:#5b21b6;} .chip-ap{background:#ccfbf1;color:#134e4a;}
+  .chip-fc{background:#f3f4f6;color:#374151;} .chip-hw{background:#1f2937;color:#f9fafb;}
+  .chip-warn{background:#dc2626;color:#fff;} .chip-caut{background:#d97706;color:#fff;} .chip-adv{background:#1d4ed8;color:#fff;}
+  .editable{width:100%;min-height:36px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:4px;font-size:12px;font-family:inherit;resize:vertical;background:#fafafa;}
+  .editable:focus{outline:none;border-color:#3b82f6;background:#fff;}
+  select.flag-sel{padding:4px 6px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#fff;cursor:pointer;}
+  .hint-text{font-size:11px;color:#4b5563;line-height:1.5;max-width:320px;}
+  .atc-block{background:#eff6ff;border-left:3px solid #2563eb;padding:6px 10px;border-radius:3px;margin-bottom:6px;font-size:12px;}
+  .atc-choice{padding:3px 8px;border-radius:3px;font-size:11px;margin:2px 0;}
+  .atc-choice.correct{background:#d1fae5;color:#065f46;} .atc-choice.wrong{background:#fee2e2;color:#991b1b;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px;}
+  .card{background:#fff;border-radius:6px;padding:12px 14px;border:1px solid #e5e7eb;}
+  .card-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:.6px;}
+  .card-value{font-size:22px;font-weight:800;color:#111;margin-top:2px;}
+  .card-sub{font-size:11px;color:#6b7280;margin-top:2px;}
+  .timeline{position:relative;padding-left:24px;}
+  .tl-item{position:relative;margin-bottom:14px;}
+  .tl-item::before{content:'';position:absolute;left:-18px;top:6px;width:10px;height:10px;border-radius:50%;background:#3b82f6;}
+  .tl-item::after{content:'';position:absolute;left:-14px;top:16px;width:2px;height:calc(100% + 4px);background:#e5e7eb;}
+  .tl-item:last-child::after{display:none;}
+  .tl-time{font-weight:700;color:#1d4ed8;font-family:monospace;font-size:12px;}
+  .tl-desc{font-size:12px;color:#374151;}
+  .tl-effects{font-size:11px;color:#6b7280;margin-top:2px;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1>RAPID DECOMPRESSION — Workbook V3</h1>
+    <span class="topbar-meta">Cruise FL350 · A320 · Source: FCOM PRO-ABN-PRESS + FCTM ABN-040</span>
+  </div>
+  <div class="topbar-right">
+    <span class="save-status" id="saveStatus">Auto-save on</span>
+    <button class="btn btn-v2" onclick="window.open('procedure-previews/rapid-depress_PROCEDURE_PREVIEW_EDITABLE.html','_blank')">Open V2</button>
+    <button class="btn btn-save" onclick="saveAll()">Save</button>
+    <button class="btn btn-export" onclick="exportHTML()">Export HTML</button>
+  </div>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="showTab('summary',event)">Summary</div>
+  <div class="tab" onclick="showTab('procedure',event)">Procedure Flow</div>
+  <div class="tab" onclick="showTab('ecam',event)">ECAM / Triggers</div>
+  <div class="tab" onclick="showTab('atc',event)">ATC Distractions</div>
+  <div class="tab" onclick="showTab('status',event)">Status &amp; Decisions</div>
+</div>
+
+<div class="section active" id="tab-summary">
+  <div class="cards">
+    <div class="card"><div class="card-label">Scenario</div><div class="card-value" style="font-size:14px;">RAPID DEPRESS</div><div class="card-sub">Structural failure FL350</div></div>
+    <div class="card"><div class="card-label">TUC at FL350</div><div class="card-value" style="color:var(--red);font-size:18px;">15–30s</div><div class="card-sub">Without oxygen</div></div>
+    <div class="card"><div class="card-label">Alert Level</div><div class="card-value" style="color:var(--red);font-size:16px;">MASTER WARN</div><div class="card-sub">CRC · RED</div></div>
+    <div class="card"><div class="card-label">Steps</div><div class="card-value">20</div><div class="card-sub">Procedure steps</div></div>
+    <div class="card"><div class="card-label">ATC Calls</div><div class="card-value">11</div><div class="card-sub">IFLY202 · MAYDAY</div></div>
+    <div class="card"><div class="card-label">Decision</div><div class="card-value" style="font-size:14px;">DIVERT FL100</div><div class="card-sub">Do NOT re-climb</div></div>
+  </div>
+  <div class="section-title">Situation Brief</div>
+  <div style="background:#fff;border-radius:6px;padding:14px 16px;border:1px solid #e5e7eb;margin-bottom:20px;font-size:12px;line-height:1.7;color:#374151;">
+    <strong>Situation:</strong> Cruise FL350. Sudden loud bang — structural failure. CABIN ALT HI warning fires. Cabin altitude rising above 14,000 ft. TUC at FL350 without oxygen: 15–30 seconds.<br><br>
+    <strong>Job:</strong> Crew dons O2 masks IMMEDIATELY. Announce to passengers. Initiate emergency descent to FL100. Squawk 7700. Declare MAYDAY. Plan diversion.
+  </div>
+  <div class="section-title">Trigger Timeline</div>
+  <div class="timeline" style="margin-bottom:20px;">
+    <div class="tl-item"><div class="tl-time">T+4s</div><div class="tl-desc"><strong>depress</strong> — CAB PR EXCESS CAB ALT warning, rapid decompression</div><div class="tl-effects">SET_MASTER_WARN · ADD_ECAM (9 messages including CREW OXY MASKS, EMER DESCENT, SPD BRK, ENG MODE IGN, ATC NOTIFY, EMER DESCENT PA, PAX OXY MASKS)</div></div>
+    <div class="tl-item"><div class="tl-time">T+9s (after emer_descent_init +5s)</div><div class="tl-desc"><strong>descent_started</strong> — emergency descent in progress</div><div class="tl-effects">ADD_ECAM "EMER DESCENT IN PROGRESS" · CLEAR_ECAM [emer_descent_ecam]</div></div>
+    <div class="tl-item"><div class="tl-time">T+~8s after level_off_10k</div><div class="tl-desc"><strong>below_10000ft</strong> — cabin pressure normalising at FL100</div><div class="tl-effects">SET_MASTER_WARN false · CLEAR_ECAM · ADD_ECAM "CABIN ALT — NORMAL"</div></div>
+  </div>
+  <div class="section-title">Instructor Notes</div>
+  <table><thead><tr><th>#</th><th>Topic</th><th>Notes</th></tr></thead><tbody>
+    <tr><td>1</td><td>Masks FIRST</td><td><textarea class="editable" data-key="note_0">Masks on 100% BEFORE all other actions. TUC 15-30s — incapacitation risk is immediate.</textarea></td></tr>
+    <tr><td>2</td><td>Do NOT re-climb</td><td><textarea class="editable" data-key="note_1">Structural failure — do NOT re-pressurize, do NOT re-climb after landing at FL100.</textarea></td></tr>
+    <tr><td>3</td><td>MAYDAY not PAN</td><td><textarea class="editable" data-key="note_2">Structural decompression = MAYDAY (life threatening). Squawk 7700 simultaneously.</textarea></td></tr>
+    <tr><td>4</td><td>SME review pending</td><td><textarea class="editable" data-key="note_3"></textarea></td></tr>
+  </tbody></table>
+</div>
+
+<div class="section" id="tab-procedure">
+  <div class="section-title">Procedure Flow — 20 Steps</div>
+  <table><thead><tr><th>#</th><th>ID</th><th>Group</th><th>Crew</th><th>Cat</th><th>Label</th><th>Action</th><th>Hint (first 150 chars)</th><th>Proposed Change</th><th>Flag</th></tr></thead>
+  <tbody id="procBody"></tbody></table>
+</div>
+
+<div class="section" id="tab-ecam">
+  <div class="section-title">Primary ECAM — depress (T+4s) · MASTER WARN (RED/CRC)</div>
+  <table><thead><tr><th>ID</th><th>ECAM Line</th><th>Level</th></tr></thead><tbody>
+    <tr><td><code>cabin_alt</code></td><td>CAB PR EXCESS CAB ALT</td><td><span class="chip chip-warn">WARNING</span></td></tr>
+    <tr><td><code>crew_masks</code></td><td>CREW OXY MASKS..........USE</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+    <tr><td><code>emer_descent_ecam</code></td><td>EMER DESCENT...........INITIATE</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+    <tr><td><code>spd_brk_ecam</code></td><td>SPD BRK....................FULL</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+    <tr><td><code>eng_ign_ecam</code></td><td>ENG MODE SEL..............IGN</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+    <tr><td><code>atc_ecam</code></td><td>ATC.....................NOTIFY</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+    <tr><td><code>pa_ecam</code></td><td>EMER DESCENT(PA)..ANNOUNCE</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+    <tr><td><code>ecam_if_cab14k</code></td><td>·IF CAB ALT > 14 000 FT:</td><td><span class="chip" style="background:#6b7280;color:#fff;">REMARK</span></td></tr>
+    <tr><td><code>pax_masks</code></td><td>&nbsp;&nbsp;PAX OXY MASKS........MAN ON</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+  </tbody></table>
+  <div class="section-title">Subsequent ECAM Effects</div>
+  <table><thead><tr><th>Trigger</th><th>ECAM Line / Action</th></tr></thead><tbody>
+    <tr><td><code>descent_started</code> (+5s after emer_descent_init)</td><td>ADD "EMER DESCENT IN PROGRESS" · CLEAR [emer_descent_ecam]</td></tr>
+    <tr><td><code>below_10000ft</code> (+8s after level_off_10k)</td><td>CLEAR cabin_alt, outflow_open, pax_masks · ADD "CABIN ALT — NORMAL" · SET_MASTER_WARN false</td></tr>
+  </tbody></table>
+</div>
+
+<div class="section" id="tab-atc">
+  <div class="section-title">ATC Distractions — 11 calls · IFLY202 · Mumbai Control / Approach / Tower</div>
+  <table><thead><tr><th>#</th><th>Time / Gate</th><th>From</th><th>Message</th><th>Choices</th><th>Notes</th></tr></thead>
+  <tbody id="atcBody"></tbody></table>
+</div>
+
+<div class="section" id="tab-status">
+  <div class="section-title">STATUS Page — FCOM PRO-ABN-CAB_PR</div>
+  <table><thead><tr><th>Line</th><th>Severity</th></tr></thead><tbody>
+    <tr><td>MAX FL.........100/MEA-MORA</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+    <tr><td>PRESS SYS DEGRADED</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+    <tr><td>STRUCTURAL CHECK REQUIRED</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+    <tr><td>APPR NORMAL</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+    <tr><td>MEDICAL ON STANDBY</td><td><span class="chip" style="background:#6b7280;color:#fff;">MEMO</span></td></tr>
+  </tbody></table>
+  <div class="section-title">Decisions</div>
+  <table><thead><tr><th>Option</th><th>Label</th><th>Description</th><th>Tone</th><th>Notes</th></tr></thead><tbody>
+    <tr><td>DIVERT_NEAREST</td><td><strong>DIVERT NEAREST</strong></td><td>Divert to nearest airport at FL100 — do not re-climb after structural failure.</td><td><span class="chip chip-adv">PRIMARY</span></td><td><textarea class="editable" data-key="dec_0"></textarea></td></tr>
+    <tr><td>LAND_IMMEDIATELY</td><td><strong>LAND IMMEDIATELY</strong></td><td>Land at nearest available field without delay.</td><td><span class="chip chip-adv">PRIMARY</span></td><td><textarea class="editable" data-key="dec_1"></textarea></td></tr>
+    <tr><td>CONTINUE_LOW</td><td><strong>CONTINUE LOW</strong></td><td>Continue at FL100 — only if no nearer field and fuel allows.</td><td><span class="chip chip-pm">SECONDARY</span></td><td><textarea class="editable" data-key="dec_2"></textarea></td></tr>
+    <tr><td>RETURN_TO_FIELD</td><td><strong>RETURN TO FIELD</strong></td><td>Return to departure if closer — acceptable option.</td><td><span class="chip chip-pm">SECONDARY</span></td><td><textarea class="editable" data-key="dec_3"></textarea></td></tr>
+  </tbody></table>
+</div>
+
+<script>
+const LS_KEY = 'rapid_depress_workbook_v3';
+
+const steps = [
+  {n:1, id:'masks_on',         group:'flightcheck',crew:'PF',cat:'av',label:'CREW OXY MASKS',       action:'USE / 100%',  hw:true,  req:'',                hint:'BOTH CREW: don oxygen masks IMMEDIATELY at 100%. Mic ON interphone. TUC at FL350 = 15–30 s. FIRST action per FCOM — don masks BEFORE everything else.'},
+  {n:2, id:'masks_confirm',    group:'flightcheck',crew:'PM',cat:'av',label:'MASKS CONFIRMED',       action:'BOTH CREW',  hw:false, req:'masks_on',        hint:"PM: 'MASKS ON 100%' — PF confirms. Only proceed after BOTH masks confirmed on."},
+  {n:3, id:'cancel_master_warn',group:'glareshield',crew:'PM',cat:'av',label:'MASTER WARN',          action:'CANCEL',     hw:true,  req:'masks_confirm',   hint:'PM: cancel MASTER WARN. Proceed with ECAM procedure.'},
+  {n:4, id:'emer_descent_init',group:'',           crew:'PF',cat:'ec',label:'EMER DESCENT',          action:'INITIATE',   hw:true,  req:'masks_confirm',   hint:'PF: if above FL160 — initiate EMER DESCENT. THR LEVERS → IDLE. Select OPEN DES, set FL100 or MEA/MORA whichever higher.'},
+  {n:5, id:'spd_brakes_ext',   group:'',           crew:'PF',cat:'ec',label:'SPD BRK',               action:'FULL',       hw:true,  req:'emer_descent_init',hint:'PF: SPD BRK → FULL. Allow speed to increase FIRST before extending to avoid AoA protection triggering AP disconnect.'},
+  {n:6, id:'spd_max',          group:'',           crew:'PF',cat:'ec',label:'SPEED',                 action:'MAX / APPROPRIATE',hw:false,req:'spd_brakes_ext',hint:'PF: accelerate to max appropriate speed. If structural damage — reduce speed as appropriate. Gear extension limits VLO/VLE.'},
+  {n:7, id:'eng_mode_sel',     group:'',           crew:'PF',cat:'ec',label:'ENG MODE SEL',          action:'IGN',        hw:true,  req:'emer_descent_init',hint:'PF: ENG MODE SEL → IGN. Protects engines during high-altitude cold rapid descent.'},
+  {n:8, id:'pax_oxy_man',      group:'',           crew:'PM',cat:'ec',label:'PAX OXY MASKS',         action:'MAN ON',     hw:true,  req:'emer_descent_init',hint:'PM: IF CAB ALT > 14,000 FT: PAX OXY MASKS MAN ON. Confirms passenger oxygen masks are released.'},
+  {n:9, id:'pa_emer_descent',  group:'',           crew:'PM',cat:'pl',label:'EMER DESCENT (PA)',     action:'ANNOUNCE',   hw:true,  req:'emer_descent_init',hint:"PM: PA (on mask mic): 'CABIN CREW AND PASSENGERS — EMERGENCY DESCENT. REMAIN SEATED. FASTEN SEATBELTS.'"},
+  {n:10,id:'atc_squawk',       group:'comms',      crew:'PM',cat:'atc',label:'XPDR 7700 / ATC',     action:'SET / MAYDAY',hw:true, req:'emer_descent_init',hint:"PM: XPDR → 7700. Call ATC: 'MAYDAY MAYDAY MAYDAY, IFLY202, emergency descent from FL350, CABIN DEPRESS, leaving FL350 for FL100.'"},
+  {n:11,id:'atc_intentions',   group:'comms',      crew:'PM',cat:'atc',label:'ATC INTENTIONS',      action:'ADVISE',     hw:false, req:'atc_squawk',       hint:'PM: advise ATC of route and descent block required. Request traffic separation below.'},
+  {n:12,id:'level_off_10k',    group:'',           crew:'PF',cat:'ec',label:'LEVEL OFF FL100',       action:'CONFIRM',    hw:true,  req:'emer_descent_init',hint:'PF: level off at FL100 or MEA, whichever higher. Reduce speed. Confirm cabin altitude returning to normal.'},
+  {n:13,id:'crew_brief_press', group:'comms',      crew:'PM',cat:'pl',label:'CREW BRIEF',            action:'CONFIRM',    hw:false, req:'level_off_10k',   hint:'PM: brief cabin crew on situation once masks may be removed at FL100.'},
+  {n:14,id:'masks_off',        group:'comms',      crew:'PF',cat:'pl',label:'MASKS OFF',             action:'WHEN SAFE',  hw:false, req:'level_off_10k',   hint:'PF: when cabin altitude ≤10,000 ft and pressure stable — masks OFF at discretion of PIC.'},
+  {n:15,id:'wx_divert',        group:'comms',      crew:'PM',cat:'pl',label:'WX / DIVERT',           action:'CHECK',      hw:false, req:'crew_brief_press', hint:'PM: request nearest airport wx and approach info. Low altitude fuel burn is higher — confirm reserves.'},
+  {n:16,id:'fordec_press',     group:'comms',      crew:'PF',cat:'pl',label:'FORDEC',                action:'COMPLETE',   hw:false, req:'wx_divert',        hint:'PF leads FORDEC. Structural failure — do NOT re-climb. Divert nearest at FL100. F-Structural failure. D-Divert nearest FL100.'},
+  {n:17,id:'nis_brief_press',  group:'comms',      crew:'PM',cat:'pl',label:'NITS BRIEF',            action:'CONFIRM',    hw:false, req:'fordec_press',     hint:'PM: SCCM brief — structural event, oxygen deployed, diverting, approximately X minutes to landing.'},
+  {n:18,id:'approach_brief',   group:'comms',      crew:'PF',cat:'ap',label:'APPROACH BRIEF',        action:'COMPLETE',   hw:false, req:'fordec_press',     hint:'PF: ILS approach, normal Vapp, normal landing. Structural check required after landing.'},
+  {n:19,id:'approach_cl',      group:'chclm',      crew:'PM',cat:'ec',label:'APPROACH CL',           action:'COMPLETE',   hw:false, req:'approach_brief',   hint:'PM runs approach checklist. BARO QNH, MDA SET, Seatbelts ON, Autobrake MED, Spoilers ARM, Cabin ADVISED.'},
+  {n:20,id:'landing_cl',       group:'chclm',      crew:'PM',cat:'ec',label:'LANDING CL',            action:'COMPLETE',   hw:false, req:'approach_cl',      hint:'PM runs landing checklist at 1000 ft on final. GEAR DOWN 3 GREEN, FLAPS FULL, SPOILERS ARM, AUTOBRAKE MED, CABIN ADVISED.'},
+];
+
+const atcCalls = [
+  {n:1, id:'atc_initial_query',       time:'T+8s',   gate:'', from:'MUMBAI CONTROL', msg:'IFLY202, confirm FL350.',
+    choices:[{t:'a',label:'MAYDAY MAYDAY MAYDAY, IFLY202, cabin depressurisation, emergency descent FL350 to FL100, squawking 7700',correct:true},{t:'b',label:'IFLY202 descending, just a precaution',correct:false},{t:'c',label:'Standby IFLY202',correct:false}]},
+  {n:2, id:'atc_emer_desc_clearance', time:'T+25s',  gate:'', from:'MUMBAI CONTROL', msg:'IFLY202, roger MAYDAY, cleared emergency descent FL100, turn right heading 270 clear of traffic, report level.',
+    choices:[{t:'a',label:'Cleared emergency descent FL100, right heading 270, will report level, IFLY202',correct:true},{t:'b',label:'Roger IFLY202',correct:false},{t:'c',label:'Descending FL100, IFLY202',correct:false}]},
+  {n:3, id:'atc_level_off',           time:'T+80s',  gate:'', from:'MUMBAI CONTROL', msg:'IFLY202, vectors available, nearest suitable Mumbai VABB 45 nm, advise intentions.',
+    choices:[{t:'a',label:'Continuing checklist, will advise intentions, IFLY202',correct:true},{t:'b',label:'Request vectors Mumbai, level FL100, will confirm requirements shortly, IFLY202',correct:true},{t:'c',label:'IFLY202 request immediate ILS runway 27 Mumbai',correct:false}]},
+  {n:4, id:'atc_vectors_when_ready',  time:'T+110s', gate:'', from:'MUMBAI CONTROL', msg:'IFLY202, vectors available when ready, no reported traffic in the descent area.',
+    choices:[{t:'a',label:'Continuing checklist, will advise when ready, IFLY202',correct:true},{t:'b',label:'Standby IFLY202',correct:true},{t:'c',label:'IFLY202 ready for ILS 27 Mumbai',correct:false}]},
+  {n:5, id:'atc_briefing_prompt',     time:'T+140s', gate:'atc_intentions', from:'MUMBAI APPROACH', msg:'IFLY202, Mumbai Approach, advise requirements for the approach and any assistance required.',
+    choices:[{t:'a',label:'Request latest Mumbai weather, runway in use, NOTAMs, and expected approach, IFLY202',correct:true},{t:'b',label:'Standby IFLY202',correct:false},{t:'c',label:'Request vectors ILS 27, IFLY202',correct:false}]},
+  {n:6, id:'atc_briefing_info',       time:'T+180s', gate:'', from:'MUMBAI APPROACH', msg:'IFLY202, wind 270 at 6, runway 27 in use, NOTAMs nil significant, expect ILS runway 27.',
+    choices:[{t:'a',label:'Wind 270 at 6, runway 27, ILS runway 27, no significant NOTAMs, IFLY202',correct:true},{t:'b',label:'Roger IFLY202',correct:false},{t:'c',label:'Wind 270 at 6, runway 27, IFLY202',correct:false}]},
+  {n:7, id:'atc_pob_fuel_services',   time:'T+210s', gate:'', from:'MUMBAI APPROACH', msg:'IFLY202, say persons on board, fuel endurance, and assistance required.',
+    choices:[{t:'a',label:'IFLY202, 186 persons on board, 11 tonnes fuel, endurance 2 hours, request medical and emergency services standby, possible structural damage',correct:true},{t:'b',label:'Standby IFLY202',correct:false},{t:'c',label:'IFLY202, 186 POB, normal approach',correct:false}]},
+  {n:8, id:'atc_ready_for_approach',  time:'T+235s', gate:'', from:'MUMBAI APPROACH', msg:'IFLY202, advise when ready for approach.',
+    choices:[{t:'a',label:'IFLY202 ready, request vectors for ILS runway 27',correct:true},{t:'b',label:'Ready, IFLY202',correct:false},{t:'c',label:'Standby IFLY202',correct:false}]},
+  {n:9, id:'atc_cleared_approach',    time:'T+260s', gate:'', from:'MUMBAI APPROACH', msg:'IFLY202, turn left heading 240, descend 3 000 feet, cleared ILS runway 27 approach, contact Mumbai Tower 118.10 when established.',
+    choices:[{t:'a',label:'Left heading 240, descend 3 000, cleared ILS runway 27, contact Tower 118.10 when established, IFLY202',correct:true},{t:'b',label:'Roger IFLY202',correct:false},{t:'c',label:'Cleared ILS runway 27, IFLY202',correct:false}]},
+  {n:10,id:'atc_tower_contact',       time:'T+290s', gate:'', from:'MUMBAI TOWER',   msg:'IFLY202, Mumbai Tower, continue ILS approach runway 27, report established.',
+    choices:[{t:'a',label:'Continuing ILS runway 27, will report established, IFLY202',correct:true},{t:'b',label:'Switching, IFLY202',correct:false}]},
+  {n:11,id:'atc_cleared_to_land',     time:'T+315s', gate:'', from:'MUMBAI TOWER',   msg:'IFLY202, runway 27 cleared to land, wind 270 at 6, emergency and medical services in position.',
+    choices:[{t:'a',label:'Cleared to land runway 27, IFLY202',correct:true},{t:'b',label:'Roger IFLY202',correct:false},{t:'c',label:'Cleared to land runway 28, IFLY202',correct:false}]},
+];
+
+function catChip(cat) {
+  const map={av:'chip-av',ec:'chip-ec',atc:'chip-atc',st:'chip-st',pl:'chip-pl',ap:'chip-ap'};
+  const labels={av:'AVIATE',ec:'ECAM',atc:'ATC',st:'STATUS',pl:'PLAN',ap:'APPROACH'};
+  return `<span class="chip ${map[cat]||'chip-fc'}">${labels[cat]||cat.toUpperCase()}</span>`;
+}
+
+function buildProcedureTable() {
+  const tb = document.getElementById('procBody');
+  const saved = loadData();
+  steps.forEach(s => {
+    const hintShort = s.hint.length > 150 ? s.hint.slice(0,150)+'…' : s.hint;
+    const crewChip = `<span class="chip chip-${s.crew.toLowerCase()}">${s.crew}</span>`;
+    const groupChip = s.group ? `<span class="chip chip-fc">${s.group}</span>` : '';
+    const hwChip = s.hw ? `<span class="chip chip-hw">HW</span>` : '';
+    const reqStr = s.req ? `<span style="font-size:10px;color:#6b7280;">→ ${s.req}</span>` : '';
+    const changeKey = `proc_change_${s.id}`;
+    const flagKey = `proc_flag_${s.id}`;
+    const changeVal = saved[changeKey] || '';
+    const flagVal = saved[flagKey] || '';
+    const tr = document.createElement('tr');
+    tr.className = `cat-${s.cat}`;
+    tr.innerHTML = `
+      <td style="font-weight:700;font-family:monospace;">${s.n}</td>
+      <td><code style="font-size:10px;">${s.id}</code></td>
+      <td>${groupChip}</td><td>${crewChip}</td><td>${catChip(s.cat)}</td>
+      <td><strong>${s.label}</strong>${reqStr?'<br>'+reqStr:''}</td>
+      <td><span class="chip chip-fc">${s.action}</span>${hwChip}</td>
+      <td><span class="hint-text">${hintShort}</span></td>
+      <td><textarea class="editable" data-key="${changeKey}">${changeVal}</textarea></td>
+      <td><select class="flag-sel" data-key="${flagKey}">
+        <option value=""${flagVal===''?' selected':''}>–</option>
+        <option value="critical"${flagVal==='critical'?' selected':''}>🔴 Critical</option>
+        <option value="review"${flagVal==='review'?' selected':''}>🟡 Review</option>
+        <option value="ok"${flagVal==='ok'?' selected':''}>✅ OK</option>
+      </select></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function buildAtcTable() {
+  const tb = document.getElementById('atcBody');
+  const saved = loadData();
+  atcCalls.forEach(c => {
+    const gateStr = c.gate ? `<span class="chip chip-pl">gate: ${c.gate}</span>` : '';
+    const noteKey = `atc_note_${c.id}`;
+    const noteVal = saved[noteKey] || '';
+    const choicesHtml = c.choices.map(ch => `<div class="atc-choice ${ch.correct?'correct':'wrong'}">${ch.correct?'✓':'✗'} ${ch.label}</div>`).join('');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:700;">${c.n}</td>
+      <td><span style="font-family:monospace;font-size:11px;">${c.time}</span><br>${gateStr}</td>
+      <td><strong>${c.from}</strong></td>
+      <td><div class="atc-block">${c.msg}</div></td>
+      <td>${choicesHtml}</td>
+      <td><textarea class="editable" data-key="${noteKey}">${noteVal}</textarea></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function showTab(name, ev) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (ev && ev.currentTarget) ev.currentTarget.classList.add('active');
+}
+function loadData() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch(e) { return {}; } }
+function saveAll() {
+  const data = {};
+  document.querySelectorAll('[data-key]').forEach(el => { data[el.dataset.key] = el.value; });
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
+  const s = document.getElementById('saveStatus');
+  s.textContent = 'Saved ✓ ' + new Date().toLocaleTimeString();
+  setTimeout(() => s.textContent = 'Auto-save on', 2000);
+}
+function loadAll() {
+  const data = loadData();
+  document.querySelectorAll('[data-key]').forEach(el => { if (data[el.dataset.key] !== undefined) el.value = data[el.dataset.key]; });
+}
+function exportHTML() {
+  const blob = new Blob([document.documentElement.outerHTML], {type:'text/html'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'RAPID_DEPRESS_WORKBOOK_V3_export.html'; a.click();
+}
+let autoSaveTimer;
+document.addEventListener('input', () => { clearTimeout(autoSaveTimer); autoSaveTimer = setTimeout(() => { saveAll(); }, 800); });
+buildProcedureTable(); buildAtcTable(); loadAll();
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 "use client";
 
+// HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Airbus A320 Engine Fire Panel — mockup with realistic FCOM behavior modeled.
 // View at /mockups/fire-panel in dev.
@@ -282,7 +284,7 @@ function DemoBar({
 export function FireSection({
   title, isAPU = false, testSide = "center",
   fireDetected, guardOpen, firePbOut, firePbOutAt,
-  agent1Disch, agent2Disch, testActive,
+  agent1Disch, agent2Disch, agent2Available = true, testActive,
   onOpenGuard, onPushFirePb, onPushAgent1, onPushAgent2, onPushTest,
 }: {
   title: string; isAPU?: boolean;
@@ -293,6 +295,7 @@ export function FireSection({
   firePbOutAt: number | null;
   agent1Disch: boolean;
   agent2Disch: boolean;
+  agent2Available?: boolean;
   testActive: boolean;
   onOpenGuard:  () => void;
   onPushFirePb: () => void;
@@ -305,8 +308,8 @@ export function FireSection({
   // AGENT 1 / 2 derived state
   const a1Arming = isAgentArming(firePbOutAt, agent1Disch);
   const a1Armed  = isAgentArmed (firePbOutAt, agent1Disch);
-  const a2Arming = isAgentArming(firePbOutAt, agent2Disch);
-  const a2Armed  = isAgentArmed (firePbOutAt, agent2Disch);
+  const a2Arming = agent2Available && isAgentArming(firePbOutAt, agent2Disch);
+  const a2Armed  = agent2Available && isAgentArmed (firePbOutAt, agent2Disch);
   const countdown = a1Arming || a2Arming ? armingCountdownSec(firePbOutAt) : 0;
 
   return (
@@ -389,7 +392,7 @@ export function FireSection({
                  style={{
                    ...labelHorizontalStyle,
                    bottom: 196, fontSize: "11px", letterSpacing: "0.14em",
-                   fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 700,
+                   fontFamily: "var(--font-cockpit)", fontWeight: 700,
                  }}>
               TEST
             </div>
@@ -735,7 +738,7 @@ function FirePushbutton({
           fire warning is active (fireDetected) or TEST is pressed. */}
       <div style={{
         position: "absolute", top: 22, left: "50%", transform: "translateX(-50%)",
-        fontSize: 22, fontFamily: '"Helvetica Neue", Arial, sans-serif',
+        fontSize: 22, fontFamily: "var(--font-cockpit)",
         fontWeight: 800, letterSpacing: "0.06em",
         color: fireLightLit ? "#ffffff" : "#5A0808",
         textShadow: fireLightLit ? "0 0 14px rgba(255,80,80,0.9), 0 0 4px #fff" : "none",
@@ -744,7 +747,7 @@ function FirePushbutton({
 
       <div style={{
         position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)",
-        fontSize: 11, fontFamily: '"Helvetica Neue", Arial, sans-serif',
+        fontSize: 11, fontFamily: "var(--font-cockpit)",
         fontWeight: 700, letterSpacing: "0.14em",
         color: fireLightLit ? "#ffffff" : "#5A0808",
         textShadow: fireLightLit ? "0 0 10px rgba(255,80,80,0.9)" : "none",
@@ -802,7 +805,7 @@ function AgentPanel({
     <div className="absolute" style={sideStyle}>
       <div className="text-gray-200"
            style={{ fontSize: 11, letterSpacing: "0.08em",
-                    fontFamily: '"Helvetica Neue", Arial, sans-serif',
+                    fontFamily: "var(--font-cockpit)",
                     fontWeight: 700, textAlign: "center",
                     marginBottom: 2 }}>
         AGENT {apuStyle ? "" : agentNum}
@@ -857,7 +860,7 @@ function SquibCell({ arming, armed, discharged }: { arming: boolean; armed: bool
         animation: arming ? "agent-arming-pulse 1s ease-in-out infinite" : undefined,
         borderRadius: 3,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 9, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 800,
+        fontSize: 9, fontFamily: "var(--font-cockpit)", fontWeight: 800,
         letterSpacing: "0.06em",
         // After the AGENT pb is pressed (discharged), SQUIB stays visible
         // but dimmed — readable without competing with the lit DISCH amber.
@@ -887,7 +890,7 @@ function Indicator({ label, lit, color }: { label: string; lit: boolean; color: 
         background: "#06080c",
         borderRadius: 3,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 9, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 800,
+        fontSize: 9, fontFamily: "var(--font-cockpit)", fontWeight: 800,
         letterSpacing: "0.08em",
         color: lit ? litFg : "#3a4252",
         textShadow: lit ? `0 0 4px ${litFg}` : "none",

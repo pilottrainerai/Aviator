@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A320 Cockpit Controls Inventory</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0c10;
+    color: #c8cdd8;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  header {
+    background: #0e1118;
+    border-bottom: 1px solid #1e2430;
+    padding: 18px 24px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
+  .header-title { flex: 1; min-width: 200px; }
+  .header-title h1 { font-size: 15px; font-weight: 600; color: #e8ecf4; letter-spacing: 0.05em; }
+  .header-title p  { font-size: 11px; color: #5a6478; margin-top: 2px; }
+
+  /* search */
+  #search {
+    background: #141820;
+    border: 1px solid #2a3040;
+    border-radius: 4px;
+    color: #c8cdd8;
+    font-size: 12px;
+    padding: 6px 10px;
+    width: 220px;
+    outline: none;
+  }
+  #search:focus { border-color: #3a8fff44; }
+  #search::placeholder { color: #3a4050; }
+
+  /* zone filter pills */
+  .filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    background: #141820;
+    border: 1px solid #2a3040;
+    border-radius: 20px;
+    color: #7a8498;
+    cursor: pointer;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .pill.active, .pill:hover { background: #1e2840; border-color: #3a8fff88; color: #7ab4ff; }
+
+  /* stats bar */
+  .stat-bar {
+    width: 100%;
+    display: flex;
+    gap: 18px;
+    font-size: 10px;
+    color: #4a5468;
+    padding-top: 6px;
+    border-top: 1px solid #141820;
+    margin-top: 6px;
+  }
+  .stat-bar span b { color: #7a8498; }
+
+  /* ── Layout ── */
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* zone section */
+  .zone {
+    margin-bottom: 32px;
+  }
+  .zone-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1e2430;
+  }
+  .zone-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #3a4a60;
+    padding: 2px 8px;
+    border: 1px solid #1e2430;
+    border-radius: 3px;
+  }
+  .zone-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #8a9ab8;
+    letter-spacing: 0.04em;
+  }
+  .zone-count { font-size: 10px; color: #3a4050; margin-left: auto; }
+
+  /* system subsection */
+  .subsection { margin-bottom: 20px; }
+  .subsection-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #4a5878;
+    margin-bottom: 6px;
+    padding-left: 2px;
+  }
+  .fcom-ref { font-size: 9px; color: #2a3848; margin-left: 6px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+
+  /* table */
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: #0e1118; }
+  th {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #3a4a5a;
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid #1a2030;
+  }
+  tbody tr {
+    border-bottom: 1px solid #111620;
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: #0e1420; }
+  tbody tr.hidden { display: none; }
+  td { padding: 7px 10px; vertical-align: middle; }
+  td:first-child { color: #d0d8e8; font-weight: 500; }
+
+  /* control type badge */
+  .type-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .type-guarded-pb   { background: #2a1818; color: #ff7070; border: 1px solid #3a2020; }
+  .type-latching-pb  { background: #1a1e2c; color: #7090d0; border: 1px solid #202838; }
+  .type-momentary-pb { background: #101820; color: #5080a0; border: 1px solid #182030; }
+  .type-rotary       { background: #1a2018; color: #70a870; border: 1px solid #202818; }
+  .type-toggle       { background: #1e1a10; color: #a09050; border: 1px solid #2a2418; }
+  .type-lever        { background: #201518; color: #b06870; border: 1px solid #2a1e20; }
+  .type-mechanical   { background: #181818; color: #606060; border: 1px solid #202020; }
+  .type-indicator    { background: #101820; color: #5070a0; border: 1px solid #182030; }
+
+  /* light cell pills */
+  .lights { display: flex; flex-wrap: wrap; gap: 4px; }
+  .light-cell {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 2px 6px;
+    border-radius: 2px;
+    text-transform: uppercase;
+  }
+  .lc-red    { background: #300808; color: #ff4444; border: 1px solid #400a0a; }
+  .lc-amber  { background: #2a1800; color: #ffb300; border: 1px solid #3a2200; }
+  .lc-white  { background: #1e2028; color: #c8d0e0; border: 1px solid #282a38; }
+  .lc-green  { background: #081e08; color: #00cc44; border: 1px solid #0a2a0a; }
+  .lc-blue   { background: #081828; color: #4898f0; border: 1px solid #0a2038; }
+  .lc-cyan   { background: #081c20; color: #00c8d8; border: 1px solid #0a2428; }
+  .lc-none   { color: #2a3040; font-size: 9px; }
+
+  td.notes { font-size: 11px; color: #4a5870; max-width: 280px; }
+
+  /* no-results */
+  #no-results {
+    display: none;
+    text-align: center;
+    padding: 60px 0;
+    color: #3a4050;
+    font-size: 13px;
+  }
+
+  /* legend */
+  .legend {
+    background: #0e1118;
+    border: 1px solid #1a2030;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .legend-group h4 {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #3a4a5a;
+    margin-bottom: 8px;
+  }
+  .legend-items { display: flex; flex-wrap: wrap; gap: 5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <h1>A320 COCKPIT CONTROLS INVENTORY</h1>
+    <p>Source: Airbus FCOM — DSC-21 through DSC-70 | Controls &amp; Indications sections</p>
+  </div>
+  <input id="search" type="text" placeholder="Search control name…" oninput="filterAll()">
+  <div class="filter-pills">
+    <div class="pill active" onclick="setZone('all',this)">All</div>
+    <div class="pill" onclick="setZone('overhead',this)">Overhead</div>
+    <div class="pill" onclick="setZone('glareshield',this)">Glareshield</div>
+    <div class="pill" onclick="setZone('pedestal',this)">Pedestal</div>
+    <div class="pill" onclick="setZone('instrument',this)">Instruments</div>
+  </div>
+  <div class="stat-bar">
+    <span id="stat-visible">—</span>
+    <span>|</span>
+    <span id="stat-type">—</span>
+  </div>
+</header>
+
+<main>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-group">
+    <h4>Control Type</h4>
+    <div class="legend-items">
+      <span class="type-badge type-guarded-pb">Guarded pb</span>
+      <span class="type-badge type-latching-pb">Latching pb</span>
+      <span class="type-badge type-momentary-pb">Momentary pb</span>
+      <span class="type-badge type-rotary">Rotary</span>
+      <span class="type-badge type-toggle">Toggle sw</span>
+      <span class="type-badge type-lever">Lever</span>
+      <span class="type-badge type-mechanical">Mechanical</span>
+    </div>
+  </div>
+  <div class="legend-group">
+    <h4>Light Cell Color</h4>
+    <div class="legend-items">
+      <span class="light-cell lc-red">RED — Warning</span>
+      <span class="light-cell lc-amber">AMBER — Caution</span>
+      <span class="light-cell lc-white">WHITE — Status/On</span>
+      <span class="light-cell lc-green">GREEN — Normal/Active</span>
+      <span class="light-cell lc-blue">BLUE — Engaged/Advisory</span>
+      <span class="light-cell lc-cyan">CYAN — Selected</span>
+    </div>
+  </div>
+</div>
+
+<div id="no-results">No controls match your search.</div>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- OVERHEAD PANEL                                          -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="zone" data-zone="overhead">
+  <div class="zone-header">
+    <span class="zone-label">Zone 1</span>
+    <span class="zone-name">OVERHEAD PANEL (OHP)</span>
+    <span class="zone-count" id="cnt-overhead"></span>
+  </div>
+
+  <!-- AIR COND / PRESSURIZATION -->
+  <div class="subsection">
+    <div class="subsection-title">Air Conditioning &amp; Pressurization <span class="fcom-ref">DSC-21-10 / DSC-21-20 / DSC-21-30</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>CKPT / FWD / AFT Zone Temp selector</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">3 selectors (COLD–HOT range)</td></tr>
+        <tr data-zone="overhead"><td>HOT AIR pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Hot trim air pressure regulator; OFF = valve closes</td></tr>
+        <tr data-zone="overhead"><td>PACK 1 / PACK 2 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Pack flow control valve; OFF light when pb out (off)</td></tr>
+        <tr data-zone="overhead"><td>BLEED FAULT lt (pack inlet)</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Pack inlet pressure abnormal</td></tr>
+        <tr data-zone="overhead"><td>RAM AIR pb-sw (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><div class="lights"><span class="light-cell lc-white">ON</span></div></td><td class="notes">Opens ram air inlet to mix manifold</td></tr>
+        <tr data-zone="overhead"><td>CAB PR MODE SEL rotary</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">AUTO / MAN positions; MAN unlocks outflow valve wheel</td></tr>
+        <tr data-zone="overhead"><td>OUTFLOW VALVE manual control wheel</td><td><span class="type-badge type-mechanical">Mechanical</span></td><td><span class="lc-none">—</span></td><td class="notes">Active only in MAN mode</td></tr>
+        <tr data-zone="overhead"><td>DITCHING pb-sw (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><div class="lights"><span class="light-cell lc-white">ON</span></div></td><td class="notes">Closes all under-floor openings for water landing</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ELECTRICAL -->
+  <div class="subsection">
+    <div class="subsection-title">Electrical <span class="fcom-ref">DSC-24-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>BAT 1 / BAT 2 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Auto/Off; OFF light when pb out</td></tr>
+        <tr data-zone="overhead"><td>GEN 1 / GEN 2 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Generator field excitation; OFF = generator offline</td></tr>
+        <tr data-zone="overhead"><td>APU GEN pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">APU generator; connects when APU AVAIL</td></tr>
+        <tr data-zone="overhead"><td>EXT PWR pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-green">AVAIL</span><span class="light-cell lc-blue">ON</span></div></td><td class="notes">External power; AVAIL when power cart connected</td></tr>
+        <tr data-zone="overhead"><td>BUS TIE pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-white">OFF</span></div></td><td class="notes">AC bus tie contactor; AUTO (normal) or OFF (manual split)</td></tr>
+        <tr data-zone="overhead"><td>AC ESS FEED pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">ALTN</span></div></td><td class="notes">NORM feeds from AC BUS 1; ALTN from AC BUS 2</td></tr>
+        <tr data-zone="overhead"><td>IDG 1 / IDG 2 pb (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">DISC</span></div></td><td class="notes">Irreversible IDG disconnect; springs out; cannot re-engage in flight</td></tr>
+        <tr data-zone="overhead"><td>GALLEY / GALY &amp; CAB pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Sheds galley load in electrical emergency</td></tr>
+        <tr data-zone="overhead"><td>COMMERCIAL pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-white">OFF</span></div></td><td class="notes">All commercial loads (IFE, galleys, etc.)</td></tr>
+        <tr data-zone="overhead"><td>GEN 1 LINE pb-sw (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><div class="lights"><span class="light-cell lc-amber">SMOKE</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Isolates GEN 1 line in smoke/fume emergency</td></tr>
+        <tr data-zone="overhead"><td>EMER GEN TEST pb (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Tests RAT and emergency gen (ground only)</td></tr>
+        <tr data-zone="overhead"><td>MAN ON pb (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Manual RAT deployment; spring-load — lifts guard and presses</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FIRE PROTECTION -->
+  <div class="subsection">
+    <div class="subsection-title">Fire Protection <span class="fcom-ref">DSC-26-20-20 / DSC-26-30-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>ENG 1 FIRE pb (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><div class="lights"><span class="light-cell lc-red">FIRE</span><span class="light-cell lc-white">SQUIB</span><span class="light-cell lc-amber">DISCH</span></div></td><td class="notes">FIRE red = detection; pops out when pushed; SQUIB/DISCH on pb face</td></tr>
+        <tr data-zone="overhead"><td>ENG 2 FIRE pb (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><div class="lights"><span class="light-cell lc-red">FIRE</span><span class="light-cell lc-white">SQUIB</span><span class="light-cell lc-amber">DISCH</span></div></td><td class="notes">Identical to ENG 1</td></tr>
+        <tr data-zone="overhead"><td>AGENT 1 pb-sw (ENG)</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-white">SQUIB</span><span class="light-cell lc-amber">DISCH</span></div></td><td class="notes">Discharges bottle 1 to selected engine; 10 s arming after FIRE pb</td></tr>
+        <tr data-zone="overhead"><td>AGENT 2 pb-sw (ENG)</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-white">SQUIB</span><span class="light-cell lc-amber">DISCH</span></div></td><td class="notes">Discharges bottle 2</td></tr>
+        <tr data-zone="overhead"><td>ENG 1 / ENG 2 FIRE TEST pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Illuminates all FIRE/SQUIB/DISCH lights for test</td></tr>
+        <tr data-zone="overhead"><td>APU FIRE pb (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><div class="lights"><span class="light-cell lc-red">FIRE</span><span class="light-cell lc-white">SQUIB</span><span class="light-cell lc-amber">DISCH</span></div></td><td class="notes">Identical mechanic to ENG FIRE pb</td></tr>
+        <tr data-zone="overhead"><td>APU AGENT pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-white">SQUIB</span><span class="light-cell lc-amber">DISCH</span></div></td><td class="notes">Single bottle for APU</td></tr>
+        <tr data-zone="overhead"><td>APU FIRE TEST pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">APU fire detection test</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FLIGHT CONTROLS -->
+  <div class="subsection">
+    <div class="subsection-title">Flight Controls <span class="fcom-ref">DSC-27-20-30 / DSC-27-30-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>ELAC 1 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Elevator &amp; Aileron Computer 1; reset by cycling</td></tr>
+        <tr data-zone="overhead"><td>ELAC 2 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Elevator &amp; Aileron Computer 2</td></tr>
+        <tr data-zone="overhead"><td>SEC 1 / SEC 2 / SEC 3 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Spoiler &amp; Elevator Computers</td></tr>
+        <tr data-zone="overhead"><td>FAC 1 / FAC 2 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Flight Augmentation Computers (rudder &amp; yaw damper)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FUEL -->
+  <div class="subsection">
+    <div class="subsection-title">Fuel <span class="fcom-ref">DSC-28-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>L WING TK PUMP 1 / PUMP 2 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Left wing tank pumps; OFF when pb out</td></tr>
+        <tr data-zone="overhead"><td>R WING TK PUMP 1 / PUMP 2 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Right wing tank pumps</td></tr>
+        <tr data-zone="overhead"><td>CTR TK L / CTR TK R PUMP pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Center tank feed pumps</td></tr>
+        <tr data-zone="overhead"><td>MODE SEL pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">MAN</span></div></td><td class="notes">AUTO (normal) / MAN (manual transfer)</td></tr>
+        <tr data-zone="overhead"><td>X FEED pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-green">OPEN</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Cross-feed valve; OPEN green when valve fully open</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- HYDRAULIC -->
+  <div class="subsection">
+    <div class="subsection-title">Hydraulic <span class="fcom-ref">DSC-29-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>ENG 1 PUMP pb-sw (Green sys)</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Engine-driven pump; low pressure = FAULT</td></tr>
+        <tr data-zone="overhead"><td>ENG 2 PUMP pb-sw (Yellow sys)</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Engine-driven pump Yellow system</td></tr>
+        <tr data-zone="overhead"><td>BLUE ELEC PUMP pb-sw (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Electric pump for Blue sys; AUTO (guarded-in, normal)</td></tr>
+        <tr data-zone="overhead"><td>YELLOW ELEC PUMP pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Electric pump Yellow sys; used on ground for braking/cargo</td></tr>
+        <tr data-zone="overhead"><td>PTU pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Power Transfer Unit; AUTO normal; inhibited when asymmetric</td></tr>
+        <tr data-zone="overhead"><td>RAT MAN ON pb (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Manual Ram Air Turbine deploy; irreversible in flight</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ICE & RAIN -->
+  <div class="subsection">
+    <div class="subsection-title">Ice &amp; Rain Protection <span class="fcom-ref">DSC-30-20-20 / DSC-30-30-20 / DSC-30-60-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>WING ANTI ICE pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-blue">ON</span><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Slat leading-edge anti-ice; ON blue when active</td></tr>
+        <tr data-zone="overhead"><td>ENG 1 ANTI ICE pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-blue">ON</span><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Engine 1 nacelle anti-ice</td></tr>
+        <tr data-zone="overhead"><td>ENG 2 ANTI ICE pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-blue">ON</span><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Engine 2 nacelle anti-ice</td></tr>
+        <tr data-zone="overhead"><td>PROBE/WINDOW HEAT pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-blue">ON</span><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Pitot / static / AOA / window heat; AUTO = on when airborne</td></tr>
+        <tr data-zone="overhead"><td>WIPER selector (CAPT / F/O)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">OFF / SLOW / FAST</td></tr>
+        <tr data-zone="overhead"><td>RAIN RPLNT pb (CAPT / F/O)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Spray rain repellent; momentary push</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- LIGHTS -->
+  <div class="subsection">
+    <div class="subsection-title">Lights <span class="fcom-ref">DSC-33-10-30 / DSC-33-20-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>STROBE rotary (OFF / AUTO / ON)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">AUTO = on when airborne</td></tr>
+        <tr data-zone="overhead"><td>BEACON sw (ON / OFF)</td><td><span class="type-badge type-toggle">Toggle sw</span></td><td><span class="lc-none">—</span></td><td class="notes">Red anti-collision beacons</td></tr>
+        <tr data-zone="overhead"><td>WING sw (ON / OFF)</td><td><span class="type-badge type-toggle">Toggle sw</span></td><td><span class="lc-none">—</span></td><td class="notes">Wing inspection &amp; engine inlet lights</td></tr>
+        <tr data-zone="overhead"><td>NAV &amp; LOGO sw</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">OFF / 1 / 2 / ON — navigation lights + tail logo</td></tr>
+        <tr data-zone="overhead"><td>NOSE selector (OFF / TAXI / T.O.)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Nose taxi + runway TO light</td></tr>
+        <tr data-zone="overhead"><td>L(R) LAND selector</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">ON / OFF / RETRACT (retractable landing lights)</td></tr>
+        <tr data-zone="overhead"><td>RWY TURN OFF sw (L / R)</td><td><span class="type-badge type-toggle">Toggle sw</span></td><td><span class="lc-none">—</span></td><td class="notes">Runway turn-off lights; ON/OFF</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- OXYGEN -->
+  <div class="subsection">
+    <div class="subsection-title">Oxygen <span class="fcom-ref">DSC-35-20-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>CREW SUPPLY pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Crew oxygen masks; OFF light when pb out (supply cut)</td></tr>
+        <tr data-zone="overhead"><td>PASSENGER SYS ON pb (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><div class="lights"><span class="light-cell lc-white">ON</span></div></td><td class="notes">Manual pax O₂ deploy; auto deploys below 14 000 ft cabin alt</td></tr>
+        <tr data-zone="overhead"><td>MASK MAN ON pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Test mask deployment</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PNEUMATIC / BLEED -->
+  <div class="subsection">
+    <div class="subsection-title">Pneumatic / Bleed <span class="fcom-ref">DSC-36-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>ENG 1 BLEED pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">High-pressure bleed valve; closes on ENG FIRE pb push</td></tr>
+        <tr data-zone="overhead"><td>ENG 2 BLEED pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">High-pressure bleed valve ENG 2</td></tr>
+        <tr data-zone="overhead"><td>APU BLEED pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-blue">ON</span></div></td><td class="notes">APU bleed supply; ON blue when supplying packs</td></tr>
+        <tr data-zone="overhead"><td>X BLEED selector</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">SHUT / AUTO / OPEN — cross-bleed duct valve</td></tr>
+        <tr data-zone="overhead"><td>HP VALVE OPEN lt</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-amber">OPEN</span></div></td><td class="notes">Amber when HP valve not in commanded position</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- APU -->
+  <div class="subsection">
+    <div class="subsection-title">APU <span class="fcom-ref">DSC-49-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>APU MASTER SW pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-blue">ON</span><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Energises APU ECB, fuel valve; ON blue when on</td></tr>
+        <tr data-zone="overhead"><td>APU START pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-blue">ON</span><span class="light-cell lc-green">AVAIL</span></div></td><td class="notes">ON blue during start sequence; AVAIL green when ready to load</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ADIRS -->
+  <div class="subsection">
+    <div class="subsection-title">Air Data / Inertial (ADIRS) <span class="fcom-ref">DSC-34-NAV-10-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>ADR 1 / ADR 2 / ADR 3 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Air Data Reference; cycling resets disagreement</td></tr>
+        <tr data-zone="overhead"><td>IR 1 / IR 2 / IR 3 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Inertial Reference; 10-min alignment on ground</td></tr>
+        <tr data-zone="overhead"><td>ADIRS MODE selector (×3)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">OFF / NAV / ATT — per unit</td></tr>
+        <tr data-zone="overhead"><td>ON BAT lt (×3)</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-white">ON BAT</span></div></td><td class="notes">White when unit running on battery only</td></tr>
+        <tr data-zone="overhead"><td>SYS FAULT lt (×3)</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-amber">SYS FAULT</span></div></td><td class="notes">Amber when that ADIRU has a system fault</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SURVEILLANCE -->
+  <div class="subsection">
+    <div class="subsection-title">Surveillance / TCAS <span class="fcom-ref">DSC-34-SURV</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="overhead"><td>XPDR selector (MODE S / XPDR)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Located on ATC/TCAS panel on pedestal</td></tr>
+        <tr data-zone="overhead"><td>ATC FAIL lt</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-amber">FAIL</span></div></td><td class="notes">Transponder failure indication</td></tr>
+        <tr data-zone="overhead"><td>TCAS pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Traffic Collision Avoidance System</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- end overhead zone -->
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- GLARESHIELD                                             -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="zone" data-zone="glareshield">
+  <div class="zone-header">
+    <span class="zone-label">Zone 2</span>
+    <span class="zone-name">GLARESHIELD</span>
+    <span class="zone-count" id="cnt-glareshield"></span>
+  </div>
+
+  <!-- FCU -->
+  <div class="subsection">
+    <div class="subsection-title">Flight Control Unit (FCU) <span class="fcom-ref">DSC-22_10-10</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="glareshield"><td>SPD / MACH pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Toggles speed display between Kt and Mach</td></tr>
+        <tr data-zone="glareshield"><td>SPD / MACH knob (pull/push + rotate)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Pull = managed speed; Push = selected; Rotate = set value</td></tr>
+        <tr data-zone="glareshield"><td>HDG / TRK pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Toggles HDG-V/S vs TRK-FPA mode</td></tr>
+        <tr data-zone="glareshield"><td>HDG / TRK knob (pull/push + rotate)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Pull = managed nav; Push = selected HDG/TRK</td></tr>
+        <tr data-zone="glareshield"><td>ALT knob (rotate)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Sets target altitude in FCU; 100 ft steps (small) / 1000 ft (large)</td></tr>
+        <tr data-zone="glareshield"><td>ALT PULL (OP CLB / OP DES)</td><td><span class="type-badge type-mechanical">Mechanical</span></td><td><span class="lc-none">—</span></td><td class="notes">Pull knob = OP CLB or OP DES immediately</td></tr>
+        <tr data-zone="glareshield"><td>ALT PUSH (managed CLB / DES)</td><td><span class="type-badge type-mechanical">Mechanical</span></td><td><span class="lc-none">—</span></td><td class="notes">Push knob = CLB or DES managed (FMS altitude target)</td></tr>
+        <tr data-zone="glareshield"><td>V/S — FPA knob (rotate)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Pull = engages V/S or FPA with displayed value</td></tr>
+        <tr data-zone="glareshield"><td>LOC pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">LOC</span></div></td><td class="notes">Arms LOC capture; light on when armed or captured</td></tr>
+        <tr data-zone="glareshield"><td>APPR pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">APPR</span></div></td><td class="notes">Arms G/S + LOC together for ILS approach</td></tr>
+        <tr data-zone="glareshield"><td>EXPED pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">EXPED</span></div></td><td class="notes">Expedite climb / descent at Vmax or GD speed</td></tr>
+        <tr data-zone="glareshield"><td>AP 1 pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">AP1</span></div></td><td class="notes">Engages/disengages AP 1; min 100 ft RA at T/O</td></tr>
+        <tr data-zone="glareshield"><td>AP 2 pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">AP2</span></div></td><td class="notes">Engages/disengages AP 2</td></tr>
+        <tr data-zone="glareshield"><td>A/THR pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">A/THR</span></div></td><td class="notes">Arms/disengages autothrust; status shown in FMA col 5</td></tr>
+        <tr data-zone="glareshield"><td>FD 1 / FD 2 pb-sw (CAPT / F/O)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">FD</span></div></td><td class="notes">Flight Director bars on/off; each side independent</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- EFIS CONTROL PANEL -->
+  <div class="subsection">
+    <div class="subsection-title">EFIS Control Panel (ECP) — CAPT &amp; F/O <span class="fcom-ref">DSC-31-55-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="glareshield"><td>BARO selector (knob)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Sets QNH/STD; inner knob = hPa/inHg toggle</td></tr>
+        <tr data-zone="glareshield"><td>BARO STD pb (push knob)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Push = STD immediately; pull = set QNH numerically</td></tr>
+        <tr data-zone="glareshield"><td>FD pb-sw (EFIS side)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">FD</span></div></td><td class="notes">Mirrors FCU FD</td></tr>
+        <tr data-zone="glareshield"><td>ILS pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">ILS</span></div></td><td class="notes">Shows ILS info (frequency, ID, DME) on PFD bottom-left</td></tr>
+        <tr data-zone="glareshield"><td>ND MODE selector (ROSE NAV / VOR / ILS / ARC / PLAN)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">5-position rotary; each side independent</td></tr>
+        <tr data-zone="glareshield"><td>ND RANGE selector (10–320 NM)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">5 NM / 10 / 20 / 40 / 80 / 160 / 320 NM</td></tr>
+        <tr data-zone="glareshield"><td>VOR/ADF 1 selector (L)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">OFF / VOR / ADF — left navaid needle on ND</td></tr>
+        <tr data-zone="glareshield"><td>VOR/ADF 2 selector (R)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">OFF / VOR / ADF — right navaid needle on ND</td></tr>
+        <tr data-zone="glareshield"><td>CSTR pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">CSTR</span></div></td><td class="notes">Shows FMS constraints on ND</td></tr>
+        <tr data-zone="glareshield"><td>WPT pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">WPT</span></div></td><td class="notes">Shows waypoints on ND</td></tr>
+        <tr data-zone="glareshield"><td>VORD pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">VORD</span></div></td><td class="notes">Shows VOR/DME stations on ND</td></tr>
+        <tr data-zone="glareshield"><td>NDB pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">NDB</span></div></td><td class="notes">Shows NDB stations on ND</td></tr>
+        <tr data-zone="glareshield"><td>ARPT pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">ARPT</span></div></td><td class="notes">Shows airports on ND</td></tr>
+        <tr data-zone="glareshield"><td>TERR pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">TERR</span></div></td><td class="notes">Terrain awareness overlay on ND (GPWS-based)</td></tr>
+        <tr data-zone="glareshield"><td>WXR pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">WXR</span></div></td><td class="notes">Weather radar overlay on ND</td></tr>
+        <tr data-zone="glareshield"><td>TRAF pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">TRAF</span></div></td><td class="notes">TCAS traffic display on ND</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- GLARESHIELD WARNINGS -->
+  <div class="subsection">
+    <div class="subsection-title">Master Warning / Caution (Glareshield) <span class="fcom-ref">DSC-31-30 / DSC-31-60</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="glareshield"><td>MASTER WARN pb (CAPT / F/O)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-red">MASTER WARN</span></div></td><td class="notes">Flashes red; press = silences CRC aural + extinguishes light; ECAM still shows</td></tr>
+        <tr data-zone="glareshield"><td>MASTER CAUT pb (CAPT / F/O)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">MASTER CAUT</span></div></td><td class="notes">Steady amber; press = silences SC chime + extinguishes; ECAM still shows</td></tr>
+        <tr data-zone="glareshield"><td>CHRONO pb (CAPT / F/O)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Chronometer on PFD; press = start / reset / stop cycle</td></tr>
+        <tr data-zone="glareshield"><td>SIDE STICK PRIORITY lt (CAPT)</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-red">CAPT</span><span class="light-cell lc-green">GREEN</span></div></td><td class="notes">Red = other side has priority; green = this side has priority</td></tr>
+        <tr data-zone="glareshield"><td>SIDE STICK PRIORITY lt (F/O)</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-red">F/O</span><span class="light-cell lc-green">GREEN</span></div></td><td class="notes">Mirror of CAPT side</td></tr>
+        <tr data-zone="glareshield"><td>GPWS G/S MODE pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">G/S MODE</span></div></td><td class="notes">Inhibits GPWS glideslope alert momentarily</td></tr>
+        <tr data-zone="glareshield"><td>GPWS SYS pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">SYS</span></div></td><td class="notes">GPWS system fault</td></tr>
+        <tr data-zone="glareshield"><td>GPWS FLAP MODE pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">FLAP MODE</span></div></td><td class="notes">Inhibits GPWS flap alert</td></tr>
+        <tr data-zone="glareshield"><td>GPWS TERR MODE pb-sw</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-white">TERR MODE</span></div></td><td class="notes">Inhibits TAWS terrain alert</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- end glareshield zone -->
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- PEDESTAL                                                -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="zone" data-zone="pedestal">
+  <div class="zone-header">
+    <span class="zone-label">Zone 3</span>
+    <span class="zone-name">PEDESTAL (CENTER CONSOLE)</span>
+    <span class="zone-count" id="cnt-pedestal"></span>
+  </div>
+
+  <!-- ENGINE CONTROLS -->
+  <div class="subsection">
+    <div class="subsection-title">Engine Controls <span class="fcom-ref">DSC-70-90-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="pedestal"><td>THR LEVER 1 / THR LEVER 2</td><td><span class="type-badge type-lever">Lever</span></td><td><span class="lc-none">—</span></td><td class="notes">Detents: TOGA / FLX·MCT / CL / IDLE; mechanical gate at each</td></tr>
+        <tr data-zone="pedestal"><td>REV LEVER 1 / REV LEVER 2</td><td><span class="type-badge type-lever">Lever</span></td><td><span class="lc-none">—</span></td><td class="notes">Latched at stow; pull up + back to deploy reverser</td></tr>
+        <tr data-zone="pedestal"><td>A/THR Instinctive disconnect pb (×2)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Red pb on each THR lever handle; press = disconnects A/THR</td></tr>
+        <tr data-zone="pedestal"><td>AP DISC / TAKE CTRL pb (sidestick)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-red">AP OFF</span></div></td><td class="notes">On sidestick; press = AP disconnects + cavalry charge aural</td></tr>
+        <tr data-zone="pedestal"><td>ENG MODE SEL rotary</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">CRANK / NORM / IGN START; between ENG MASTER levers</td></tr>
+        <tr data-zone="pedestal"><td>ENG 1 MASTER sw</td><td><span class="type-badge type-lever">Lever</span></td><td><div class="lights"><span class="light-cell lc-red">FIRE</span><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">ON / OFF toggle lever; pull up then back for OFF</td></tr>
+        <tr data-zone="pedestal"><td>ENG 2 MASTER sw</td><td><span class="type-badge type-lever">Lever</span></td><td><div class="lights"><span class="light-cell lc-red">FIRE</span><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">ON / OFF toggle lever ENG 2</td></tr>
+        <tr data-zone="pedestal"><td>ENG MAN START pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-blue">ON</span></div></td><td class="notes">Manual start; bypasses FADEC auto start logic</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ECAM CONTROL PANEL -->
+  <div class="subsection">
+    <div class="subsection-title">ECAM Control Panel (ECP) <span class="fcom-ref">DSC-31-30 / DSC-52-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="pedestal"><td>ENG pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Selects ENG page on SD; FAULT when page has an alert</td></tr>
+        <tr data-zone="pedestal"><td>BLEED pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Bleed system page</td></tr>
+        <tr data-zone="pedestal"><td>PRESS pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Pressurisation page</td></tr>
+        <tr data-zone="pedestal"><td>ELEC pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Electrical page</td></tr>
+        <tr data-zone="pedestal"><td>HYD pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Hydraulic page</td></tr>
+        <tr data-zone="pedestal"><td>FUEL pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Fuel page</td></tr>
+        <tr data-zone="pedestal"><td>APU pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">APU page</td></tr>
+        <tr data-zone="pedestal"><td>COND pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Air conditioning page</td></tr>
+        <tr data-zone="pedestal"><td>DOOR / OXY pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Door/oxygen page</td></tr>
+        <tr data-zone="pedestal"><td>WHEEL pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Wheel/brake page</td></tr>
+        <tr data-zone="pedestal"><td>F/CTL pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Flight controls page</td></tr>
+        <tr data-zone="pedestal"><td>STS pb (SD page)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Status page (inop systems after ECAM actions)</td></tr>
+        <tr data-zone="pedestal"><td>CLR pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Clears top ECAM message; hold = clears all</td></tr>
+        <tr data-zone="pedestal"><td>RCL pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Recalls cleared ECAM messages</td></tr>
+        <tr data-zone="pedestal"><td>EMER CANCEL pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Silences CRC; next ECAM warning still generates new aural</td></tr>
+        <tr data-zone="pedestal"><td>ALL pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Cycles through all active ECAM messages</td></tr>
+        <tr data-zone="pedestal"><td>ECAM DISPLAY selector (brightness)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Separate knobs for EWD and SD brightness</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FLIGHT CONTROLS PEDESTAL -->
+  <div class="subsection">
+    <div class="subsection-title">Flight Controls / Trim <span class="fcom-ref">DSC-27-30-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="pedestal"><td>RUD TRIM rotary</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Sets rudder trim bias; indicator shows degrees L/R</td></tr>
+        <tr data-zone="pedestal"><td>RUD TRIM RESET pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Returns rudder trim to zero</td></tr>
+        <tr data-zone="pedestal"><td>SPD BRK lever</td><td><span class="type-badge type-lever">Lever</span></td><td><div class="lights"><span class="light-cell lc-amber">SPEED BRK</span></div></td><td class="notes">RETRACTED → full (½ spoilers deploy); FAULT when auto retracted at T/O</td></tr>
+        <tr data-zone="pedestal"><td>PITCH TRIM wheel (×2 — CAPT / F/O side)</td><td><span class="type-badge type-mechanical">Mechanical</span></td><td><span class="lc-none">—</span></td><td class="notes">Manual pitch trim; indicator in centre; range –4° to +13.5°</td></tr>
+        <tr data-zone="pedestal"><td>FLAP / SLAT lever</td><td><span class="type-badge type-lever">Lever</span></td><td><span class="lc-none">—</span></td><td class="notes">0 / 1 / 1+F / 2 / 3 / FULL gates; position confirmed on SD WHEEL</td></tr>
+        <tr data-zone="pedestal"><td>PARK BRK valve lever (guarded)</td><td><span class="type-badge type-lever">Lever</span></td><td><div class="lights"><span class="light-cell lc-amber">PARK BRK</span></div></td><td class="notes">ON / OFF; amber PARK BRK light on EWD when applied</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ATC/TCAS PEDESTAL -->
+  <div class="subsection">
+    <div class="subsection-title">ATC / TCAS Panel <span class="fcom-ref">DSC-34-SURV-10-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="pedestal"><td>XPDR rotary (STBY / ON / AUTO)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Transponder mode; AUTO = TA/RA mode when airborne</td></tr>
+        <tr data-zone="pedestal"><td>TCAS MODE selector (STBY / TA / TA/RA)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Traffic Advisory / Resolution Advisory modes</td></tr>
+        <tr data-zone="pedestal"><td>ALT RPTG selector (NORM / OFF)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Altitude reporting to ATC transponder</td></tr>
+        <tr data-zone="pedestal"><td>XPDR IDENT pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">SPI special position identification pulse</td></tr>
+        <tr data-zone="pedestal"><td>ATC 1 / ATC 2 selector (×2)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><span class="lc-none">—</span></td><td class="notes">Squawk code (4-digit octal); separate digit knobs</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- COMMS PEDESTAL -->
+  <div class="subsection">
+    <div class="subsection-title">Radio Management / Audio <span class="fcom-ref">DSC-23 / DSC-46-40-30</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="pedestal"><td>RMP 1 / RMP 2 (Radio Management Panel)</td><td><span class="type-badge type-rotary">Rotary</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Frequency tuning; inner/outer concentric knobs per RMP</td></tr>
+        <tr data-zone="pedestal"><td>VHF 1 / VHF 2 / VHF 3 transfer pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Swaps standby ↔ active frequency on RMP</td></tr>
+        <tr data-zone="pedestal"><td>PTT (Push To Talk) sw (×2, on yoke/tiller)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Press = transmit on selected radio; spring-load</td></tr>
+        <tr data-zone="pedestal"><td>DFDR EVENT pb</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Marks event on flight data recorder</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- end pedestal zone -->
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- MAIN INSTRUMENT PANEL                                   -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="zone" data-zone="instrument">
+  <div class="zone-header">
+    <span class="zone-label">Zone 4</span>
+    <span class="zone-name">MAIN INSTRUMENT PANEL</span>
+    <span class="zone-count" id="cnt-instrument"></span>
+  </div>
+
+  <!-- LANDING GEAR -->
+  <div class="subsection">
+    <div class="subsection-title">Landing Gear <span class="fcom-ref">DSC-32-10-40 / DSC-32-20-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="instrument"><td>L/G LEVER (UP / DN)</td><td><span class="type-badge type-lever">Lever</span></td><td><div class="lights"><span class="light-cell lc-red">RED ARROW</span></div></td><td class="notes">Red arrow flashes when gear disagrees with lever; pin-locked in UP</td></tr>
+        <tr data-zone="instrument"><td>L/G DOWNLOCK OVERRIDE pb (guarded)</td><td><span class="type-badge type-guarded-pb">Guarded pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Releases downlock for gravity extension; irreversible</td></tr>
+        <tr data-zone="instrument"><td>LGCIU 1 / LGCIU 2 pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Landing Gear Control Interface Unit; cycling resets</td></tr>
+        <tr data-zone="instrument"><td>GEAR POSITION lights (L / N / R per gear)</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-green">DOWN &amp; LOCKED</span><span class="light-cell lc-red">UNLOCKED/TRANSIT</span></div></td><td class="notes">Green = locked down; Red = in transit or not locked; off = up &amp; locked</td></tr>
+        <tr data-zone="instrument"><td>GRAVITY EXTENSION crank</td><td><span class="type-badge type-mechanical">Mechanical</span></td><td><span class="lc-none">—</span></td><td class="notes">Releases gear by gravity; located on floor between seats</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ANTI-SKID / BRAKES -->
+  <div class="subsection">
+    <div class="subsection-title">Brakes / Anti-Skid <span class="fcom-ref">DSC-32-30-20</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="instrument"><td>A/SKID &amp; N/W STRG pb-sw</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span><span class="light-cell lc-white">OFF</span></div></td><td class="notes">Anti-skid and nose wheel steering; OFF disables both</td></tr>
+        <tr data-zone="instrument"><td>LT BRAKE ACCU pb</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-amber">LO PR</span></div></td><td class="notes">Low brake accumulator pressure indication</td></tr>
+        <tr data-zone="instrument"><td>BRAKE TEMP (BTMS) indicator</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-amber">HOT</span></div></td><td class="notes">Amber HOT when brake temp > limit on any wheel</td></tr>
+        <tr data-zone="instrument"><td>AUTO BRK pb-sw (LO / MED / MAX)</td><td><span class="type-badge type-latching-pb">Latching pb</span></td><td><div class="lights"><span class="light-cell lc-blue">ARMED</span><span class="light-cell lc-amber">DECEL</span></div></td><td class="notes">Autobrake for landing; DECEL = auto braking active</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CLOCK / CHRONOMETER -->
+  <div class="subsection">
+    <div class="subsection-title">Clock / Standby Instruments <span class="fcom-ref">DSC-31-60</span></div>
+    <table>
+      <thead><tr><th>Control</th><th>Type</th><th>Light Cells</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr data-zone="instrument"><td>ISIS (Standby Instrument)</td><td><span class="type-badge type-indicator">Indicator</span></td><td><div class="lights"><span class="light-cell lc-amber">FAULT</span></div></td><td class="notes">Integrated Standby Instrument System — backup spd/alt/att</td></tr>
+        <tr data-zone="instrument"><td>ISIS BARO pb (on ISIS face)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Sets QNH/STD on ISIS independently</td></tr>
+        <tr data-zone="instrument"><td>STBY NAV (backup VOR/ILS)</td><td><span class="type-badge type-indicator">Indicator</span></td><td><span class="lc-none">—</span></td><td class="notes">Standby HSI/CDI for nav backup</td></tr>
+        <tr data-zone="instrument"><td>Cockpit clock (CHR / SET / sel)</td><td><span class="type-badge type-momentary-pb">Momentary pb</span></td><td><span class="lc-none">—</span></td><td class="notes">Mechanical analogue + digital elapsed-time clock</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- end instrument zone -->
+
+</main>
+
+<script>
+  let activeZone = 'all';
+
+  function setZone(zone, el) {
+    activeZone = zone;
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    filterAll();
+  }
+
+  function filterAll() {
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    const rows = document.querySelectorAll('tbody tr[data-zone]');
+    let visible = 0;
+
+    rows.forEach(row => {
+      const zoneMatch = activeZone === 'all' || row.dataset.zone === activeZone;
+      const textMatch = !q || row.textContent.toLowerCase().includes(q);
+      const show = zoneMatch && textMatch;
+      row.classList.toggle('hidden', !show);
+      if (show) visible++;
+    });
+
+    // show/hide zone sections based on filter
+    document.querySelectorAll('.zone').forEach(zone => {
+      const zoneKey = zone.dataset.zone;
+      const zoneMatch = activeZone === 'all' || zoneKey === activeZone;
+      const hasVisible = zoneMatch && zone.querySelectorAll('tbody tr:not(.hidden)').length > 0;
+      zone.style.display = hasVisible ? '' : 'none';
+    });
+
+    document.getElementById('no-results').style.display = visible === 0 ? '' : 'none';
+    updateStats(visible);
+    updateZoneCounts();
+  }
+
+  function updateStats(visible) {
+    const total = document.querySelectorAll('tbody tr[data-zone]').length;
+    document.getElementById('stat-visible').innerHTML =
+      `<b>${visible}</b> of <b>${total}</b> controls shown`;
+
+    // count types visible
+    const types = {};
+    document.querySelectorAll('tbody tr[data-zone]:not(.hidden) .type-badge').forEach(b => {
+      const t = b.textContent.trim();
+      types[t] = (types[t] || 0) + 1;
+    });
+    const topTypes = Object.entries(types)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(' · ');
+    document.getElementById('stat-type').innerHTML = topTypes;
+  }
+
+  function updateZoneCounts() {
+    [['overhead','cnt-overhead'],['glareshield','cnt-glareshield'],
+     ['pedestal','cnt-pedestal'],['instrument','cnt-instrument']].forEach(([zone, id]) => {
+      const n = document.querySelectorAll(`tbody tr[data-zone="${zone}"]:not(.hidden)`).length;
+      const el = document.getElementById(id);
+      if (el) el.textContent = n + ' controls';
+    });
+  }
+
+  // init
+  filterAll();
+</script>
+</body>
+</html>

@@ -1,11 +1,14 @@
 "use client";
 
+// HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 import { useEffect, useId, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
 import type { Scenario, SysSwState } from "@/scenarios/types";
 import { evalSysCase, SYS_COLORS } from "@/components/cockpit/system-display";
 import { EngineFireScenarioPanel } from "@/components/cockpit/engine-fire-panel-scenario";
+import { FirePanel3D } from "@/components/cockpit/fire-panel-3d";
 
 // ─── CSS keyframes (AGENT arming pulse, TEST pulse) ─────────────────────────
 // Injected once via <style> in the panel root.
@@ -564,7 +567,7 @@ function AirbusPB({
           <span
             style={{
               fontSize: large ? "20px" : "8px",
-              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontFamily: "var(--font-cockpit)",
               fontWeight: 800,
               letterSpacing: large ? "0.04em" : "0.12em",
               color: ledTextColor,
@@ -597,7 +600,7 @@ function AirbusPB({
           <div
             style={{
               fontSize: large ? "11px" : "9px",
-              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontFamily: "var(--font-cockpit)",
               fontWeight: 700,
               letterSpacing: large ? "0.04em" : "0.08em",
               // FIRE pb at rest: off-white label on orange-red body.
@@ -614,7 +617,7 @@ function AirbusPB({
             <div
               style={{
                 fontSize: "10px",
-                fontFamily: '"Helvetica Neue", Arial, sans-serif',
+                fontFamily: "var(--font-cockpit)",
                 color: lit ? "#FFFFFF" : FIRE_LEGEND_OFFWHITE,
                 fontWeight: 700,
                 letterSpacing: "0.14em",
@@ -778,7 +781,7 @@ function AgentPb({
           }}>
             <span style={{
               fontSize: "9px",
-              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontFamily: "var(--font-cockpit)",
               fontWeight: 800,
               color: squibLit ? C.white : C.dimLo,
               letterSpacing: "0.06em",
@@ -797,7 +800,7 @@ function AgentPb({
           }}>
             <span style={{
               fontSize: "9px",
-              fontFamily: '"Helvetica Neue", Arial, sans-serif',
+              fontFamily: "var(--font-cockpit)",
               fontWeight: 800,
               color: dischLit ? C.amber : C.dimLo,
               letterSpacing: "0.06em",
@@ -812,7 +815,7 @@ function AgentPb({
         marginTop: "6px",
         textAlign: "center",
         fontSize: "8px",
-        fontFamily: '"Helvetica Neue", Arial, sans-serif',
+        fontFamily: "var(--font-cockpit)",
         fontWeight: 700,
         color: dischLit ? C.amber : squibLit ? C.white : arming ? C.amber : C.dim,
         letterSpacing: "0.08em",
@@ -823,7 +826,7 @@ function AgentPb({
         {sub && (
           <span style={{
             display: "block", fontSize: "7px",
-            fontFamily: '"Helvetica Neue", Arial, sans-serif',
+            fontFamily: "var(--font-cockpit)",
             color: C.dim, marginTop: "1px", letterSpacing: "0.06em",
           }}>
             {sub}
@@ -1080,10 +1083,10 @@ function DslOHPSwitch({ label, sub, swState }: { label: string; sub?: string; sw
 // ─── DSL Param row for engine display ────────────────────────────────────────
 function DslEngRow({ label, value, color, unit }: { label: string; value: string; color: string; unit?: string }) {
   return (
-    <div className="flex items-baseline justify-between px-2 py-[3px]" style={{ borderBottom: "1px solid #1C2130" }}>
-      <span style={{ color: "#8A9AAE", fontSize: "9px", letterSpacing: "0.08em", fontFamily: "monospace" }}>{label}</span>
-      <span style={{ color, fontSize: "11px", fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em" }}>
-        {value}{unit && <span style={{ color: "#6A7A8A", fontSize: "8px", marginLeft: "3px" }}>{unit}</span>}
+    <div className="flex items-baseline justify-between px-2 py-[1px]" style={{ borderBottom: "1px solid #1C2130" }}>
+      <span style={{ color: "#8A9AAE", fontSize: "8px", letterSpacing: "0.08em", fontFamily: "monospace" }}>{label}</span>
+      <span style={{ color, fontSize: "9px", fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.06em" }}>
+        {value}{unit && <span style={{ color: "#6A7A8A", fontSize: "7px", marginLeft: "2px" }}>{unit}</span>}
       </span>
     </div>
   );
@@ -1104,7 +1107,7 @@ function DslTray({ title, note, children }: { title: string; note?: string; chil
 function DslEnginePanel({ engNum, panel, state, warningActive }: { engNum: 1 | 2; panel: import("@/scenarios/types").EnginePanelDef; state: ScenarioState; warningActive: boolean }) {
   return (
     <div className="flex flex-col">
-      <span style={{ fontSize: "8px", fontFamily: "monospace", color: warningActive ? C.amber : C.dim, letterSpacing: "0.2em", fontWeight: 700, padding: "4px 8px 2px" }}>
+      <span style={{ fontSize: "7px", fontFamily: "monospace", color: warningActive ? C.amber : C.dim, letterSpacing: "0.2em", fontWeight: 700, padding: "1px 4px 1px" }}>
         ENG {engNum}{warningActive && <span style={{ color: C.red, marginLeft: "4px" }}>✕</span>}
       </span>
       {panel.rows.map((row) => {
@@ -1624,69 +1627,73 @@ function DslControlPanel({
         <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
       </div>
 
-      {/* Controls row — fire_pb + the AGENT pbs are replaced by a single
-          EngineFireScenarioPanel (canonical mockup design, scaled).  Other
-          controls (thr_lever, master, cancel_*, …) stay as individual cells. */}
+      {/* Two-column layout: left 40% = thrust levers + master, right 60% = 3D fire panel */}
       {(() => {
         const firePbCtrl  = controls.find(c => c.kind === "fire_pb");
         const agentCtrls  = controls.filter(c => c.kind === "agent");
         const agent1Ctrl  = agentCtrls[0];
         const agent2Ctrl  = agentCtrls[1];
+        const agent2Available = !!state.triggersFired["fire_persists_30s"] && !state.triggersFired["fire_extinguished"];
         const performStep = (id?: string) => {
           if (!id || disabled) return;
           perform({ kind: "STEP", stepId: id });
         };
-        return (
-          <div style={{ display: "flex", gap: "12px", justifyContent: "center", alignItems: "flex-end", flexWrap: "wrap", paddingLeft: "6px", paddingRight: "6px" }}>
-            {controls.map((ctrl) => {
-              const done    = isDone(ctrl.stepId);
-              const step    = scenario.steps.find(s => s.id === ctrl.stepId);
-              const reqsMet = (step?.requires ?? []).every(r => !!state.completedSteps[r]);
-              const active  = !done && reqsMet && warningActive;
-              const clickable = !done && reqsMet && warningActive && !disabled;
-              const onClick = () => { if (clickable) perform({ kind: "STEP", stepId: ctrl.stepId }); };
 
-              switch (ctrl.kind) {
-                case "thr_lever": return <DslThrLeverCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                case "mode_sel":  return <DslModeSelCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={fireLit} />;
-                case "fire_pb":
-                  // Render the canonical cyan FIRE panel (mockup design,
-                  // chromeless, cropped) covering FIRE pb + AGENT 1 +
-                  // AGENT 2 + FIRE bar + TEST in one combined embed.
-                  //
-                  // THR LEVERS + MASTER controls reserve a status-memo
-                  // line (~15 px) below their visual frames, so flex-end
-                  // alone lines up wrappers but NOT visible bottoms.
-                  // marginBottom: 15px lifts the cyan panel by the same
-                  // amount so all three visible bottoms (THR frame, MASTER
-                  // housing, cyan box) sit at one line.
-                  return (
-                    <div key={ctrl.stepId} style={{ marginBottom: "25px" }}>
-                      <EngineFireScenarioPanel
-                        fireDetected={fireLit}
-                        firePbDone={isDone(firePbCtrl?.stepId ?? "")}
-                        agent1Disch={isDone(agent1Ctrl?.stepId ?? "")}
-                        agent2Disch={isDone(agent2Ctrl?.stepId ?? "")}
-                        onPushFirePb={() => performStep(firePbCtrl?.stepId)}
-                        onPushAgent1={() => performStep(agent1Ctrl?.stepId)}
-                        onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
-                      />
-                    </div>
-                  );
-                case "agent":
-                  // AGENT pbs are now drawn inside EngineFireScenarioPanel
-                  // — skip the standalone cell so we don't double-render.
-                  return null;
-                case "cancel_warn": return <DslCancelWarnCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                case "cancel_caut": return <DslCancelCautCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                case "o2_mask":     return <DslO2MaskCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-                case "toggle_sw":   return <DslToggleSwCtrl   key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-                case "emer_pb":     return <DslEmerPbCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-                case "spd_brk":     return <DslSpdBrkCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                default:            return <DslMonitorCtrl    key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-              }
-            })}
+        const sideControls = controls.filter(c => c.kind !== "fire_pb" && c.kind !== "agent");
+
+        const fp3dFireDetected = fireLit;
+        const fp3dFirePbDone   = isDone(firePbCtrl?.stepId ?? "");
+        const fp3dAgent1Disch  = isDone(agent1Ctrl?.stepId ?? "");
+        const fp3dAgent2Disch  = isDone(agent2Ctrl?.stepId ?? "");
+        const fp3dActiveStepId =
+          !fp3dFirePbDone && fp3dFireDetected ? "eng1_fire_pb" :
+          fp3dFirePbDone  && !fp3dAgent1Disch  ? "agent1" :
+          fp3dAgent1Disch && !fp3dAgent2Disch && agent2Available ? "agent2" : undefined;
+
+        return (
+          <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+            {/* Left 40%: thrust levers + engine master */}
+            <div style={{ flex: "0 0 38%", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
+              {sideControls.map((ctrl) => {
+                const done      = isDone(ctrl.stepId);
+                const step      = scenario.steps.find(s => s.id === ctrl.stepId);
+                const reqsMet   = (step?.requires ?? []).every(r => !!state.completedSteps[r]);
+                const active    = !done && reqsMet && warningActive;
+                const clickable = !done && reqsMet && warningActive && !disabled;
+                const onClick   = () => { if (clickable) perform({ kind: "STEP", stepId: ctrl.stepId }); };
+                switch (ctrl.kind) {
+                  case "thr_lever": return <DslThrLeverCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                  case "mode_sel":  return <DslModeSelCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                  case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={fireLit} />;
+                  case "cancel_warn": return <DslCancelWarnCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                  case "cancel_caut": return <DslCancelCautCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                  case "o2_mask":     return <DslO2MaskCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+                  case "toggle_sw":   return <DslToggleSwCtrl   key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+                  case "emer_pb":     return <DslEmerPbCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+                  case "spd_brk":     return <DslSpdBrkCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
+                  default:            return <DslMonitorCtrl    key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+                }
+              })}
+            </div>
+
+            {/* Right 60%: 3D Blender fire panel — 30% taller than original 155px */}
+            {firePbCtrl && (
+              <div style={{ flex: "1 1 0", height: "202px", position: "relative", background: "#080C12" }}>
+                <div style={{ position: "absolute", inset: 0 }}>
+                  <FirePanel3D
+                    fireDetected={fp3dFireDetected}
+                    firePbDone={fp3dFirePbDone}
+                    agent1Disch={fp3dAgent1Disch}
+                    agent2Disch={fp3dAgent2Disch}
+                    agent2Available={agent2Available}
+                    activeStepId={fp3dActiveStepId}
+                    onPushFirePb={() => performStep(firePbCtrl?.stepId)}
+                    onPushAgent1={() => performStep(agent1Ctrl?.stepId)}
+                    onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}
@@ -1748,17 +1755,17 @@ export function FirePanel({
       >
         <style>{FIRE_PANEL_CSS}</style>
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-[5px] border-b" style={{ borderColor: "#1C2130" }}>
-          <span style={{ color: C.dim, fontSize: "9px", letterSpacing: "0.25em", textTransform: "uppercase" }}>ENGINE DISPLAY</span>
+        <div className="flex items-center justify-between px-2 py-[2px] border-b" style={{ borderColor: "#1C2130" }}>
+          <span style={{ color: C.dim, fontSize: "8px", letterSpacing: "0.25em", textTransform: "uppercase" }}>ENGINE DISPLAY</span>
           {fireLit && (
-            <span className="animate-pulse font-bold" style={{ color: C.amber, fontSize: "8px", letterSpacing: "0.2em" }}>
+            <span className="animate-pulse font-bold" style={{ color: C.amber, fontSize: "7px", letterSpacing: "0.2em" }}>
               ▲ {state.alarmLabel ?? "CAUTION"}
             </span>
           )}
         </div>
 
         {/* Engine parameter grid — equal-height columns, no trays here */}
-        <div className="grid grid-cols-[1fr_1px_1fr] gap-x-2 px-1 pt-2 pb-1" style={{ alignItems: "start" }}>
+        <div className="grid grid-cols-[1fr_1px_1fr] gap-x-2 px-1 pt-0 pb-0" style={{ alignItems: "start" }}>
           <DslEnginePanel engNum={1} panel={ed.eng1} state={state} warningActive={fireLit} />
           <div style={{ backgroundColor: "#1C2130", alignSelf: "stretch" }} />
           <DslEnginePanel engNum={2} panel={ed.eng2} state={state} warningActive={false} />

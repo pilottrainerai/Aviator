@@ -3,6 +3,7 @@
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
 import type { Scenario } from "@/scenarios/types";
+import { getApplicableRequiredSteps } from "@/lib/scenarios/step-applicability";
 
 export function DecisionPanel({
   scenario,
@@ -16,13 +17,14 @@ export function DecisionPanel({
   disabled?: boolean;
 }) {
   // Decision unlocks once the first non-optional step has been completed
-  const requiredSteps = scenario.steps.filter((s) => !s.optional);
+  const requiredSteps = getApplicableRequiredSteps(scenario, state);
+  const completedRequired = requiredSteps.filter((step) => !!state.completedSteps[step.id]).length;
   const halfWay = requiredSteps.length > 0
-    ? Object.keys(state.completedSteps).length >= Math.ceil(requiredSteps.length / 2)
+    ? completedRequired >= Math.ceil(requiredSteps.length / 2)
     : true;
   const decisionAvailable = halfWay && !state.masterWarnActive
     ? true
-    : Object.keys(state.completedSteps).length >= requiredSteps.length - 1;
+    : completedRequired >= requiredSteps.length - 1;
 
   const made = !!state.decision;
 

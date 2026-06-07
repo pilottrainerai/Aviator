@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAV ADR 1+2 FAULT — Workbook V3</title>
+<style>
+  :root {
+    --red:    #dc2626; --red-bg:    #fef2f2;
+    --amber:  #d97706; --amber-bg:  #fffbeb;
+    --blue:   #1d4ed8; --blue-bg:   #eff6ff;
+    --green:  #16a34a; --green-bg:  #f0fdf4;
+    --purple: #7c3aed; --purple-bg: #f5f3ff;
+    --teal:   #0d9488; --teal-bg:   #f0fdfa;
+    --gray:   #374151; --gray-bg:   #f9fafb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; background: #f3f4f6; color: #111; }
+  .topbar { background: #111827; color: #fff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .topbar h1 { font-size: 15px; font-weight: 700; letter-spacing: .5px; }
+  .topbar-meta { font-size: 11px; color: #9ca3af; margin-left: 16px; }
+  .topbar-right { display: flex; gap: 8px; align-items: center; }
+  .save-status { font-size: 11px; color: #6b7280; }
+  button.btn { padding: 5px 14px; border-radius: 5px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; }
+  button.btn-save { background: #2563eb; color: #fff; }
+  button.btn-export { background: #374151; color: #fff; }
+  button.btn-v2 { background: #7c3aed; color: #fff; }
+  .tabs { background: #1f2937; display: flex; padding: 0 20px; border-bottom: 2px solid #374151; }
+  .tab { padding: 9px 18px; color: #9ca3af; cursor: pointer; font-size: 12px; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+  .tab.active { color: #fff; border-bottom-color: #3b82f6; }
+  .tab:hover:not(.active) { color: #e5e7eb; }
+  .section { display: none; padding: 16px 20px; }
+  .section.active { display: block; }
+  .section-title { font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 20px; }
+  th { background: #1f2937; color: #e5e7eb; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; padding: 8px 10px; text-align: left; white-space: nowrap; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+  .cat-av  td:first-child { border-left: 4px solid var(--red);    background: var(--red-bg); }
+  .cat-ec  td:first-child { border-left: 4px solid var(--amber);  background: var(--amber-bg); }
+  .cat-atc td:first-child { border-left: 4px solid var(--blue);   background: var(--blue-bg); }
+  .cat-st  td:first-child { border-left: 4px solid var(--green);  background: var(--green-bg); }
+  .cat-pl  td:first-child { border-left: 4px solid var(--purple); background: var(--purple-bg); }
+  .cat-ap  td:first-child { border-left: 4px solid var(--teal);   background: var(--teal-bg); }
+  .chip { display: inline-block; padding: 2px 7px; border-radius: 3px; font-weight: 700; font-size: 10px; font-family: monospace; margin: 1px; }
+  .chip-pf  { background: #dbeafe; color: #1e40af; }
+  .chip-pm  { background: #dcfce7; color: #166534; }
+  .chip-av  { background: #fee2e2; color: #991b1b; }
+  .chip-ec  { background: #fef9c3; color: #854d0e; }
+  .chip-atc { background: #dbeafe; color: #1e3a8a; }
+  .chip-st  { background: #d1fae5; color: #065f46; }
+  .chip-pl  { background: #ede9fe; color: #5b21b6; }
+  .chip-ap  { background: #ccfbf1; color: #134e4a; }
+  .chip-fc  { background: #f3f4f6; color: #374151; }
+  .chip-hw  { background: #1f2937; color: #f9fafb; }
+  .chip-warn { background: #dc2626; color: #fff; }
+  .chip-caut { background: #d97706; color: #fff; }
+  .chip-adv  { background: #1d4ed8; color: #fff; }
+  .editable { width: 100%; min-height: 36px; padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical; background: #fafafa; }
+  .editable:focus { outline: none; border-color: #3b82f6; background: #fff; }
+  select.flag-sel { padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 11px; background: #fff; cursor: pointer; }
+  .hint-text { font-size: 11px; color: #4b5563; line-height: 1.5; max-width: 320px; }
+  .atc-block { background: #eff6ff; border-left: 3px solid #2563eb; padding: 6px 10px; border-radius: 3px; margin-bottom: 6px; font-size: 12px; }
+  .atc-choice { padding: 3px 8px; border-radius: 3px; font-size: 11px; margin: 2px 0; }
+  .atc-choice.correct { background: #d1fae5; color: #065f46; }
+  .atc-choice.wrong   { background: #fee2e2; color: #991b1b; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 6px; padding: 12px 14px; border: 1px solid #e5e7eb; }
+  .card-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #6b7280; letter-spacing: .6px; }
+  .card-value { font-size: 22px; font-weight: 800; color: #111; margin-top: 2px; }
+  .card-sub { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  .timeline { position: relative; padding-left: 24px; }
+  .tl-item { position: relative; margin-bottom: 14px; }
+  .tl-item::before { content: ''; position: absolute; left: -18px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; }
+  .tl-item::after { content: ''; position: absolute; left: -14px; top: 16px; width: 2px; height: calc(100% + 4px); background: #e5e7eb; }
+  .tl-item:last-child::after { display: none; }
+  .tl-time { font-weight: 700; color: #1d4ed8; font-family: monospace; font-size: 12px; }
+  .tl-desc { font-size: 12px; color: #374151; }
+  .tl-effects { font-size: 11px; color: #6b7280; margin-top: 2px; font-style: italic; }
+  .notes-list { margin: 0; padding-left: 14px; }
+  .notes-list li { font-size: 11px; color: #4b5563; line-height: 1.5; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1>NAV ADR 1+2 FAULT — Workbook V3</h1>
+    <span class="topbar-meta">VIDP–VABB Climb FL150 · A320 · Source: FCOM PRO-ABN-NAV + FCTM PR-AEP-NAV</span>
+  </div>
+  <div class="topbar-right">
+    <span class="save-status" id="saveStatus">Auto-save on</span>
+    <button class="btn btn-v2" onclick="window.open('procedure-previews/nav-adr-1-2-fault_PROCEDURE_PREVIEW_EDITABLE.html','_blank')">Open V2</button>
+    <button class="btn btn-save" onclick="saveAll()">Save</button>
+    <button class="btn btn-export" onclick="exportHTML()">Export HTML</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('summary',event)">Summary</div>
+  <div class="tab" onclick="showTab('procedure',event)">Procedure Flow</div>
+  <div class="tab" onclick="showTab('ecam',event)">ECAM / Triggers</div>
+  <div class="tab" onclick="showTab('atc',event)">ATC Distractions</div>
+  <div class="tab" onclick="showTab('status',event)">Status &amp; Decisions</div>
+  <div class="tab" onclick="showTab('phases',event)">Phase FMA</div>
+</div>
+
+<!-- SUMMARY -->
+<div class="section active" id="tab-summary">
+  <div class="cards">
+    <div class="card"><div class="card-label">Scenario</div><div class="card-value" style="font-size:14px;">NAV ADR 1+2</div><div class="card-sub">Dual ADR failure</div></div>
+    <div class="card"><div class="card-label">Phase / Alt</div><div class="card-value">FL150</div><div class="card-sub">Climb VIDP–VABB</div></div>
+    <div class="card"><div class="card-label">Alert Level</div><div class="card-value" style="color:var(--amber);font-size:14px;">MASTER CAUT</div><div class="card-sub">Level 2 SC chime · AMBER</div></div>
+    <div class="card"><div class="card-label">Steps</div><div class="card-value">22</div><div class="card-sub">Procedure steps</div></div>
+    <div class="card"><div class="card-label">ATC Calls</div><div class="card-value">5</div><div class="card-sub">Distractions</div></div>
+    <div class="card"><div class="card-label">Law</div><div class="card-value" style="font-size:14px;">ALTN LAW</div><div class="card-sub">F/CTL PROT LOST</div></div>
+  </div>
+
+  <div class="section-title">Situation Brief</div>
+  <div style="background:#fff;border-radius:6px;padding:14px 16px;border:1px solid #e5e7eb;margin-bottom:20px;font-size:12px;line-height:1.7;color:#374151;">
+    <strong>Situation:</strong> Climb passing FL150, VIDP–VABB. Both ADR 1 and ADR 2 have failed simultaneously — NAV ADR 1+2 FAULT ECAM caution triggers (Level 2, amber, single chime). AP 1+2 and A/THR disconnect. Flight controls revert to ALTERNATE LAW (PROT LOST). CAPT PFD and F/O PFD show conflicting or unreliable speed/altitude data. ADR 3 remains available.<br><br>
+    <strong>Job:</strong> Fly the aircraft in alternate law (MANEUVER WITH CARE, MAX 320 KT). Follow the ECAM: set AIR DATA SWTG to CAPT 3, then switch off both affected ADR pushbuttons. Crosscheck CAPT PFD, F/O PFD, and STBY ISIS. Switch off GPWS TERR and GPWS SYS if fault lights come on. Review STATUS. Plan for FLAP 3 landing at VREF+10 KT.
+  </div>
+
+  <div class="section-title">Trigger Timeline</div>
+  <div class="timeline" style="margin-bottom:20px;">
+    <div class="tl-item">
+      <div class="tl-time">T+5s</div>
+      <div class="tl-desc"><strong>adr_12_fail</strong> — ADR 1+2 failure — Level 2 CAUTION (SC + MASTER CAUT amber)</div>
+      <div class="tl-effects">SET_MASTER_CAUT · ADD_ECAM (NAV ADR 1+2 FAULT, AP DISC, A/THR DISC, ALTN LAW, AIR DATA SWTG, ADR 1 OFF, ADR 2 OFF)</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">T+6.5s (after adr2_off +1.5s)</div>
+      <div class="tl-desc"><strong>gpws_fault_appears</strong> — GPWS TERR/SYS FAULT lights come on</div>
+      <div class="tl-effects">ADD_ECAM (GPWS TERR FAULT, GPWS SYS FAULT) · SET_MASTER_CAUT</div>
+    </div>
+  </div>
+
+  <div class="section-title">Instructor Notes</div>
+  <table>
+    <thead><tr><th>#</th><th>Topic</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>ADR pb vs rotary</td><td><textarea class="editable" data-key="note_0">FCTM: use ADR pb to switch OFF — do NOT use the rotary selector (rotary also cuts the IR part).</textarea></td></tr>
+      <tr><td>2</td><td>GPWS consequence</td><td><textarea class="editable" data-key="note_1">GPWS TERR/SYS FAULT lights are expected after ADR 1+2 isolated — EGPWS enhanced functions inhibited. Not an additional fault.</textarea></td></tr>
+      <tr><td>3</td><td>MAX SPEED</td><td><textarea class="editable" data-key="note_2">320 KT — F/CTL in ALTERNATE LAW, PROT LOST. Speed limited — no high-speed protection.</textarea></td></tr>
+      <tr><td>4</td><td>No STATUS items</td><td><textarea class="editable" data-key="note_3">No STATUS page items defined in scenario data — see FCOM PRO-ABN-NAV P 18-19/70 for full STATUS list.</textarea></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PROCEDURE FLOW -->
+<div class="section" id="tab-procedure">
+  <div class="section-title">Procedure Flow — 22 Steps</div>
+  <table id="procTable">
+    <thead>
+      <tr><th>#</th><th>ID</th><th>Group</th><th>Crew</th><th>Cat</th><th>Label</th><th>Action</th><th>Hint (first 150 chars)</th><th>Proposed Change</th><th>Flag</th></tr>
+    </thead>
+    <tbody id="procBody"></tbody>
+  </table>
+</div>
+
+<!-- ECAM / TRIGGERS -->
+<div class="section" id="tab-ecam">
+  <div class="section-title">Primary ECAM — adr_12_fail (T+5s) · MASTER CAUT (AMBER/SC)</div>
+  <table>
+    <thead><tr><th>ID</th><th>ECAM Line</th><th>Level</th></tr></thead>
+    <tbody>
+      <tr><td><code>adr_12_fault</code></td><td>NAV ADR 1+2 FAULT</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td><code>ap_disc</code></td><td>AP 1+2 DISCONNECTED</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+      <tr><td><code>athr_disc</code></td><td>A/THR DISCONNECTED</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+      <tr><td><code>fctl_altn</code></td><td>F/CTL ALTN LAW (PROT LOST)</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+      <tr><td><code>ecam_swtg</code></td><td>AIR DATA SWTG.......CAPT 3</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+      <tr><td><code>ecam_adr1_off</code></td><td>ADR 1 P/B...............OFF</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+      <tr><td><code>ecam_adr2_off</code></td><td>ADR 2 P/B...............OFF</td><td><span class="chip chip-adv">ADVISORY</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">Secondary ECAM — gpws_fault_appears (afterEffect on adr2_off +1.5s)</div>
+  <table>
+    <thead><tr><th>ID</th><th>ECAM Line</th><th>Level</th></tr></thead>
+    <tbody>
+      <tr><td><code>gpws_terr</code></td><td>GPWS TERR FAULT</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td><code>gpws_sys</code></td><td>GPWS SYS FAULT</td><td><span class="chip chip-caut">CAUTION</span></td></tr>
+      <tr><td colspan="3" style="font-size:11px;color:#6b7280;font-style:italic;">SET_MASTER_CAUT — FCOM [L2]: expected consequence of ADR 1+2 isolation — not an additional fault</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ATC DISTRACTIONS -->
+<div class="section" id="tab-atc">
+  <div class="section-title">ATC Distractions — 5 calls · IFLY101 · Mumbai Control / Approach</div>
+  <table id="atcTable">
+    <thead><tr><th>#</th><th>Time / Gate</th><th>From</th><th>Message</th><th>Choices</th><th>Notes</th></tr></thead>
+    <tbody id="atcBody"></tbody>
+  </table>
+</div>
+
+<!-- STATUS & DECISIONS -->
+<div class="section" id="tab-status">
+  <div class="section-title">STATUS Page</div>
+  <div style="background:#fffbeb;border:1px solid #d97706;border-radius:6px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:#92400e;">
+    <strong>Note:</strong> No STATUS page items defined in this scenario's data file. Reference FCOM PRO-ABN-NAV P 18–19/70 for the full STATUS page including: MAX SPEED 320 KT, FOR LDG USE FLAP 3, APPR SPD VREF+10 KT, LDG DIST PROC APPLY, ALTN LAW PROT LOST, WHEN L/G DN DIRECT LAW, FLS LIMITED TO F-APP+RAW, and all INOP SYS entries.
+  </div>
+
+  <div class="section-title">Decisions</div>
+  <table>
+    <thead><tr><th>Option</th><th>Label</th><th>Description</th><th>Tone</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>DIVERT_NEAREST</td><td><strong>DIVERT — NEAREST SUITABLE</strong></td><td>Divert to nearest suitable airport. AP 1+2 and A/THR INOP, ALTN LAW, FLAP 3 approach at VREF+10 KT.</td><td><span class="chip chip-adv">PRIMARY</span></td><td><textarea class="editable" data-key="dec_0"></textarea></td></tr>
+      <tr><td>CONTINUE_DESTINATION</td><td><strong>CONTINUE TO DESTINATION</strong></td><td>Acceptable only if destination is closer or conditions favour it — AP and A/THR INOP for remainder.</td><td><span class="chip chip-pm">SECONDARY</span></td><td><textarea class="editable" data-key="dec_1"></textarea></td></tr>
+      <tr><td>RETURN_TO_FIELD</td><td><strong>RETURN TO DEPARTURE</strong></td><td>Valid if significantly closer and runway requirement met for FLAP 3, LDG DIST PROC.</td><td><span class="chip chip-pm">SECONDARY</span></td><td><textarea class="editable" data-key="dec_2"></textarea></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PHASE FMA -->
+<div class="section" id="tab-phases">
+  <div class="section-title">Phase FMA Snapshots — 6 Phases (FCTM PR-AEP-NAV)</div>
+  <table id="phaseTable">
+    <thead>
+      <tr><th>Phase</th><th>Time</th><th>Label</th><th>PFD State</th><th>PF Task</th><th>PM Task</th><th>Notes</th></tr>
+    </thead>
+    <tbody id="phaseBody"></tbody>
+  </table>
+</div>
+
+<script>
+const LS_KEY = 'nav_adr_1_2_workbook_v3';
+
+const steps = [
+  { n:1,  id:'maintain_control',       group:'flightcheck', crew:'PF', cat:'av', label:'FLY THE AIRCRAFT',          action:'MAINTAIN CONTROL', hw:false, req:'',                   hint:'PF: AVIATE. AP 1+2 and A/THR disconnected. F/CTL now in ALTERNATE LAW — PROT LOST. Smooth sidestick inputs only.' },
+  { n:2,  id:'cancel_master_caut',     group:'glareshield', crew:'PM', cat:'av', label:'MASTER CAUT',               action:'CANCEL',           hw:true,  req:'maintain_control',   hint:'PM: cancel MASTER CAUTION — silences single chime. NAV ADR 1+2 FAULT = Level 2 AMBER CAUTION.' },
+  { n:3,  id:'callout_unreliable_speed',group:'flightcheck',crew:'PM', cat:'av', label:'CALLOUT — UNRELIABLE SPEED', action:'CALL',             hw:false, req:'cancel_master_caut', hint:"PM calls 'UNRELIABLE SPEED' to alert PF that PFD speed data is unreliable. Memory item callout." },
+  { n:4,  id:'air_data_swtg_capt3',   group:'',            crew:'PM', cat:'ec', label:'AIR DATA SWTG',             action:'CAPT 3',           hw:true,  req:'callout_unreliable_speed',hint:'PM: overhead AIR DATA switching panel → CAPT 3. Routes ADR 3 (surviving ADR) to CAPT PFD.' },
+  { n:5,  id:'adr1_off',               group:'',            crew:'PM', cat:'ec', label:'ADR 1 P/B',                 action:'OFF',              hw:true,  req:'air_data_swtg_capt3',hint:"PM: 'ADR 1 P/B, CONFIRM OFF?' — PF confirms — PM switches OFF. FCTM: use ADR pb only, NOT rotary selector." },
+  { n:6,  id:'adr2_off',               group:'',            crew:'PM', cat:'ec', label:'ADR 2 P/B',                 action:'OFF',              hw:true,  req:'adr1_off',           hint:"PM: 'ADR 2 P/B, CONFIRM OFF?' — PF confirms — PM switches OFF. FCTM AOP-30-20 crosscheck required." },
+  { n:7,  id:'cancel_gpws_mc',         group:'glareshield', crew:'PM', cat:'av', label:'MASTER CAUT',               action:'CANCEL',           hw:true,  req:'adr2_off',           hint:'PM: cancel MASTER CAUTION triggered by GPWS TERR FAULT and GPWS SYS FAULT. Expected consequence — not additional fault.' },
+  { n:8,  id:'gpws_terr_off',          group:'',            crew:'PM', cat:'ec', label:'GPWS TERR pb-sw',           action:'OFF',              hw:true,  req:'cancel_gpws_mc',     hint:'PM: overhead → GPWS TERR pb-sw → OFF. FCOM [L2]: switch off because GPWS TERR FAULT light comes on after ADR 1+2 isolated.' },
+  { n:9,  id:'gpws_sys_off',           group:'',            crew:'PM', cat:'ec', label:'GPWS SYS pb-sw',            action:'OFF',              hw:true,  req:'gpws_terr_off',      hint:'PM: overhead → GPWS SYS pb-sw → OFF. FCOM [L2]: GPWS SYS FAULT appears after ADR 1+2 isolated — switch off.' },
+  { n:10, id:'max_speed_set',          group:'',            crew:'PF', cat:'ec', label:'MAX SPEED',                 action:'320 KT',           hw:false, req:'gpws_sys_off',       hint:'PF: set and observe MAX SPEED 320 KT. FCOM [L2]: limited due to loss of high-speed protections in ALTERNATE LAW.' },
+  { n:11, id:'crosscheck_adrs',        group:'chclm',       crew:'PM', cat:'ec', label:'SPEED + ALT CROSSCHECK',   action:'CROSSCHECK',       hw:false, req:'max_speed_set',      hint:'PM crosschecks CAPT PFD (ADR 3 via CAPT 3) vs STBY ISIS vs F/O PFD. Confirm ADR 3 reliable. WARNING: two ADRs can give identical erroneous data.' },
+  { n:12, id:'buss_awareness',         group:'chclm',       crew:'PM', cat:'ec', label:'BUSS — AWARENESS',         action:'NOTE',             hw:false, req:'crosscheck_adrs',    hint:'PM notes: BUSS available below FL250 — FL150 qualifies. CAUTION: do not use speed brakes when BUSS active.' },
+  { n:13, id:'announce_status',        group:'chclm',       crew:'PM', cat:'ec', label:'ECAM — STATUS',            action:'ANNOUNCE',         hw:false, req:'buss_awareness',     hint:"PM announces 'STATUS' as SD switches to STATUS page. PF acknowledges." },
+  { n:14, id:'stop_ecam',              group:'chclm',       crew:'PF', cat:'ec', label:'STOP ECAM',                action:'CALL',             hw:false, req:'announce_status',    hint:"PF: 'STOP ECAM.' ECAM actions complete." },
+  { n:15, id:'oeb_check',              group:'chclm',       crew:'PF', cat:'ec', label:'OEB / COMPUTER RESETS',    action:'CHECK',            hw:false, req:'stop_ecam',          hint:"PF: 'Any OEB? Any COMPUTER RESETS?' PM checks QRH. Do NOT reset from memory." },
+  { n:16, id:'read_status',            group:'chclm',       crew:'PF', cat:'ec', label:'READ STATUS',              action:'CALL',             hw:false, req:'oeb_check',          hint:"PF: 'READ STATUS' — PM reads STATUS page aloud line by line." },
+  { n:17, id:'status_read_aloud',      group:'chclm',       crew:'PM', cat:'ec', label:'STATUS — PM READS',        action:'REVIEW',           hw:false, req:'read_status',        hint:'PM reads each STATUS line; PF: CHECKED after each. MAX 320 KT, FLAP 3 LDG, VREF+10, ALTN LAW, DIRECT LAW on gear, GPWS INOP.' },
+  { n:18, id:'ecam_complete',          group:'chclm',       crew:'PM', cat:'ec', label:'ECAM ACTIONS COMPLETED',   action:'ANNOUNCE',         hw:false, req:'status_read_aloud',  hint:"PM: 'ECAM ACTIONS COMPLETED.' PF acknowledges and continues with diversion/approach assessment." },
+];
+
+const atcCalls = [
+  { n:1, id:'atc_initial_query',    time:'T+20s', gate:'', from:'MUMBAI CONTROL', msg:'IFLY101, confirm passing altitude and advise if able higher.',
+    choices:[{t:'a',label:'PAN PAN PAN, IFLY101, unreliable airspeed, NAV ADR 1 plus 2 fault, unable RVSM, request block FL140 to FL160, standby',correct:true},{t:'b',label:'IFLY101 passing FL150, able higher',correct:false},{t:'c',label:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire',correct:false}]},
+  { n:2, id:'atc_block_altitude',   time:'T+45s', gate:'', from:'MUMBAI CONTROL', msg:'IFLY101, roger PAN PAN, block altitude FL140 to FL160 approved, turn left heading 240 and advise intentions.',
+    choices:[{t:'a',label:'Block FL140 to FL160, left heading 240, standby for intentions, IFLY101',correct:true},{t:'b',label:'Roger IFLY101',correct:false},{t:'c',label:'Left heading 240, climbing FL200, IFLY101',correct:false}]},
+  { n:3, id:'atc_intentions',       time:'T+95s', gate:'', from:'MUMBAI CONTROL', msg:'IFLY101, say present capability, assistance required, and whether you intend return or diversion.',
+    choices:[{t:'a',label:'IFLY101, autopilot and autothrust lost, alternate law, request return or nearest suitable, require weather, runway, and approach available',correct:true},{t:'b',label:'IFLY101 normal now, continuing climb',correct:false},{t:'c',label:'Standby IFLY101',correct:false}]},
+  { n:4, id:'atc_briefing_prompt',  time:'T+150s',gate:'ecam_complete', from:'MUMBAI APPROACH', msg:'IFLY101, advise approach requirements and any operational limitations.',
+    choices:[{t:'a',label:'Require longest suitable runway, flap 3 landing, VREF plus 10, no autoland, request latest weather, runway in use, and type of approach, IFLY101',correct:true},{t:'b',label:'Vectors ILS, IFLY101',correct:false},{t:'c',label:'Standby IFLY101',correct:false}]},
+  { n:5, id:'atc_pob_fuel_services',time:'T+185s',gate:'', from:'MUMBAI APPROACH', msg:'IFLY101, say persons on board, fuel endurance, and whether emergency services are required.',
+    choices:[{t:'a',label:'IFLY101, 186 persons on board, fuel endurance 1 hour 45, request emergency services standby as a precaution, IFLY101',correct:true},{t:'b',label:'Standby IFLY101',correct:false},{t:'c',label:'No services required, IFLY101',correct:false}]},
+];
+
+const phases = [
+  { id:'climb_stable',     time:'T+0s',  label:'CLIMB STABLE — NORMAL AIR DATA',                   speed:286, alt:15000, vs:1800, thrust:'THR CLB',  pitch:'OP CLB', lat:'NAV',  ap:'AP1', athr:'ON',  pf:'Monitor managed climb and raw-data crosscheck in normal conditions.', pm:'Monitor climb, automation, and route tracking.' },
+  { id:'adr_fault_detected',time:'T+5s', label:'ADR 1+2 FAULT — AUTOMATION LOST',                 speed:278, alt:15150, vs:1400, thrust:'MAN THR',  pitch:'ALT LAW',lat:'HDG',  ap:'–',   athr:'–',   pf:'Aviate manually, ignore unreliable speed cues, stabilise pitch and power.', pm:'Cancel caution, identify NAV ADR 1+2 FAULT, prepare ECAM actions.' },
+  { id:'adr3_selected',    time:'T+20s', label:'AIR DATA SWTG CAPT 3 — RELIABLE CAPT SIDE RESTORED',speed:272,alt:15550, vs:900,  thrust:'MAN THR',  pitch:'V/S',    lat:'HDG',  ap:'–',   athr:'–',   pf:'Continue manual flight using Captain-side ADR 3 and standby crosscheck.', pm:'Crosscheck CAPT PFD, F/O PFD, and STBY ISIS after selecting CAPT 3.' },
+  { id:'affected_adrs_off',time:'T+35s', label:'ADR 1 AND ADR 2 ISOLATED',                        speed:268, alt:15900, vs:0,    thrust:'MAN THR',  pitch:'ALT',    lat:'HDG',  ap:'–',   athr:'–',   pf:'Hold assigned block altitude and keep speed below the 320 kt limit.', pm:'Confirm both ADR pushbuttons off and monitor for GPWS consequence cautions.' },
+  { id:'gpws_inhibited',   time:'T+55s', label:'GPWS TERR / SYS OFF — STABILISED RAW-DATA FLIGHT', speed:258, alt:15980, vs:0,    thrust:'MAN THR',  pitch:'ALT',    lat:'HDG',  ap:'–',   athr:'–',   pf:'Maintain raw-data flight in ALTN LAW and prepare diversion / return decision.', pm:'Read operational consequences and prepare STATUS review.' },
+  { id:'status_review',    time:'T+95s', label:'STATUS REVIEW — DIVERSION / APPROACH PLANNING',   speed:250, alt:16000, vs:0,    thrust:'MAN THR',  pitch:'ALT',    lat:'HDG',  ap:'–',   athr:'–',   pf:'Assess runway, weather, and raw-data approach suitability before committing.', pm:'Read STATUS page and brief FLAP 3 / VREF+10 / direct law constraints.' },
+];
+
+function catChip(cat) {
+  const map = {av:'chip-av',ec:'chip-ec',atc:'chip-atc',st:'chip-st',pl:'chip-pl',ap:'chip-ap'};
+  const labels = {av:'AVIATE',ec:'ECAM',atc:'ATC',st:'STATUS',pl:'PLAN',ap:'APPROACH'};
+  return `<span class="chip ${map[cat]||'chip-fc'}">${labels[cat]||cat.toUpperCase()}</span>`;
+}
+
+function buildProcedureTable() {
+  const tb = document.getElementById('procBody');
+  const saved = loadData();
+  steps.forEach(s => {
+    const hintShort = s.hint.length > 150 ? s.hint.slice(0,150)+'…' : s.hint;
+    const crewChip = `<span class="chip chip-${s.crew.toLowerCase()}">${s.crew}</span>`;
+    const groupChip = s.group ? `<span class="chip chip-fc">${s.group}</span>` : '';
+    const hwChip = s.hw ? `<span class="chip chip-hw">HW</span>` : '';
+    const reqStr = s.req ? `<span style="font-size:10px;color:#6b7280;">→ ${s.req}</span>` : '';
+    const changeKey = `proc_change_${s.id}`;
+    const flagKey = `proc_flag_${s.id}`;
+    const changeVal = saved[changeKey] || '';
+    const flagVal = saved[flagKey] || '';
+    const tr = document.createElement('tr');
+    tr.className = `cat-${s.cat}`;
+    tr.innerHTML = `
+      <td style="font-weight:700;font-family:monospace;">${s.n}</td>
+      <td><code style="font-size:10px;">${s.id}</code></td>
+      <td>${groupChip}</td>
+      <td>${crewChip}</td>
+      <td>${catChip(s.cat)}</td>
+      <td><strong>${s.label}</strong>${reqStr ? '<br>'+reqStr : ''}</td>
+      <td><span class="chip chip-fc">${s.action}</span>${hwChip}</td>
+      <td><span class="hint-text">${hintShort}</span></td>
+      <td><textarea class="editable" data-key="${changeKey}">${changeVal}</textarea></td>
+      <td><select class="flag-sel" data-key="${flagKey}">
+        <option value=""${flagVal===''?' selected':''}>–</option>
+        <option value="critical"${flagVal==='critical'?' selected':''}>🔴 Critical</option>
+        <option value="review"${flagVal==='review'?' selected':''}>🟡 Review</option>
+        <option value="ok"${flagVal==='ok'?' selected':''}>✅ OK</option>
+      </select></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function buildAtcTable() {
+  const tb = document.getElementById('atcBody');
+  const saved = loadData();
+  atcCalls.forEach(c => {
+    const gateStr = c.gate ? `<span class="chip chip-pl">gate: ${c.gate}</span>` : '';
+    const noteKey = `atc_note_${c.id}`;
+    const noteVal = saved[noteKey] || '';
+    const choicesHtml = c.choices.map(ch =>
+      `<div class="atc-choice ${ch.correct?'correct':'wrong'}">${ch.correct?'✓':'✗'} ${ch.label}</div>`
+    ).join('');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:700;">${c.n}</td>
+      <td><span style="font-family:monospace;font-size:11px;">${c.time}</span><br>${gateStr}</td>
+      <td><strong>${c.from}</strong></td>
+      <td><div class="atc-block">${c.msg}</div></td>
+      <td>${choicesHtml}</td>
+      <td><textarea class="editable" data-key="${noteKey}">${noteVal}</textarea></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function buildPhaseTable() {
+  const tb = document.getElementById('phaseBody');
+  const saved = loadData();
+  phases.forEach(p => {
+    const noteKey = `phase_note_${p.id}`;
+    const noteVal = saved[noteKey] || '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:700;font-family:monospace;font-size:10px;">${p.id}</td>
+      <td style="font-family:monospace;font-size:11px;">${p.time}</td>
+      <td><strong>${p.label}</strong></td>
+      <td style="font-size:11px;">
+        <div>SPD: <strong>${p.speed}</strong> kt · ALT: <strong>${p.alt}</strong> ft</div>
+        <div>V/S: ${p.vs} fpm · AP: ${p.ap} · A/THR: ${p.athr}</div>
+        <div>THR: <span class="chip chip-fc">${p.thrust}</span> PITCH: <span class="chip chip-fc">${p.pitch}</span></div>
+      </td>
+      <td style="font-size:11px;"><span class="chip chip-pf">PF</span> ${p.pf}</td>
+      <td style="font-size:11px;"><span class="chip chip-pm">PM</span> ${p.pm}</td>
+      <td><textarea class="editable" data-key="${noteKey}">${noteVal}</textarea></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function showTab(name, ev) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (ev && ev.currentTarget) ev.currentTarget.classList.add('active');
+}
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch(e) { return {}; }
+}
+
+function saveAll() {
+  const data = {};
+  document.querySelectorAll('[data-key]').forEach(el => { data[el.dataset.key] = el.value; });
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
+  const s = document.getElementById('saveStatus');
+  s.textContent = 'Saved ✓ ' + new Date().toLocaleTimeString();
+  setTimeout(() => s.textContent = 'Auto-save on', 2000);
+}
+
+function loadAll() {
+  const data = loadData();
+  document.querySelectorAll('[data-key]').forEach(el => {
+    if (data[el.dataset.key] !== undefined) el.value = data[el.dataset.key];
+  });
+}
+
+function exportHTML() {
+  const blob = new Blob([document.documentElement.outerHTML], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'NAV_ADR_1_2_WORKBOOK_V3_export.html';
+  a.click();
+}
+
+let autoSaveTimer;
+document.addEventListener('input', () => {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => { saveAll(); }, 800);
+});
+
+buildProcedureTable();
+buildAtcTable();
+buildPhaseTable();
+loadAll();
+</script>
+</body>
+</html>

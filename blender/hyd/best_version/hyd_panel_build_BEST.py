@@ -87,6 +87,7 @@ for label, path in [
 ]:
     try:
         COCKPIT_FONT = bpy.data.fonts.load(path)
+        COCKPIT_FONT.pack()  # MANDATORY — blender-panels §6 rule 11
         print(f"Loaded cockpit font: {label}")
         break
     except Exception as e:

@@ -2,6 +2,7 @@
 
 import type { ScenarioState } from "@/engine/state";
 import type { Scenario } from "@/scenarios/types";
+import { getApplicableRequiredSteps } from "@/lib/scenarios/step-applicability";
 
 function formatClock(ms: number) {
   const totalSec = Math.floor(ms / 1000);
@@ -20,8 +21,9 @@ export function ScenarioClock({
   state: ScenarioState;
   scenario: Scenario;
 }) {
-  const completed = Object.keys(state.completedSteps).length;
-  const required = scenario.steps.filter((s) => !s.optional).length;
+  const requiredSteps = getApplicableRequiredSteps(scenario, state);
+  const completed = requiredSteps.filter((step) => !!state.completedSteps[step.id]).length;
+  const required = requiredSteps.length;
 
   return (
     <div className="flex items-center justify-between gap-6 px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface)]">

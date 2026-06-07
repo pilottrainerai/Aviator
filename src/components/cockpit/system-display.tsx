@@ -331,7 +331,8 @@ function activePage(state: ScenarioState): "eng" | "hyd" | "elec" | "air" | "nor
 
 function EngPage({ state }: { state: ScenarioState }) {
   const done = (id: string) => !!state.completedSteps[id];
-  const fire = !!state.triggersFired?.["fire_warn"];
+  const fire = !!state.triggersFired?.["fire_warn"] && !state.triggersFired?.["fire_extinguished"];
+  const firePersisted = !!state.triggersFired?.["fire_persists_30s"] && !state.triggersFired?.["fire_extinguished"];
   const masterOff  = done("eng1_master_off");
   const firePbDone = done("eng1_fire_pb");
   const thrIdle    = done("thr_lever_idle");
@@ -353,10 +354,10 @@ function EngPage({ state }: { state: ScenarioState }) {
       <SwTray title="ENG PANEL" note="FCOM step 2 — MASTER OFF: fuel SOV + oil SOV close, FADEC de-energised">
         <OHPSwitch label="MASTER" sublabel="ENG 1" swState={masterOff ? "off" : "norm"} />
       </SwTray>
-      <SwTray title="FIRE PANEL" note="Step 3: FIRE PB pull → HYD/bleed/IDG SOVs + fuel shutoff. Steps 4-5: AGENT 1 → AGENT 2 if fire light persists (30 s each)">
+      <SwTray title="FIRE PANEL" note="Step 3: FIRE PB pull → HYD/bleed/IDG SOVs + fuel shutoff. Step 4: AGENT 1 after 10 s. Step 5: AGENT 2 only if the fire light still persists 30 s later.">
         <OHPSwitch label="FIRE PB" sublabel="ENG 1"  swState={firePbDone ? "off" : fire ? "fire"  : "norm"} />
         <OHPSwitch label="AGENT 1" sublabel="DISCH"  swState={done("agent1") ? "off" : firePbDone ? "armed" : "norm"} />
-        <OHPSwitch label="AGENT 2" sublabel="DISCH"  swState={done("agent2") ? "off" : done("agent1") ? "armed" : "norm"} />
+        <OHPSwitch label="AGENT 2" sublabel="DISCH"  swState={done("agent2") ? "off" : firePersisted ? "armed" : "norm"} />
       </SwTray>
     </>
   );

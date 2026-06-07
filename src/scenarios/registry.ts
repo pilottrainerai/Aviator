@@ -16,6 +16,8 @@ export type ScenarioSystem =
 
 export type ScenarioPhase = "takeoff" | "cruise" | "approach" | "any";
 
+export type ScenarioDifficulty = "easy" | "moderate" | "hard";
+
 export type ScenarioStatus = "available" | "coming_soon";
 
 export type ScenarioMeta = {
@@ -24,7 +26,7 @@ export type ScenarioMeta = {
   system: ScenarioSystem;
   phase: ScenarioPhase;
   status: ScenarioStatus;
-  difficulty: 1 | 2 | 3 | 4 | 5;
+  difficulty: ScenarioDifficulty;
   estimatedMinutes: number;
   summary: string;
   runHref?: string;
@@ -48,6 +50,12 @@ export const PHASE_LABEL: Record<ScenarioPhase, string> = {
   any: "ANY PHASE",
 };
 
+export const DIFFICULTY_LABEL: Record<ScenarioDifficulty, string> = {
+  easy: "Easy",
+  moderate: "Moderate",
+  hard: "Hard",
+};
+
 const runHref = (slug: string) => `/train/${slug}`;
 
 export const ENG1_FIRE_AFTER_V1_META: ScenarioMeta = {
@@ -56,11 +64,24 @@ export const ENG1_FIRE_AFTER_V1_META: ScenarioMeta = {
   system: "fire",
   phase: "takeoff",
   status: "available",
-  difficulty: 4,
+  difficulty: "hard",
   estimatedMinutes: 5,
   summary:
     "Engine 1 fire warning illuminates two seconds after passing V1 on takeoff roll. Run the abnormal procedure, contain the fire, and make the right landing call.",
   runHref: runHref("eng1-fire-after-v1"),
+};
+
+export const ENG1_FIRE_AFTER_V1_PERSISTENT_FIRE_META: ScenarioMeta = {
+  slug: "eng1-fire-after-v1-persistent-fire",
+  title: "ENG 1 FIRE after V1 — Persistent Fire",
+  system: "fire",
+  phase: "takeoff",
+  status: "available",
+  difficulty: "hard",
+  estimatedMinutes: 6,
+  summary:
+    "A training variant where AGENT 1 does not extinguish the warning. Recognize the 30-second monitoring gate, discharge AGENT 2, and continue the return with the engine secured.",
+  runHref: runHref("eng1-fire-after-v1-persistent-fire"),
 };
 
 export const ENG_FAILURE_AFTER_V1_META: ScenarioMeta = {
@@ -69,7 +90,7 @@ export const ENG_FAILURE_AFTER_V1_META: ScenarioMeta = {
   system: "engines",
   phase: "takeoff",
   status: "available",
-  difficulty: 3,
+  difficulty: "moderate",
   estimatedMinutes: 5,
   summary:
     "Asymmetric thrust at the worst possible moment. Maintain centerline, climb out, secure the failed engine, and decide.",
@@ -82,7 +103,7 @@ export const RTO_LOW_SPEED_META: ScenarioMeta = {
   system: "engines",
   phase: "takeoff",
   status: "available",
-  difficulty: 2,
+  difficulty: "easy",
   estimatedMinutes: 3,
   summary:
     "Below V1, an abnormal triggers. The decision is binary: reject or commit. Discriminate signal from noise under time pressure.",
@@ -95,7 +116,7 @@ export const DUAL_HYD_G_Y_META: ScenarioMeta = {
   system: "hydraulics",
   phase: "cruise",
   status: "available",
-  difficulty: 5,
+  difficulty: "hard",
   estimatedMinutes: 12,
   summary:
     "Loss of green and yellow hydraulic systems. Manage degraded flight controls, plan a flapless approach, and brief the configuration.",
@@ -108,7 +129,7 @@ export const ELEC_EMER_CONFIG_META: ScenarioMeta = {
   system: "electrical",
   phase: "cruise",
   status: "available",
-  difficulty: 5,
+  difficulty: "hard",
   estimatedMinutes: 15,
   summary:
     "Battery-only flight after total electrical loss. Run the emergency electrical configuration and plan an immediate landing.",
@@ -121,7 +142,7 @@ export const RAPID_DEPRESS_META: ScenarioMeta = {
   system: "pressurization",
   phase: "cruise",
   status: "available",
-  difficulty: 4,
+  difficulty: "hard",
   estimatedMinutes: 8,
   summary:
     "Cabin altitude rising. Don oxygen, initiate emergency descent, communicate with cabin and ATC, plan a diversion.",
@@ -134,7 +155,7 @@ export const SMOKE_CABIN_META: ScenarioMeta = {
   system: "smoke-fumes",
   phase: "cruise",
   status: "available",
-  difficulty: 4,
+  difficulty: "hard",
   estimatedMinutes: 10,
   summary:
     "Smoke source unknown. Apply the smoke procedure, isolate suspected sources, and decide whether to continue or land immediately.",
@@ -147,15 +168,29 @@ export const UNRELIABLE_SPEED_META: ScenarioMeta = {
   system: "flight-controls",
   phase: "any",
   status: "available",
-  difficulty: 4,
+  difficulty: "hard",
   estimatedMinutes: 10,
   summary:
     "Pitot or static system failure. Identify the bad indication, fly pitch + thrust, ignore the noise, configure for landing.",
   runHref: runHref("unreliable-speed"),
 };
 
+export const NAV_ADR_1_2_META: ScenarioMeta = {
+  slug: "nav-adr-1-2-fault",
+  title: "NAV ADR 1+2 FAULT",
+  system: "flight-controls",
+  phase: "cruise",
+  status: "available",
+  difficulty: "hard",
+  estimatedMinutes: 10,
+  summary:
+    "Both ADR 1 and ADR 2 fail in the climb. Identify the surviving ADR, switch off the affected units, and fly on STBY ISIS while managing alternate law.",
+  runHref: runHref("nav-adr-1-2-fault"),
+};
+
 export const SCENARIOS: ScenarioMeta[] = [
   ENG1_FIRE_AFTER_V1_META,
+  ENG1_FIRE_AFTER_V1_PERSISTENT_FIRE_META,
   ENG_FAILURE_AFTER_V1_META,
   RTO_LOW_SPEED_META,
   DUAL_HYD_G_Y_META,
@@ -163,6 +198,7 @@ export const SCENARIOS: ScenarioMeta[] = [
   RAPID_DEPRESS_META,
   SMOKE_CABIN_META,
   UNRELIABLE_SPEED_META,
+  NAV_ADR_1_2_META,
 ];
 
 export function getScenarioMeta(slug: string): ScenarioMeta | undefined {

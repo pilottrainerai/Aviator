@@ -8,6 +8,9 @@
 import type {
   ScenarioMeta as RegistryMeta,
 } from "./registry";
+import type { AirportOption } from "@/data/india-airports";
+
+export type { AirportOption };
 
 // FCOM DSC-31-60 ECAM colour convention:
 //   warning  = red    (CRC alarm, critical)
@@ -171,6 +174,8 @@ export type Scenario = {
   engineDisplay?: EngineDisplayDef;
   /** Phase-by-phase cockpit channel state: PFD, ND, PF, PM, ATC, overhead */
   phases?: readonly ScenarioPhase[];
+  /** If present, a pre-start airport picker is shown in the briefing screen. */
+  airports?: readonly AirportOption[];
 };
 
 // ─── System / Engine display DSL ─────────────────────────────────────────────
@@ -238,6 +243,8 @@ export type PFDSnapshot = {
   fmaPitch?: string;
   /** FMA column 3 — lateral mode, e.g. "NAV", "TRACK", "LOC" */
   fmaLateral?: string;
+  /** FMA col 1 third line — flashing white cue, e.g. "LVR CLB", "LVR MCT" */
+  fmaThrCue?: string;
   /** AP1 engaged */
   ap1?: boolean;
   /** AP2 engaged */
@@ -334,4 +341,19 @@ export type ScenarioPhase = {
   atc?: ATCChannel;
   /** Overhead panel state */
   overhead?: OverheadSnapshot;
+  /**
+   * PF action confirmation overlay on the PFD canvas.
+   * When set, the PFD shows a pulsing green ring. After coachMs the ring
+   * shows a coaching hint. PF clicks the PFD to confirm the action.
+   */
+  pfAction?: {
+    /** Short label on the PFD overlay, e.g. "V/S ZERO" or "AP1 ENGAGE" */
+    label: string;
+    /** Coaching text shown after coachMs if PF has not clicked yet */
+    hint: string;
+    /** Delay before coaching text appears (default 8 000 ms) */
+    coachMs?: number;
+    /** Step ID to complete when PF clicks the PFD ring */
+    stepId?: string;
+  };
 };

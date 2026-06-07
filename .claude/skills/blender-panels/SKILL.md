@@ -289,6 +289,51 @@ or two-cell pbs. If a single-pb panel, only §2a/§2b apply.
 
 ---
 
+## 2d. Typography — Futura Medium, packed into the .blend
+
+**Every Text object in a panel .blend uses Futura Medium**, loaded from
+`/System/Library/Fonts/Supplemental/Futura.ttc` and **packed into the
+.blend** immediately after load.
+
+### Why packed (not external reference)
+Storing the font as an external reference is fragile. Blender's "Save
+with Relative Paths" preference can miscount parent-directory hops,
+producing a `//../../...` path that doesn't resolve when the file is
+reopened. The .blend then renders every character as a tofu placeholder
+rectangle.
+
+Confirmed bug on 2026-05-27: `hyd_panel_BEST.blend` had its font path
+saved as `//../../../../../../../System/Library/Fonts/Supplemental/Futura.ttc`
+— 7 `../` segments where 8 were needed to reach `/`. All 34 text objects
+rendered as boxes. Fix: load Futura fresh from the absolute path,
+reassign every FONT object, then `font.pack()` to embed the font data
+inside the .blend file itself. Once packed, the .blend is self-contained.
+
+### Typeface justification (cross-reference)
+PICS analysis of `~/Desktop/PANELS/HYD/Hydraulic-Panel.jpg` (2026-05-27)
+confirmed the real Airbus overhead panel uses a geometric sans-serif
+(circular `O`/`G`, even stroke weight, vertical-spur `G`, symmetric `U`)
+that matches Futura. FCOM is silent on typeface — only MCDU font-size
+rules exist at DSC-22-10-40 [fcom:L11491-11496]. See cockpit-ui §2d for
+the full reasoning.
+
+### Implementation pattern (required)
+```python
+COCKPIT_FONT = bpy.data.fonts.load(
+    '/System/Library/Fonts/Supplemental/Futura.ttc')
+COCKPIT_FONT.pack()  # MANDATORY — see §6 rule 11
+
+# Every Text object must use COCKPIT_FONT:
+o.data.font = COCKPIT_FONT
+```
+
+### Scope
+Every panel `.blend` in the project. As of 2026-05-27 this applies to
+`hyd_panel_BEST.blend`, `eng1_left_panel.blend`, `fire_panel_two.blend`,
+and every future overhead-panel `.blend`.
+
+---
+
 ## 3. Source library and FCOM chapter map
 
 ### Manual files
@@ -485,6 +530,10 @@ Once "go" is given:
 8. Never read `ob.location` or `ob.rotation_euler` from the scene as a base value — use hard-coded values from diagnostic or user input.
 9. Unique material per animated indicator — no shared materials between elements that animate independently.
 10. Test with `python3 -m py_compile <script>` before giving to user.
+11. **After loading an external font, immediately call `.pack()` on it.**
+    `font = bpy.data.fonts.load(path); font.pack()`. Leaving the font as
+    an unpacked external reference produces broken-path tofu rendering
+    when the `.blend` is reopened — see §2d and §11 [2026-05-27].
 
 ---
 
@@ -556,6 +605,8 @@ These are confirmed constraints — not guesses:
 - ❌ Using training-data knowledge of "how A320 fire procedure works" —
      only what FCOM 4a says in this session counts.
 - ❌ Asking the user to re-state §0 hard rules — they are always in effect.
+- ❌ Loading an external font without calling `.pack()` on it before save —
+     the `.blend` will reopen with broken-path tofu rendering. See §2d.
 
 ---
 
@@ -592,3 +643,14 @@ from real work. Add a new entry each time a Checkpoint B passes.
   - Standard view transform preserves #33607A panel color
 - best_version snapshot: `blender/hyd/best_version/hyd_panel_BEST.py` and `hyd_panel_build_BEST.py`
 - Script: `blender/hyd/hyd_panel.py`
+
+### [2026-05-27] Font convergence + packing across all panels
+- Three .blend files updated to packed Futura Medium:
+  - `hyd_panel_BEST.blend` — 34 text objects, fixed broken relative-path bug (172 KB → 361 KB)
+  - `eng1_left_panel.blend` — 15 text objects, was on Blender's default Bfont (138 KB → 327 KB)
+  - `fire_panel_two.blend` — 36 text objects, was on Bfont (157 KB → 346 KB)
+- Each `.blend` grew ~189 KB from embedded Futura.ttc data — acceptable for portability
+- PICS source: `~/Desktop/PANELS/HYD/Hydraulic-Panel.jpg`
+- Typeface rationale: cockpit-ui §2d (FCOM silent → PICS = only valid source → photo letterforms match Futura)
+- Build script gap (open): `hyd_panel_build*.py` and `fire_panel_two_build.py` load Futura but never call `.pack()`. Re-running them will regenerate the broken external reference. Patch pending — see new §6 rule 11.
+- Rule codified in §2d + §6 rule 11 + §10 anti-pattern

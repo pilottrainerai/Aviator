@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RTO — ENG 1 FIRE (Low Speed) — Workbook V3</title>
+<style>
+  :root { --red:#dc2626;--red-bg:#fef2f2;--amber:#d97706;--amber-bg:#fffbeb;--blue:#1d4ed8;--blue-bg:#eff6ff;--green:#16a34a;--green-bg:#f0fdf4;--purple:#7c3aed;--purple-bg:#f5f3ff;--teal:#0d9488;--teal-bg:#f0fdfa;--gray:#374151;--gray-bg:#f9fafb; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:#f3f4f6;color:#111;}
+  .topbar{background:#111827;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+  .topbar h1{font-size:15px;font-weight:700;letter-spacing:.5px;}
+  .topbar-meta{font-size:11px;color:#9ca3af;margin-left:16px;}
+  .topbar-right{display:flex;gap:8px;align-items:center;}
+  .save-status{font-size:11px;color:#6b7280;}
+  button.btn{padding:5px 14px;border-radius:5px;border:none;cursor:pointer;font-size:12px;font-weight:600;}
+  button.btn-save{background:#2563eb;color:#fff;}
+  button.btn-export{background:#374151;color:#fff;}
+  button.btn-v2{background:#7c3aed;color:#fff;}
+  .tabs{background:#1f2937;display:flex;padding:0 20px;border-bottom:2px solid #374151;}
+  .tab{padding:9px 18px;color:#9ca3af;cursor:pointer;font-size:12px;font-weight:600;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;}
+  .tab.active{color:#fff;border-bottom-color:#3b82f6;}
+  .tab:hover:not(.active){color:#e5e7eb;}
+  .section{display:none;padding:16px 20px;}
+  .section.active{display:block;}
+  .section-title{font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;border-bottom:2px solid #e5e7eb;padding-bottom:6px;}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:20px;}
+  th{background:#1f2937;color:#e5e7eb;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:8px 10px;text-align:left;white-space:nowrap;}
+  td{padding:7px 10px;border-bottom:1px solid #f3f4f6;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#fafafa;}
+  .cat-av td:first-child{border-left:4px solid var(--red);background:var(--red-bg);}
+  .cat-ec td:first-child{border-left:4px solid var(--amber);background:var(--amber-bg);}
+  .cat-atc td:first-child{border-left:4px solid var(--blue);background:var(--blue-bg);}
+  .cat-st td:first-child{border-left:4px solid var(--green);background:var(--green-bg);}
+  .cat-pl td:first-child{border-left:4px solid var(--purple);background:var(--purple-bg);}
+  .cat-ap td:first-child{border-left:4px solid var(--teal);background:var(--teal-bg);}
+  .chip{display:inline-block;padding:2px 7px;border-radius:3px;font-weight:700;font-size:10px;font-family:monospace;margin:1px;}
+  .chip-pf{background:#dbeafe;color:#1e40af;} .chip-pm{background:#dcfce7;color:#166534;}
+  .chip-av{background:#fee2e2;color:#991b1b;} .chip-ec{background:#fef9c3;color:#854d0e;}
+  .chip-atc{background:#dbeafe;color:#1e3a8a;} .chip-st{background:#d1fae5;color:#065f46;}
+  .chip-pl{background:#ede9fe;color:#5b21b6;} .chip-ap{background:#ccfbf1;color:#134e4a;}
+  .chip-fc{background:#f3f4f6;color:#374151;} .chip-hw{background:#1f2937;color:#f9fafb;}
+  .chip-warn{background:#dc2626;color:#fff;} .chip-caut{background:#d97706;color:#fff;} .chip-adv{background:#1d4ed8;color:#fff;}
+  .editable{width:100%;min-height:36px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:4px;font-size:12px;font-family:inherit;resize:vertical;background:#fafafa;}
+  .editable:focus{outline:none;border-color:#3b82f6;background:#fff;}
+  select.flag-sel{padding:4px 6px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#fff;cursor:pointer;}
+  .hint-text{font-size:11px;color:#4b5563;line-height:1.5;max-width:320px;}
+  .atc-block{background:#eff6ff;border-left:3px solid #2563eb;padding:6px 10px;border-radius:3px;margin-bottom:6px;font-size:12px;}
+  .atc-choice{padding:3px 8px;border-radius:3px;font-size:11px;margin:2px 0;}
+  .atc-choice.correct{background:#d1fae5;color:#065f46;} .atc-choice.wrong{background:#fee2e2;color:#991b1b;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px;}
+  .card{background:#fff;border-radius:6px;padding:12px 14px;border:1px solid #e5e7eb;}
+  .card-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:.6px;}
+  .card-value{font-size:22px;font-weight:800;color:#111;margin-top:2px;}
+  .card-sub{font-size:11px;color:#6b7280;margin-top:2px;}
+  .timeline{position:relative;padding-left:24px;}
+  .tl-item{position:relative;margin-bottom:14px;}
+  .tl-item::before{content:'';position:absolute;left:-18px;top:6px;width:10px;height:10px;border-radius:50%;background:#3b82f6;}
+  .tl-item::after{content:'';position:absolute;left:-14px;top:16px;width:2px;height:calc(100% + 4px);background:#e5e7eb;}
+  .tl-item:last-child::after{display:none;}
+  .tl-time{font-weight:700;color:#1d4ed8;font-family:monospace;font-size:12px;}
+  .tl-desc{font-size:12px;color:#374151;}
+  .tl-effects{font-size:11px;color:#6b7280;margin-top:2px;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1>RTO — ENG 1 FIRE (Low Speed) — Workbook V3</h1>
+    <span class="topbar-meta">VIDP RWY 28 · Ground · A320 · Source: FCOM PRO-ABN-ENG + FCTM OP-010</span>
+  </div>
+  <div class="topbar-right">
+    <span class="save-status" id="saveStatus">Auto-save on</span>
+    <button class="btn btn-v2" onclick="window.open('procedure-previews/rto-low-speed_PROCEDURE_PREVIEW_EDITABLE.html','_blank')">Open V2</button>
+    <button class="btn btn-save" onclick="saveAll()">Save</button>
+    <button class="btn btn-export" onclick="exportHTML()">Export HTML</button>
+  </div>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="showTab('summary',event)">Summary</div>
+  <div class="tab" onclick="showTab('procedure',event)">Procedure Flow</div>
+  <div class="tab" onclick="showTab('ecam',event)">ECAM / Triggers</div>
+  <div class="tab" onclick="showTab('atc',event)">ATC Distractions</div>
+  <div class="tab" onclick="showTab('status',event)">Status &amp; Decisions</div>
+</div>
+
+<!-- SUMMARY -->
+<div class="section active" id="tab-summary">
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Scenario</div>
+      <div class="card-value" style="font-size:15px;">RTO — ENG 1 FIRE</div>
+      <div class="card-sub">Below V1 — Ground Emergency</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Flight</div>
+      <div class="card-value" style="font-size:16px;">IFLY101</div>
+      <div class="card-sub">VIDP RWY 28</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Phase</div>
+      <div class="card-value" style="font-size:15px;">GROUND</div>
+      <div class="card-sub">Takeoff roll ~90 kt</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Alert</div>
+      <div class="card-value" style="font-size:15px;color:var(--red);">MASTER WARN</div>
+      <div class="card-sub">ENG 1 FIRE — CRC chime</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Steps</div>
+      <div class="card-value">13</div>
+      <div class="card-sub">incl. memory items</div>
+    </div>
+    <div class="card">
+      <div class="card-label">ATC Calls</div>
+      <div class="card-value">5</div>
+      <div class="card-sub">Delhi Tower only</div>
+    </div>
+  </div>
+
+  <div class="section-title">Situation Brief</div>
+  <div style="background:#fff;border-radius:6px;padding:14px 16px;margin-bottom:20px;border:1px solid #e5e7eb;font-size:13px;line-height:1.7;color:#374151;">
+    <strong>Situation:</strong> VIDP RWY 28, during takeoff roll at approximately 90 kt. ENG 1 fire warning illuminates. Speed is BELOW V1. The go/no-go decision must be made in under one second.<br><br>
+    <strong>Job:</strong> Reject — call STOP, close thrust levers, apply max brakes, ground spoilers, max reverse. Vacate the runway. Assess for evacuation.
+  </div>
+
+  <div class="section-title">Trigger Timeline</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-time">T + 3 s</div>
+      <div class="tl-desc"><strong>accel_phase</strong> — Accelerating through 90 kt on takeoff roll</div>
+      <div class="tl-effects">No ECAM effects</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">T + 6 s</div>
+      <div class="tl-desc"><strong>fire_warn_ground</strong> — ENG 1 FIRE warning on ground — below V1</div>
+      <div class="tl-effects">SET_MASTER_WARN active · SET_ALARM_LABEL "ENG 1 FIRE" · ADD_ECAM: ENG 1 FIRE (warning), THR LEVER 1 IDLE (advisory), ENG 1 MASTER OFF (advisory), ENG 1 FIRE P/B PUSH (advisory), AGENT 1 AFTER 10 S DISCH (advisory)</div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:20px;">Notes</div>
+  <table>
+    <thead><tr><th>#</th><th>Topic</th><th>Note / Observation</th></tr></thead>
+    <tbody id="notes-tbody">
+      <tr>
+        <td>1</td>
+        <td><input class="editable" placeholder="Topic…" data-key="note_topic_1"></td>
+        <td><textarea class="editable" placeholder="Note…" data-key="note_body_1"></textarea></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><input class="editable" placeholder="Topic…" data-key="note_topic_2"></td>
+        <td><textarea class="editable" placeholder="Note…" data-key="note_body_2"></textarea></td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><input class="editable" placeholder="Topic…" data-key="note_topic_3"></td>
+        <td><textarea class="editable" placeholder="Note…" data-key="note_body_3"></textarea></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PROCEDURE FLOW -->
+<div class="section" id="tab-procedure">
+  <div class="section-title">Procedure Flow — All Steps</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>ID</th><th>Group</th><th>Crew</th><th>Cat</th><th>Label</th><th>Action</th><th>Hint (150 chars)</th><th>Proposed Change</th><th>Flag</th>
+      </tr>
+    </thead>
+    <tbody id="proc-tbody"></tbody>
+  </table>
+</div>
+
+<!-- ECAM / TRIGGERS -->
+<div class="section" id="tab-ecam">
+  <div class="section-title">ECAM Messages from Trigger Effects</div>
+  <table>
+    <thead><tr><th>Trigger</th><th>Time</th><th>ECAM ID</th><th>Line</th><th>Level</th></tr></thead>
+    <tbody>
+      <tr>
+        <td rowspan="5"><strong>fire_warn_ground</strong></td>
+        <td rowspan="5">T+6 s</td>
+        <td><code>eng1_fire_gnd</code></td>
+        <td>ENG 1 FIRE</td>
+        <td><span class="chip chip-warn">WARNING</span></td>
+      </tr>
+      <tr>
+        <td><code>ecam_thr</code></td>
+        <td>THR LEVER 1........IDLE</td>
+        <td><span class="chip chip-adv">ADVISORY</span></td>
+      </tr>
+      <tr>
+        <td><code>ecam_master</code></td>
+        <td>ENG 1 MASTER.......OFF</td>
+        <td><span class="chip chip-adv">ADVISORY</span></td>
+      </tr>
+      <tr>
+        <td><code>ecam_fire_pb</code></td>
+        <td>ENG 1 FIRE P/B.....PUSH</td>
+        <td><span class="chip chip-adv">ADVISORY</span></td>
+      </tr>
+      <tr>
+        <td><code>ecam_agent1</code></td>
+        <td>AGENT 1 AFTER 10 S..DISCH</td>
+        <td><span class="chip chip-adv">ADVISORY</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">After-Effects from Steps</div>
+  <table>
+    <thead><tr><th>Step</th><th>Delay</th><th>Trigger ID</th><th>Effects</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>cancel_master_warn</code></td>
+        <td>+400 ms</td>
+        <td><code>mw_cancelled</code></td>
+        <td>SET_MASTER_WARN false</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ATC DISTRACTIONS -->
+<div class="section" id="tab-atc">
+  <div class="section-title">ATC Distractions (5) — Delhi Tower</div>
+  <div id="atc-container"></div>
+</div>
+
+<!-- STATUS & DECISIONS -->
+<div class="section" id="tab-status">
+  <div class="section-title">Status Items</div>
+  <table>
+    <thead><tr><th>ID</th><th>Line</th><th>Severity</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>st_eng1</code></td>
+        <td>ENG 1............SHUT DOWN</td>
+        <td><span class="chip chip-caut">CAUTION</span></td>
+      </tr>
+      <tr>
+        <td><code>st_rto</code></td>
+        <td>RTO COMPLETE</td>
+        <td><span class="chip chip-fc">MEMO</span></td>
+      </tr>
+      <tr>
+        <td><code>st_cfr</code></td>
+        <td>CFR ATTENDING</td>
+        <td><span class="chip chip-fc">MEMO</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">Decisions</div>
+  <table>
+    <thead><tr><th>Value</th><th>Label</th><th>Tone</th><th>Description</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>EVACUATE</code></td>
+        <td><strong>EVACUATE</strong></td>
+        <td><span class="chip chip-warn">PRIMARY</span></td>
+        <td>Order evacuation — if fire or smoke confirmed, or structural damage suspected.</td>
+        <td><textarea class="editable" data-key="dec_EVACUATE" placeholder="Notes…"></textarea></td>
+      </tr>
+      <tr>
+        <td><code>HOLD_FOR_ASSESSMENT</code></td>
+        <td><strong>HOLD FOR ASSESSMENT</strong></td>
+        <td><span class="chip chip-adv">SECONDARY</span></td>
+        <td>Hold position, await CFR assessment. Appropriate if aircraft stopped safely and no visible fire.</td>
+        <td><textarea class="editable" data-key="dec_HOLD_FOR_ASSESSMENT" placeholder="Notes…"></textarea></td>
+      </tr>
+      <tr>
+        <td><code>CONTINUE_TAXI</code></td>
+        <td><strong>CONTINUE TAXI</strong></td>
+        <td><span class="chip chip-warn" style="background:#7f1d1d;">DANGER</span></td>
+        <td>Taxi to gate with an unextinguished engine fire — never appropriate.</td>
+        <td><textarea class="editable" data-key="dec_CONTINUE_TAXI" placeholder="Notes…"></textarea></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+const LS_KEY = 'rto_low_speed_workbook_v3';
+
+const STEPS = [
+  { n:1,  id:'rto_call',         group:'flightcheck', crew:'PF', cat:'av',  label:'STOP STOP STOP',      action:'CALL',       hint:'PF calls \'STOP STOP STOP\' — reject below V1 only. This is a memory item. Decision made in <1 s. Close thrust levers immediately.' },
+  { n:2,  id:'thr_levers_close', group:'—',           crew:'PF', cat:'ec',  label:'THR LEVERS',          action:'IDLE',       hint:'PF: thrust levers to idle immediately on rejection — MEMORY ITEM. FCOM: immediate action on RTO decision.' },
+  { n:3,  id:'max_brakes',       group:'—',           crew:'PF', cat:'ec',  label:'BRAKES',              action:'MAX',        hint:'PF: full manual toe brakes — override autobrake. Do NOT pump brakes. ANTI-SKID is active.' },
+  { n:4,  id:'ground_spoilers',  group:'—',           crew:'PF', cat:'ec',  label:'GROUND SPOILERS',     action:'EXTEND',     hint:'PF: ARM spoilers — they extend automatically with thrust reversal. Confirm \'SPOILERS GREEN\' on ECAM F/CTL page.' },
+  { n:5,  id:'reverse_thrust',   group:'—',           crew:'PM', cat:'ec',  label:'REVERSE THRUST',      action:'MAX',        hint:'PM: apply max reverse thrust (both engines). Reduce to idle reverser before 70 kt to avoid FOD ingestion.' },
+  { n:6,  id:'cancel_master_warn',group:'glareshield',crew:'PM', cat:'av',  label:'MASTER WARN',         action:'CANCEL',     hint:'PM: cancel MASTER WARN once aircraft stopping action is established.' },
+  { n:7,  id:'atc_notify',       group:'comms',       crew:'PM', cat:'atc', label:'ATC NOTIFY',          action:'MAYDAY',     hint:'PM: notify tower: \'MAYDAY MAYDAY MAYDAY, IFLY101, RTO engine fire, stopping runway 28, emergency services required.\'' },
+  { n:8,  id:'vacate_rwy',       group:'—',           crew:'PF', cat:'ec',  label:'VACATE RUNWAY',       action:'IF SAFE',    hint:'PF: if aircraft stopped safely, vacate via first taxiway if brakes allow. If brake temp HIGH — HOLD POSITION.' },
+  { n:9,  id:'park_brake',       group:'—',           crew:'PM', cat:'ec',  label:'PARK BRAKE',          action:'SET',        hint:'PM: set parking brake once stopped. Do NOT taxi if brake temperature is elevated — await CFR assessment.' },
+  { n:10, id:'eng_shutdown',     group:'—',           crew:'PM', cat:'ec',  label:'ENG SHUTDOWN',        action:'BOTH ENG',   hint:'PM: shut down both engines once stopped. MASTER switches → OFF. Follow ECAM ENG FIRE on ground procedure.' },
+  { n:11, id:'fire_pb_gnd',      group:'—',           crew:'PM', cat:'ec',  label:'ENG 1 FIRE P/B',      action:'PUSH',       hint:'PM: pull ENG 1 FIRE PB — arms squibs. Confirms crew: \'ENG 1 FIRE P/B CONFIRM PUSH?\' → \'CONFIRM\'.' },
+  { n:12, id:'agent1_gnd',       group:'—',           crew:'PM', cat:'ec',  label:'AGENT 1',             action:'DISCH',      hint:'PM: discharge AGENT 1 once squibs armed. Wait for N1 decay (~10 s). Monitor FIRE light.' },
+  { n:13, id:'evacuation_assess',group:'comms',       crew:'PF', cat:'pl',  label:'EVACUATION ASSESS',   action:'DECISION',   hint:'PIC: assess need for evacuation. Criteria: visible fire or smoke entering cabin, structural damage, CFR advises. Brief crew.' },
+];
+
+const ATC = [
+  {
+    id:'atc_tower_initial', atMs:8000, from:'DELHI TOWER',
+    message:'IFLY101, Delhi Tower, confirm intentions.',
+    choices:[
+      { label:'MAYDAY MAYDAY MAYDAY, IFLY101, rejected takeoff, engine 1 fire, stopping on runway 28, emergency services required', correct:true },
+      { label:'IFLY101 continuing takeoff', correct:false },
+      { label:'Standby IFLY101', correct:false },
+    ]
+  },
+  {
+    id:'atc_tower_state', atMs:35000, from:'DELHI TOWER',
+    message:'IFLY101, roger MAYDAY, ARFF rolling, say aircraft state and assistance required.',
+    choices:[
+      { label:'IFLY101, aircraft stopped on runway 28, engine 1 fire warning, running fire checklist, 186 persons on board, request immediate ARFF and ambulance', correct:true },
+      { label:'IFLY101, stopped, all good, no services needed', correct:false },
+      { label:'IFLY101, just a precaution, will advise', correct:false },
+    ]
+  },
+  {
+    id:'atc_arff_update', atMs:70000, from:'DELHI TOWER',
+    message:'IFLY101, ARFF in position, report fire status and intentions for evacuation.',
+    choices:[
+      { label:'IFLY101, fire indication extinguished after AGENT 1, ARFF to remain in position, evaluating evacuation, standby', correct:true },
+      { label:'IFLY101, fire persists, initiating evacuation on the runway, request ARFF approach from the right side, downwind', correct:true },
+      { label:'IFLY101 requesting taxi back to gate', correct:false },
+    ]
+  },
+  {
+    id:'atc_disposition', atMs:110000, from:'DELHI TOWER',
+    message:'IFLY101, advise final intentions — taxi back, tow, or evacuate.',
+    choices:[
+      { label:'IFLY101 request tow to the gate, no engine taxi after engine fire, ARFF to follow, runway will be closed', correct:true },
+      { label:'IFLY101 will taxi back to the gate on engine 2', correct:false },
+      { label:'IFLY101 evacuating now', correct:false },
+    ]
+  },
+  {
+    id:'atc_ground_handoff', atMs:140000, from:'DELHI TOWER',
+    message:'IFLY101, runway 28 closed, ARFF on scene, contact Delhi Ground 121.90 when stationary for tow coordination.',
+    choices:[
+      { label:'Runway 28 closed, ARFF on scene, Ground 121.90 when stationary, IFLY101', correct:true },
+      { label:'Switching, IFLY101', correct:false },
+      { label:'Ground 121.80, IFLY101', correct:false },
+    ]
+  },
+];
+
+const CAT_LABEL = { av:'AV', ec:'EC', atc:'ATC', st:'ST', pl:'PL', ap:'AP' };
+
+function fmtMs(ms) {
+  const s = Math.floor(ms/1000);
+  return 'T+' + Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+
+function buildProcedure() {
+  const tb = document.getElementById('proc-tbody');
+  const saved = loadData();
+  tb.innerHTML = STEPS.map(s => {
+    const ch = `<select class="flag-sel" data-key="flag_${s.id}" onchange="debounceSave()">
+      <option value="">–</option>
+      <option value="crit">🔴 Critical</option>
+      <option value="rev">🟡 Review</option>
+      <option value="ok">✅ OK</option>
+    </select>`;
+    const hint150 = s.hint.slice(0,150) + (s.hint.length>150?'…':'');
+    return `<tr class="cat-${s.cat}">
+      <td>${s.n}</td>
+      <td><code style="font-size:10px;">${s.id}</code></td>
+      <td><span class="chip chip-fc">${s.group}</span></td>
+      <td><span class="chip chip-${s.crew.toLowerCase()}">${s.crew}</span></td>
+      <td><span class="chip chip-${s.cat}">${CAT_LABEL[s.cat]}</span></td>
+      <td><strong>${s.label}</strong></td>
+      <td><code>${s.action}</code></td>
+      <td><span class="hint-text">${hint150}</span></td>
+      <td><textarea class="editable" data-key="change_${s.id}" onchange="debounceSave()">${saved['change_'+s.id]||''}</textarea></td>
+      <td>${ch}</td>
+    </tr>`;
+  }).join('');
+  STEPS.forEach(s => {
+    const sel = tb.querySelector(`[data-key="flag_${s.id}"]`);
+    if (sel && saved['flag_'+s.id]) sel.value = saved['flag_'+s.id];
+  });
+}
+
+function buildATC() {
+  const c = document.getElementById('atc-container');
+  c.innerHTML = ATC.map((d,i) => `
+    <div class="atc-block">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <strong>#${i+1} — ${d.from}</strong>
+        <span style="font-family:monospace;font-size:11px;color:#1d4ed8;">${fmtMs(d.atMs)}</span>
+      </div>
+      <div style="font-style:italic;margin-bottom:6px;color:#1e3a8a;">"${d.message}"</div>
+      ${d.choices.map(ch => `<div class="atc-choice ${ch.correct?'correct':'wrong'}">${ch.correct?'✓':'✗'} ${ch.label}</div>`).join('')}
+    </div>
+  `).join('');
+}
+
+let saveTimer = null;
+function debounceSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveAll, 800);
+}
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); } catch(e) { return {}; }
+}
+
+function saveAll() {
+  const data = loadData();
+  document.querySelectorAll('[data-key]').forEach(el => {
+    data[el.dataset.key] = el.tagName==='SELECT' ? el.value : el.value;
+  });
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
+  const st = document.getElementById('saveStatus');
+  st.textContent = 'Saved ' + new Date().toLocaleTimeString();
+  setTimeout(() => { st.textContent = 'Auto-save on'; }, 2000);
+}
+
+function loadAll() {
+  const data = loadData();
+  document.querySelectorAll('[data-key]').forEach(el => {
+    if (data[el.dataset.key] !== undefined) el.value = data[el.dataset.key];
+  });
+}
+
+function exportHTML() {
+  const blob = new Blob([document.documentElement.outerHTML], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'RTO_LOW_SPEED_WORKBOOK_V3_export.html';
+  a.click();
+}
+
+function showTab(name, ev) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (ev && ev.currentTarget) ev.currentTarget.classList.add('active');
+}
+
+document.addEventListener('input', debounceSave);
+
+buildProcedure();
+buildATC();
+loadAll();
+</script>
+</body>
+</html>

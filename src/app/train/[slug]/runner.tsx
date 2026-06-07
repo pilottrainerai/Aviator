@@ -1,9 +1,11 @@
 "use client";
 
+// HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useScenarioRunner } from "@/lib/scenarios/runner";
-import type { Scenario, ScenarioDistraction, ScenarioStep } from "@/scenarios/types";
+import type { Scenario, ScenarioDistraction, ScenarioStep, AirportOption } from "@/scenarios/types";
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
 import { ScenarioClock } from "@/components/cockpit/scenario-clock";
@@ -21,9 +23,55 @@ import { FlightCheckPopup } from "@/components/cockpit/flight-check-popup";
 import { FirePanel } from "@/components/cockpit/fire-panel";
 import { SystemDisplay } from "@/components/cockpit/system-display";
 import { StatusPanel } from "@/components/cockpit/status-panel";
+import { getApplicableRequiredSteps, isStepApplicable } from "@/lib/scenarios/step-applicability";
 import { track } from "@/lib/analytics";
 
 const AUTO_END_DELAY_MS = 3_000;
+const DEV_ANN_KEY = "devAnnotations:eng1-fire-v1";
+const DEV_SEQ_KEY_PREFIX = "devSeqOrder:";
+
+type DevAnnotation = {
+  tag: string;
+  note: string;
+  fcomRef: string;
+};
+
+type DevAnnotations = Record<string, DevAnnotation>;
+
+function reorderBySavedSequence<T extends { id: string }>(items: readonly T[], sequence: readonly string[]): T[] {
+  if (!sequence.length) return [...items];
+
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const seen = new Set<string>();
+  const ordered: T[] = [];
+
+  for (const id of sequence) {
+    const item = byId.get(id);
+    if (!item || seen.has(id)) continue;
+    ordered.push(item);
+    seen.add(id);
+  }
+
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    ordered.push(item);
+  }
+
+  return ordered;
+}
+
+function loadSavedSequence(slug: string): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(`${DEV_SEQ_KEY_PREFIX}${slug}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v): v is string => typeof v === "string");
+  } catch {
+    return [];
+  }
+}
 
 // ── ATC state machine ──────────────────────────────────────────────────────────
 // A call can only be permanently dismissed by a CORRECT answer.
@@ -34,23 +82,271 @@ type AtcPhase =
   | { kind: "active"; d: ScenarioDistraction }
   | { kind: "standby"; d: ScenarioDistraction; resumesAt: number };
 
+// ── FirePanelContainer ────────────────────────────────────────────────────────
+// ── FirePanelContainer ────────────────────────────────────────────────────────
+// Renders the full 2D FirePanel (ENGINE DISPLAY + ACTION PANEL + thrust levers).
+// FirePanel3D is embedded *inside* FirePanel at the fire_pb control slot —
+// only the actual pushbutton cluster is 3D; everything else stays 2D.
+// ─────────────────────────────────────────────────────────────────────────────
+function FirePanelContainer({
+  scenario,
+  state,
+  perform,
+  disabled,
+}: {
+  scenario: import("@/scenarios/types").Scenario;
+  state: import("@/engine/state").ScenarioState;
+  perform: (a: import("@/engine/events").PilotAction) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <FirePanel scenario={scenario} state={state} perform={perform} disabled={disabled} />
+    </div>
+  );
+}
+
+function DeveloperOverlay({
+  scenario,
+  currentStepId,
+  activeAtcId,
+}: {
+  scenario: Scenario;
+  currentStepId?: string;
+  activeAtcId?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [annotations, setAnnotations] = useState<DevAnnotations>({});
+  const [kind, setKind] = useState<"step" | "distraction" | "trigger" | "phase">("step");
+  const [selectedId, setSelectedId] = useState("");
+  const [section, setSection] = useState("GENERAL");
+  const [fcomRef, setFcomRef] = useState("");
+  const [text, setText] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DEV_ANN_KEY);
+      setAnnotations(raw ? JSON.parse(raw) : {});
+    } catch {
+      setAnnotations({});
+    }
+  }, []);
+
+  const options = useMemo(() => {
+    if (kind === "step") return scenario.steps.map((s) => ({ id: s.id, label: s.label }));
+    if (kind === "distraction") return (scenario.distractions ?? []).map((d) => ({ id: d.id, label: `${d.from}: ${d.message}` }));
+    if (kind === "trigger") return scenario.triggers.map((t) => ({ id: t.id, label: t.description }));
+    return (scenario.phases ?? []).map((p) => ({ id: p.id, label: p.label }));
+  }, [kind, scenario]);
+
+  useEffect(() => {
+    if (!options.length) {
+      setSelectedId("");
+      return;
+    }
+    setSelectedId((prev) => (prev && options.some((o) => o.id === prev) ? prev : options[0].id));
+  }, [options]);
+
+  const key = selectedId ? `${kind}:${selectedId}` : "";
+  const current = key ? annotations[key] : undefined;
+  const directionLines = (current?.note ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  function persist(next: DevAnnotations) {
+    setAnnotations(next);
+    try {
+      localStorage.setItem(DEV_ANN_KEY, JSON.stringify(next));
+    } catch {
+      // no-op
+    }
+  }
+
+  function saveDirection() {
+    const line = text.trim();
+    if (!key || !line) return;
+    const prev = annotations[key] ?? { tag: "edit_pending", note: "", fcomRef: "" };
+    const payload = `[${section}] ${line}`;
+    const next: DevAnnotations = {
+      ...annotations,
+      [key]: {
+        tag: "edit_pending",
+        note: prev.note ? `${prev.note}\n${payload}` : payload,
+        fcomRef: fcomRef.trim() || prev.fcomRef || "",
+      },
+    };
+    persist(next);
+    setText("");
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1000);
+  }
+
+  async function copyPayload() {
+    const seqRaw = localStorage.getItem("devSeqOrder:eng1-fire-v1");
+    const phaseRaw = localStorage.getItem("devPhaseEdits:eng1-fire-v1");
+    const payload = {
+      annotations,
+      sequence: seqRaw ? JSON.parse(seqRaw) : [],
+      phaseEdits: phaseRaw ? JSON.parse(phaseRaw) : {},
+      scenarioSlug: scenario.meta.slug,
+      exportedAt: new Date().toISOString(),
+    };
+    const text = JSON.stringify(payload, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // Clipboard blocked; user can still copy from prompt.
+      window.prompt("Copy payload", text);
+    }
+  }
+
+  return (
+    <div style={{ borderBottom: "1px solid var(--color-border)", background: "#0A0F18" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full text-left px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em]"
+        style={{ color: "#50FA7B" }}
+      >
+        {open ? "Close" : "Open"} Developer Directions
+      </button>
+
+      {open && (
+        <div className="px-4 pb-3 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                if (currentStepId) {
+                  setKind("step");
+                  setSelectedId(currentStepId);
+                }
+              }}
+              className="px-2 py-1 text-[9px] border border-[#1E2530] hover:border-[#50FA7B]"
+            >
+              Use Current Step
+            </button>
+            <button
+              onClick={() => {
+                if (activeAtcId) {
+                  setKind("distraction");
+                  setSelectedId(activeAtcId);
+                }
+              }}
+              className="px-2 py-1 text-[9px] border border-[#1E2530] hover:border-[#FFD700]"
+            >
+              Use Active ATC
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} className="text-[10px] bg-[#101722] border border-[#1C2530] text-white px-2 py-1">
+              <option value="step">Step</option>
+              <option value="distraction">ATC</option>
+              <option value="trigger">Trigger</option>
+              <option value="phase">Phase</option>
+            </select>
+            <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} className="text-[10px] bg-[#101722] border border-[#1C2530] text-white px-2 py-1">
+              {options.map((o) => (
+                <option key={o.id} value={o.id}>{o.id}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="text-[9px] text-[#77839A] border border-[#1C2530] bg-[#101722] px-2 py-1 truncate">
+            {options.find((o) => o.id === selectedId)?.label ?? "No item selected"}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={section}
+              onChange={(e) => setSection(e.target.value)}
+              placeholder="Section (PF, PM, PFD/FMA...)"
+              className="text-[10px] bg-[#101722] border border-[#1C2530] text-white px-2 py-1"
+            />
+            <input
+              value={fcomRef}
+              onChange={(e) => setFcomRef(e.target.value)}
+              placeholder="FCOM ref (optional)"
+              className="text-[10px] bg-[#101722] border border-[#1C2530] text-white px-2 py-1"
+            />
+          </div>
+
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && e.ctrlKey) {
+                saveDirection();
+                e.preventDefault();
+              }
+            }}
+            rows={3}
+            placeholder="Add recommendation while scenario runs..."
+            className="text-[11px] bg-[#101722] border border-[#1C2530] text-white px-2 py-1 resize-y"
+          />
+
+          <button onClick={saveDirection} className="px-2 py-1.5 text-[10px] font-bold bg-[#50FA7B] text-black hover:bg-[#40EA6B]">
+            Save Direction
+          </button>
+          <button onClick={copyPayload} className="px-2 py-1.5 text-[10px] font-bold border border-[#1C2530] text-[#B9C7D8] hover:border-[#50FA7B]">
+            Copy Saved Payload
+          </button>
+          {saved && <div className="text-[9px] text-[#50FA7B]">Saved</div>}
+          {copied && <div className="text-[9px] text-[#50FA7B]">Copied payload</div>}
+
+          {directionLines.length > 0 && (
+            <div className="border border-[#1C2530] bg-[#101722] p-2">
+              <div className="text-[8px] uppercase tracking-wider text-[#50FA7B] mb-1">Saved Directions ({directionLines.length})</div>
+              <div className="max-h-24 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+                {directionLines.slice(-8).map((line, i) => (
+                  <div key={i} className="text-[10px] text-[#B9C7D8] mb-1 break-words">{line}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ScenarioRunner({ scenario }: { scenario: Scenario }) {
   const [started, setStarted] = useState(false);
+  const [selectedAirport, setSelectedAirport] = useState<AirportOption | undefined>(undefined);
   if (!started) {
     return (
       <PreflightBrief
         scenario={scenario}
-        onStart={() => {
+        onStart={(airport) => {
           track("scenario_started", { slug: scenario.meta.slug });
+          setSelectedAirport(airport);
           setStarted(true);
         }}
       />
     );
   }
-  return <RunningScenario scenario={scenario} />;
+  return <RunningScenario scenario={scenario} selectedAirport={selectedAirport} />;
 }
 
-function RunningScenario({ scenario }: { scenario: Scenario }) {
+function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario: Scenario; selectedAirport?: AirportOption }) {
+  const scenario = useMemo<Scenario>(() => {
+    const sequence = loadSavedSequence(baseScenario.meta.slug);
+    if (!sequence.length) return baseScenario;
+
+    const orderedSteps = reorderBySavedSequence(baseScenario.steps, sequence);
+    const orderedDistractions = reorderBySavedSequence(baseScenario.distractions ?? [], sequence);
+
+    return {
+      ...baseScenario,
+      steps: orderedSteps,
+      distractions: orderedDistractions,
+    };
+  }, [baseScenario]);
+
   const router = useRouter();
   const runner = useScenarioRunner(scenario);
   const [submitting, setSubmitting] = useState(false);
@@ -286,10 +582,35 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             {/* PFD + ND */}
             <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
               <div style={{ width: "380px", height: "380px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
-                <PfdMockup state={runner.state} />
+                <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                  <PfdMockup
+                    state={runner.state}
+                    scenario={scenario}
+                    elapsedMs={runner.elapsedMs}
+                    paused={runner.paused}
+                    onPfAction={(phaseId) => {
+                      const phase = scenario.phases?.find(p => p.id === phaseId);
+                      if (phase?.pfAction?.stepId) {
+                        runner.perform({ kind: "STEP", stepId: phase.pfAction.stepId });
+                      }
+                    }}
+                  />
+                  {/* Dev-mode PAUSED badge on PFD */}
+                  {isDevMode && runner.paused && (
+                    <div style={{
+                      position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)",
+                      background: "rgba(255,215,0,0.15)", border: "1px solid #FFD700",
+                      color: "#FFD700", fontSize: "10px", fontFamily: "monospace",
+                      fontWeight: 700, letterSpacing: "0.12em", padding: "2px 10px",
+                      borderRadius: "3px", pointerEvents: "none",
+                    }}>
+                      ⏸ PAUSED
+                    </div>
+                  )}
+                </div>
               </div>
               <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
-                <NdCanvas state={runner.state} />
+                <NdCanvas state={runner.state} scenario={scenario} elapsedMs={runner.elapsedMs} paused={runner.paused} />
               </div>
             </div>
             {/* Glareshield — compact strip */}
@@ -311,14 +632,12 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
 
           {/* Right sub-column: Fire/Engine (top) + System Display (mid) */}
           <div style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: "6px", padding: "10px 10px 8px 4px" }}>
-            <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <FirePanel
-                scenario={scenario}
-                state={runner.state}
-                perform={runner.perform}
-                disabled={runner.status !== "running"}
-              />
-            </div>
+            <FirePanelContainer
+              scenario={scenario}
+              state={runner.state}
+              perform={runner.perform}
+              disabled={runner.status !== "running"}
+            />
             <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <SystemDisplay state={runner.state} scenario={scenario} />
             </div>
@@ -335,15 +654,33 @@ function RunningScenario({ scenario }: { scenario: Scenario }) {
             className="px-4 py-2 shrink-0 flex items-center justify-between"
             style={{ borderBottom: "1px solid var(--color-border)" }}
           >
-            <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
-              ◈ ACTION PANEL
-            </span>
-            {distractionQueue.length > 0 && (
-              <span className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: "var(--color-amber)" }}>
-                {distractionQueue.length} QUEUED
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
+                ◈ ACTION PANEL
               </span>
-            )}
+              <button
+                onClick={() => (runner.paused ? runner.resume() : runner.pause())}
+                className="px-2 py-0.5 border border-[#1C2530] text-[9px] uppercase tracking-wider hover:border-[#3A4555]"
+                style={{ color: runner.paused ? "#50FA7B" : "#FFD700" }}
+              >
+                {runner.paused ? "Resume" : "Pause"}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              {runner.paused && <span className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: "#FFD700" }}>PAUSED</span>}
+              {distractionQueue.length > 0 && (
+                <span className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: "var(--color-amber)" }}>
+                  {distractionQueue.length} QUEUED
+                </span>
+              )}
+            </div>
           </div>
+
+          <DeveloperOverlay
+            scenario={scenario}
+            currentStepId={nextSoftwareStep?.id ?? nextHardwareStep?.id}
+            activeAtcId={atcPhase.kind === "active" || atcPhase.kind === "standby" ? atcPhase.d.id : undefined}
+          />
 
           {/* ── COMMS SECTION — fixed reservation, content scrolls if overflow ── */}
           <div
@@ -739,13 +1076,13 @@ const GROUP_ORDER = ["flightcheck", "glareshield", "procedure", "comms", "chclm"
 function ScenarioProgress({ scenario, state }: { scenario: Scenario; state: ScenarioState }) {
   const grouped: Record<string, ScenarioStep[]> = {};
   for (const s of scenario.steps) {
-    if (s.optional) continue;
+    if (s.optional || !isStepApplicable(s, state)) continue;
     const g = s.group ?? "procedure";
     if (!grouped[g]) grouped[g] = [];
     grouped[g].push(s);
   }
 
-  const allRequired = scenario.steps.filter((s) => !s.optional);
+  const allRequired = getApplicableRequiredSteps(scenario, state);
   const doneCount = allRequired.filter((s) => state.completedSteps[s.id]).length;
 
   // Active group = first group with a step whose trigger + requires are all met but not yet done

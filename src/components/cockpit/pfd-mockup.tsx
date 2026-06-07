@@ -13,9 +13,10 @@
 //   ILS info     — bottom-left frequency / dist block
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
-import { buildAircraftState } from "@/components/cockpit/pfd-nd";
+import type { Scenario } from "@/scenarios/types";
+import { buildAircraftState, getActiveScenarioPhase, PfActionOverlay } from "@/components/cockpit/pfd-nd";
 
 type PfdData = {
   pitch: number; roll: number;
@@ -33,12 +34,50 @@ type PfdData = {
   ra: number;
 };
 
-export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
+export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paused }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number; onPfAction?: (phaseId: string) => void; paused?: boolean } = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef  = useRef(state);
+  const scenarioRef = useRef(scenario);
+  const elapsedMsRef = useRef(elapsedMs);
+  const pausedRef = useRef(paused);
+
+  // PF action overlay — pulsing green ring on PFD at key phases.
+  // Ring persists until the PF clicks it (completing the step), even if later
+  // phases become active. This lets the AP1 ENGAGE ring stay visible through
+  // the 400 ft gate rather than disappearing when the next phase starts.
+  const [confirmedPhases, setConfirmedPhases] = useState<Set<string>>(new Set());
+
+  // Scan backwards through all phases reached so far; return the most recent
+  // one whose pfAction step has not yet been completed or confirmed.
+  const pendingPhase = (() => {
+    if (!scenario?.phases) return null;
+    for (let i = scenario.phases.length - 1; i >= 0; i--) {
+      const p = scenario.phases[i];
+      if (p.atMs > (elapsedMs ?? 0)) continue;           // not yet reached
+      if (!p.pfAction) continue;                          // no ring for this phase
+      if (confirmedPhases.has(p.id)) continue;            // PF already clicked it
+      const stepDone = p.pfAction.stepId
+        ? !!state?.completedSteps?.[p.pfAction.stepId]
+        : false;
+      if (stepDone) continue;                             // step completed another way
+      return p;
+    }
+    return null;
+  })();
+
+  const pfAction     = pendingPhase?.pfAction;
+  const needsConfirm = !!(pfAction && pendingPhase);
+  const handleConfirm = useCallback(() => {
+    if (!pendingPhase || !pfAction) return;
+    setConfirmedPhases(prev => new Set(prev).add(pendingPhase.id));
+    onPfAction?.(pendingPhase.id);
+  }, [pendingPhase, pfAction, onPfAction]);
   // Keep latest scenario state available to the rAF loop without re-running
   // the whole effect on every state change.
   useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => { scenarioRef.current = scenario; }, [scenario]);
+  useEffect(() => { elapsedMsRef.current = elapsedMs; }, [elapsedMs]);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -140,38 +179,67 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     };
 
     // ── FMA ────────────────────────────────────────────────────────────────
+    // FCOM DSC-22-30-100: first line = engaged (green), second line = armed (blue),
+    // third line = special cues (LVR CLB / LVR MCT — white, flashing).
+    // MAN TOGA is white per FCOM (manual mode, not A/THR managed).
     const drawFMA = () => {
-      const live = stateRef.current ? buildAircraftState(stateRef.current) : null;
+      const live = stateRef.current
+        ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current)
+        : null;
       const thrMode  = live?.thrMode  ?? "MAN TOGA";
+      const thrCue   = live?.thrCue;
       const vertMode = live?.vertMode ?? "SRS";
-      const latMode  = live?.latMode  ?? "RWY TRK";
+      const latMode  = live?.latMode  ?? "NAV";
+      const altitude = live?.altitude ?? 1500;
+      const onGround = altitude === 0;
 
-      const C_ACTIVE = "#00ff00";
-      const C_ARMED  = "#00bfff";  // FCOM blue for armed modes
-      const C_WHITE  = "#ffffff";
+      const C_ACTIVE = "#00ff00";  // engaged modes — green
+      const C_ARMED  = "#00bfff";  // armed modes — blue
+      const C_WHITE  = "#ffffff";  // manual modes + special cues — white
 
-      // Solid black background, uniform across rows — no gradient on active row,
-      // no horizontal divider between active and armed rows.
+      // MAN modes (MAN TOGA, MAN MCT, MAN GA SOFT) are white per FCOM.
+      // Managed modes (THR CLB, THR MCT, THR IDLE) are green.
+      const thrColor = thrMode.startsWith("MAN") ? C_WHITE : C_ACTIVE;
+
+      // Solid black background.
       ctx.fillStyle = "#000000"; ctx.fillRect(0, 0, W, FH);
 
       // Vertical column dividers only (FCOM-correct).
-      ctx.strokeStyle = "#555"; ctx.lineWidth = 1;
       [105, 210, 312, 418].forEach(x => line(x, 2, x, FH - 2, "#555", 1));
 
-      // Row 1 — ACTIVE modes (GREEN)
-      txt(thrMode,  52,  16, 14, C_ACTIVE, "center", true, 5);
-      txt(vertMode, 156, 16, 14, C_ACTIVE, "center", true, 5);
-      txt(latMode,  260, 16, 14, C_ACTIVE, "center", true, 5);
+      // Row 1 — ENGAGED modes (first line).
+      // Vertical and lateral modes only shown when airborne (altitude > 0).
+      // On ground they are ARMED (second line, blue) not yet engaged.
+      txt(thrMode, 52,  16, 14, thrColor, "center", true, 5);
+      if (!onGround) {
+        txt(vertMode, 156, 16, 14, C_ACTIVE, "center", true, 5);
+        txt(latMode,  260, 16, 14, C_ACTIVE, "center", true, 5);
+      }
 
-      // Engagement column — AP / FD / A/THR always visible (full column).
-      txt("AP1",    466, 13, 11, C_WHITE, "center", true);
+      // Engagement column — AP / FD / A/THR.
+      // AP1 only shown when autopilot is engaged (after PF presses AP1 on FCU).
+      if (live?.apEngaged) txt("AP1", 466, 13, 11, C_WHITE, "center", true);
       txt("1 FD 2", 466, 30, 11, C_WHITE, "center", true);
-      txt("A/THR",  466, 47, 11, C_WHITE, "center", true);
+      // A/THR: GREEN when actively managing thrust (levers at managed detent),
+      //        CYAN when armed (pb pressed, levers at TOGA = MAN TOGA on col 1),
+      //        not shown when A/THR off.
+      if (live?.athrActive)     txt("A/THR", 466, 47, 11, C_ACTIVE, "center", true);
+      else if (live?.athrArmed) txt("A/THR", 466, 47, 11, C_ARMED,  "center", true);
 
-      // Row 2 — ARMED modes (BLUE).  Per FCOM: a mode that has already engaged
-      // is no longer shown as armed.  No ENG OUT badge on the FMA.
-      if (vertMode !== "CLB") txt("CLB", 156, 44, 12, C_ARMED, "center", true, 3);
-      if (latMode  !== "NAV") txt("NAV", 260, 44, 12, C_ARMED, "center", true, 3);
+      // Row 2 — ARMED modes (second line, blue) and thrust cues (third line, white flashing).
+      if (onGround) {
+        // Before liftoff: SRS and NAV are armed (blue).
+        txt("SRS", 156, 44, 12, C_ARMED, "center", true, 3);
+        if (latMode === "NAV") txt("NAV", 260, 44, 12, C_ARMED, "center", true, 3);
+      } else {
+        // Airborne: CLB is armed during SRS climb (altitude capture target is armed).
+        if (vertMode === "SRS") txt("CLB", 156, 44, 12, C_ARMED, "center", true, 3);
+        // LVR CLB or LVR MCT cue in thrust column — white, flashing at ~1 Hz.
+        if (thrCue) {
+          const flashOn = Math.floor(Date.now() / 500) % 2 === 0;
+          if (flashOn) txt(thrCue, 52, 44, 12, C_WHITE, "center", true, 3);
+        }
+      }
     };
 
     // ── ADI ────────────────────────────────────────────────────────────────
@@ -733,8 +801,10 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
     let t = 0;
     let rafId = 0;
     const animate = () => {
-      t += 0.004;
-      const live = stateRef.current ? buildAircraftState(stateRef.current) : null;
+      if (!pausedRef.current) t += 0.004;   // freeze shimmer when paused
+      const live = stateRef.current
+        ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current)
+        : null;
       if (live) {
         // Wired to scenario — use derived AircraftState directly.  Pitch and
         // roll get a tiny live shimmer so the attitude indicator feels alive;
@@ -785,10 +855,17 @@ export default function PfdMockup({ state }: { state?: ScenarioState } = {}) {
   //   • Wired (with `state`) — fills its parent container slot in the runner
   if (state) {
     return (
-      <canvas
-        ref={canvasRef}
-        style={{ display: "block", width: "100%", height: "100%" }}
-      />
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
+        {needsConfirm && pfAction && (
+          <PfActionOverlay
+            label={pfAction.label}
+            hint={pfAction.hint}
+            coachMs={pfAction.coachMs}
+            onConfirm={handleConfirm}
+          />
+        )}
+      </div>
     );
   }
   return (

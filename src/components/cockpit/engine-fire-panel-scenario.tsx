@@ -1,5 +1,7 @@
 "use client";
 
+// HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
+
 // ─────────────────────────────────────────────────────────────────────────────
 // FIRE panel — SCENARIO integration wrapper
 //
@@ -34,6 +36,8 @@ export interface EngineFireScenarioPanelProps {
   agent1Disch:  boolean;
   /** True when `agent2` step is done. */
   agent2Disch:  boolean;
+  /** True when the conditional AGENT 2 branch is applicable. */
+  agent2Available?: boolean;
   /** Called when the user presses the FIRE pb after the guard is open. */
   onPushFirePb: () => void;
   /** Called when the user presses AGENT 1 (after 10-s arming window). */
@@ -75,6 +79,7 @@ export function EngineFireScenarioPanel({
   firePbDone,
   agent1Disch,
   agent2Disch,
+  agent2Available = false,
   onPushFirePb,
   onPushAgent1,
   onPushAgent2,
@@ -128,6 +133,7 @@ export function EngineFireScenarioPanel({
       firePbOutAt={firePbOutAt}
       agent1Disch={agent1Disch}
       agent2Disch={agent2Disch}
+      agent2Available={agent2Available}
       testActive={testActive}
       onOpenGuard={handleOpenGuard}
       onPushFirePb={handlePushFirePb}

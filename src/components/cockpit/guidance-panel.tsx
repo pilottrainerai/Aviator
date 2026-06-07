@@ -2,20 +2,23 @@
 
 import type { ScenarioState } from "@/engine/state";
 import type { Scenario, ScenarioStep } from "@/scenarios/types";
+import {
+  getApplicableRequiredSteps,
+  isStepApplicable,
+  isStepCurrent,
+} from "@/lib/scenarios/step-applicability";
 
 type Status = "pending" | "current" | "done" | "skip";
 
 function stepRowStatus(step: ScenarioStep, state: ScenarioState): Status {
   if (state.completedSteps[step.id]) return "done";
+  if (!isStepApplicable(step, state)) return "skip";
   if (step.optional) {
     // Mark optional step as "skip" if a later step (one that requires it transitively or comes after) has been done
     // Simplified: if all non-optional steps are done, skip the optional ones
     return "pending";
   }
-  const requirementsMet = (step.requires ?? []).every(
-    (r) => !!state.completedSteps[r],
-  );
-  return requirementsMet ? "current" : "pending";
+  return isStepCurrent(step, state) ? "current" : "pending";
 }
 
 function nextHint(scenario: Scenario, state: ScenarioState): {
@@ -49,8 +52,7 @@ function nextHint(scenario: Scenario, state: ScenarioState): {
   }
 
   // All required done — prompt for decision
-  const requiredDone = scenario.steps
-    .filter((s) => !s.optional)
+  const requiredDone = getApplicableRequiredSteps(scenario, state)
     .every((s) => state.completedSteps[s.id]);
   if (requiredDone) {
     return {
@@ -70,7 +72,7 @@ export function GuidancePanel({
   state: ScenarioState;
 }) {
   const next = nextHint(scenario, state);
-  const required = scenario.steps.filter((s) => !s.optional);
+  const required = getApplicableRequiredSteps(scenario, state);
   const done = required.filter((s) => state.completedSteps[s.id]).length;
 
   return (
@@ -96,7 +98,7 @@ export function GuidancePanel({
       </div>
 
       <ol className="divide-y divide-[var(--color-border)]">
-        {scenario.steps.map((s) => (
+        {scenario.steps.filter((s) => isStepApplicable(s, state)).map((s) => (
           <StepRow key={s.id} step={s} state={state} />
         ))}
       </ol>

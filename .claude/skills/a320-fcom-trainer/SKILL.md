@@ -367,12 +367,40 @@ Every completed procedure intake is recorded here. Claude uses these to
 calibrate future runs — FCOM line citations, tasksharing, callouts, and
 FCTM technique notes from real work. Add a new entry each time intake is confirmed.
 
-### [2026-05-24] ENG 1(2) FIRE — AFTER V1
+### [2026-05-24] ENG 1(2) FIRE — AFTER V1  (REVISED 2026-05-27)
 - Phase: after V1 on takeoff
 - Goal: PF/PM split at V1 cut; ECAM fire challenge-response; when to declare MAYDAY
-- Source hierarchy: Memory items first → ECAM → FCOM PRO-ABN-ENG → FCTM
-- Memory items (PF): FIRE pb — PUSH; AGENT 1 or 2 — DISCH  `[fcom:LN]`
-- LAND ASAP: RED — nearest airport, MAYDAY  `[fcom:LN]`
-- Key callouts: PF "FIRE" → PM "CONFIRMED, ENG 1 FIRE"  `[callouts:LN]`
-- FCTM: if fire goes out after AGENT 1, hold AGENT 2 — do not discharge  `[fctm:LN]`
-- File: `src/scenarios/eng1-fire-after-v1.ts`
+- Source hierarchy: ECAM (Box 1) → FCOM PRO-ABN-ENG p.39-40 → FCTM
+  - NOT "Memory items first" — ENG 1(2) FIRE has NO memory items. Memory
+    items in A320 are reserved for cabin-altitude / smoke / stall warning.
+    ENG FIRE starts directly with ECAM actions.  `[callouts §QRH MEMORY ITEMS]`
+- ECAM actions (verbatim from PRO-ABN-ENG p.40):
+  1. THR LEVER (AFFECTED) … IDLE     `[fcom:L94614]`
+  2. ENG MASTER (AFFECTED) … OFF     `[fcom:L94615]`
+  3. ENG FIRE P/B (AFFECTED) … PUSH  `[fcom:L94619]`
+  4. AGENT 1 AFTER 10 S … DISCH      `[fcom:L94625]`
+  5. ATC … NOTIFY                    `[fcom:L94632]`
+  6. IF FIRE AFTER 30 S: AGENT 2 … DISCH  `[fcom:L94640]`
+- LAND ASAP: RED — nearest airport, MAYDAY  `[fcom:L94604 / abnormal-procs:L229]`
+- Key callouts:
+  - PM identifies fire: `"Engine Fire"` — DO NOT identify which engine
+    yet `[callouts:L617-618 "For engine problem: do NOT identify which
+    engine yet"]`. Engine number is added only after ECAM confirmation.
+  - Confirm items (PF verbal confirmation required for PM action): THR
+    LEVER, ENG MASTER, ENG FIRE PB, AGENT  `[callouts:L688-708]`
+- FCTM: if fire is extinguished after AGENT 1, ENG 1(2) FIRE warning
+  disappears and procedure no longer applies — hold AGENT 2  `[fctm:L2823-24]`
+- Parallel-procedure rule: after THR IDLE + MASTER OFF, engine is also
+  inoperative — engine failure technique runs in parallel with fire ECAM
+  `[abnormal-procs:L541-543]`. 12.5° rotation pitch / rudder trim / beta
+  target are engine-FAILURE techniques and apply only AFTER master OFF,
+  not during initial rotation with fire warning only.
+- FMA final takeoff segment: at green dot speed, LVR MCT flashes amber
+  on FMA; PF moves thrust levers to MCT detent (recycle CL→MCT if already
+  at FLX/MCT); PF pulls ALT knob → OPEN CLB engages. FMA: THR MCT / OP CLB.
+  `[fctm:L12879-12882]`
+- File: `src/scenarios/data/eng1-fire-after-v1.ts`
+- 2026-05-27 REVISION: prior entry had PM callout as `"CONFIRMED, ENG 1
+  FIRE"` — that contradicts callouts.txt L617-618. Pilot review flagged
+  the error; corrected in this revision. Also fleshed out FMA cycle,
+  parallel-procedure rule, and the memory-items vs ECAM-first distinction.

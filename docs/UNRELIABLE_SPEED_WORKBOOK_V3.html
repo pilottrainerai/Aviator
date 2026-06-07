@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNRELIABLE SPEED / IAS DISAGREE — Workbook V3</title>
+<style>
+  :root { --red:#dc2626;--red-bg:#fef2f2;--amber:#d97706;--amber-bg:#fffbeb;--blue:#1d4ed8;--blue-bg:#eff6ff;--green:#16a34a;--green-bg:#f0fdf4;--purple:#7c3aed;--purple-bg:#f5f3ff;--teal:#0d9488;--teal-bg:#f0fdfa;--gray:#374151;--gray-bg:#f9fafb; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:#f3f4f6;color:#111;}
+  .topbar{background:#111827;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+  .topbar h1{font-size:15px;font-weight:700;letter-spacing:.5px;}
+  .topbar-meta{font-size:11px;color:#9ca3af;margin-left:16px;}
+  .topbar-right{display:flex;gap:8px;align-items:center;}
+  .save-status{font-size:11px;color:#6b7280;}
+  button.btn{padding:5px 14px;border-radius:5px;border:none;cursor:pointer;font-size:12px;font-weight:600;}
+  button.btn-save{background:#2563eb;color:#fff;}
+  button.btn-export{background:#374151;color:#fff;}
+  button.btn-v2{background:#7c3aed;color:#fff;}
+  .tabs{background:#1f2937;display:flex;padding:0 20px;border-bottom:2px solid #374151;}
+  .tab{padding:9px 18px;color:#9ca3af;cursor:pointer;font-size:12px;font-weight:600;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;}
+  .tab.active{color:#fff;border-bottom-color:#3b82f6;}
+  .tab:hover:not(.active){color:#e5e7eb;}
+  .section{display:none;padding:16px 20px;}
+  .section.active{display:block;}
+  .section-title{font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;border-bottom:2px solid #e5e7eb;padding-bottom:6px;}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:20px;}
+  th{background:#1f2937;color:#e5e7eb;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:8px 10px;text-align:left;white-space:nowrap;}
+  td{padding:7px 10px;border-bottom:1px solid #f3f4f6;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#fafafa;}
+  .cat-av td:first-child{border-left:4px solid var(--red);background:var(--red-bg);}
+  .cat-ec td:first-child{border-left:4px solid var(--amber);background:var(--amber-bg);}
+  .cat-atc td:first-child{border-left:4px solid var(--blue);background:var(--blue-bg);}
+  .cat-st td:first-child{border-left:4px solid var(--green);background:var(--green-bg);}
+  .cat-pl td:first-child{border-left:4px solid var(--purple);background:var(--purple-bg);}
+  .cat-ap td:first-child{border-left:4px solid var(--teal);background:var(--teal-bg);}
+  .chip{display:inline-block;padding:2px 7px;border-radius:3px;font-weight:700;font-size:10px;font-family:monospace;margin:1px;}
+  .chip-pf{background:#dbeafe;color:#1e40af;} .chip-pm{background:#dcfce7;color:#166534;}
+  .chip-av{background:#fee2e2;color:#991b1b;} .chip-ec{background:#fef9c3;color:#854d0e;}
+  .chip-atc{background:#dbeafe;color:#1e3a8a;} .chip-st{background:#d1fae5;color:#065f46;}
+  .chip-pl{background:#ede9fe;color:#5b21b6;} .chip-ap{background:#ccfbf1;color:#134e4a;}
+  .chip-fc{background:#f3f4f6;color:#374151;} .chip-hw{background:#1f2937;color:#f9fafb;}
+  .chip-warn{background:#dc2626;color:#fff;} .chip-caut{background:#d97706;color:#fff;} .chip-adv{background:#1d4ed8;color:#fff;}
+  .editable{width:100%;min-height:36px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:4px;font-size:12px;font-family:inherit;resize:vertical;background:#fafafa;}
+  .editable:focus{outline:none;border-color:#3b82f6;background:#fff;}
+  select.flag-sel{padding:4px 6px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#fff;cursor:pointer;}
+  .hint-text{font-size:11px;color:#4b5563;line-height:1.5;max-width:320px;}
+  .atc-block{background:#eff6ff;border-left:3px solid #2563eb;padding:6px 10px;border-radius:3px;margin-bottom:6px;font-size:12px;}
+  .atc-choice{padding:3px 8px;border-radius:3px;font-size:11px;margin:2px 0;}
+  .atc-choice.correct{background:#d1fae5;color:#065f46;} .atc-choice.wrong{background:#fee2e2;color:#991b1b;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px;}
+  .card{background:#fff;border-radius:6px;padding:12px 14px;border:1px solid #e5e7eb;}
+  .card-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:.6px;}
+  .card-value{font-size:22px;font-weight:800;color:#111;margin-top:2px;}
+  .card-sub{font-size:11px;color:#6b7280;margin-top:2px;}
+  .timeline{position:relative;padding-left:24px;}
+  .tl-item{position:relative;margin-bottom:14px;}
+  .tl-item::before{content:'';position:absolute;left:-18px;top:6px;width:10px;height:10px;border-radius:50%;background:#3b82f6;}
+  .tl-item::after{content:'';position:absolute;left:-14px;top:16px;width:2px;height:calc(100% + 4px);background:#e5e7eb;}
+  .tl-item:last-child::after{display:none;}
+  .tl-time{font-weight:700;color:#1d4ed8;font-family:monospace;font-size:12px;}
+  .tl-desc{font-size:12px;color:#374151;}
+  .tl-effects{font-size:11px;color:#6b7280;margin-top:2px;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1>UNRELIABLE SPEED / IAS DISAGREE — Workbook V3</h1>
+    <span class="topbar-meta">Climb FL150 · A320 · Source: FCOM PRO-ABN-FLT + FCTM ABN-070 + QRH 2.10</span>
+  </div>
+  <div class="topbar-right">
+    <span class="save-status" id="saveStatus">Auto-save on</span>
+    <button class="btn btn-v2" onclick="window.open('procedure-previews/unreliable-speed_PROCEDURE_PREVIEW_EDITABLE.html','_blank')">Open V2</button>
+    <button class="btn btn-save" onclick="saveAll()">Save</button>
+    <button class="btn btn-export" onclick="exportHTML()">Export HTML</button>
+  </div>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="showTab('summary',event)">Summary</div>
+  <div class="tab" onclick="showTab('procedure',event)">Procedure Flow</div>
+  <div class="tab" onclick="showTab('ecam',event)">ECAM / Triggers</div>
+  <div class="tab" onclick="showTab('atc',event)">ATC Distractions</div>
+  <div class="tab" onclick="showTab('status',event)">Status &amp; Decisions</div>
+</div>
+
+<!-- SUMMARY -->
+<div class="section active" id="tab-summary">
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Scenario</div>
+      <div class="card-value" style="font-size:14px;">UNRELIABLE SPEED</div>
+      <div class="card-sub">ADR 1 Fault / IAS Disagree</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Flight</div>
+      <div class="card-value" style="font-size:16px;">IFLY101</div>
+      <div class="card-sub">VIDP — climbing FL150</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Phase</div>
+      <div class="card-value" style="font-size:15px;">CLIMB</div>
+      <div class="card-sub">Passing FL150</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Alert</div>
+      <div class="card-value" style="font-size:14px;color:var(--amber);">MASTER CAUT</div>
+      <div class="card-sub">SC chime · SPEED UNRELIABLE</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Steps</div>
+      <div class="card-value">15</div>
+      <div class="card-sub">incl. memory items</div>
+    </div>
+    <div class="card">
+      <div class="card-label">ATC Calls</div>
+      <div class="card-value">10</div>
+      <div class="card-sub">Delhi Departure / Approach / Tower</div>
+    </div>
+  </div>
+
+  <div class="section-title">Situation Brief</div>
+  <div style="background:#fff;border-radius:6px;padding:14px 16px;margin-bottom:20px;border:1px solid #e5e7eb;font-size:13px;line-height:1.7;color:#374151;">
+    <strong>Situation:</strong> Shortly after takeoff passing FL150. ECAM displays NAV ADR 1 FAULT and NAV IAS DISCREPANCY — amber MASTER CAUTION and single chime. Two PFDs show conflicting airspeeds. The autopilot has disconnected. "UNRELIABLE SPEED" is a memory item call-out.<br><br>
+    <strong>Job:</strong> Immediately disconnect AP/FD/A-THR. Apply FCOM pitch+thrust table (15°/TOGA below thrust red alt). Identify and isolate the faulty ADR. Check probe/window heat ON. Use STBY ISIS as backup speed reference.<br><br>
+    <strong>ATC Protocol:</strong> PAN PAN — not MAYDAY. RVSM inop, request block altitude FL130–FL150. Return to Delhi for raw-data approach. Memory items (AP/FD/A-THR ALL OFF → pitch+thrust table) must precede all ATC calls.
+  </div>
+
+  <div class="section-title">Trigger Timeline</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-time">T + 5 s</div>
+      <div class="tl-desc"><strong>pitot_fail</strong> — ADR 1 failure — NAV ADR 1 FAULT, IAS disagree, speed unreliable</div>
+      <div class="tl-effects">SET_MASTER_CAUT active · SET_ALARM_LABEL "SPEED UNRELIABLE" · ADD_ECAM: NAV ADR 1 FAULT (caution), NAV IAS DISCREPANCY (caution), AP DISCONNECTED (advisory), FMGC UNRELIABLE DATA (advisory)</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">T + ~step</div>
+      <div class="tl-desc"><strong>rvsm_lost</strong> — after adr_disagree (+3 s) — RVSM capability lost</div>
+      <div class="tl-effects">ADD_ECAM "RVSM AIRSPACE — CHECK WITH ATC" (advisory)</div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:20px;">Memory Items — FCOM PRO-ABN-FLT</div>
+  <div style="background:#fef9c3;border:1px solid #d97706;border-radius:6px;padding:12px 16px;margin-bottom:20px;font-size:12px;line-height:1.8;">
+    <strong>1. AP / FD / A-THR — ALL OFF</strong><br>
+    <strong>2. Apply pitch/thrust table:</strong><br>
+    &nbsp;&nbsp;• Below thrust reduction alt: 15° nose up + TOGA<br>
+    &nbsp;&nbsp;• Above thrust red alt, below FL100: 10° + CLB<br>
+    &nbsp;&nbsp;• Above FL100: 5° + CLB<br>
+    <strong>3. Fly ATTITUDE — do NOT chase speed tapes.</strong>
+  </div>
+
+  <div class="section-title">Notes</div>
+  <table>
+    <thead><tr><th>#</th><th>Topic</th><th>Note / Observation</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><input class="editable" placeholder="Topic…" data-key="note_topic_1"></td>
+        <td><textarea class="editable" placeholder="Note…" data-key="note_body_1"></textarea></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><input class="editable" placeholder="Topic…" data-key="note_topic_2"></td>
+        <td><textarea class="editable" placeholder="Note…" data-key="note_body_2"></textarea></td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><input class="editable" placeholder="Topic…" data-key="note_topic_3"></td>
+        <td><textarea class="editable" placeholder="Note…" data-key="note_body_3"></textarea></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PROCEDURE FLOW -->
+<div class="section" id="tab-procedure">
+  <div class="section-title">Procedure Flow — All Steps</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>ID</th><th>Group</th><th>Crew</th><th>Cat</th><th>Label</th><th>Action</th><th>Hint (150 chars)</th><th>Proposed Change</th><th>Flag</th>
+      </tr>
+    </thead>
+    <tbody id="proc-tbody"></tbody>
+  </table>
+</div>
+
+<!-- ECAM / TRIGGERS -->
+<div class="section" id="tab-ecam">
+  <div class="section-title">ECAM Messages from Trigger Effects</div>
+  <table>
+    <thead><tr><th>Trigger</th><th>Time</th><th>ECAM ID</th><th>Line</th><th>Level</th></tr></thead>
+    <tbody>
+      <tr>
+        <td rowspan="4"><strong>pitot_fail</strong></td>
+        <td rowspan="4">T+5 s</td>
+        <td><code>adr_fault</code></td>
+        <td>NAV ADR 1 FAULT</td>
+        <td><span class="chip chip-caut">CAUTION</span></td>
+      </tr>
+      <tr>
+        <td><code>ias_disagree</code></td>
+        <td>NAV IAS DISCREPANCY</td>
+        <td><span class="chip chip-caut">CAUTION</span></td>
+      </tr>
+      <tr>
+        <td><code>autopilot_off</code></td>
+        <td>AP DISCONNECTED</td>
+        <td><span class="chip chip-adv">ADVISORY</span></td>
+      </tr>
+      <tr>
+        <td><code>fmgc_warn</code></td>
+        <td>FMGC UNRELIABLE DATA</td>
+        <td><span class="chip chip-adv">ADVISORY</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">After-Effects from Steps</div>
+  <table>
+    <thead><tr><th>Step</th><th>Delay</th><th>Trigger ID</th><th>Effects</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>adr_disagree</code></td>
+        <td>+3 000 ms</td>
+        <td><code>rvsm_lost</code></td>
+        <td>ADD_ECAM "RVSM AIRSPACE — CHECK WITH ATC" (advisory)</td>
+      </tr>
+      <tr>
+        <td><code>cancel_master_caut_initial</code></td>
+        <td>+400 ms</td>
+        <td><code>mc_cancelled</code></td>
+        <td>SET_MASTER_CAUT false</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ATC DISTRACTIONS -->
+<div class="section" id="tab-atc">
+  <div class="section-title">ATC Distractions (10) — Delhi Departure / Approach / Tower</div>
+  <div id="atc-container"></div>
+</div>
+
+<!-- STATUS & DECISIONS -->
+<div class="section" id="tab-status">
+  <div class="section-title">Status Items — Left Column</div>
+  <table>
+    <thead><tr><th>ID</th><th>Line</th><th>Severity</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>st_adr</code></td>
+        <td>NAV ADR 1 FAULT</td>
+        <td><span class="chip chip-caut">CAUTION</span></td>
+      </tr>
+      <tr>
+        <td><code>st_ias</code></td>
+        <td>NAV IAS DISCREPANCY</td>
+        <td><span class="chip chip-caut">CAUTION</span></td>
+      </tr>
+      <tr>
+        <td><code>st_rvsm</code></td>
+        <td>RVSM INOP</td>
+        <td><span class="chip chip-fc">MEMO</span></td>
+      </tr>
+      <tr>
+        <td><code>st_isis</code></td>
+        <td>STBY ISIS IN USE</td>
+        <td><span class="chip chip-fc">MEMO</span></td>
+      </tr>
+      <tr>
+        <td><code>st_appr</code></td>
+        <td>APPR RAW DATA</td>
+        <td><span class="chip chip-adv">ADVISORY</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">INOP SYS — Right Column</div>
+  <table>
+    <thead><tr><th>ID</th><th>System</th><th>Severity</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>st_inop_adr</code></td>
+        <td>ADR 1</td>
+        <td><span class="chip chip-caut">CAUTION</span></td>
+      </tr>
+      <tr>
+        <td><code>st_inop_gpws</code></td>
+        <td>GPWS</td>
+        <td><span class="chip chip-caut">CAUTION</span></td>
+      </tr>
+      <tr>
+        <td><code>st_inop_cat3s</code></td>
+        <td>CAT 3 SINGLE</td>
+        <td><span class="chip chip-caut">CAUTION</span></td>
+      </tr>
+      <tr>
+        <td><code>st_inop_cat3d</code></td>
+        <td>CAT 3 DUAL</td>
+        <td><span class="chip chip-caut">CAUTION</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">Decisions</div>
+  <table>
+    <thead><tr><th>Value</th><th>Label</th><th>Tone</th><th>Description</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>DIVERT_NEAREST</code></td>
+        <td><strong>DIVERT NEAREST</strong></td>
+        <td><span class="chip chip-warn">PRIMARY</span></td>
+        <td>Land at nearest field — raw data approach, manual ILS.</td>
+        <td><textarea class="editable" data-key="dec_DIVERT_NEAREST" placeholder="Notes…"></textarea></td>
+      </tr>
+      <tr>
+        <td><code>LAND_ASAP</code></td>
+        <td><strong>LAND ASAP</strong></td>
+        <td><span class="chip chip-warn">PRIMARY</span></td>
+        <td>Land as soon as possible — do not risk further ADR failures.</td>
+        <td><textarea class="editable" data-key="dec_LAND_ASAP" placeholder="Notes…"></textarea></td>
+      </tr>
+      <tr>
+        <td><code>CONTINUE_MONITORED</code></td>
+        <td><strong>CONTINUE MONITORED</strong></td>
+        <td><span class="chip chip-adv">SECONDARY</span></td>
+        <td>Continue carefully if 2 ADRs agree and conditions are stable — increased risk.</td>
+        <td><textarea class="editable" data-key="dec_CONTINUE_MONITORED" placeholder="Notes…"></textarea></td>
+      </tr>
+      <tr>
+        <td><code>CONTINUE_FULL</code></td>
+        <td><strong>CONTINUE FULL IFR</strong></td>
+        <td><span class="chip chip-warn" style="background:#7f1d1d;">DANGER</span></td>
+        <td>Continue IFR with unreliable speed indication — never appropriate.</td>
+        <td><textarea class="editable" data-key="dec_CONTINUE_FULL" placeholder="Notes…"></textarea></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+const LS_KEY = 'unreliable_speed_workbook_v3';
+
+const STEPS = [
+  { n:1,  id:'ap_fd_disc',                group:'flightcheck', crew:'PF', cat:'av',  label:'AP / FD / A-THR',         action:'ALL OFF',      hint:'PF: IMMEDIATELY disconnect AP, A/THR, and both FDs. Call \'UNRELIABLE SPEED\'. Fly raw data. Do NOT chase speed indications. This is a MEMORY ITEM.' },
+  { n:2,  id:'pitch_thrust',              group:'flightcheck', crew:'PF', cat:'av',  label:'PITCH + THRUST TABLE',    action:'APPLY',        hint:'PF: IMMEDIATELY apply FCOM pitch/thrust table. CLIMB below thrust red alt: 15° nose up + TOGA. Above thrust red alt below FL100: 10°/CLB. Above FL100: 5°/CLB.' },
+  { n:3,  id:'adr_disagree',             group:'—',           crew:'PM', cat:'ec',  label:'ADR DISAGREE CHECK',      action:'IDENTIFY',     hint:'PM: compare ADR 1, ADR 2, ADR 3 on both PFDs — use STBY ISIS as backup reference (independent pitot). Identify the faulty ADR. ADR3 and STBY speeds use the same probe.' },
+  { n:4,  id:'cancel_master_caut_initial',group:'glareshield', crew:'PM', cat:'av',  label:'MASTER CAUT',             action:'CANCEL',       hint:'PM: cancel MASTER CAUTION (ADR 1 FAULT is a CAUTION, not Warning). Silences SC chime. ECAM procedure remains displayed.' },
+  { n:5,  id:'adr_off',                  group:'—',           crew:'PM', cat:'ec',  label:'FAULTY ADR — OFF',        action:'SWITCH OFF',   hint:'PM: switch off faulty ADR pushbutton (ADIRS panel). FCOM: if at least one ADR confirmed reliable — switch unreliable ADR(s) OFF.' },
+  { n:6,  id:'spd_check',               group:'—',           crew:'PM', cat:'ec',  label:'SPEED CROSS-CHECK',       action:'CONFIRM',      hint:'PM: cross-check: ASI (both), ISIS, Mach. If 2 ADRs agree — speeds reliable. If all unreliable — continue flying attitude table.' },
+  { n:7,  id:'probe_heat_on',            group:'—',           crew:'PM', cat:'ec',  label:'PROBE / WINDOW HEAT',     action:'ON',           hint:'PM: FCOM step after ADR disagree check — ensure ALL probe and window heat is ON. Ice accretion is the most common cause of ADR disagreement.' },
+  { n:8,  id:'atc_notify_speed',         group:'comms',       crew:'PM', cat:'atc', label:'ATC NOTIFY',              action:'ADVISE',       hint:'PM: \'IFLY101, speed unreliable, unable RVSM, request block FL130–FL150, possible diversion.\'' },
+  { n:9,  id:'crew_brief_speed',         group:'comms',       crew:'PM', cat:'pl',  label:'CREW BRIEF',              action:'CONFIRM',      hint:'PM: brief cabin crew — precautionary descent, possible diversion.' },
+  { n:10, id:'wx_ldg_speed',             group:'comms',       crew:'PM', cat:'pl',  label:'WX / LDG PERF',           action:'CHECK',        hint:'PM: nearest airport wx. Normal Vapp if 2 ADRs agree. Use ISIS if only 1 ADR remaining.' },
+  { n:11, id:'fordec_speed',             group:'comms',       crew:'PF', cat:'pl',  label:'FORDEC',                  action:'COMPLETE',     hint:'PF leads FORDEC. If 2 ADRs agree — may continue carefully. If any doubt — land asap.' },
+  { n:12, id:'nis_brief_speed',          group:'comms',       crew:'PM', cat:'pl',  label:'NITS BRIEF',              action:'CONFIRM',      hint:'PM: SCCM brief — precautionary landing, normal approach expected.' },
+  { n:13, id:'approach_brief',           group:'comms',       crew:'PF', cat:'ap',  label:'APPROACH BRIEF',          action:'COMPLETE',     hint:'PF: manual ILS approach using ISIS + 2 ADRs cross-checked. Normal Vapp. No autoland.' },
+  { n:14, id:'approach_cl',              group:'chclm',       crew:'PM', cat:'ec',  label:'APPROACH CL',             action:'COMPLETE',     hint:'PM runs approach checklist.' },
+  { n:15, id:'landing_cl',               group:'chclm',       crew:'PM', cat:'ec',  label:'LANDING CL',              action:'COMPLETE',     hint:'PM runs landing checklist at 1000 ft on final.' },
+];
+
+const ATC = [
+  {
+    id:'atc_handoff_climb', atMs:10000, from:'DELHI DEPARTURE',
+    message:'IFLY101, climb FL250, direct KARNAL.',
+    choices:[
+      { label:'PAN PAN PAN, IFLY101, unreliable airspeed, unable RVSM, request block altitude FL130 to FL150, possible return to Delhi, standby', correct:true },
+      { label:'IFLY101, climbing FL250 direct KARNAL', correct:false },
+      { label:'MAYDAY MAYDAY MAYDAY, IFLY101, declaring emergency', correct:false },
+    ]
+  },
+  {
+    id:'atc_block_grant', atMs:30000, from:'DELHI DEPARTURE',
+    message:'IFLY101, roger PAN PAN, block altitude approved FL130 to FL150, turn right heading 120 for radar identification.',
+    choices:[
+      { label:'Block FL130 to FL150, right heading 120, IFLY101', correct:true },
+      { label:'Roger IFLY101', correct:false },
+      { label:'Block FL130 to FL150, IFLY101', correct:false },
+    ]
+  },
+  {
+    id:'atc_intentions_query', atMs:65000, from:'DELHI DEPARTURE',
+    message:'IFLY101, say current capability, intentions, and any assistance required.',
+    choices:[
+      { label:'IFLY101, ADR 1 isolated, two remaining ADRs in agreement, using STBY ISIS as reference, AP and A/THR disconnected, request return Delhi for raw-data approach', correct:true },
+      { label:'Standby IFLY101', correct:false },
+      { label:'IFLY101, no issue, continuing climb', correct:false },
+    ]
+  },
+  {
+    id:'atc_briefing_prompt', atMs:110000, from:'DELHI APPROACH',
+    message:'IFLY101, Delhi Approach, advise approach requirements and any assistance.',
+    choices:[
+      { label:'Request latest Delhi weather, runway in use, NOTAMs, expected approach type, IFLY101', correct:true },
+      { label:'Standby IFLY101', correct:false },
+      { label:'Request immediate vectors ILS 28, IFLY101', correct:false },
+    ]
+  },
+  {
+    id:'atc_briefing_info', atMs:145000, from:'DELHI APPROACH',
+    message:'IFLY101, wind 280 at 8, runway 28 in use, NOTAMs nil significant, expect ILS runway 28, QNH 1013.',
+    choices:[
+      { label:'Wind 280 at 8, runway 28, ILS runway 28, QNH 1013, no significant NOTAMs, IFLY101', correct:true },
+      { label:'Roger IFLY101', correct:false },
+      { label:'Wind 280 at 8, runway 28, ILS, IFLY101', correct:false },
+    ]
+  },
+  {
+    id:'atc_pob_fuel_services', atMs:175000, from:'DELHI APPROACH',
+    message:'IFLY101, say persons on board, fuel endurance, and assistance required.',
+    choices:[
+      { label:'IFLY101, 186 persons on board, 7 tonnes fuel, endurance 2 hours, request fire services as a precaution, no medical required, raw-data approach', correct:true },
+      { label:'Standby IFLY101', correct:false },
+      { label:'IFLY101, 186 POB, request full emergency, all services', correct:false },
+    ]
+  },
+  {
+    id:'atc_ready_for_approach', atMs:200000, from:'DELHI APPROACH',
+    message:'IFLY101, advise when ready for approach.',
+    choices:[
+      { label:'IFLY101 ready, request vectors for ILS runway 28, raw-data approach, STBY ISIS as speed reference', correct:true },
+      { label:'Ready, IFLY101', correct:false },
+      { label:'Standby IFLY101', correct:false },
+    ]
+  },
+  {
+    id:'atc_cleared_approach', atMs:225000, from:'DELHI APPROACH',
+    message:'IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 28 approach, contact Delhi Tower 118.10 when established.',
+    choices:[
+      { label:'Left heading 240, descend 3 000, cleared ILS runway 28, contact Tower 118.10 when established, IFLY101', correct:true },
+      { label:'Roger IFLY101', correct:false },
+      { label:'Cleared ILS runway 28, IFLY101', correct:false },
+    ]
+  },
+  {
+    id:'atc_tower_contact', atMs:250000, from:'DELHI TOWER',
+    message:'IFLY101, Delhi Tower, continue ILS approach runway 28, report established.',
+    choices:[
+      { label:'Continuing ILS runway 28, will report established, IFLY101', correct:true },
+      { label:'Switching, IFLY101', correct:false },
+    ]
+  },
+  {
+    id:'atc_cleared_to_land', atMs:275000, from:'DELHI TOWER',
+    message:'IFLY101, runway 28 cleared to land, wind 280 at 8, fire services in position as a precaution.',
+    choices:[
+      { label:'Cleared to land runway 28, IFLY101', correct:true },
+      { label:'Roger IFLY101', correct:false },
+      { label:'Cleared to land runway 27, IFLY101', correct:false },
+    ]
+  },
+];
+
+const CAT_LABEL = { av:'AV', ec:'EC', atc:'ATC', st:'ST', pl:'PL', ap:'AP' };
+
+function fmtMs(ms) {
+  const s = Math.floor(ms/1000);
+  return 'T+' + Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+
+function buildProcedure() {
+  const tb = document.getElementById('proc-tbody');
+  const saved = loadData();
+  tb.innerHTML = STEPS.map(s => {
+    const ch = `<select class="flag-sel" data-key="flag_${s.id}" onchange="debounceSave()">
+      <option value="">–</option>
+      <option value="crit">🔴 Critical</option>
+      <option value="rev">🟡 Review</option>
+      <option value="ok">✅ OK</option>
+    </select>`;
+    const hint150 = s.hint.slice(0,150) + (s.hint.length>150?'…':'');
+    return `<tr class="cat-${s.cat}">
+      <td>${s.n}</td>
+      <td><code style="font-size:10px;">${s.id}</code></td>
+      <td><span class="chip chip-fc">${s.group}</span></td>
+      <td><span class="chip chip-${s.crew.toLowerCase()}">${s.crew}</span></td>
+      <td><span class="chip chip-${s.cat}">${CAT_LABEL[s.cat]}</span></td>
+      <td><strong>${s.label}</strong></td>
+      <td><code>${s.action}</code></td>
+      <td><span class="hint-text">${hint150}</span></td>
+      <td><textarea class="editable" data-key="change_${s.id}" onchange="debounceSave()">${saved['change_'+s.id]||''}</textarea></td>
+      <td>${ch}</td>
+    </tr>`;
+  }).join('');
+  STEPS.forEach(s => {
+    const sel = tb.querySelector(`[data-key="flag_${s.id}"]`);
+    if (sel && saved['flag_'+s.id]) sel.value = saved['flag_'+s.id];
+  });
+}
+
+function buildATC() {
+  const c = document.getElementById('atc-container');
+  c.innerHTML = ATC.map((d,i) => `
+    <div class="atc-block">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <strong>#${i+1} — ${d.from}</strong>
+        <span style="font-family:monospace;font-size:11px;color:#1d4ed8;">${fmtMs(d.atMs)}</span>
+      </div>
+      <div style="font-style:italic;margin-bottom:6px;color:#1e3a8a;">"${d.message}"</div>
+      ${d.choices.map(ch => `<div class="atc-choice ${ch.correct?'correct':'wrong'}">${ch.correct?'✓':'✗'} ${ch.label}</div>`).join('')}
+    </div>
+  `).join('');
+}
+
+let saveTimer = null;
+function debounceSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveAll, 800);
+}
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); } catch(e) { return {}; }
+}
+
+function saveAll() {
+  const data = loadData();
+  document.querySelectorAll('[data-key]').forEach(el => {
+    data[el.dataset.key] = el.value;
+  });
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
+  const st = document.getElementById('saveStatus');
+  st.textContent = 'Saved ' + new Date().toLocaleTimeString();
+  setTimeout(() => { st.textContent = 'Auto-save on'; }, 2000);
+}
+
+function loadAll() {
+  const data = loadData();
+  document.querySelectorAll('[data-key]').forEach(el => {
+    if (data[el.dataset.key] !== undefined) el.value = data[el.dataset.key];
+  });
+}
+
+function exportHTML() {
+  const blob = new Blob([document.documentElement.outerHTML], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'UNRELIABLE_SPEED_WORKBOOK_V3_export.html';
+  a.click();
+}
+
+function showTab(name, ev) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (ev && ev.currentTarget) ev.currentTarget.classList.add('active');
+}
+
+document.addEventListener('input', debounceSave);
+
+buildProcedure();
+buildATC();
+loadAll();
+</script>
+</body>
+</html>
