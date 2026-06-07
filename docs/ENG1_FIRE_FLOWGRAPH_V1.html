@@ -173,7 +173,7 @@ const nodes = [
   // PM COMMS PARALLEL TRACK
   {id:'mayday_atc',        type:'step',    x:COL.pm,   y:1708, w:NW,h:NH, label:'PM INITIAL COMMS — MAYDAY',  sub:'PM · TOWER freq · ENGINE SECURED → MAYDAY×3 · nature + hdg + alt · STANDBY', req:['engine_secured']},
   {id:'atc_radar_mayday',  type:'atc',     x:COL.atc,  y:1708, w:SW,h:SH, label:'② TWR ACK + HANDOVER',     sub:'TWR: MAYDAY ack → "contact Departure 124.85"', req:['mayday_atc']},
-  {id:'pm_dep_initial_call',type:'step',   x:COL.pm,   y:1734, w:NW,h:NH, label:'PM CALLS DEPARTURE',        sub:'PM · 124.85 · "IFLY101 MAYDAY · ENG fire · hdg + alt"', req:['atc_radar_mayday']},
+  {id:'pm_dep_initial_call',type:'step',   x:COL.pm,   y:1734, w:NW,h:NH, label:'PM CALLS DEPARTURE',        sub:'PM · 124.85 · "IFLY101 · hdg 280 · climbing [ALT] · STANDBY"', req:['atc_radar_mayday']},
   {id:'atc_vectors_clb',   type:'atc',     x:COL.atc,  y:1760, w:SW,h:SH, label:'③ DEP: MAYDAY CONFIRM',    sub:'DEP: radar contact · MAYDAY ack · continue track · climb 4000', req:['pm_dep_initial_call']},
   {id:'atc_pob_rwy_ask',   type:'atc',     x:COL.atc,  y:1780, w:SW,h:SH, label:'[D2] DEP: POB + ENDURANCE?',    sub:'DEP: say POB and endurance → PM: "STANDBY, IFLY101"', req:['atc_vectors_clb']},
   {id:'announce_sec_failures',type:'step', x:COL.pm,   y:1818, w:NW,h:NH, label:'SECONDARY FAILURES',        sub:'PM · ECAM — read from SD (HYD/ELEC/AIR)', req:['mayday_atc']},
@@ -263,7 +263,7 @@ NOTE: No "returning to Delhi" or runway request in initial MAYDAY.
 
 `,
 
-  atc_radar_mayday:`③ TOWER ACKNOWLEDGES → HANDOVER → PM CHANGES FREQUENCY
+  atc_radar_mayday:`② TOWER ACKNOWLEDGES → HANDOVER → PM CHANGES FREQUENCY
 ─────────────────────────────────────────
 TOWER: "IFLY101, MAYDAY acknowledged.
         Contact Delhi Departure 124.85.
@@ -274,30 +274,23 @@ PM readback + frequency change:
   → PM selects 124.85 on VHF 1
 
 ON DEPARTURE (124.85):
-  PM transmits full MAYDAY again on new frequency:
-  "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one,
-   maintaining runway track, heading 280,
-   climbing through [ALT], STANDBY"
+  PM gives position report only — no second MAYDAY:
+  "IFLY101, heading 280, climbing [ALT], STANDBY"
 
-WHY repeat on Departure:
-  Departure has no record of the MAYDAY from Tower freq.
-  Must re-establish distress status on new channel.`,
+DEP acknowledges and issues climb clearance (see ③ DEP node).`,
 
-  atc_vectors_clb:`④ DEPARTURE RADAR — MAYDAY CONFIRMED + INSTRUCTIONS
+  atc_vectors_clb:`③ DEPARTURE — MAYDAY CONFIRMED + CLIMB CLEARANCE
 ─────────────────────────────────────────
-DEPARTURE: "IFLY101, Delhi Departure, radar contact.
-            MAYDAY acknowledged.
-            Continue runway track, climb 4000 feet,
-            QNH 1013."
+[simulation-placeholder — ICAO Doc 9432 format]
 
-PM READBACK:
-  "Radar contact, MAYDAY acknowledged.
-   Continuing runway track, climbing 4000,
-   QNH 1013, will advise intentions shortly,
-   IFLY101"
+DEP: "IFLY101, Delhi Departure, radar contact.
+     MAYDAY acknowledged.
+     Continue runway track, climb 4000 feet,
+     QNH 1013."
 
-PM may add: "Continuing checklist, will advise"
-if vectors or further instructions come early.
+PM READBACK (climb clearance only — no MAYDAY repeat):
+  "Continuing runway track, climbing 4000,
+   QNH 1013, IFLY101"
 
 → Departure now owns the MAYDAY. Crew continues ECAM.`,
 
@@ -308,18 +301,10 @@ if vectors or further instructions come early.
 TRIGGER: Tower hands over → PM selects 124.85 on VHF 1
 
 TRANSMISSION (on 124.85 DEPARTURE):
-"MAYDAY MAYDAY MAYDAY
- Delhi Departure, IFLY101
- Engine fire engine one
- Heading 280, climbing through [ALT] feet
- STANDBY"
+"IFLY101, heading 280, climbing [ALT], STANDBY"
 
-WHY repeat MAYDAY on Departure:
-  Departure has no record of MAYDAY declared on Tower freq.
-  Must re-establish distress status on new channel.
-
-PM readback to Tower before switching:
-  "MAYDAY acknowledged, Departure 124.85, IFLY101"`,
+Position report only — no second MAYDAY.
+PM informs Departure of current state. DEP will acknowledge the MAYDAY.`,
 
   atc_pob_rwy_ask:`[D2] DEPARTURE — POB + ENDURANCE?
 ─────────────────────────────────────────
