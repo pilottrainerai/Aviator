@@ -317,7 +317,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "engine_secured",
       label: "ENGINE SECURED",
       action: "ANNOUNCE",
-      hint: "IF FIRE PERSISTS 30 s after AGENT 1: PM discharges AGENT 2 (last bottle). Once fire extinguished (FIRE pb light off, ENG MASTER FIRE light off): PM announces 'ENGINE SECURED, PRIMARY ECAM ACTIONS COMPLETE'. PF acknowledges. PM then calls ATC: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 4 000 ft, following engine fire procedure.'",
+      hint: "IF FIRE PERSISTS 30 s after AGENT 1: PM discharges AGENT 2 (last bottle). Once fire extinguished (FIRE pb light off, ENG MASTER FIRE light off): PM announces 'ENGINE SECURED, PRIMARY ECAM ACTIONS COMPLETE'. PF acknowledges. MAYDAY follows immediately (see MAYDAY step).",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
@@ -349,11 +349,11 @@ export const eng1FireAfterV1: Scenario = {
       id: "mayday_atc",
       label: "MAYDAY",
       action: "DECLARE",
-      hint: "CONDITIONAL — skip if MAYDAY was already declared during engine_secured step. If not yet declared: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 4 000 ft, standby.' Brief — declare, state, standby. No intentions yet. ATC will acknowledge and hold for intentions; crew advises 'will advise intentions shortly' once workload eases.",
+      hint: "PM on Tower 118.10: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one, heading 280, climbing [ALT] feet, STANDBY.' Nature + heading + altitude only. No destination, no runway, no POB. Tower acknowledges and hands over to Departure 124.85.",
       variant: "warning",
       crew: "PM",
       group: "comms",
-      requires: ["announce_land_asap"],
+      requires: ["engine_secured"],
       // Maps to the FCOM ECAM 'ATC ............ NOTIFY' line — completing
       // the MAYDAY call satisfies the ECAM notify item.
       ecamRef: "ecam_atc",
@@ -369,9 +369,9 @@ export const eng1FireAfterV1: Scenario = {
       notes: [
         "MAYDAY × 3",
         "Callsign",
-        "Nature: engine fire engine 1",
-        "Position / heading / altitude",
-        "STANDBY — defer intentions and POB/fuel until workload eases",
+        "Nature: engine fire engine one",
+        "Heading + altitude only — no destination, no runway, no POB",
+        "STANDBY — POB / fuel / intentions deferred until hold established",
         "ATC ack sequence (modelled as separate distractions):",
         "  1. `atc_radar_contact_mayday` — 'IFLY101, Delhi Departure, radar contact.'",
         "  2. `atc_vectors_climb` — 'IFLY101, roger MAYDAY, radar contact, continue runway track, climb 4 000 feet.'",
@@ -632,14 +632,14 @@ export const eng1FireAfterV1: Scenario = {
       id: "intention_to_atc",
       label: "INTENTION — ATC",
       action: "ADVISE",
-      hint: "PM advises ATC of the FORDEC outcome: 'IFLY101, intentions: returning to VIDP for landing runway 28, will advise when ready for approach.' Expect ATC ack and possible follow-up on POB/fuel/endurance.",
+      hint: "PM: 'IFLY101, intention is to return to Delhi, ILS approach runway 28.' Intention only — no emergency services yet. FMGC prep and NITS brief follow in parallel after this call.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
       requires: ["fordec"],
     },
 
-    // ── CR2c ── FMGC Preparation — enter diversion/arrival in MCDU
+    // ── CR2c ── FMGC Preparation — after intention stated to ATC — enter diversion/arrival in MCDU
     {
       id: "fmgc_prep",
       label: "FMGC PREP",
@@ -648,7 +648,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["fordec"],
+      requires: ["intention_to_atc"],
     },
 
     // ── CR3 ── NITS briefing — cabin crew via interphone (Nature · Intentions · Time · Special)
@@ -661,7 +661,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["fordec"],
+      requires: ["intention_to_atc"],
       notes: [
         "N — NATURE: 'Engine fire, ENG 1 shut down, aircraft serviceable'",
         "I — INTENTIONS: 'Returning and landing runway 28 Delhi VIDP'",
@@ -714,11 +714,11 @@ export const eng1FireAfterV1: Scenario = {
       id: "atc_emergency_services",
       label: "ATC — EMERG SVCS",
       action: "ADVISE",
-      hint: "PM advises ATC: 'IFLY101, request Category 3 emergency services on runway 28. Require CFR vehicles, ambulances, and medical standby.' Expect ATC readback/confirmation of services.",
+      hint: "PM: 'IFLY101, request Cat 3 crash fire rescue runway 28. Ambulance and medical services on standby. [POB] persons on board.' Emergency services only — intention was already stated. One call covers all.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["approach_prep"],
+      requires: ["nis_brief"],
     },
 
     // ── CR6 ── Approach briefing — normal + non-normal, using STATUS page items.
@@ -852,7 +852,7 @@ export const eng1FireAfterV1: Scenario = {
       ],
     },
 
-    // ② Departure — "radar contact" → crew makes full MAYDAY call
+    // ② Departure — "radar contact" → PM gives position report only (no second MAYDAY)
     //   Step-driven: fires as soon as mayday_atc step is done (5 s floor).
     {
       id: "atc_radar_contact_mayday",
@@ -863,30 +863,31 @@ export const eng1FireAfterV1: Scenario = {
       message: "IFLY101, Delhi Departure, radar contact.",
       standbyResurfaceMs: 25_000,
       choices: [
-        // Correct — declare MAYDAY with nature + track + altitude + STANDBY
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, climbing 3 000 feet, standby", correct: true  },
-        // Wrong — over-committal, no intentions established yet
-        { id: "b", label: "MAYDAY IFLY101, engine fire, returning immediate, request runway 28 ILS, full emergency",                     correct: false },
-        // Wrong — no MAYDAY prefix
-        { id: "c", label: "Maintaining runway track, climbing 3 000, IFLY101",                                                            correct: false },
+        // Correct — position report only, no second MAYDAY
+        { id: "a", label: "IFLY101, heading 280, climbing [ALT], STANDBY",                                                                correct: true  },
+        // Wrong — second MAYDAY not required on Departure
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, standby",                       correct: false },
+        // Wrong — over-committal with intentions
+        { id: "c", label: "MAYDAY IFLY101, engine fire, returning immediate, request runway 28 ILS, full emergency",                     correct: false },
       ],
     },
 
-    // ③ Departure — acknowledges MAYDAY, issues track + climb — fires ~15 s after mayday step
-    //   Offset from ② gives time for the radar-contact distraction to play out first.
+    // ③ Departure — MAYDAY confirmed, issues climb clearance — fires ~15 s after mayday step
     {
       id: "atc_vectors_climb",
       atMs: 15_000,
       requiresStep: "mayday_atc",
       kind: "atc",
       from: "DELHI DEPARTURE",
-      message: "IFLY101, roger MAYDAY, radar contact, continue runway track, climb 4 000 feet.",
+      message: "IFLY101, MAYDAY acknowledged, radar contact, continue runway track, climb 4 000 feet, QNH 1013.",
       standbyResurfaceMs: 25_000,
       choices: [
-        // Correct — full readback of the clearance elements
-        { id: "a", label: "Continuing runway track, climbing 4 000, will advise intentions shortly, IFLY101", correct: true  },
-        // Wrong — premature intentions before workload eased
-        { id: "b", label: "IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel", correct: false },
+        // Correct — readback climb clearance only, no "MAYDAY acknowledged" in PM readback
+        { id: "a", label: "Continuing runway track, climbing 4 000, QNH 1013, IFLY101",          correct: true  },
+        // Wrong — PM should not repeat MAYDAY acknowledged in readback
+        { id: "b", label: "Radar contact, MAYDAY acknowledged, continuing runway track, climbing 4 000, IFLY101", correct: false },
+        // Wrong — premature intentions
+        { id: "c", label: "IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel",  correct: false },
       ],
     },
 
@@ -908,26 +909,6 @@ export const eng1FireAfterV1: Scenario = {
       ],
     },
 
-    // ⑤ Approach — acknowledges intention, prompts for approach requirements
-    //   Step-driven on intention_to_atc (crew has stated their plan to ATC).
-    {
-      id: "atc_info_request_prompt",
-      atMs: 5_000,
-      requiresStep: "intention_to_atc",
-      kind: "atc",
-      from: "DELHI APPROACH",
-      message: "IFLY101, Delhi Approach, advise any requirements for the approach and any assistance required.",
-      standbyResurfaceMs: 30_000,
-      choices: [
-        // Correct — crew requests weather before briefing
-        { id: "a", label: "Request latest Delhi weather, runway in use, NOTAMs, and expected approach type, IFLY101", correct: true  },
-        // Wrong — standby after workload has eased
-        { id: "b", label: "Standby IFLY101",                                                                          correct: false },
-        // Wrong — requesting vectors without weather/briefing data
-        { id: "c", label: "Request vectors ILS runway 28, IFLY101",                                                    correct: false },
-      ],
-    },
-
     // ⑥ Approach — delivers weather + runway info — step-driven on wx_request
     {
       id: "atc_provides_briefing_info",
@@ -935,30 +916,34 @@ export const eng1FireAfterV1: Scenario = {
       requiresStep: "wx_request",
       kind: "atc",
       from: "DELHI APPROACH",
-      message: "IFLY101, roger standby. … Delhi wind 280 at 8, runway 28 in use, NOTAMs nil significant, expect ILS runway 28.",
+      message: "IFLY101, wind 280 at 8, QNH 1013, runway 28 in use, ILS runway 28 available.",
       standbyResurfaceMs: 30_000,
       choices: [
-        // Correct — full readback of all items needed to brief the approach
-        { id: "a", label: "Wind 280 at 8, runway 28, ILS runway 28, no significant NOTAMs, IFLY101", correct: true  },
-        { id: "b", label: "Roger, IFLY101",                                                          correct: false },
-        // Wrong — missed approach type
-        { id: "c", label: "Wind 280 at 8, runway 28, IFLY101",                                       correct: false },
+        // Correct — full readback including QNH
+        { id: "a", label: "Wind 280/8, QNH 1013, runway 28, ILS runway 28, IFLY101",  correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                             correct: false },
+        // Wrong — missed QNH
+        { id: "c", label: "Wind 280 at 8, runway 28, ILS runway 28, IFLY101",          correct: false },
       ],
     },
 
-    // ⑦ Approach — POB / fuel / assistance — step-driven on ldg_perf
+    // [D2] Departure — POB + endurance — fires ~25 s after mayday_atc (after vectors_climb at 15 s)
+    //   Crew says STANDBY — ECAM checklist still running. POB + endurance given later (JOIN gate).
     {
       id: "atc_pob_fuel_services",
-      atMs: 5_000,
-      requiresStep: "ldg_perf",
+      atMs: 25_000,
+      requiresStep: "mayday_atc",
       kind: "atc",
-      from: "DELHI APPROACH",
-      message: "IFLY101, say persons on board, fuel endurance, and assistance required.",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, say persons on board and endurance.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "IFLY101, 186 persons on board, 8.4 tonnes fuel, endurance 3 hours, request full emergency services on the runway", correct: true  },
-        { id: "b", label: "Standby IFLY101",                                                                                                   correct: false },
-        { id: "c", label: "IFLY101, 186 POB, 8.4 tonnes, no emergency services required",                                                      correct: false },
+        // Correct — STANDBY while ECAM running
+        { id: "a", label: "Standby IFLY101",                                                   correct: true  },
+        // Wrong — too early, ECAM not complete
+        { id: "b", label: "IFLY101, 186 persons on board, endurance 3 hours",                 correct: false },
+        // Wrong — giving emergency services request here (too early, wrong sequence)
+        { id: "c", label: "IFLY101, 186 POB, 8.4 tonnes fuel, request full emergency services", correct: false },
       ],
     },
 
@@ -969,11 +954,11 @@ export const eng1FireAfterV1: Scenario = {
       requiresStep: "atc_emergency_services",
       kind: "atc",
       from: "DELHI APPROACH",
-      message: "IFLY101, Roger, emergency services standing by runway 28, full CFR, Category 3 confirmed.",
+      message: "IFLY101, Roger, Category 3 crash fire rescue confirmed runway 28, ambulance and medical services on standby, advise ready for approach.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "Roger emergency services standing by runway 28, Category 3 confirmed, IFLY101", correct: true  },
-        { id: "b", label: "Roger, IFLY101",                                                                correct: false },
+        { id: "a", label: "Cat 3 CFR runway 28, ambulance on standby, will advise ready for approach, IFLY101", correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                                       correct: false },
       ],
     },
 
@@ -1019,8 +1004,8 @@ export const eng1FireAfterV1: Scenario = {
       message: "IFLY101, Delhi Tower, continue ILS approach runway 28, report established.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Continuing ILS runway 28, will report established, IFLY101", correct: true  },
-        { id: "b", label: "Switching, IFLY101",                                          correct: false },
+        { id: "a", label: "Wilco, will report established runway 28, IFLY101", correct: true  },
+        { id: "b", label: "Switching, IFLY101",                               correct: false },
       ],
     },
 
@@ -1034,10 +1019,12 @@ export const eng1FireAfterV1: Scenario = {
       message: "IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Cleared to land runway 28, IFLY101",  correct: true  },
-        { id: "b", label: "Roger, IFLY101",                       correct: false },
+        { id: "a", label: "Cleared to land runway 28, IFLY101",           correct: true  },
+        { id: "b", label: "Roger, IFLY101",                               correct: false },
+        // Wrong — unnecessary wind readback (PM does not repeat wind)
+        { id: "c", label: "Cleared to land runway 28, wind 280/8, IFLY101", correct: false },
         // Wrong — runway mis-readback under stress
-        { id: "c", label: "Cleared to land runway 29, IFLY101",  correct: false },
+        { id: "d", label: "Cleared to land runway 29, IFLY101",            correct: false },
       ],
     },
   ],
