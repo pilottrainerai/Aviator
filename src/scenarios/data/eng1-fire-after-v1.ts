@@ -852,23 +852,66 @@ export const eng1FireAfterV1: Scenario = {
       ],
     },
 
-    // ② Departure — "radar contact" → PM gives position report only (no second MAYDAY)
-    //   Step-driven: fires as soon as mayday_atc step is done (5 s floor).
+    // ①b Tower — MAYDAY declaration — fires 5 s after engine_secured
+    //   PM initiates MAYDAY on Tower 118.10. Tests correct phraseology:
+    //   nature + heading + altitude + STANDBY only. No destination, no runway, no POB.
     {
-      id: "atc_radar_contact_mayday",
+      id: "mayday_tower_declare",
       atMs: 5_000,
+      requiresStep: "engine_secured",
+      kind: "crew",
+      from: "PM → TOWER 118.10",
+      message: "Select MAYDAY phraseology for Tower 118.10.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — nature + heading + altitude + STANDBY
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one, heading 280, climbing [ALT] feet, STANDBY",            correct: true  },
+        // Wrong — missing heading and altitude
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one, STANDBY",                                              correct: false },
+        // Wrong — adds destination and runway prematurely
+        { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, returning Delhi runway 28, 186 POB, request full emergency",      correct: false },
+        // Wrong — incorrect format (no MAYDAY × 3)
+        { id: "d", label: "IFLY101, declaring emergency, engine fire, standby",                                                           correct: false },
+      ],
+    },
+
+    // ② Tower ACKs MAYDAY → hands PM to Departure 124.85 (green — ATC-initiated)
+    //   Fires 2 s after mayday_atc step confirmed.
+    {
+      id: "atc_tower_mayday_ack",
+      atMs: 2_000,
       requiresStep: "mayday_atc",
       kind: "atc",
-      from: "DELHI DEPARTURE",
-      message: "IFLY101, Delhi Departure, radar contact.",
+      from: "DELHI TOWER",
+      message: "IFLY101, MAYDAY acknowledged. Contact Delhi Departure 124.85. Emergency services alerted.",
+      standbyResurfaceMs: 20_000,
+      choices: [
+        // Correct — ACK + freq change readback
+        { id: "a", label: "MAYDAY acknowledged, Departure 124.85, IFLY101",   correct: true  },
+        // Wrong — just reads freq, doesn't ACK MAYDAY
+        { id: "b", label: "Delhi Departure 124.85, IFLY101",                   correct: false },
+        // Wrong — no freq readback
+        { id: "c", label: "Roger, IFLY101",                                     correct: false },
+      ],
+    },
+
+    // ② PM calls Departure on 124.85 — position report only (blue — PM-initiated)
+    //   Fires 8 s after mayday_atc. PM has switched freq; gives heading/alt/STANDBY.
+    {
+      id: "pm_dep_initial_call",
+      atMs: 8_000,
+      requiresStep: "mayday_atc",
+      kind: "crew",
+      from: "PM → DEPARTURE 124.85",
+      message: "Select PM initial call on Departure 124.85.",
       standbyResurfaceMs: 25_000,
       choices: [
         // Correct — position report only, no second MAYDAY
-        { id: "a", label: "IFLY101, heading 280, climbing [ALT], STANDBY",                                                                correct: true  },
-        // Wrong — second MAYDAY not required on Departure
-        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, standby",                       correct: false },
-        // Wrong — over-committal with intentions
-        { id: "c", label: "MAYDAY IFLY101, engine fire, returning immediate, request runway 28 ILS, full emergency",                     correct: false },
+        { id: "a", label: "IFLY101, heading 280, climbing [ALT], STANDBY",                                        correct: true  },
+        // Wrong — repeats full MAYDAY (not required on DEP)
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT]",     correct: false },
+        // Wrong — states intentions prematurely
+        { id: "c", label: "IFLY101, emergency, returning Delhi, request runway 28 ILS, full emergency services",   correct: false },
       ],
     },
 

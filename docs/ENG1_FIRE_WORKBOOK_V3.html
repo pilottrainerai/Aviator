@@ -525,8 +525,10 @@ function buildProcedureTable() {
 const atcCalls = [
   { n:'①', id:'atc_handoff_to_departure', gate:'continue_rotation', from:'DELHI TOWER',    msg:'IFLY101, contact Delhi Departure 124.85.',
     choices:[{t:'Delhi Departure 124.85, IFLY101',c:true},{t:'Roger, IFLY101',c:false},{t:'Delhi Departure 124.95, IFLY101',c:false},{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, standby',c:false}] },
-  { n:'②', id:'atc_radar_contact_mayday', gate:'mayday_atc', from:'DELHI DEPARTURE', msg:'IFLY101, Delhi Departure, radar contact.',
-    choices:[{t:'IFLY101, heading 280, climbing [ALT], STANDBY',c:true},{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, maintaining runway track, standby',c:false},{t:'MAYDAY IFLY101, engine fire, returning immediate, request runway 28 ILS',c:false}] },
+  { n:'②a', id:'atc_tower_mayday_ack', gate:'mayday_atc (+2s)', from:'DELHI TOWER', msg:'IFLY101, MAYDAY acknowledged. Contact Delhi Departure 124.85. Emergency services alerted.',
+    choices:[{t:'MAYDAY acknowledged, Departure 124.85, IFLY101',c:true},{t:'Delhi Departure 124.85, IFLY101',c:false},{t:'Roger, IFLY101',c:false}] },
+  { n:'②b', id:'pm_dep_initial_call', gate:'mayday_atc (+8s)', from:'PM → DEPARTURE 124.85', msg:'Select PM initial call on Departure 124.85.',
+    choices:[{t:'IFLY101, heading 280, climbing [ALT], STANDBY',c:true},{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT]',c:false},{t:'IFLY101, emergency, returning Delhi, request runway 28 ILS, full emergency services',c:false}] },
   { n:'③', id:'atc_vectors_climb', gate:'mayday_atc (+15s)', from:'DELHI DEPARTURE', msg:'IFLY101, MAYDAY acknowledged, radar contact, continue runway track, climb 4 000 feet, QNH 1013.',
     choices:[{t:'Continuing runway track, climbing 4 000, QNH 1013, IFLY101',c:true},{t:'Radar contact, MAYDAY acknowledged, continuing runway track, climbing 4 000, IFLY101',c:false},{t:'IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel',c:false}] },
   { n:'④', id:'atc_vectors_when_ready', gate:'announce_sec_failures', from:'DELHI DEPARTURE', msg:'IFLY101, vectors available when ready, no reported traffic.',
@@ -667,7 +669,8 @@ const flowNodes = [
 
   // ── ATC CALLS ──────────────────────────────────────────────────────────────
   { id:'atc_handoff',       type:'atc',     t:'T+27 500 ms',    req:['continue_rotation'],                    track:null,              batch:null,           effects:'STANDBY expected during ECAM · resurfaces T+52 500 ms',                       payload:'DELHI TWR: IFLY101, contact Delhi Departure 124.85.' },
-  { id:'atc_radar_mayday',  type:'atc',     t:'on mayday_atc',  req:['mayday_atc'],                           track:'pm_comms',        batch:null,           effects:'MAYDAY readback required',                                                     payload:'DELHI DEP: IFLY101, Delhi Departure, radar contact.' },
+  { id:'atc_tower_mayday_ack', type:'atc',  t:'mayday_atc+2s',  req:['mayday_atc'],                           track:'pm_comms',        batch:null,           effects:'TWR ACK: readback MAYDAY ack + Dep 124.85 + freq change',                      payload:'DELHI TWR: IFLY101, MAYDAY acknowledged. Contact Departure 124.85.' },
+  { id:'pm_dep_initial_call',  type:'step', t:'mayday_atc+8s',  req:['mayday_atc'],                           track:'pm_comms',        batch:null,           effects:'PM position report on 124.85 — heading + climbing alt + STANDBY',              payload:'PM: IFLY101, heading 280, climbing [ALT], STANDBY' },
   { id:'atc_vectors_clb',   type:'atc',     t:'mayday_atc+15s', req:['mayday_atc'],                           track:'pm_comms',        batch:null,           effects:'Climb clearance readback + continue runway track',                             payload:'DELHI DEP: Roger MAYDAY, continue runway track, climb 4 000 ft.' },
   { id:'atc_vectors_rdy',   type:'atc',     t:'on step',        req:['announce_sec_failures'],                track:'pm_comms',        batch:null,           effects:'Crew continues checklist or requests hold',                                    payload:'DELHI DEP: Vectors available when ready.' },
   { id:'atc_wx_brief',      type:'atc',     t:'on step',        req:['wx_request'],                           track:'post_fordec',     batch:null,           effects:'Wind / QNH / runway readback expected',                                       payload:'DELHI APP: Wind 280/8, QNH 1013, RWY 28, ILS RWY 28.' },

@@ -156,7 +156,7 @@ export function FlightCheckPopup({
   const [pendingConfirm, setPendingConfirm] = useState(false);
 
   // Reading progress bar — gives trainee time to read before confirming.
-  // Visual only (does not lock the CONFIRM button). Runs for 6 s per step.
+  // Locks the CONFIRM button until bar completes. Runs for 6 s per step.
   const READ_SECS = 6;
   const [readPct, setReadPct] = useState(0);
   useEffect(() => {
@@ -261,7 +261,7 @@ export function FlightCheckPopup({
             </span>
             <button
               type="button"
-              disabled={disabled}
+              disabled={disabled || readPct < 100}
               onClick={handleConfirm}
               className="font-mono uppercase tracking-widest transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
@@ -276,7 +276,7 @@ export function FlightCheckPopup({
                 boxShadow: `0 0 12px ${isExecutePhase ? "#FFB30030" : theme.accent + "25"}`,
               }}
             >
-              {isExecutePhase ? "EXECUTE ▶" : step.confirmRequired ? "CONFIRM?" : "CONFIRM ✓"}
+              {readPct < 100 ? "READING…" : isExecutePhase ? "EXECUTE ▶" : step.confirmRequired ? "CONFIRM?" : "CONFIRM ✓"}
             </button>
           </div>
         </div>
@@ -431,7 +431,7 @@ export function FlightCheckPopup({
 
           <button
             type="button"
-            disabled={disabled}
+            disabled={disabled || readPct < 100}
             onClick={handleConfirm}
             className="font-mono uppercase tracking-widest transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
@@ -446,7 +446,7 @@ export function FlightCheckPopup({
               boxShadow: `0 0 16px ${isExecutePhase ? "#FFB30040" : theme.accent + "30"}`,
             }}
           >
-            {isExecutePhase ? "EXECUTE ▶" : step.confirmRequired ? "CONFIRM?" : "CONFIRM ✓"}
+            {readPct < 100 ? "READING…" : isExecutePhase ? "EXECUTE ▶" : step.confirmRequired ? "CONFIRM?" : "CONFIRM ✓"}
           </button>
         </div>
       </div>

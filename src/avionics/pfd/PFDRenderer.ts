@@ -763,7 +763,7 @@ export class PFDRenderer extends Container {
 
     const cols: Array<{ top: string; topColor: number; sub: string; subColor: number }> = [
       { top: s.thrMode,  topColor: thrColor,  sub: '',      subColor: C.cyan },
-      { top: s.vertMode, topColor: C.green,   sub: vertSub, subColor: C.cyan },
+      { top: s.vertMode, topColor: s.srsCyan ? C.cyan : C.green, sub: vertSub, subColor: C.cyan },
       { top: s.latMode,  topColor: C.green,   sub: '',      subColor: C.cyan },
       { top: apprCap,    topColor: C.white,   sub: '',      subColor: C.cyan },
       { top: apfdLabel,  topColor: C.white,   sub: athrSub, subColor: athrColor },

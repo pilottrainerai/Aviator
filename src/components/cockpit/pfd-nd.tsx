@@ -61,10 +61,7 @@ function buildAircraftStateFromPhase(phase: ScenarioPhase, s?: ScenarioState): A
 }
 
 export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elapsedMs?: number): AircraftState {
-  const activePhase = getActiveScenarioPhase(scenario, elapsedMs);
-  if (activePhase) {
-    return buildAircraftStateFromPhase(activePhase, s);
-  }
+  void scenario; void elapsedMs; // PFD is step-driven only — no timing jumps
 
   const step  = (id: string) => !!(s?.completedSteps?.[id]);
   const fired = (id: string) => !!(s?.triggersFired?.[id]);
@@ -77,48 +74,55 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
   const ecamDone    = step("engine_secured") || fired("fire_extinguished");
   const levelOff    = step("level_off_maa");
   const accelClean  = step("accel_clean");
+  const mctOpClb    = step("mct_open_clb");
   const masterWarn  = !!(s?.masterWarnActive && !mwCancelled);
   const masterCaut  = !!(s?.masterCautActive && !step("cancel_master_caut"));
 
-  // ── FMA modes ──────────────────────────────────────────────────────────────
-  // Col 1 (A/THR): MAN TOGA pre-TRA; THR MCT after acceleration alt (single engine)
-  const thrMode  = levelOff ? 'THR MCT' : 'MAN TOGA';
-  // Col 2 (vertical): SRS from liftoff → CLB after acceleration alt
-  const vertMode = levelOff ? 'CLB' : 'SRS';
+  // ── FMA modes per workbook V3 phase table ─────────────────────────────────
+  // Col 1 (A/THR): MAN TOGA → LVR MCT flash → THR MCT active
+  const thrMode  = mctOpClb ? 'THR MCT' : accelClean ? 'LVR MCT' : 'MAN TOGA';
+  // Col 2 (vertical): SRS cyan (armed) → SRS green (active) → V/S=0 → OP CLB
+  const vertMode = mctOpClb ? 'OP CLB' : levelOff ? 'V/S' : 'SRS';
+  // A/THR: armed (cyan) until mctOpClb, then active (green)
+  const athrActive = mctOpClb;
+  // SRS green (active) once fire warning fires; cyan (armed) before
+  const srsCyan    = fireActive ? false : !levelOff && !mctOpClb;
 
-  // ── Flight values per phase ────────────────────────────────────────────────
-  // Phase logic: each step advances the aircraft to the next snapshot.
-  // Speeds/altitudes per FCTM OP-020 ENG FIRE after V1 — VIDP, ~77t, ISA.
+  // ── Flight values — step-driven, per workbook V3 flight model ─────────────
   let speed, altitude, vs, pitch, bank, gs, tas;
 
-  if (accelClean) {
-    // Accelerating through S/F speeds, flap retraction complete
-    speed = 210; altitude = 2200; vs = 1200; pitch = 5; bank = 0;
-    gs    = 208; tas = 212;
+  if (mctOpClb) {
+    // THR MCT + OP CLB — climbing away from MAA, single engine
+    speed = 220; altitude = 3500; vs = 1400; pitch = 5; bank = 0;
+    gs    = 218; tas = 224;
+  } else if (accelClean) {
+    // Green dot reached — LVR MCT flashing, accelerating through flap speeds
+    speed = 210; altitude = 2300; vs = 800; pitch = 4; bank = 0;
+    gs    = 208; tas = 214;
   } else if (levelOff) {
-    // Minimum Acceleration Altitude ~1500ft — level off, hold speed
-    speed = 185; altitude = 1500; vs = 100; pitch = 2; bank = 0;
-    gs    = 183; tas = 187;
+    // MAA (~2300 ft AMSL) — V/S 0 selected, holding speed
+    speed = 185; altitude = 2300; vs = 0; pitch = 2; bank = 0;
+    gs    = 183; tas = 189;
   } else if (ecamDone) {
-    // ECAM actions complete, continuing climb on SRS
-    speed = 172; altitude = 1100; vs = 1800; pitch = 7; bank = 0;
-    gs    = 170; tas = 174;
+    // Engine secured, SRS still climbing
+    speed = 172; altitude = 1800; vs = 1800; pitch = 7; bank = 0;
+    gs    = 170; tas = 176;
   } else if (thrIdle) {
-    // ENG 1 TL at IDLE, ENG 2 still TOGA — climbing through ~800ft
-    speed = 168; altitude = 800; vs = 2000; pitch = 8; bank = 0;
-    gs    = 166; tas = 170;
+    // ENG 1 TL at IDLE — climbing through ~1200 ft
+    speed = 168; altitude = 1200; vs = 2000; pitch = 8; bank = 0;
+    gs    = 166; tas = 172;
   } else if (apEngaged) {
-    // AP1 engaged, SRS tracking V2+10 — ~600ft
-    speed = 166; altitude = 600; vs = 2100; pitch = 8; bank = 0;
-    gs    = 164; tas = 168;
+    // AP1 engaged, SRS active — ~700 ft
+    speed = 166; altitude = 700; vs = 2100; pitch = 8; bank = 0;
+    gs    = 164; tas = 170;
   } else if (fireActive) {
-    // Fire warning, 400ft AGL, gear retracting
+    // Fire warning — 400 ft AGL, gear retracting
     speed = 165; altitude = 400; vs = 2200; pitch = 9; bank = 0;
-    gs    = 163; tas = 167;
+    gs    = 163; tas = 169;
   } else {
-    // Pre-fire: just past V1, rotating — 200ft AGL
+    // Pre-fire: V1 rotation — 200 ft AGL
     speed = 157; altitude = 200; vs = 1600; pitch = 10; bank = 0;
-    gs    = 155; tas = 159;
+    gs    = 155; tas = 161;
   }
 
   return {
@@ -132,7 +136,8 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
     thrMode,
     vertMode,
     latMode:      'NAV',
-    athrActive:   true,
+    athrActive,
+    srsCyan,
     // Flight values
     speed,
     altitude,

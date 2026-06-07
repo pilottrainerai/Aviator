@@ -172,8 +172,8 @@ const nodes = [
 
   // PM COMMS PARALLEL TRACK
   {id:'mayday_atc',        type:'step',    x:COL.pm,   y:1708, w:NW,h:NH, label:'PM INITIAL COMMS — MAYDAY',  sub:'PM · TOWER freq · ENGINE SECURED → MAYDAY×3 · nature + hdg + alt · STANDBY', req:['engine_secured']},
-  {id:'atc_radar_mayday',  type:'atc',     x:COL.atc,  y:1708, w:SW,h:SH, label:'② TWR ACK + HANDOVER',     sub:'TWR: MAYDAY ack → "contact Departure 124.85"', req:['mayday_atc']},
-  {id:'pm_dep_initial_call',type:'step',   x:COL.pm,   y:1734, w:NW,h:NH, label:'PM CALLS DEPARTURE',        sub:'PM · 124.85 · "IFLY101 · hdg 280 · climbing [ALT] · STANDBY"', req:['atc_radar_mayday']},
+  {id:'atc_tower_mayday_ack',type:'atc',   x:COL.atc,  y:1708, w:SW,h:SH, label:'② TWR: MAYDAY ACK + HANDOVER', sub:'TWR: MAYDAY ack · "Contact Departure 124.85" · PM readback + freq change', req:['mayday_atc']},
+  {id:'pm_dep_initial_call',type:'step',   x:COL.pm,   y:1760, w:NW,h:NH, label:'PM CALLS DEPARTURE',        sub:'PM · 124.85 · "IFLY101 · hdg 280 · climbing [ALT] · STANDBY"', req:['atc_tower_mayday_ack']},
   {id:'atc_vectors_clb',   type:'atc',     x:COL.atc,  y:1760, w:SW,h:SH, label:'③ DEP: MAYDAY CONFIRM',    sub:'DEP: radar contact · MAYDAY ack · continue track · climb 4000', req:['pm_dep_initial_call']},
   {id:'atc_pob_rwy_ask',   type:'atc',     x:COL.atc,  y:1780, w:SW,h:SH, label:'[D2] DEP: POB + ENDURANCE?',    sub:'DEP: say POB and endurance → PM: "STANDBY, IFLY101"', req:['atc_vectors_clb']},
   {id:'announce_sec_failures',type:'step', x:COL.pm,   y:1818, w:NW,h:NH, label:'SECONDARY FAILURES',        sub:'PM · ECAM — read from SD (HYD/ELEC/AIR)', req:['mayday_atc']},
@@ -263,21 +263,21 @@ NOTE: No "returning to Delhi" or runway request in initial MAYDAY.
 
 `,
 
-  atc_radar_mayday:`② TOWER ACKNOWLEDGES → HANDOVER → PM CHANGES FREQUENCY
+  atc_tower_mayday_ack:`② TOWER: MAYDAY ACK + HANDOVER TO DEPARTURE
 ─────────────────────────────────────────
-TOWER: "IFLY101, MAYDAY acknowledged.
-        Contact Delhi Departure 124.85.
-        Emergency services alerted."
+TOWER (118.10): "IFLY101, MAYDAY acknowledged.
+                 Contact Delhi Departure 124.85.
+                 Emergency services alerted."
 
-PM readback + frequency change:
+PM READBACK (correct):
   "MAYDAY acknowledged, Departure 124.85, IFLY101"
-  → PM selects 124.85 on VHF 1
 
-ON DEPARTURE (124.85):
-  PM gives position report only — no second MAYDAY:
-  "IFLY101, heading 280, climbing [ALT], STANDBY"
+WRONG OPTIONS (training discriminators):
+  • "Delhi Departure 124.85, IFLY101" — omits MAYDAY ack
+  • "Roger, IFLY101" — no freq readback, no MAYDAY ack
 
-DEP acknowledges and issues climb clearance (see ③ DEP node).`,
+After readback: PM selects 124.85 on VHF 1.
+PM calls Departure — position report only (see PM CALLS DEPARTURE node).`,
 
   atc_vectors_clb:`③ DEPARTURE — MAYDAY CONFIRMED + CLIMB CLEARANCE
 ─────────────────────────────────────────
@@ -637,7 +637,7 @@ let nodeNotes = {};
 try { nodeNotes = JSON.parse(localStorage.getItem(NOTES_KEY)||'{}'); } catch{}
 // Always apply latest defaults — overwrite nodes whose saved value equals old placeholder text
 const ATC_NODES = [
-  'atc_handoff','mayday_atc','atc_radar_mayday','atc_vectors_clb',
+  'atc_handoff','mayday_atc','atc_tower_mayday_ack','atc_vectors_clb',
   'pm_dep_initial_call','atc_pob_rwy_ask','atc_vectors_rdy',
   'pm_hold_inform','atc_hold_clr','atc_endurance_ask','pm_endurance_pob',
   'wx_request','atc_wx_brief','pm_wx_readback',
