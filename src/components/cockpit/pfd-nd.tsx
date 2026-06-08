@@ -60,6 +60,21 @@ function buildAircraftStateFromPhase(phase: ScenarioPhase, s?: ScenarioState): A
   };
 }
 
+// Step-driven ring lookup — ring appears when prereqStep is done and stepId is not yet done.
+// Replaces the timing-based getActiveScenarioPhase for PF action overlays.
+export function getActivePfActionPhase(scenario?: Scenario, state?: ScenarioState): ScenarioPhase | null {
+  if (!scenario?.phases) return null;
+  for (let i = scenario.phases.length - 1; i >= 0; i--) {
+    const phase = scenario.phases[i];
+    if (!phase.pfAction) continue;
+    const { stepId, prereqStep } = phase.pfAction;
+    if (stepId && state?.completedSteps?.[stepId]) continue;
+    if (prereqStep && !state?.completedSteps?.[prereqStep]) continue;
+    return phase;
+  }
+  return null;
+}
+
 export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elapsedMs?: number): AircraftState {
   void scenario; void elapsedMs; // PFD is step-driven only — no timing jumps
 
@@ -72,21 +87,32 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
   const thrIdle     = step("thr_lever_idle");
   const mwCancelled = step("cancel_master_warn");
   const ecamDone    = step("engine_secured") || fired("fire_extinguished");
+  // Aircraft reaches minimum acceleration altitude (2300 ft baro / 1500 ft RA at VIDP)
+  // after the engine ECAM procedure is complete. This is altitude-driven, not procedure-driven —
+  // the ECAM completion is used as the timing proxy for reaching MAA in the step model.
+  const atMaa       = ecamDone;
   const levelOff    = step("level_off_maa");
   const accelClean  = step("accel_clean");
   const mctOpClb    = step("mct_open_clb");
   const masterWarn  = !!(s?.masterWarnActive && !mwCancelled);
   const masterCaut  = !!(s?.masterCautActive && !step("cancel_master_caut"));
 
+  // ALT pulled → OP CLB engaged (intermediate: before levers reach MCT)
+  const opClbDone = step("pull_alt_op_clb");
+
   // ── FMA modes per workbook V3 phase table ─────────────────────────────────
-  // Col 1 (A/THR): MAN TOGA → LVR MCT flash → THR MCT active
-  const thrMode  = mctOpClb ? 'THR MCT' : accelClean ? 'LVR MCT' : 'MAN TOGA';
-  // Col 2 (vertical): SRS cyan (armed) → SRS green (active) → V/S=0 → OP CLB
-  const vertMode = mctOpClb ? 'OP CLB' : levelOff ? 'V/S' : 'SRS';
-  // A/THR: armed (cyan) until mctOpClb, then active (green)
+  // Col 1 row 1 (engaged): MAN TOGA until levers reach MCT → THR MCT
+  const thrMode  = mctOpClb ? 'THR MCT' : 'MAN TOGA';
+  // Col 1 row 3 (flashing white cue): LVR MCT flashes after OP CLB is selected (ALT knob pulled),
+  // before the live engine lever is moved to MCT.
+  const thrCue   = opClbDone && !mctOpClb ? 'LVR MCT' : undefined;
+  // Col 2 (vertical): SRS → V/S → OP CLB (OP CLB engages on ALT pull, before MCT set)
+  const vertMode = (opClbDone || mctOpClb) ? 'OP CLB' : levelOff ? 'V/S' : 'SRS';
+  // A/THR: armed (cyan) from fire warning until MCT engaged, then active (green)
   const athrActive = mctOpClb;
+  const athrArmed  = fireActive && !mctOpClb;
   // SRS green (active) once fire warning fires; cyan (armed) before
-  const srsCyan    = fireActive ? false : !levelOff && !mctOpClb;
+  const srsCyan    = fireActive ? false : !levelOff && !opClbDone && !mctOpClb;
 
   // ── Flight values — step-driven, per workbook V3 flight model ─────────────
   let speed, altitude, vs, pitch, bank, gs, tas;
@@ -95,18 +121,23 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
     // THR MCT + OP CLB — climbing away from MAA, single engine
     speed = 220; altitude = 3500; vs = 1400; pitch = 5; bank = 0;
     gs    = 218; tas = 224;
+  } else if (opClbDone) {
+    // ALT pulled, OP CLB engaged — LVR MCT still flashing, MCT not yet set
+    speed = 212; altitude = 2400; vs = 600; pitch = 3; bank = 0;
+    gs    = 210; tas = 216;
   } else if (accelClean) {
-    // Green dot reached — LVR MCT flashing, accelerating through flap speeds
-    speed = 210; altitude = 2300; vs = 800; pitch = 4; bank = 0;
+    // Green dot reached — level at MAA 2300 ft, LVR MCT flashing, accelerating clean
+    speed = 210; altitude = 2300; vs = 0; pitch = 0; bank = 0;
     gs    = 208; tas = 214;
   } else if (levelOff) {
-    // MAA (~2300 ft AMSL) — V/S 0 selected, holding speed
-    speed = 185; altitude = 2300; vs = 0; pitch = 2; bank = 0;
+    // MAA (2300 ft baro, 1500 ft RA at VIDP) — V/S = 0 selected, holding level
+    speed = 185; altitude = 2300; vs = 0; pitch = 0; bank = 0;
     gs    = 183; tas = 189;
-  } else if (ecamDone) {
-    // Engine secured, SRS still climbing
-    speed = 172; altitude = 1800; vs = 1800; pitch = 7; bank = 0;
-    gs    = 170; tas = 176;
+  } else if (atMaa) {
+    // Minimum acceleration altitude (2300 ft baro, 1500 ft RA at VIDP) — SRS active,
+    // V/S push pending. PF ring prompts PUSH V/S ZERO.
+    speed = 175; altitude = 2300; vs = 400; pitch = 2; bank = 0;
+    gs    = 173; tas = 179;
   } else if (thrIdle) {
     // ENG 1 TL at IDLE — climbing through ~1200 ft
     speed = 168; altitude = 1200; vs = 2000; pitch = 8; bank = 0;
@@ -134,9 +165,11 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
     eng1Failed,
     eng2Failed:   false,
     thrMode,
+    thrCue,
     vertMode,
     latMode:      'NAV',
     athrActive,
+    athrArmed,
     srsCyan,
     // Flight values
     speed,
@@ -166,52 +199,37 @@ const PF_RING_STYLE: React.CSSProperties = {
   boxSizing: "border-box",
   cursor: "pointer",
   display: "flex",
-  alignItems: "flex-end",
-  justifyContent: "center",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "flex-end",
   paddingBottom: "8px",
+  gap: "4px",
 };
 
 export function PfActionOverlay({
   label,
-  hint,
-  coachMs = 8_000,
   onConfirm,
 }: {
   label: string;
-  hint: string;
-  coachMs?: number;
   onConfirm: () => void;
 }) {
-  const [coaching, setCoaching] = useState(false);
-
-  useEffect(() => {
-    setCoaching(false);
-    const t = setTimeout(() => setCoaching(true), coachMs);
-    return () => clearTimeout(t);
-  }, [coachMs, label]);
-
   return (
-    <>
-      <div style={PF_RING_STYLE} onClick={onConfirm}>
-        {coaching && (
-          <div style={{
-            background: "rgba(0,0,0,0.88)",
-            border: "1px solid #00ff00",
-            color: "#00ff00",
-            fontSize: "11px",
-            fontFamily: "monospace",
-            padding: "5px 10px",
-            borderRadius: "4px",
-            textAlign: "center",
-            maxWidth: "90%",
-            lineHeight: 1.4,
-          }}>
-            PF ACTION: {label}
-            <div style={{ color: "#aaa", fontSize: "10px", marginTop: "2px" }}>{hint}</div>
-          </div>
-        )}
+    <div style={PF_RING_STYLE} onClick={onConfirm}>
+      <div style={{
+        background: "rgba(0,0,0,0.75)",
+        border: "1px solid #00ff0060",
+        color: "#00ff00",
+        fontSize: "10px",
+        fontFamily: "monospace",
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        padding: "2px 10px",
+        borderRadius: "2px",
+        whiteSpace: "nowrap",
+      }}>
+        ▶ PF — {label}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -240,7 +258,7 @@ export function PfdCanvas({
     stateRef.current = buildAircraftState(state, scenario, elapsedMs);
   }, [elapsedMs, scenario, state]);
 
-  const activePhase  = getActiveScenarioPhase(scenario, elapsedMs);
+  const activePhase  = getActivePfActionPhase(scenario, state);
   const pfAction     = activePhase?.pfAction;
   const needsConfirm = !!(pfAction && activePhase && !confirmedPhases.has(activePhase.id));
 
@@ -301,8 +319,6 @@ export function PfdCanvas({
       {needsConfirm && pfAction && (
         <PfActionOverlay
           label={pfAction.label}
-          hint={pfAction.hint}
-          coachMs={pfAction.coachMs}
           onConfirm={handleConfirm}
         />
       )}

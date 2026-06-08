@@ -24,14 +24,20 @@ export function DistractionModal({
   distraction,
   onRespond,
   onStandby,
+  liveAltFt,
   inline = false,
 }: {
   distraction: ScenarioDistraction;
   onRespond: (choiceId: string, correct: boolean) => void;
   onStandby: () => void;
+  /** Current aircraft altitude in feet — substituted for [ALT] in message and choice labels */
+  liveAltFt?: number;
   /** true = render as a block inside the right panel (no fixed position, no backdrop) */
   inline?: boolean;
 }) {
+  const altStr = liveAltFt != null ? String(Math.round(liveAltFt / 100) * 100) : "[ALT]";
+  const subAlt = (text: string) => text.replace("[ALT]", altStr);
+
   const autoDismissMs = distraction.autoDismissMs ?? AUTO_DISMISS_DEFAULT;
   const [remainingMs, setRemainingMs] = useState(autoDismissMs);
   const startedAt = useRef(performance.now());
@@ -100,55 +106,84 @@ export function DistractionModal({
           <div style={{ color: style.accent, fontSize: "8px", letterSpacing: "0.2em", fontWeight: 700, marginBottom: "4px" }}>ATC → FLIGHT CREW</div>
         )}
         <p style={{ color: "#D4D8E8", fontSize: compact ? "11px" : "13px", lineHeight: "1.55", letterSpacing: "0.02em" }}>
-          &ldquo;{distraction.message}&rdquo;
+          &ldquo;{subAlt(distraction.message)}&rdquo;
         </p>
       </div>
 
-      {/* Choices */}
+      {/* Choices — or Acknowledge button for info-only cards (empty choices) */}
       <div
         className="flex flex-col"
         style={{ borderTop: "1px solid #111820", padding: compact ? "8px 16px 8px" : "0 16px 12px", gap: compact ? "6px" : "6px" }}
       >
-        <div style={{ color: "#3A4858", fontSize: "8px", letterSpacing: "0.2em", paddingTop: compact ? "0" : "10px", paddingBottom: "4px" }}>SELECT RESPONSE:</div>
-        {distraction.choices.map((choice) => (
+        {(!distraction.choices || distraction.choices.length === 0) ? (
           <button
-            key={choice.id}
             type="button"
-            onClick={() => onRespond(choice.id, choice.correct)}
+            onClick={() => onRespond("ack", true)}
             className="text-left border transition-all"
             style={{
-              padding: compact ? "6px 10px" : "10px 12px",
-              borderColor: style.accent + "40",
-              backgroundColor: style.accent + "0A",
-              color: "#D0D8E4",
-              fontSize: compact ? "10px" : "11px",
-              lineHeight: "1.45",
+              padding: compact ? "8px 10px" : "12px 12px",
+              borderColor: style.accent + "60",
+              backgroundColor: style.accent + "14",
+              color: style.accent,
+              fontSize: compact ? "10px" : "12px",
+              fontWeight: 700,
+              letterSpacing: "0.15em",
+              textAlign: "center",
               borderRadius: "2px",
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "1C"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent + "40"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "0A"; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "28"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "14"; }}
           >
-            {choice.label}
+            ACKNOWLEDGE ✓
           </button>
-        ))}
-        <button
-          type="button"
-          onClick={onStandby}
-          className="text-left border border-dashed flex items-center justify-between"
-          style={{
-            padding: compact ? "5px 10px" : "8px 12px",
-            borderColor: "#FFB30050",
-            backgroundColor: "#FFB3000A",
-            color: "#FFB300",
-            fontSize: "9px",
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            borderRadius: "2px",
-          }}
-        >
-          <span>STAND BY</span>
-          <span style={{ fontSize: "8px", color: "#4A5566", textTransform: "none" }}>calls back in ~{resurfaceSec}s</span>
-        </button>
+        ) : (
+          <div style={{ paddingTop: compact ? "0" : "10px" }}>
+            <div style={{ color: "#8090A8", fontSize: "7px", letterSpacing: "0.2em", fontWeight: 700, paddingBottom: "6px" }}>
+              CREW RESPONSE
+            </div>
+            {distraction.choices.map((choice) => (
+              <button
+                key={choice.id}
+                type="button"
+                onClick={() => onRespond(choice.id, choice.correct)}
+                className="text-left border transition-all"
+                style={{
+                  padding: compact ? "6px 10px" : "10px 12px",
+                  borderColor: style.accent + "40",
+                  backgroundColor: style.accent + "0A",
+                  color: "#D0D8E4",
+                  fontSize: compact ? "10px" : "11px",
+                  lineHeight: "1.45",
+                  borderRadius: "2px",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "1C"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent + "40"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "0A"; }}
+              >
+                {subAlt(choice.label)}
+              </button>
+            ))}
+          </div>
+        )}
+        {distraction.choices && distraction.choices.length > 0 && (
+          <button
+            type="button"
+            onClick={onStandby}
+            className="text-left border border-dashed flex items-center justify-between"
+            style={{
+              padding: compact ? "5px 10px" : "8px 12px",
+              borderColor: "#FFB30050",
+              backgroundColor: "#FFB3000A",
+              color: "#FFB300",
+              fontSize: "9px",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              borderRadius: "2px",
+            }}
+          >
+            <span>STAND BY</span>
+            <span style={{ fontSize: "8px", color: "#4A5566", textTransform: "none" }}>calls back in ~{resurfaceSec}s</span>
+          </button>
+        )}
       </div>
 
       {/* Countdown */}

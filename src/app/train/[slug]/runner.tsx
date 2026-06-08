@@ -15,7 +15,7 @@ import { PreflightBrief } from "@/components/cockpit/preflight-brief";
 import { FireBanner } from "@/components/cockpit/fire-banner";
 import { GuidancePanel } from "@/components/cockpit/guidance-panel";
 import { AudioController } from "@/components/cockpit/audio-controller";
-import { NdCanvas } from "@/components/cockpit/pfd-nd";
+import { NdCanvas, buildAircraftState, getActivePfActionPhase } from "@/components/cockpit/pfd-nd";
 import PfdMockup from "@/components/cockpit/pfd-mockup";
 import { DistractionModal } from "@/components/cockpit/distraction-modal";
 import { GlareshieldPanel } from "@/components/cockpit/glareshield-panel";
@@ -433,6 +433,11 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
         standbyCountRef.current.delete(d.id);
         setAtcPhase({ kind: "idle" });
         setAtcNextAllowedAt(Date.now() + 9_000);
+        // If the distraction declares a step (e.g. PM MAYDAY card completing
+        // mayday_atc), complete it now so downstream gates fire correctly.
+        if (d.completesStep) {
+          runner.perform({ kind: "STEP", stepId: d.completesStep });
+        }
       } else {
         // Wrong → short re-surface (8 s)
         const count = (standbyCountRef.current.get(d.id) ?? 0) + 1;
@@ -459,6 +464,13 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
     const d = atcPhase.d;
     const count = (standbyCountRef.current.get(d.id) ?? 0) + 1;
     standbyCountRef.current.set(d.id, count);
+    if (d.standbyResurfaceOnStep) {
+      // Step-gated standby — no timer; resurface useEffect watches for the step
+      const resumesAt = Date.now() + 999_999;
+      setAtcPhase({ kind: "standby", d, resumesAt });
+      if (atcTimerRef.current) clearTimeout(atcTimerRef.current);
+      return;
+    }
     // Escalating delay: 20 s → 12 s → 6 s → 3 s (persistent pressure)
     const delay = count === 1 ? 20_000 : count === 2 ? 12_000 : count <= 4 ? 6_000 : 3_000;
     const resumesAt = Date.now() + delay;
@@ -466,6 +478,17 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
     if (atcTimerRef.current) clearTimeout(atcTimerRef.current);
     atcTimerRef.current = setTimeout(() => setAtcPhase({ kind: "active", d }), delay);
   }, [atcPhase]);
+
+  // When a distraction was stood-by with standbyResurfaceOnStep, resurface it
+  // as soon as the named step completes — no fixed timer involved.
+  useEffect(() => {
+    if (atcPhase.kind !== "standby") return;
+    const d = atcPhase.d;
+    if (!d.standbyResurfaceOnStep) return;
+    if (!runner.state.completedSteps[d.standbyResurfaceOnStep]) return;
+    if (atcTimerRef.current) clearTimeout(atcTimerRef.current);
+    setAtcPhase({ kind: "active", d });
+  }, [atcPhase, runner.state.completedSteps]);
 
   // ── Crew-action popup gap (2 s between steps) ──────────────────────────────
   const popupGapUntilRef = useRef(0);
@@ -721,6 +744,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                   distraction={atcPhase.d}
                   onRespond={handleAtcRespond}
                   onStandby={handleAtcStandby}
+                  liveAltFt={buildAircraftState(runner.state, scenario, runner.elapsedMs).altitude}
                   inline
                 />
               ) : atcPhase.kind === "standby" ? (
@@ -1358,6 +1382,105 @@ function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenar
             >
               {runner.paused ? "▶ RESUME" : "⏸ PAUSE"}
             </button>
+          </div>
+
+          {/* FMA live readout */}
+          {(() => {
+            const ls = buildAircraftState(runner.state, scenario, runner.elapsedMs);
+            const activePf = getActivePfActionPhase(scenario, runner.state);
+            const vsLabel = ls.vertMode === "V/S" && ls.vs === 0 ? "V/S=0" : ls.vertMode;
+            return (
+              <div style={{ borderTop: "1px solid #1A2230", paddingTop: "8px" }}>
+                <div style={{ color: "#3A4858", fontSize: "7px", letterSpacing: "0.2em", marginBottom: "5px" }}>
+                  FMA LIVE
+                </div>
+                <div style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em" }}>
+                  <span style={{ color: "#ffffff" }}>{ls.thrMode}</span>
+                  <span style={{ color: "#2A3848" }}>│</span>
+                  <span style={{ color: "#00D060" }}>{vsLabel}</span>
+                  <span style={{ color: "#2A3848" }}>│</span>
+                  <span style={{ color: "#00D060" }}>{ls.latMode}</span>
+                  {ls.thrCue && (
+                    <>
+                      <span style={{ color: "#2A3848" }}>│</span>
+                      <span style={{ color: "#FFB300", animation: "pulse 1s ease-in-out infinite" }}>{ls.thrCue}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Phase checkpoints — seek to a specific flight phase by bulk-completing steps */}
+          <div>
+            <div style={{ color: "#3A4858", fontSize: "7px", letterSpacing: "0.2em", marginBottom: "4px" }}>
+              SEEK TO PHASE
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {([
+                {
+                  label: "①  >100ft",
+                  sub:   "ENGAGE AP1 ring",
+                  fma:   "MAN TOGA · SRS · NAV",
+                  triggers: ["fire_warn"],
+                  steps: ["continue_rotation", "positive_rate_gear_up"],
+                },
+                {
+                  label: "②  400ft",
+                  sub:   "START ECAM ACTIONS ring",
+                  fma:   "MAN TOGA · SRS · NAV",
+                  triggers: ["fire_warn", "four_hundred_ft"],
+                  steps: ["continue_rotation", "positive_rate_gear_up", "engage_ap_fma", "cancel_master_warn"],
+                },
+                {
+                  label: "③  MAA V/S=0",
+                  sub:   "Level off 2 300 ft",
+                  fma:   "MAN TOGA · V/S=0 · NAV",
+                  triggers: ["fire_warn", "four_hundred_ft", "fire_extinguished"],
+                  steps: ["continue_rotation", "positive_rate_gear_up", "engage_ap_fma", "cancel_master_warn", "four_hundred_ft_cmd", "thr_lever_idle", "eng1_master_off", "eng1_fire_pb", "cancel_master_caut", "agent1", "engine_secured", "announce_land_asap", "mayday_atc"],
+                },
+                {
+                  label: "④  GRN DOT / OP CLB",
+                  sub:   "LVR MCT flash — PULL ALT ring",
+                  fma:   "MAN TOGA · OP CLB · NAV",
+                  triggers: ["fire_warn", "four_hundred_ft", "fire_extinguished"],
+                  steps: ["continue_rotation", "positive_rate_gear_up", "engage_ap_fma", "cancel_master_warn", "four_hundred_ft_cmd", "thr_lever_idle", "eng1_master_off", "eng1_fire_pb", "cancel_master_caut", "agent1", "engine_secured", "announce_land_asap", "mayday_atc", "level_off_maa", "accel_clean"],
+                },
+                {
+                  label: "⑤  THR MCT",
+                  sub:   "SET MCT ring",
+                  fma:   "THR MCT · OP CLB · NAV",
+                  triggers: ["fire_warn", "four_hundred_ft", "fire_extinguished"],
+                  steps: ["continue_rotation", "positive_rate_gear_up", "engage_ap_fma", "cancel_master_warn", "four_hundred_ft_cmd", "thr_lever_idle", "eng1_master_off", "eng1_fire_pb", "cancel_master_caut", "agent1", "engine_secured", "announce_land_asap", "mayday_atc", "level_off_maa", "accel_clean", "pull_alt_op_clb"],
+                },
+              ] as { label: string; sub: string; fma: string; triggers: string[]; steps: string[] }[]).map((cp) => (
+                <button
+                  key={cp.label}
+                  type="button"
+                  onClick={() => runner.seekToCheckpoint(cp.steps, cp.triggers)}
+                  style={{
+                    padding: "4px 7px 3px",
+                    fontSize: "8px",
+                    fontWeight: 700,
+                    letterSpacing: "0.1em",
+                    backgroundColor: "#7744FF18",
+                    color: "#9966FF",
+                    border: "1px solid #7744FF40",
+                    borderRadius: "2px",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "1px",
+                    alignItems: "flex-start",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#7744FF30"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#7744FF18"; }}
+                >
+                  <span>{cp.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Triggers */}

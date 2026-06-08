@@ -130,15 +130,26 @@ export type ScenarioDistraction = {
   /** Display name of the caller — "ATC LONDON", "PURSER", "F/O", etc. */
   from: string;
   message: string;
-  choices: DistractionChoice[];
+  /** If empty or omitted, card is info-only — a single Acknowledge button is shown */
+  choices?: DistractionChoice[];
   /** Auto-dismiss after this many ms if not responded to (default 20 000) */
   autoDismissMs?: number;
   /** If pilot says Stand By, re-surface after this many ms (default 25 000) */
   standbyResurfaceMs?: number;
+  /** If pilot says Stand By AND this field is set, the card only re-surfaces
+   *  when the named step completes — overrides standbyResurfaceMs timer.
+   *  Use when the correct answer is "STANDBY" but the crew should come back
+   *  only after a specific procedural milestone (e.g. wx_request complete). */
+  standbyResurfaceOnStep?: string;
   /** If set, this distraction only fires once the named step is complete.
    *  Use for ATC calls that must come after a procedural milestone — e.g.
    *  ATC requesting briefing info only after the crew has finished ECAM. */
   requiresStep?: string;
+  /** If set, selecting the CORRECT choice in this distraction also completes
+   *  the named step in the scenario engine — e.g. PM declaring MAYDAY via a
+   *  blue crew distraction card should complete the mayday_atc step so that
+   *  downstream ATC responses (Tower ACK, DEP vectors) fire correctly. */
+  completesStep?: string;
   /** Optional. The pilot's call to ATC that PRECEDES the ATC message in this
    *  exchange.  When set, the distraction modal renders it as the first line
    *  ("FLIGHT CREW → ATC") so the user sees the full back-and-forth: pilot's
@@ -355,5 +366,7 @@ export type ScenarioPhase = {
     coachMs?: number;
     /** Step ID to complete when PF clicks the PFD ring */
     stepId?: string;
+    /** Step that must be completed before this ring appears (gates on step, not timing) */
+    prereqStep?: string;
   };
 };

@@ -15,8 +15,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
-import type { Scenario } from "@/scenarios/types";
-import { buildAircraftState, getActiveScenarioPhase, PfActionOverlay } from "@/components/cockpit/pfd-nd";
+import type { Scenario, ScenarioPhase } from "@/scenarios/types";
+import { buildAircraftState, getActivePfActionPhase, PfActionOverlay } from "@/components/cockpit/pfd-nd";
 
 type PfdData = {
   pitch: number; roll: number;
@@ -40,6 +40,7 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
   const scenarioRef = useRef(scenario);
   const elapsedMsRef = useRef(elapsedMs);
   const pausedRef = useRef(paused);
+  const pendingPhaseRef = useRef<ScenarioPhase | null>(null);
 
   // PF action overlay — pulsing green ring on PFD at key phases.
   // Ring persists until the PF clicks it (completing the step), even if later
@@ -47,23 +48,36 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
   // the 400 ft gate rather than disappearing when the next phase starts.
   const [confirmedPhases, setConfirmedPhases] = useState<Set<string>>(new Set());
 
-  // Scan backwards through all phases reached so far; return the most recent
-  // one whose pfAction step has not yet been completed or confirmed.
+  // When dev mode seeks backward and un-completes a pfAction step, remove it from
+  // confirmedPhases so the ring re-appears for that phase.
+  useEffect(() => {
+    if (!scenario?.phases) return;
+    setConfirmedPhases(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const phaseId of prev) {
+        const phase = scenario.phases?.find(p => p.id === phaseId);
+        const stepId = phase?.pfAction?.stepId;
+        if (stepId && !state?.completedSteps?.[stepId]) {
+          next.delete(phaseId);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [state?.completedSteps, scenario?.phases]);
+
+  // Step-driven ring: appears when prereqStep is done, disappears when stepId is done.
+  // No timing dependency — prevents altitude jumps from early ring clicks.
   const pendingPhase = (() => {
-    if (!scenario?.phases) return null;
-    for (let i = scenario.phases.length - 1; i >= 0; i--) {
-      const p = scenario.phases[i];
-      if (p.atMs > (elapsedMs ?? 0)) continue;           // not yet reached
-      if (!p.pfAction) continue;                          // no ring for this phase
-      if (confirmedPhases.has(p.id)) continue;            // PF already clicked it
-      const stepDone = p.pfAction.stepId
-        ? !!state?.completedSteps?.[p.pfAction.stepId]
-        : false;
-      if (stepDone) continue;                             // step completed another way
-      return p;
-    }
-    return null;
+    if (!scenario || !state) return null;
+    const phase = getActivePfActionPhase(scenario, state);
+    if (!phase || confirmedPhases.has(phase.id)) return null;
+    return phase;
   })();
+
+  // Keep ref in sync so the rAF loop can read pending ring state without a re-render.
+  pendingPhaseRef.current = pendingPhase ?? null;
 
   const pfAction     = pendingPhase?.pfAction;
   const needsConfirm = !!(pfAction && pendingPhase);
@@ -212,8 +226,14 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
       // On ground they are ARMED (second line, blue) not yet engaged.
       txt(thrMode, 52,  16, 14, thrColor, "center", true, 5);
       if (!onGround) {
-        txt(vertMode, 156, 16, 14, C_ACTIVE, "center", true, 5);
-        txt(latMode,  260, 16, 14, C_ACTIVE, "center", true, 5);
+        // FCOM DSC-22_30-100-C [fcom:L37741]: engaged row-1 modes are always GREEN.
+        // "SRS — Green — Takeoff or go-around mode is engaged." No cyan on row 1.
+        // FCOM DSC-22_30-70-80 [fcom:L11987-11988]: V/S nulled → FMA shows "V/S = 0" in green.
+        const vsVal = live?.vs ?? 0;
+        const vertLabel = (vertMode === "V/S" && vsVal === 0) ? "V/S = 0" : vertMode;
+        const vertFontSz = vertLabel === "V/S = 0" ? 11 : 14;
+        txt(vertLabel, 156, 16, vertFontSz, C_ACTIVE, "center", true, 5);
+        txt(latMode,   260, 16, 14, C_ACTIVE, "center", true, 5);
       }
 
       // Engagement column — AP / FD / A/THR.
@@ -798,6 +818,10 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
     };
 
     // ── Main animation loop ────────────────────────────────────────────────
+    // Smooth lerp targets: initialised to -1 so first frame snaps to live values.
+    let lerpAlt = -1, lerpSpd = -1, lerpVs = 0;
+    let prevHadRing = false;
+    let prevPhaseId: string | null = null;
     let t = 0;
     let rafId = 0;
     const animate = () => {
@@ -806,22 +830,42 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
         ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current)
         : null;
       if (live) {
-        // Wired to scenario — use derived AircraftState directly.  Pitch and
-        // roll get a tiny live shimmer so the attitude indicator feels alive;
-        // digital readouts (alt, vs, speed) stay quantised to avoid digit jitter.
-        d.pitch  = live.pitch  + Math.sin(t)       * 0.15;
+        // Wired to scenario — use derived AircraftState.  Pitch/roll get a tiny
+        // shimmer so the ADI feels alive.  Altitude, speed, and VS are smoothly
+        // lerped toward the step-driven target so the tapes slide rather than jump
+        // when a procedure step is completed.
+        const tgtAlt = live.altitude;
+        const tgtSpd = live.speed;
+        const tgtVs  = Math.round(live.vs / 10) * 10;
+        const nowHasRing = !!pendingPhaseRef.current;
+        const nowPhaseId = pendingPhaseRef.current?.id ?? null;
+        if (lerpAlt < 0 || (nowHasRing && nowPhaseId !== prevPhaseId)) {
+          // First frame OR ring appeared / changed phase (e.g. dev seek jumped to a
+          // different checkpoint) — snap tapes immediately to the step-driven target.
+          lerpAlt = tgtAlt; lerpSpd = tgtSpd; lerpVs = tgtVs;
+        } else if (!nowHasRing) {
+          // No PF action ring visible — advance tapes smoothly toward target.
+          // Factor 0.04 → ~1.5 s to reach 95 % at 60 fps.
+          lerpAlt += (tgtAlt - lerpAlt) * 0.04;
+          lerpSpd += (tgtSpd - lerpSpd) * 0.05;
+          lerpVs  += (tgtVs  - lerpVs)  * 0.06;
+        }
+        prevHadRing = nowHasRing;
+        prevPhaseId = nowPhaseId;
+        // else: PF action ring is showing — hold tapes frozen until PF clicks.
+        d.pitch  = live.pitch  + Math.sin(t) * 0.15;
         d.roll   = live.bank;
-        d.speed  = Math.round(live.speed);
+        d.speed  = Math.round(lerpSpd);
         d.selSpd = live.selectedSpeed;
         d.mgtSpd = live.selectedSpeed;
-        d.alt    = Math.round(live.altitude);
+        d.alt    = Math.round(lerpAlt);
         d.selAlt = live.selectedAlt;
-        d.vs     = Math.round(live.vs / 10) * 10;     // round to 10 fpm — no jitter
+        d.vs     = Math.round(lerpVs / 10) * 10;
         d.hdg    = live.heading;
         d.selHdg = live.selectedHdg;
         d.track  = live.track;
-        // RA roughly tracks altitude until 2500 ft AGL
-        d.ra = Math.max(0, Math.round(Math.min(2500, live.altitude)));
+        // RA = baro alt minus VIDP field elevation (777 ft AMSL)
+        d.ra = Math.max(0, Math.round(Math.min(2500, lerpAlt - 777)));
       } else {
         // Demo / standalone mode — only the attitude indicator shimmers.
         // Digital readouts (alt, vs, speed) stay frozen to keep digits stable.
@@ -860,8 +904,6 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
         {needsConfirm && pfAction && (
           <PfActionOverlay
             label={pfAction.label}
-            hint={pfAction.hint}
-            coachMs={pfAction.coachMs}
             onConfirm={handleConfirm}
           />
         )}

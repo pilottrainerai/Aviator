@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ENG 1 FIRE — Workbook V3</title>
@@ -94,6 +92,15 @@
   .atc-choice.correct { background: #d1fae5; color: #065f46; }
   .atc-choice.wrong   { background: #fee2e2; color: #991b1b; }
 
+  /* ── ATC table row colouring: green = ATC initiates, blue = PM initiates ── */
+  .atc-row-green                  { background: #f0fdf4; }
+  .atc-row-green td:first-child   { border-left: 5px solid #16a34a; }
+  .atc-row-blue                   { background: #eff6ff; }
+  .atc-row-blue  td:first-child   { border-left: 5px solid #2563eb; }
+  /* "from" chip colours */
+  .chip-from-green { background: #bbf7d0; color: #14532d; font-weight: 700; border-radius: 4px; padding: 2px 7px; font-size: 11px; white-space: nowrap; }
+  .chip-from-blue  { background: #bfdbfe; color: #1e3a8a; font-weight: 700; border-radius: 4px; padding: 2px 7px; font-size: 11px; white-space: nowrap; }
+
   /* ── Summary cards ── */
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
   .card { background: #fff; border-radius: 6px; padding: 12px 14px; border: 1px solid #e5e7eb; }
@@ -162,7 +169,7 @@
     <span class="topbar-meta">VIDP RWY 28 · A320 ~77 t · ISA · Source: FCOM PRO-ABN-ENG + FCTM OP-020</span>
   </div>
   <div class="topbar-right">
-    <span class="save-status" id="saveStatus">Auto-save on</span>
+    <span class="save-status" id="saveStatus">Saved 3:24:26 PM</span>
     <span style="font-size:11px;color:#6b7280;padding:5px 10px;background:#374151;border-radius:5px">V2 archived</span>
     <button class="btn btn-save" onclick="saveAll()">Save</button>
     <button class="btn btn-export" onclick="exportHTML()">Export HTML</button>
@@ -170,22 +177,22 @@
 </div>
 
 <div class="tabs">
-  <div class="tab active" onclick="showTab('summary')">Summary</div>
+  <div class="tab" onclick="showTab('summary')">Summary</div>
   <div class="tab" onclick="showTab('procedure')">Procedure Flow</div>
   <div class="tab" onclick="showTab('ecam')">ECAM / Triggers</div>
-  <div class="tab" onclick="showTab('atc')">ATC Distractions</div>
+  <div class="tab active" onclick="showTab('atc')">ATC Distractions</div>
   <div class="tab" onclick="showTab('status')">Status &amp; Decisions</div>
   <div class="tab" onclick="showTab('phases')">Phase FMA</div>
   <div class="tab" onclick="showTab('flow')">Flow Graph</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ SUMMARY -->
-<div class="section active" id="tab-summary">
+<div class="section" id="tab-summary">
   <p class="section-title">Scenario Overview</p>
 
   <div class="cards">
     <div class="card"><div class="card-label">Total Steps</div><div class="card-value">39</div><div class="card-sub">incl. flightcheck, glareshield, comms, chclm, approach</div></div>
-    <div class="card"><div class="card-label">ATC Distractions</div><div class="card-value">12</div><div class="card-sub">① Tower handoff → ⑫ Cleared to land</div></div>
+    <div class="card"><div class="card-label">ATC Distractions</div><div class="card-value">18</div><div class="card-sub">① Tower handoff → ⑫b Cleared to land</div></div>
     <div class="card"><div class="card-label">Triggers</div><div class="card-value">4</div><div class="card-sub">after_v1, fire_warn, four_hundred_ft, min_accel_alt</div></div>
     <div class="card"><div class="card-label">Status Items</div><div class="card-value">14</div><div class="card-sub">Left col: limitations / Right col: INOP SYS</div></div>
     <div class="card"><div class="card-label">PF Actions (PFD ring)</div><div class="card-value">4</div><div class="card-sub">AP1 · V/S 0 · LVR MCT · OP CLB</div></div>
@@ -233,7 +240,10 @@
         <td><select class="flag-sel" data-key="summary_overall_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       </tr>
       <tr><td><strong>Changes from V2</strong></td>
-        <td><textarea class="editable" data-key="summary_v2diff" rows="3" placeholder="What changed since V2?&#10;• A/THR now cyan (armed) / green (active)&#10;• AP1 only appears when engaged&#10;• PFD interactive ring on PfdMockup…"></textarea></td>
+        <td><textarea class="editable" data-key="summary_v2diff" rows="3" placeholder="What changed since V2?
+• A/THR now cyan (armed) / green (active)
+• AP1 only appears when engaged
+• PFD interactive ring on PfdMockup…"></textarea></td>
         <td><select class="flag-sel" data-key="summary_v2diff_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       </tr>
     </tbody>
@@ -262,8 +272,475 @@
         <th width="5%">Requires</th>
       </tr>
     </thead>
-    <tbody id="procedureBody">
-    </tbody>
+    <tbody id="procedureBody"><tr class="phase-divider"><td colspan="11">AVIATE / FLIGHTCHECK / GLARESHIELD</td></tr><tr class="cat-av">
+      <td>1</td>
+      <td><code style="font-size:10px">continue_rotation</code></td>
+      <td><span class="chip chip-fc">flightcheck</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>CONTINUE ROTATION</strong><br><span style="color:#6b7280;font-size:10px">V2+10</span></td>
+      <td class="hint-text">PF maintains normal takeoff rotation and climb. Do NOT reduce thrust. Follow FD/SRS, hold V2+10, and keep runway track stable.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_continue_rotation" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_continue_rotation_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">—</td>
+    </tr><tr class="cat-av">
+      <td>2</td>
+      <td><code style="font-size:10px">positive_rate_gear_up</code></td>
+      <td><span class="chip chip-fc">flightcheck</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>POSITIVE CLIMB — GEAR UP</strong><br><span style="color:#6b7280;font-size:10px">CALL</span></td>
+      <td class="hint-text">PM calls POSITIVE CLIMB. PF responds GEAR UP. PM selects gear lever UP. Verify positive climb and GEAR UP indication.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_positive_rate_gear_up" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_positive_rate_gear_up_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">continue_rotation</td>
+    </tr><tr class="cat-av">
+      <td>3</td>
+      <td><code style="font-size:10px">engage_ap_fma</code></td>
+      <td><span class="chip chip-fc">flightcheck</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>AP1 ENGAGE — READ FMA</strong><br><span style="color:#6b7280;font-size:10px">CONFIRM</span></td>
+      <td class="hint-text">PF: engage AP1 at ~100 ft once flight path stable. Read FMA aloud and announce A/THR.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_engage_ap_fma" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_engage_ap_fma_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">positive_rate_gear_up</td>
+    </tr><tr class="cat-av">
+      <td>4</td>
+      <td><code style="font-size:10px">cancel_master_warn</code></td>
+      <td><span class="chip chip-fc">glareshield</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>MASTER WARN</strong><br><span style="color:#6b7280;font-size:10px">CANCEL</span><span class="chip chip-hw">HW</span></td>
+      <td class="hint-text">PM cancels MASTER WARN FIRST — pushes glareshield light to silence CRC and reset the red light.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_cancel_master_warn" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_cancel_master_warn_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">—</td>
+    </tr><tr class="cat-av">
+      <td>5</td>
+      <td><code style="font-size:10px">four_hundred_ft_cmd</code></td>
+      <td><span class="chip chip-fc">flightcheck</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>400 FT — ECAM ACTIONS</strong><br><span style="color:#6b7280;font-size:10px">ANNOUNCE</span></td>
+      <td class="hint-text">At 400 ft AGL with flight path stabilised, PM confirms failure, reads ECAM title. PF orders ECAM ACTIONS.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_four_hundred_ft_cmd" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_four_hundred_ft_cmd_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">engage_ap_fma + cancel_master_warn</td>
+    </tr><tr class="phase-divider"><td colspan="11">ECAM PROCEDURE + POST-ECAM</td></tr><tr class="cat-ec">
+      <td>6</td>
+      <td><code style="font-size:10px">thr_lever_idle</code></td>
+      <td><span class="chip chip-fc">procedure</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td><strong>THR LEVER 1</strong><br><span style="color:#6b7280;font-size:10px">IDLE</span><span class="chip chip-hw">HW</span></td>
+      <td class="hint-text">FCTM AOP-30-20 THRUST LEVER RULE: PM announces THR LEVER 1—IDLE. PF confirms correct lever: THR LEVER 1, CONFIRM IDLE? → PM: CONFIRM → PF retards lever. PM must NOT operate thrust levers. Reduces thrust before fuel/engine isolation.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_thr_lever_idle" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_thr_lever_idle_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">four_hundred_ft_cmd</td>
+    </tr><tr class="cat-ec">
+      <td>7</td>
+      <td><code style="font-size:10px">eng1_master_off</code></td>
+      <td><span class="chip chip-fc">procedure</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td><strong>ENG 1 MASTER</strong><br><span style="color:#6b7280;font-size:10px">OFF</span><span class="chip chip-hw">HW</span></td>
+      <td class="hint-text">PM: ENG 1 MASTER, CONFIRM OFF? → PF: CONFIRM → PM sets OFF. Closes LP + HP fuel shut-off valves.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_eng1_master_off" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_eng1_master_off_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">thr_lever_idle</td>
+    </tr><tr class="cat-ec">
+      <td>8</td>
+      <td><code style="font-size:10px">eng1_fire_pb</code></td>
+      <td><span class="chip chip-fc">procedure</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td><strong>ENG 1 FIRE P/B</strong><br><span style="color:#6b7280;font-size:10px">PUSH</span><span class="chip chip-hw">HW</span></td>
+      <td class="hint-text">PM: ENG 1 FIRE P/B, CONFIRM PUSH? → PF: CONFIRM → PM pushes. Arms squibs, closes bleed + HYD SOV, cuts FADEC.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_eng1_fire_pb" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_eng1_fire_pb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">eng1_master_off</td>
+    </tr><tr class="cat-ec">
+      <td>9</td>
+      <td><code style="font-size:10px">cancel_master_caut</code></td>
+      <td><span class="chip chip-fc">glareshield</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td><strong>MASTER CAUT</strong><br><span style="color:#6b7280;font-size:10px">CANCEL</span><span class="chip chip-hw">HW</span></td>
+      <td class="hint-text">PM pushes MASTER CAUTION light — silences single-chime, resets amber light.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_cancel_master_caut" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_cancel_master_caut_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">—</td>
+    </tr><tr class="cat-ec">
+      <td>10</td>
+      <td><code style="font-size:10px">agent1</code></td>
+      <td><span class="chip chip-fc">procedure</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td><strong>AGENT 1</strong><br><span style="color:#6b7280;font-size:10px">DISCH</span><span class="chip chip-hw">HW</span></td>
+      <td class="hint-text">PM waits ECAM 10 s countdown after FIRE pb — N1 decay maximises agent concentration. Then discharge.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_agent1" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_agent1_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">eng1_fire_pb</td>
+    </tr><tr class="cat-ec">
+      <td>11</td>
+      <td><code style="font-size:10px">agent2</code></td>
+      <td><span class="chip chip-fc">procedure</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td><strong>AGENT 2</strong><br><span style="color:#6b7280;font-size:10px">DISCH</span><span class="chip chip-hw">HW</span><span class="chip chip-opt">OPT</span></td>
+      <td class="hint-text">PM: wait 30 s after AGENT 1 — IF FIRE WARN persists, discharge AGENT 2. Last bottle, no restart possible.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_agent2" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_agent2_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">agent1 + fire_persists_30s</td>
+    </tr><tr class="cat-ec">
+      <td>12</td>
+      <td><code style="font-size:10px">engine_secured</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td><strong>ENGINE SECURED</strong><br><span style="color:#6b7280;font-size:10px">ANNOUNCE</span></td>
+      <td class="hint-text">Once fire light is out and engine secured, PM announces ENGINE SECURED and PRIMARY ECAM ACTIONS COMPLETE.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_engine_secured" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_engine_secured_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">agent1 + fire_extinguished</td>
+    </tr><tr class="phase-divider"><td colspan="11">AVIATE / FLIGHTCHECK / GLARESHIELD</td></tr><tr class="cat-av">
+      <td>13</td>
+      <td><code style="font-size:10px">announce_land_asap</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>LAND ASAP</strong><br><span style="color:#6b7280;font-size:10px">ANNOUNCE</span></td>
+      <td class="hint-text">PF announces LAND ASAP (red on ECAM) — cue to declare MAYDAY on current frequency. PM cross-checks that MAYDAY is the next call.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_announce_land_asap" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_announce_land_asap_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">engine_secured</td>
+    </tr><tr class="phase-divider"><td colspan="11">ATC COMMS</td></tr><tr class="cat-atc">
+      <td>14</td>
+      <td><code style="font-size:10px">mayday_atc</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td><strong>MAYDAY</strong><br><span style="color:#6b7280;font-size:10px">DECLARE</span></td>
+      <td class="hint-text">Call on CURRENT frequency (Tower if handoff not yet accepted): MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT] feet, STANDBY. No destination, no runway, no POB yet.</td>
+      <td><ul class="notes-list"><li>MAYDAY × 3</li><li>Callsign</li><li>Nature: engine fire engine 1</li><li>Heading + altitude only</li><li>STANDBY — defer POB / fuel / intentions until workload eases</li></ul></td>
+      <td><textarea class="editable" data-key="step_mayday_atc" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_mayday_atc_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">engine_secured</td>
+    </tr><tr class="phase-divider"><td colspan="11">AVIATE / FLIGHTCHECK / GLARESHIELD</td></tr><tr class="cat-av">
+      <td>15</td>
+      <td><code style="font-size:10px">level_off_maa</code></td>
+      <td><span class="chip chip-fc">procedure</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>V/S 0 AT MAA</strong><br><span style="color:#6b7280;font-size:10px">SELECT</span></td>
+      <td class="hint-text">PF: at minimum acceleration altitude (~2300 ft AMSL), push V/S knob → FMA col 2 changes SRS → V/S = 0.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_level_off_maa" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_level_off_maa_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">engine_secured</td>
+    </tr><tr class="cat-av">
+      <td>16</td>
+      <td><code style="font-size:10px">accel_clean</code></td>
+      <td><span class="chip chip-fc">procedure</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>ACCEL / CLEAN</strong><br><span style="color:#6b7280;font-size:10px">CONFIRM</span></td>
+      <td class="hint-text">PF calls FLAPS 1 at F speed and FLAPS UP at S speed; PM checks speed, repeats callouts, selects accordingly.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_accel_clean" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_accel_clean_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">level_off_maa</td>
+    </tr><tr class="cat-av">
+      <td>17</td>
+      <td><code style="font-size:10px">mct_open_clb</code></td>
+      <td><span class="chip chip-fc">procedure</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>MCT / OPEN CLB</strong><br><span style="color:#6b7280;font-size:10px">SELECT</span></td>
+      <td class="hint-text">At green dot: LVR MCT flashes white. PF moves live lever to MCT. Pulls ALT knob → OP CLB. FMA: THR MCT · OP CLB · NAV · AP1 · A/THR.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_mct_open_clb" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_mct_open_clb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">accel_clean</td>
+    </tr><tr class="phase-divider"><td colspan="11">ECAM PROCEDURE + POST-ECAM</td></tr><tr class="cat-ec">
+      <td>18</td>
+      <td><code style="font-size:10px">announce_sec_failures</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td><strong>SECONDARY FAILURES</strong><br><span style="color:#6b7280;font-size:10px">READ</span></td>
+      <td class="hint-text">PM reads secondary system failures from SD after engine secured. PF cross-checks and acknowledges each item.</td>
+      <td><ul class="notes-list"><li>HYD G ENG1 PUMP...LO PR — Green sys ENG1 pump SOV closed by FIRE pb. PTU may transfer YELLOW→GREEN.</li><li>GEN 1 FAULT.........OFF — IDG1 deactivated by FIRE pb. BTC auto-closes, AC BUS 1 fed by GEN 2.</li><li>ENG 1 BLEED......FAULT — ENG 1 bleed SOV closed by FIRE pb. XBLEED AUTO opens, PACK 1 monitor.</li></ul></td>
+      <td><textarea class="editable" data-key="step_announce_sec_failures" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_announce_sec_failures_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">mayday_atc</td>
+    </tr><tr class="phase-divider"><td colspan="11">STATUS PAGE REVIEW</td></tr><tr class="cat-st">
+      <td>19</td>
+      <td><code style="font-size:10px">announce_status</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-st">STATUS</span></td>
+      <td><strong>STATUS — ANNOUNCE</strong><br><span style="color:#6b7280;font-size:10px">ANNOUNCE</span></td>
+      <td class="hint-text">When STATUS page appears: PM announces STATUS.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_announce_status" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_announce_status_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">announce_sec_failures</td>
+    </tr><tr class="cat-st">
+      <td>20</td>
+      <td><code style="font-size:10px">stop_ecam</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-st">STATUS</span></td>
+      <td><strong>STOP ECAM</strong><br><span style="color:#6b7280;font-size:10px">ORDER</span></td>
+      <td class="hint-text">PF: STOP ECAM — PM stops ECAM actions. Ask for After Takeoff CL, OEB, computer resets.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_stop_ecam" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_stop_ecam_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">announce_status</td>
+    </tr><tr class="cat-st">
+      <td>21</td>
+      <td><code style="font-size:10px">after_takeoff_cl</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-st">STATUS</span></td>
+      <td><strong>AFTER TAKEOFF CL</strong><br><span style="color:#6b7280;font-size:10px">COMPLETE</span></td>
+      <td class="hint-text">PF: Any NORMAL CHECKLIST? — PM runs After Takeoff checklist.</td>
+      <td><ul class="notes-list"><li>PACKS ............. CHECK (single pack ops — PACK 2 AUTO)</li><li>SEAT BELTS ........ ON</li><li>LANDING GEAR ...... UP / 3 OFF</li><li>ENGINE MODE SEL ... IGN (already set per ECAM)</li><li>FLAPS ............. 0 (clean / as required)</li></ul></td>
+      <td><textarea class="editable" data-key="step_after_takeoff_cl" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_after_takeoff_cl_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">stop_ecam</td>
+    </tr><tr class="cat-st">
+      <td>22</td>
+      <td><code style="font-size:10px">oeb_check</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-st">STATUS</span></td>
+      <td><strong>OEB / COMPUTER RESETS</strong><br><span style="color:#6b7280;font-size:10px">CHECK</span></td>
+      <td class="hint-text">PF: Any OEB? Any COMPUTER RESETS? — PM checks QRH reset table.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_oeb_check" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_oeb_check_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">after_takeoff_cl</td>
+    </tr><tr class="cat-st">
+      <td>23</td>
+      <td><code style="font-size:10px">read_status</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-st">STATUS</span></td>
+      <td><strong>READ STATUS</strong><br><span style="color:#6b7280;font-size:10px">CALL</span></td>
+      <td class="hint-text">PF: READ STATUS — PM reads the ECAM STATUS page aloud.</td>
+      <td><ul class="notes-list"><li>Reference: QRH ABNORMAL — ONE ENG INOPERATIVE supplementary procedure (SE flight management — drift-down, perf, fuel).</li><li>Reference: QRH ABNORMAL — ONE ENG INOPERATIVE LANDING procedure (approach planning — Vapp, flap setting, autobrake, EO go-around).</li></ul></td>
+      <td><textarea class="editable" data-key="step_read_status" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_read_status_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">oeb_check</td>
+    </tr><tr class="cat-st">
+      <td>24</td>
+      <td><code style="font-size:10px">status_read_aloud</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-st">STATUS</span></td>
+      <td><strong>ECAM STATUS — PM READS</strong><br><span style="color:#6b7280;font-size:10px">REVIEW</span></td>
+      <td class="hint-text">PM reads STATUS page aloud, item by item. PF: CHECKED after each item.</td>
+      <td><ul class="notes-list"><li>ENG 1 SHUT DOWN</li><li>AGENT 1 DISCH / AGENT 2 DISCH (both bottles used)</li><li>ENG 1 FIRE DET ... DEGRADED (single loop remaining)</li><li>HYD G ENG1 PUMP LO PR</li><li>GEN 1 INOP</li><li>ENG 1 BLEED FAULT</li><li>PACK 1 ........... MONITOR (single pack ops)</li><li>APPR CAT 1 (degraded approach capability)</li><li>MAX FL 250 (single-engine ceiling)</li><li>TCAS .............. TA only</li></ul></td>
+      <td><textarea class="editable" data-key="step_status_read_aloud" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_status_read_aloud_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">read_status</td>
+    </tr><tr class="cat-st">
+      <td>25</td>
+      <td><code style="font-size:10px">crew_crosscheck</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-st">STATUS</span></td>
+      <td><strong>ECAM ACTIONS COMPLETE</strong><br><span style="color:#6b7280;font-size:10px">ANNOUNCE</span></td>
+      <td class="hint-text">PM: ECAM ACTIONS COMPLETE. PF acknowledges.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_crew_crosscheck" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_crew_crosscheck_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">status_read_aloud</td>
+    </tr><tr class="phase-divider"><td colspan="11">CRM PLANNING (FORDEC / COMMS)</td></tr><tr class="cat-pl">
+      <td>26</td>
+      <td><code style="font-size:10px">wx_request</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-pl">PLAN</span></td>
+      <td><strong>WX / ATIS</strong><br><span style="color:#6b7280;font-size:10px">REQUEST</span></td>
+      <td class="hint-text">PM requests latest weather from Delhi Approach: wind, QNH, temp, vis, RVR RWY 28.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_wx_request" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_wx_request_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">crew_crosscheck</td>
+    </tr><tr class="cat-pl">
+      <td>27</td>
+      <td><code style="font-size:10px">ldg_perf</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-pl">PLAN</span></td>
+      <td><strong>LDG PERF</strong><br><span style="color:#6b7280;font-size:10px">CHECK</span></td>
+      <td class="hint-text">SE approach: Vapp +5 kt. RWY 28 VIDP LDA 4430 m / factored SE dist ~2200 m — ADEQUATE.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_ldg_perf" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_ldg_perf_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">wx_request</td>
+    </tr><tr class="cat-pl">
+      <td>28</td>
+      <td><code style="font-size:10px">fordec</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-pl">PLAN</span></td>
+      <td><strong>FORDEC</strong><br><span style="color:#6b7280;font-size:10px">COMPLETE</span></td>
+      <td class="hint-text">PF leads FORDEC discussion. PM cross-checks each element. Agree and commit to decision.</td>
+      <td><ul class="notes-list"><li>F — FACTS: ENG 1 fire secured. Single engine. VIDP 15 min. RWY 28 LDA 4430 m. Full CFR on field.</li><li>O — OPTIONS: ① Return VIDP RWY 28  ② Divert nearest alternate  ③ Continue (NOT viable)</li><li>R — RISKS &amp; BENEFITS: VIDP = known field, full CFR, adequate LDA. Divert = longer flight, unfamiliar.</li><li>D — DECISION: LAND ASAP — return VIDP RWY 28 with full emergency declared.</li><li>E — EXECUTION: ILS RWY 28, Cat 1, SE approach Vapp+5 kt, full emergency, CFR standing by.</li><li>C — CHECK-BACK: PM confirms AGREED — LAND VIDP RWY 28, FULL EMERGENCY</li></ul></td>
+      <td><textarea class="editable" data-key="step_fordec" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_fordec_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">ldg_perf</td>
+    </tr><tr class="phase-divider"><td colspan="11">ATC COMMS</td></tr><tr class="cat-atc">
+      <td>29</td>
+      <td><code style="font-size:10px">intention_to_atc</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td><strong>INTENTION — ATC</strong><br><span style="color:#6b7280;font-size:10px">ADVISE</span></td>
+      <td class="hint-text">PM advises ATC of FORDEC outcome: returning to VIDP for landing runway 28, will advise when ready for approach.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_intention_to_atc" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_intention_to_atc_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">fordec</td>
+    </tr><tr class="phase-divider"><td colspan="11">CRM PLANNING (FORDEC / COMMS)</td></tr><tr class="cat-pl">
+      <td>30</td>
+      <td><code style="font-size:10px">fmgc_prep</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-pl">PLAN</span></td>
+      <td><strong>FMGC PREP</strong><br><span style="color:#6b7280;font-size:10px">COMPLETE</span></td>
+      <td class="hint-text">PM: enter VIDP in DEST, select RWY 28, insert ILS 110.30/CRS 282. Set Vapp = Vref+5 kt.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_fmgc_prep" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_fmgc_prep_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">intention_to_atc</td>
+    </tr><tr class="cat-pl">
+      <td>31</td>
+      <td><code style="font-size:10px">nis_brief</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-pl">PLAN</span></td>
+      <td><strong>NITS BRIEF</strong><br><span style="color:#6b7280;font-size:10px">CONFIRM</span></td>
+      <td class="hint-text">Interphone to SCCM — NATURE: engine fire. INTENTIONS: landing VIDP RWY 28. TIME: ~15 min. SPECIAL: emergency/precautionary.</td>
+      <td><ul class="notes-list"><li>N — NATURE: Engine fire, ENG 1 shut down, aircraft serviceable</li><li>I — INTENTIONS: Returning and landing runway 28 Delhi VIDP</li><li>T — TIME: Approximately 15 minutes to landing</li><li>S — SPECIAL: Crew at stations. Precautionary or emergency landing per Captain's decision.</li></ul></td>
+      <td><textarea class="editable" data-key="step_nis_brief" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_nis_brief_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">intention_to_atc</td>
+    </tr><tr class="cat-pl">
+      <td>32</td>
+      <td><code style="font-size:10px">pax_pa</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-pl">PLAN</span></td>
+      <td><strong>PASSENGER PA</strong><br><span style="color:#6b7280;font-size:10px">CONFIRM</span></td>
+      <td class="hint-text">PA: Ladies and gentlemen, this is your Captain. We are returning to Delhi as a precaution. Remain seated.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_pax_pa" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_pax_pa_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">nis_brief</td>
+    </tr><tr class="cat-pl">
+      <td>33</td>
+      <td><code style="font-size:10px">company_notify</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-pl">PLAN</span></td>
+      <td><strong>OPS NOTIFY</strong><br><span style="color:#6b7280;font-size:10px">CONFIRM</span><span class="chip chip-opt">OPT</span></td>
+      <td class="hint-text">ACARS or VHF: OPS, IFLY101, MAYDAY declared, ENG 1 FIRE, returning VIDP RWY 28, request CFR + ground support.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_company_notify" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_company_notify_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">pax_pa</td>
+    </tr><tr class="phase-divider"><td colspan="11">APPROACH &amp; LANDING</td></tr><tr class="cat-ap">
+      <td>34</td>
+      <td><code style="font-size:10px">approach_prep</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ap">APPROACH</span></td>
+      <td><strong>APPROACH PREP</strong><br><span style="color:#6b7280;font-size:10px">COMPLETE</span></td>
+      <td class="hint-text">PM: set ILS RWY 28 freq 110.30/CRS 282. BARO minima 200 ft/QNH set. Autobrake MED. Spoilers ARM.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_approach_prep" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_approach_prep_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">fmgc_prep</td>
+    </tr><tr class="phase-divider"><td colspan="11">ATC COMMS</td></tr><tr class="cat-atc">
+      <td>35</td>
+      <td><code style="font-size:10px">atc_emergency_services</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td><strong>ATC — EMERG SVCS</strong><br><span style="color:#6b7280;font-size:10px">ADVISE</span></td>
+      <td class="hint-text">PM requests emergency services only — intention already stated. Call: IFLY101, request Cat 3 crash fire rescue runway 28, ambulance and medical standby, [POB] persons on board.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_atc_emergency_services" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_atc_emergency_services_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">nis_brief</td>
+    </tr><tr class="phase-divider"><td colspan="11">APPROACH &amp; LANDING</td></tr><tr class="cat-ap">
+      <td>36</td>
+      <td><code style="font-size:10px">approach_brief</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-ap">APPROACH</span></td>
+      <td><strong>APPROACH BRIEF</strong><br><span style="color:#6b7280;font-size:10px">COMPLETE</span></td>
+      <td class="hint-text">PF briefs: ILS RWY 28 VIDP, single-engine CAT 1. DA 200 ft. Vapp +5 kt. Non-normal items from STATUS. Go-around briefed.</td>
+      <td><ul class="notes-list"><li>Reference: FCTM PR-AEP-ENG ONE ENGINE INOPERATIVE — LANDING [fctm:L13250-13265]</li><li>Key items: autoland available with OEI; slip → blue beta target above threshold thrust; do NOT lower gear too early (high power needed); reset rudder trim to zero before thrust reduction.</li></ul></td>
+      <td><textarea class="editable" data-key="step_approach_brief" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_approach_brief_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">atc_emergency_services</td>
+    </tr><tr class="cat-ap">
+      <td>37</td>
+      <td><code style="font-size:10px">go_around_review</code></td>
+      <td><span class="chip chip-fc">comms</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-ap">APPROACH</span></td>
+      <td><strong>GO-AROUND REVIEW</strong><br><span style="color:#6b7280;font-size:10px">CONFIRM</span></td>
+      <td class="hint-text">PF briefs go-around plan and confirms fuel state is adequate for alternate if approach is missed.</td>
+      <td><ul class="notes-list"><li>GO-AROUND: TOGA (ENG 2 only) — SRS engages — positive climb GEAR UP — maintain V2+10</li><li>FMA: TOGA → SRS / NAV / AP1 — monitor and call FMA at each transition</li><li>FUEL CHECK: confirm total fuel vs [DEST + ALTN + FINAL RESERVE]. If marginal — LAND VIDP.</li><li>RUNWAY VACATION: vacate via first available exit (Golf / Foxtrot). Brake to stop if needed.</li><li>Emergency services attend runway — do NOT delay evacuation call if required.</li></ul></td>
+      <td><textarea class="editable" data-key="step_go_around_review" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_go_around_review_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">approach_brief</td>
+    </tr><tr class="cat-ap">
+      <td>38</td>
+      <td><code style="font-size:10px">approach_cl</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ap">APPROACH</span></td>
+      <td><strong>APPROACH CL</strong><br><span style="color:#6b7280;font-size:10px">COMPLETE</span></td>
+      <td class="hint-text">PM runs approach checklist. Call each item, PF cross-checks and responds.</td>
+      <td><ul class="notes-list"><li>BARO ................. QNH SET</li><li>MDA/DH ............... 200 ft SET</li><li>SEAT BELTS ........... ON</li><li>AUTOBRAKE ............ MED</li><li>SPOILERS ............. ARM (green)</li><li>LANDING LIGHTS ....... ON</li><li>APPROACH USING HIGHEST LEVEL OF AUTOMATION</li></ul></td>
+      <td><textarea class="editable" data-key="step_approach_cl" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_approach_cl_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">go_around_review</td>
+    </tr><tr class="cat-ap">
+      <td>39</td>
+      <td><code style="font-size:10px">landing_cl</code></td>
+      <td><span class="chip chip-fc">chclm</span></td>
+      <td><span class="chip chip-pm">PM</span></td>
+      <td><span class="chip chip-ap">APPROACH</span></td>
+      <td><strong>LANDING CL</strong><br><span style="color:#6b7280;font-size:10px">COMPLETE</span></td>
+      <td class="hint-text">PM runs landing checklist at 1000 ft on final. PF confirms each item.</td>
+      <td><ul class="notes-list"><li>GEAR ................. DOWN — 3 GREEN</li><li>FLAPS ................ FULL (or as required)</li><li>SPOILERS ............. ARM (green)</li><li>AUTOBRAKE ............ MED (SET)</li><li>CABIN ................ ADVISED</li><li>STANDARD CALLOUTS: 1000 ft / 500 ft / 100 ft / 50-40-30-20-10 RETARD</li></ul></td>
+      <td><textarea class="editable" data-key="step_landing_cl" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_landing_cl_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">approach_cl</td>
+    </tr></tbody>
   </table>
 </div>
 
@@ -297,8 +774,21 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════ ATC -->
-<div class="section" id="tab-atc">
+<div class="section active" id="tab-atc">
   <p class="section-title">ATC Distractions — 12 Calls</p>
+  <div style="display:flex;gap:16px;margin-bottom:12px;font-size:12px;align-items:center;">
+    <span style="font-weight:700;color:#374151">Legend:</span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span style="display:inline-block;width:14px;height:14px;background:#bbf7d0;border-left:4px solid #16a34a;border-radius:2px;"></span>
+      <span style="color:#14532d;font-weight:600;">ATC initiates</span>
+      <span style="color:#6b7280">(Tower / Departure / Approach calls the crew)</span>
+    </span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span style="display:inline-block;width:14px;height:14px;background:#bfdbfe;border-left:4px solid #2563eb;border-radius:2px;"></span>
+      <span style="color:#1e3a8a;font-weight:600;">PM initiates</span>
+      <span style="color:#6b7280">(PM makes the radio call)</span>
+    </span>
+  </div>
   <table>
     <thead>
       <tr>
@@ -312,7 +802,169 @@
         <th width="6%">Flag</th>
       </tr>
     </thead>
-    <tbody id="atcBody"></tbody>
+    <tbody id="atcBody"><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">①</td>
+      <td><code style="font-size:10px">atc_handoff_to_departure</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">continue_rotation</span></td>
+      <td><span class="chip-from-green">DELHI TOWER</span></td>
+      <td class="hint-text">"IFLY101, contact Delhi Departure 124.85."</td>
+      <td><div class="atc-choice correct">✔ STANDBY, IFLY101</div><div class="atc-choice wrong">✘ Delhi Departure 124.85, IFLY101</div><div class="atc-choice wrong">✘ Roger, IFLY101</div><div class="atc-choice wrong">✘ MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT] feet, STANDBY</div></td>
+      <td><textarea class="editable" data-key="atc_atc_handoff_to_departure" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_handoff_to_departure_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-blue">
+      <td style="font-weight:700;font-size:16px">①b</td>
+      <td><code style="font-size:10px">mayday_tower_declare</code><div style="margin-top:4px;font-size:10px;color:#6b7280;font-style:italic">⚙ completesStep: mayday_atc</div></td>
+      <td><span class="chip chip-fc" style="font-size:10px">engine_secured (+3s)</span></td>
+      <td><span class="chip-from-blue">PM → TOWER 118.10</span></td>
+      <td class="hint-text">"Select MAYDAY call for Delhi Tower 118.10."</td>
+      <td><div class="atc-choice correct">✔ MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT] feet, STANDBY</div><div class="atc-choice wrong">✘ MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, STANDBY</div><div class="atc-choice wrong">✘ MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, returning Delhi runway 28, 186 POB, request full emergency</div><div class="atc-choice wrong">✘ IFLY101, declaring emergency, engine fire, standby</div></td>
+      <td><textarea class="editable" data-key="atc_mayday_tower_declare" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_mayday_tower_declare_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">②a</td>
+      <td><code style="font-size:10px">atc_tower_mayday_ack</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">mayday_atc (+2s)</span></td>
+      <td><span class="chip-from-green">DELHI TOWER</span></td>
+      <td class="hint-text">"IFLY101, MAYDAY acknowledged. Contact Delhi Departure 124.85. Emergency services alerted."</td>
+      <td><div class="atc-choice correct">✔ Delhi Departure 124.85, IFLY101</div><div class="atc-choice wrong">✘ Roger, IFLY101</div></td>
+      <td><textarea class="editable" data-key="atc_atc_tower_mayday_ack" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_tower_mayday_ack_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-blue">
+      <td style="font-weight:700;font-size:16px">②b</td>
+      <td><code style="font-size:10px">pm_dep_initial_call</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">mayday_atc (+8s)</span></td>
+      <td><span class="chip-from-blue">PM → DEPARTURE 124.85</span></td>
+      <td class="hint-text">"Select PM initial call on Departure 124.85."</td>
+      <td><div class="atc-choice correct">✔ IFLY101, heading 280, climbing 4 000 ft, STANDBY</div><div class="atc-choice wrong">✘ MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing 4 000 ft</div><div class="atc-choice wrong">✘ IFLY101, emergency, returning Delhi, request runway 28 ILS, full emergency services</div></td>
+      <td><textarea class="editable" data-key="atc_pm_dep_initial_call" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_pm_dep_initial_call_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">③</td>
+      <td><code style="font-size:10px">atc_vectors_climb</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">mayday_atc (+15s)</span></td>
+      <td><span class="chip-from-green">DELHI DEPARTURE</span></td>
+      <td class="hint-text">"IFLY101, MAYDAY acknowledged, radar contact, continue runway track, climb 4 000 feet, QNH 1013."</td>
+      <td><div style="color:#6b7280;font-style:italic;font-size:11px">ACKNOWLEDGE ONLY — no crew response quiz</div></td>
+      <td><textarea class="editable" data-key="atc_atc_vectors_climb" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_vectors_climb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">④</td>
+      <td><code style="font-size:10px">atc_vectors_when_ready</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">announce_sec_failures</span></td>
+      <td><span class="chip-from-green">DELHI DEPARTURE</span></td>
+      <td class="hint-text">"IFLY101, vectors available when ready, no reported traffic."</td>
+      <td><div class="atc-choice correct">✔ Continuing checklist, will advise, IFLY101</div><div class="atc-choice correct">✔ Unable at this time, request hold, will advise when ready for approach, IFLY101</div><div class="atc-choice wrong">✘ IFLY101 returning Delhi, request runway 28 ILS</div></td>
+      <td><textarea class="editable" data-key="atc_atc_vectors_when_ready" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_vectors_when_ready_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-blue">
+      <td style="font-weight:700;font-size:16px">⑤</td>
+      <td><code style="font-size:10px">pm_hold_req_card</code><div style="margin-top:4px;font-size:10px;color:#6b7280;font-style:italic">⚙ completesStep: pm_hold_req</div></td>
+      <td><span class="chip chip-fc" style="font-size:10px">mct_open_clb (+5s)</span></td>
+      <td><span class="chip-from-blue">PM → DELHI DEPARTURE</span></td>
+      <td class="hint-text">"Select PM request to Delhi Departure for holding pattern."</td>
+      <td><div class="atc-choice correct">✔ Delhi Departure, IFLY101, request holding at 15 DME DPN, radial 260, need time to complete checks.</div><div class="atc-choice wrong">✘ Delhi Departure, IFLY101, request immediate approach, runway 28 ILS.</div><div class="atc-choice wrong">✘ Delhi Departure, IFLY101, returning to Delhi, request direct runway 28.</div></td>
+      <td><textarea class="editable" data-key="atc_pm_hold_req_card" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_pm_hold_req_card_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">⑤b</td>
+      <td><code style="font-size:10px">atc_hold_clearance</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">pm_hold_req (+5s)</span></td>
+      <td><span class="chip-from-green">DELHI DEPARTURE</span></td>
+      <td class="hint-text">"IFLY101, hold at DPN VOR, 15 DME, inbound track 260, right-hand turns, 1-minute legs, expect further clearance in 10 minutes."</td>
+      <td><div style="color:#6b7280;font-style:italic;font-size:11px">ACKNOWLEDGE ONLY — no crew response quiz</div></td>
+      <td><textarea class="editable" data-key="atc_atc_hold_clearance" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_hold_clearance_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">[D2]</td>
+      <td><code style="font-size:10px">atc_pob_fuel_services</code><div style="margin-top:4px;font-size:10px;color:#6b7280;font-style:italic">⏱ standbyResurfaceOnStep: wx_request</div></td>
+      <td><span class="chip chip-fc" style="font-size:10px">mayday_atc (+25s)</span></td>
+      <td><span class="chip-from-green">DELHI DEPARTURE</span></td>
+      <td class="hint-text">"IFLY101, say persons on board and endurance." — STANDBY is correct; resurfaces only after PM WX request completes.</td>
+      <td><div class="atc-choice correct">✔ Standby IFLY101</div><div class="atc-choice wrong">✘ IFLY101, 186 persons on board, endurance 3 hours</div><div class="atc-choice wrong">✘ IFLY101, 186 POB, 8.4 tonnes fuel, request full emergency services</div></td>
+      <td><textarea class="editable" data-key="atc_atc_pob_fuel_services" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_pob_fuel_services_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-blue">
+      <td style="font-weight:700;font-size:16px">⑥</td>
+      <td><code style="font-size:10px">pm_wx_request</code><div style="margin-top:4px;font-size:10px;color:#6b7280;font-style:italic">⚙ completesStep: wx_request</div></td>
+      <td><span class="chip chip-fc" style="font-size:10px">crew_crosscheck (+5s)</span></td>
+      <td><span class="chip-from-blue">PM → DELHI APPROACH</span></td>
+      <td class="hint-text">"Select PM request to Delhi Approach for weather, runway in use, and approach details."</td>
+      <td><div class="atc-choice correct">✔ Delhi Approach, IFLY101, request latest weather, runway in use, and ILS approach details, runway 28.</div><div class="atc-choice wrong">✘ Delhi Approach, IFLY101, request full emergency services, runway 28 ILS, wind and QNH.</div><div class="atc-choice wrong">✘ Delhi Approach, IFLY101 declaring emergency, request vectors for immediate return runway 28.</div></td>
+      <td><textarea class="editable" data-key="atc_pm_wx_request" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_pm_wx_request_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">⑦</td>
+      <td><code style="font-size:10px">atc_provides_briefing_info</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">wx_request (+5s)</span></td>
+      <td><span class="chip-from-green">DELHI APPROACH</span></td>
+      <td class="hint-text">"IFLY101, wind 280 at 8, QNH 1013, runway 28 in use, ILS runway 28 available."</td>
+      <td><div class="atc-choice correct">✔ Wind 280 at 8, runway 28, ILS runway 28, no significant NOTAMs, IFLY101</div><div class="atc-choice wrong">✘ Roger, IFLY101</div><div class="atc-choice wrong">✘ Wind 280 at 8, runway 28, IFLY101</div></td>
+      <td><textarea class="editable" data-key="atc_atc_provides_briefing_info" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_provides_briefing_info_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-blue">
+      <td style="font-weight:700;font-size:16px">⑧</td>
+      <td><code style="font-size:10px">pm_emerg_svcs_call</code><div style="margin-top:4px;font-size:10px;color:#6b7280;font-style:italic">⚙ completesStep: emerg_svcs_confirmed</div></td>
+      <td><span class="chip chip-fc" style="font-size:10px">atc_emergency_services (+5s)</span></td>
+      <td><span class="chip-from-blue">PM → DELHI APPROACH</span></td>
+      <td class="hint-text">"Select PM call to Delhi Approach requesting emergency services for runway 28."</td>
+      <td><div class="atc-choice correct">✔ Delhi Approach, IFLY101, request Cat 3 crash fire rescue runway 28. 186 persons on board, ambulance and medical services on standby.</div><div class="atc-choice wrong">✘ Delhi Approach, IFLY101, request full emergency services on standby.</div><div class="atc-choice wrong">✘ Delhi Approach, IFLY101, we have an emergency, request services runway 28.</div></td>
+      <td><textarea class="editable" data-key="atc_pm_emerg_svcs_call" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_pm_emerg_svcs_call_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">⑧b</td>
+      <td><code style="font-size:10px">atc_emerg_svcs_confirmed</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">emerg_svcs_confirmed (+5s)</span></td>
+      <td><span class="chip-from-green">DELHI APPROACH</span></td>
+      <td class="hint-text">"IFLY101, Roger, emergency services standing by runway 28, full CFR, Category 3 confirmed."</td>
+      <td><div style="color:#6b7280;font-style:italic;font-size:11px">ACKNOWLEDGE ONLY — no crew response quiz</div></td>
+      <td><textarea class="editable" data-key="atc_atc_emerg_svcs_confirmed" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_emerg_svcs_confirmed_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-blue">
+      <td style="font-weight:700;font-size:16px">⑨</td>
+      <td><code style="font-size:10px">pm_ready_for_approach</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">approach_prep (+5s)</span></td>
+      <td><span class="chip-from-blue">PM → DELHI APPROACH</span></td>
+      <td class="hint-text">"Select PM call to Delhi Approach reporting ready for approach."</td>
+      <td><div class="atc-choice correct">✔ Delhi Approach, IFLY101, ready for approach, request ILS runway 28.</div><div class="atc-choice wrong">✘ Delhi Approach, IFLY101 ready.</div><div class="atc-choice wrong">✘ Delhi Approach, IFLY101, commencing approach runway 28, single engine.</div></td>
+      <td><textarea class="editable" data-key="atc_pm_ready_for_approach" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_pm_ready_for_approach_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">⑩</td>
+      <td><code style="font-size:10px">atc_cleared_approach</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">approach_brief (+5s)</span></td>
+      <td><span class="chip-from-green">DELHI APPROACH</span></td>
+      <td class="hint-text">"IFLY101, turn left heading 240, descend 3 000 feet, cleared ILS runway 28 approach, contact Delhi Tower 118.10 when established."</td>
+      <td><div class="atc-choice correct">✔ Left heading 240, descend 3 000, cleared ILS runway 28, contact Tower 118.10 when established, IFLY101</div><div class="atc-choice wrong">✘ Roger, IFLY101</div><div class="atc-choice wrong">✘ Cleared ILS runway 28, IFLY101</div></td>
+      <td><textarea class="editable" data-key="atc_atc_cleared_approach" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_cleared_approach_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">⑪</td>
+      <td><code style="font-size:10px">atc_tower_contact</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">approach_cl (+5s)</span></td>
+      <td><span class="chip-from-green">DELHI TOWER</span></td>
+      <td class="hint-text">"IFLY101, Delhi Tower, continue ILS approach runway 28, report established."</td>
+      <td><div class="atc-choice correct">✔ Wilco, will report established runway 28, IFLY101</div><div class="atc-choice wrong">✘ Continuing ILS runway 28, will report established, IFLY101</div><div class="atc-choice wrong">✘ Switching, IFLY101</div></td>
+      <td><textarea class="editable" data-key="atc_atc_tower_contact" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_tower_contact_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-blue">
+      <td style="font-weight:700;font-size:16px">⑫</td>
+      <td><code style="font-size:10px">pm_report_established</code><div style="margin-top:4px;font-size:10px;color:#6b7280;font-style:italic">⚙ completesStep: report_established</div></td>
+      <td><span class="chip chip-fc" style="font-size:10px">approach_cl (+25s)</span></td>
+      <td><span class="chip-from-blue">PM → DELHI TOWER 118.10</span></td>
+      <td class="hint-text">"Select PM call to Delhi Tower reporting established on ILS runway 28."</td>
+      <td><div class="atc-choice correct">✔ Delhi Tower, IFLY101, established ILS runway 28.</div><div class="atc-choice wrong">✘ IFLY101, on final runway 28.</div><div class="atc-choice wrong">✘ IFLY101, established runway 28, request landing clearance.</div></td>
+      <td><textarea class="editable" data-key="atc_pm_report_established" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_pm_report_established_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr class="atc-row-green">
+      <td style="font-weight:700;font-size:16px">⑫b</td>
+      <td><code style="font-size:10px">atc_cleared_to_land</code></td>
+      <td><span class="chip chip-fc" style="font-size:10px">report_established (+5s)</span></td>
+      <td><span class="chip-from-green">DELHI TOWER</span></td>
+      <td class="hint-text">"IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position."</td>
+      <td><div class="atc-choice correct">✔ Cleared to land runway 28, IFLY101</div><div class="atc-choice wrong">✘ Roger, IFLY101</div><div class="atc-choice wrong">✘ Cleared to land runway 28, wind 280/8, IFLY101</div><div class="atc-choice wrong">✘ Cleared to land runway 29, IFLY101</div></td>
+      <td><textarea class="editable" data-key="atc_atc_cleared_to_land" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
+      <td><select class="flag-sel" data-key="atc_atc_cleared_to_land_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr></tbody>
   </table>
 </div>
 
@@ -373,7 +1025,163 @@
         <th width="6%">Flag</th>
       </tr>
     </thead>
-    <tbody id="phaseBody"></tbody>
+    <tbody id="phaseBody"><tr>
+      <td>1</td>
+      <td><code style="font-size:10px">taxi_ready</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">0 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00bfff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#9ca3af;font-family:monospace;font-size:10px">1FD2</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✘</td>
+      <td><span style="color:#6b7280;font-size:11px">—</span></td>
+      <td><textarea class="editable" data-key="phase_taxi_ready" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_taxi_ready_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>2</td>
+      <td><code style="font-size:10px">v1_rotate</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">6 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00bfff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#9ca3af;font-family:monospace;font-size:10px">1FD2</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✘</td>
+      <td><span style="color:#6b7280;font-size:11px">—</span></td>
+      <td><textarea class="editable" data-key="phase_v1_rotate" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_v1_rotate_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>3</td>
+      <td><code style="font-size:10px">fire_detected</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">8 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#9ca3af;font-family:monospace;font-size:10px">1FD2</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✘</td>
+      <td><span style="color:#6b7280;font-size:11px">—</span></td>
+      <td><textarea class="editable" data-key="phase_fire_detected" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_fire_detected_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>4</td>
+      <td><code style="font-size:10px">gear_up_ap1</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">14 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✔ AP1</td>
+      <td><span class="chip" style="background:#14532d;color:#86efac;font-size:10px">AP1 ENGAGE</span></td>
+      <td><textarea class="editable" data-key="phase_gear_up_ap1" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_gear_up_ap1_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>5</td>
+      <td><code style="font-size:10px">ecam_actions_start</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">18 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✔ AP1</td>
+      <td><span style="color:#6b7280;font-size:11px">—</span></td>
+      <td><textarea class="editable" data-key="phase_ecam_actions_start" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_ecam_actions_start_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>6</td>
+      <td><code style="font-size:10px">thr_lever_idle_ph</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">25 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✔ AP1</td>
+      <td><span style="color:#6b7280;font-size:11px">—</span></td>
+      <td><textarea class="editable" data-key="phase_thr_lever_idle_ph" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_thr_lever_idle_ph_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>7</td>
+      <td><code style="font-size:10px">master_off_ph</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">32 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✔ AP1</td>
+      <td><span style="color:#6b7280;font-size:11px">—</span></td>
+      <td><textarea class="editable" data-key="phase_master_off_ph" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_master_off_ph_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>8</td>
+      <td><code style="font-size:10px">fire_pb_ph</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">40 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✔ AP1</td>
+      <td><span style="color:#6b7280;font-size:11px">—</span></td>
+      <td><textarea class="editable" data-key="phase_fire_pb_ph" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_fire_pb_ph_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>9</td>
+      <td><code style="font-size:10px">agent1_ph</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">50 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✔ AP1</td>
+      <td><span style="color:#6b7280;font-size:11px">—</span></td>
+      <td><textarea class="editable" data-key="phase_agent1_ph" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_agent1_ph_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>10</td>
+      <td><code style="font-size:10px">engine_secured_ph</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">60 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">SRS</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✔ AP1</td>
+      <td><span style="color:#6b7280;font-size:11px">—</span></td>
+      <td><textarea class="editable" data-key="phase_engine_secured_ph" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_engine_secured_ph_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>11</td>
+      <td><code style="font-size:10px">accel_level_off</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">75 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">MAN TOGA</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">V/S=0</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✔ AP1</td>
+      <td><span class="chip" style="background:#14532d;color:#86efac;font-size:10px">V/S ZERO</span></td>
+      <td><textarea class="editable" data-key="phase_accel_level_off" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_accel_level_off_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>12</td>
+      <td><code style="font-size:10px">green_dot_lvr_mct</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">95 000 ms</td>
+      <td><span style="color:#fff;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">LVR MCT</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">V/S=0</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00bfff;font-family:monospace;font-size:10px">A/THR (cyan=armed)</span></td>
+      <td>✔ AP1</td>
+      <td><span class="chip" style="background:#14532d;color:#86efac;font-size:10px">LVR MCT → SET</span></td>
+      <td><textarea class="editable" data-key="phase_green_dot_lvr_mct" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_green_dot_lvr_mct_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr>
+      <td>13</td>
+      <td><code style="font-size:10px">op_clb_climb</code></td>
+      <td style="font-family:monospace;font-size:11px;color:#6b7280">100 000 ms</td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">THR MCT</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">OP CLB</span></td>
+      <td><span style="color:#00ff00;font-family:monospace;font-size:11px;background:#000;padding:2px 5px;border-radius:3px">NAV</span></td>
+      <td><span style="color:#fff;font-family:monospace;font-size:10px">AP1 FD1</span><br><span style="color:#00ff00;font-family:monospace;font-size:10px">A/THR (green=active)</span></td>
+      <td>✔ AP1</td>
+      <td><span class="chip" style="background:#14532d;color:#86efac;font-size:10px">OP CLB CONFIRM</span></td>
+      <td><textarea class="editable" data-key="phase_op_clb_climb" rows="2" placeholder="…"></textarea></td>
+      <td><select class="flag-sel" data-key="phase_op_clb_climb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr></tbody>
   </table>
 </div>
 
@@ -384,13 +1192,13 @@
 
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
     <span style="font-size:11px;color:#6b7280;font-weight:700;margin-right:4px;">FILTER:</span>
-    <button class="flow-filter active" data-type="all"     onclick="filterFlow(this,'all')">ALL</button>
-    <button class="flow-filter"        data-type="trigger" onclick="filterFlow(this,'trigger')">TRIGGER</button>
-    <button class="flow-filter"        data-type="step"    onclick="filterFlow(this,'step')">STEP</button>
-    <button class="flow-filter"        data-type="ecam"    onclick="filterFlow(this,'ecam')">ECAM</button>
-    <button class="flow-filter"        data-type="fma"     onclick="filterFlow(this,'fma')">FMA</button>
-    <button class="flow-filter"        data-type="atc"     onclick="filterFlow(this,'atc')">ATC</button>
-    <button class="flow-filter"        data-type="pfd"     onclick="filterFlow(this,'pfd')">PFD ACTION</button>
+    <button class="flow-filter active" data-type="all" onclick="filterFlow(this,'all')">ALL</button>
+    <button class="flow-filter" data-type="trigger" onclick="filterFlow(this,'trigger')">TRIGGER</button>
+    <button class="flow-filter" data-type="step" onclick="filterFlow(this,'step')">STEP</button>
+    <button class="flow-filter" data-type="ecam" onclick="filterFlow(this,'ecam')">ECAM</button>
+    <button class="flow-filter" data-type="fma" onclick="filterFlow(this,'fma')">FMA</button>
+    <button class="flow-filter" data-type="atc" onclick="filterFlow(this,'atc')">ATC</button>
+    <button class="flow-filter" data-type="pfd" onclick="filterFlow(this,'pfd')">PFD ACTION</button>
   </div>
 
   <!-- ── Parallel tracks legend ─────────────────────────────────────────── -->
@@ -398,13 +1206,13 @@
     <span style="font-size:11px;color:#6b7280;font-weight:700;padding-top:3px;white-space:nowrap;">TRACKS:</span>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">
       <span class="chip chip-track-fire" style="padding:3px 8px;">⚡ BATCH — fire_warn</span>
-      <span class="chip chip-track-sec"  style="padding:3px 8px;">⚡ BATCH — sec failures</span>
-      <span class="chip chip-track-pf"   style="padding:3px 8px;">✈ PF AVIATE</span>
-      <span class="chip chip-track-pm"   style="padding:3px 8px;">📻 PM COMMS</span>
+      <span class="chip chip-track-sec" style="padding:3px 8px;">⚡ BATCH — sec failures</span>
+      <span class="chip chip-track-pf" style="padding:3px 8px;">✈ PF AVIATE</span>
+      <span class="chip chip-track-pm" style="padding:3px 8px;">📻 PM COMMS</span>
       <span class="chip chip-track-ford" style="padding:3px 8px;">⊕ POST-FORDEC ∥</span>
       <span class="chip chip-track-appr" style="padding:3px 8px;">▼ APPROACH SEQ</span>
-      <span class="chip chip-join"       style="padding:3px 8px;">JOIN — ALL req must complete</span>
-      <span class="chip chip-batch"      style="padding:3px 8px;">BATCH — fires simultaneously</span>
+      <span class="chip chip-join" style="padding:3px 8px;">JOIN — ALL req must complete</span>
+      <span class="chip chip-batch" style="padding:3px 8px;">BATCH — fires simultaneously</span>
     </div>
   </div>
 
@@ -423,7 +1231,953 @@
         <th width="4%">Flag</th>
       </tr>
     </thead>
-    <tbody id="flowBody"></tbody>
+    <tbody id="flowBody"><tr data-flow-type="trigger" data-track="">
+      <td style="color:#9ca3af;font-size:11px">1</td>
+      <td><code style="font-size:10px">after_v1</code></td>
+      <td><span class="chip chip-trigger">TRIGGER</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+6 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><span style="color:#9ca3af">—</span></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Gate only — V1 committed, rotation begins</td>
+      <td class="flow-payload">V1 PASSED</td>
+      <td><textarea class="editable" data-key="flow_after_v1" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_after_v1_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="trigger" data-track="batch:fire_warn">
+      <td style="color:#9ca3af;font-size:11px">2</td>
+      <td><code style="font-size:10px">fire_warn</code></td>
+      <td><span class="chip chip-trigger">TRIGGER</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+8 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">after_v1</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-fire">BATCH</span> <span class="chip chip-track-fire" title="trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC">⚡ BATCH — fire_warn fires all at once</span></td>
+      <td class="flow-effects">SET_MASTER_WARN · ADD_ECAM (all 7 lines below simultaneously) · CRC</td>
+      <td class="flow-payload">ENG 1 FIRE detected</td>
+      <td><textarea class="editable" data-key="flow_fire_warn" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fire_warn_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="trigger" data-track="">
+      <td style="color:#9ca3af;font-size:11px">3</td>
+      <td><code style="font-size:10px">four_hundred_ft</code></td>
+      <td><span class="chip chip-trigger">TRIGGER</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+18 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">ADD_ECAM "400 FT — ECAM ACTIONS" · opens ECAM gate</td>
+      <td class="flow-payload">400 ft AGL — ECAM ACTIONS</td>
+      <td><textarea class="editable" data-key="flow_four_hundred_ft" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_four_hundred_ft_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="trigger" data-track="">
+      <td style="color:#9ca3af;font-size:11px">4</td>
+      <td><code style="font-size:10px">fire_extinguished</code></td>
+      <td><span class="chip chip-trigger">TRIGGER</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on agent disch</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">agent1</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">CLEAR_ECAM (eng1_fire) · engine_secured gate opens</td>
+      <td class="flow-payload">Fire light out — engine secured</td>
+      <td><textarea class="editable" data-key="flow_fire_extinguished" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fire_extinguished_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="trigger" data-track="">
+      <td style="color:#9ca3af;font-size:11px">5</td>
+      <td><code style="font-size:10px">fire_persists_30s</code></td>
+      <td><span class="chip chip-trigger">TRIGGER</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">fire_warn+30 s</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">agent1</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Opens AGENT 2 ECAM line</td>
+      <td class="flow-payload">Fire warning still active after 30 s</td>
+      <td><textarea class="editable" data-key="flow_fire_persists_30s" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fire_persists_30s_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="trigger" data-track="">
+      <td style="color:#9ca3af;font-size:11px">6</td>
+      <td><code style="font-size:10px">min_accel_alt</code></td>
+      <td><span class="chip chip-trigger">TRIGGER</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+55 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">four_hundred_ft</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Informational gate — MAA reached</td>
+      <td class="flow-payload">Minimum Acceleration Altitude ~1 500 ft</td>
+      <td><textarea class="editable" data-key="flow_min_accel_alt" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_min_accel_alt_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="trigger" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">7</td>
+      <td><code style="font-size:10px">atc_notified</code></td>
+      <td><span class="chip chip-trigger">TRIGGER</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">mayday_atc+1.5s</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">mayday_atc</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">CLEAR_ECAM (ecam_atc)</td>
+      <td class="flow-payload">ECAM ATC NOTIFY cleared</td>
+      <td><textarea class="editable" data-key="flow_atc_notified" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_notified_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:fire_warn">
+      <td style="color:#9ca3af;font-size:11px">8</td>
+      <td><code style="font-size:10px">ecam_eng1_fire</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on fire_warn</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-fire" title="trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC">BATCH — fire_warn fires all at once</span></td>
+      <td class="flow-effects">Drives MASTER WARN · opens ECAM ACTIONS sequence</td>
+      <td class="flow-payload">ENG 1 FIRE  [WARNING — red]</td>
+      <td><textarea class="editable" data-key="flow_ecam_eng1_fire" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ecam_eng1_fire_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:fire_warn">
+      <td style="color:#9ca3af;font-size:11px">9</td>
+      <td><code style="font-size:10px">ecam_thr</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on fire_warn</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-fire" title="trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC">BATCH — fire_warn fires all at once</span></td>
+      <td class="flow-effects">Cleared by step thr_lever_idle</td>
+      <td class="flow-payload">THR LEVER (ENG 1)......IDLE</td>
+      <td><textarea class="editable" data-key="flow_ecam_thr" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ecam_thr_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:fire_warn">
+      <td style="color:#9ca3af;font-size:11px">10</td>
+      <td><code style="font-size:10px">ecam_master</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on fire_warn</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-fire" title="trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC">BATCH — fire_warn fires all at once</span></td>
+      <td class="flow-effects">Cleared by step eng1_master_off</td>
+      <td class="flow-payload">ENG 1 MASTER...........OFF</td>
+      <td><textarea class="editable" data-key="flow_ecam_master" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ecam_master_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:fire_warn">
+      <td style="color:#9ca3af;font-size:11px">11</td>
+      <td><code style="font-size:10px">ecam_fire_pb</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on fire_warn</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-fire" title="trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC">BATCH — fire_warn fires all at once</span></td>
+      <td class="flow-effects">Cleared by step eng1_fire_pb · triggers sec failures batch +2 s</td>
+      <td class="flow-payload">ENG 1 FIRE P/B.........PUSH</td>
+      <td><textarea class="editable" data-key="flow_ecam_fire_pb" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ecam_fire_pb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:fire_warn">
+      <td style="color:#9ca3af;font-size:11px">12</td>
+      <td><code style="font-size:10px">ecam_agent1</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on fire_warn</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-fire" title="trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC">BATCH — fire_warn fires all at once</span></td>
+      <td class="flow-effects">Cleared by step agent1</td>
+      <td class="flow-payload">AGENT 1 AFTER 10 S....DISCH</td>
+      <td><textarea class="editable" data-key="flow_ecam_agent1" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ecam_agent1_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:fire_warn">
+      <td style="color:#9ca3af;font-size:11px">13</td>
+      <td><code style="font-size:10px">ecam_atc</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on fire_warn</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-fire" title="trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC">BATCH — fire_warn fires all at once</span></td>
+      <td class="flow-effects">Cleared by trigger atc_notified (1.5 s after mayday_atc)</td>
+      <td class="flow-payload">ATC..................NOTIFY</td>
+      <td><textarea class="editable" data-key="flow_ecam_atc" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ecam_atc_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:fire_warn">
+      <td style="color:#9ca3af;font-size:11px">14</td>
+      <td><code style="font-size:10px">ecam_land_asap</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on fire_warn</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-fire" title="trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC">BATCH — fire_warn fires all at once</span></td>
+      <td class="flow-effects">Drives LAND ASAP decision — remains until landing</td>
+      <td class="flow-payload">LAND ASAP  [WARNING — red]</td>
+      <td><textarea class="editable" data-key="flow_ecam_land_asap" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ecam_land_asap_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="">
+      <td style="color:#9ca3af;font-size:11px">15</td>
+      <td><code style="font-size:10px">ecam_if_persist</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">fire_warn+30 s</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_persists_30s</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Reveals AGENT 2 line</td>
+      <td class="flow-payload">· IF FIRE WARN AFTER 30 S:</td>
+      <td><textarea class="editable" data-key="flow_ecam_if_persist" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ecam_if_persist_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="">
+      <td style="color:#9ca3af;font-size:11px">16</td>
+      <td><code style="font-size:10px">ecam_agent2</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">conditional</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">ecam_if_persist</code> <code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_persists_30s</code></td>
+      <td style="font-size:11px;line-height:1.6"> <span class="chip chip-join" title="JOIN — all upstream requires must complete">JOIN</span></td>
+      <td class="flow-effects">Cleared by step agent2</td>
+      <td class="flow-payload">  AGENT 2.............DISCH</td>
+      <td><textarea class="editable" data-key="flow_ecam_agent2" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ecam_agent2_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:sec_fail">
+      <td style="color:#9ca3af;font-size:11px">17</td>
+      <td><code style="font-size:10px">sec_hyd</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">eng1_fire_pb+2s</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">eng1_fire_pb</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-sec" title="eng1_fire_pb afterEffect → sec failures appear simultaneously on SD">BATCH — fire_pb +2 s</span></td>
+      <td class="flow-effects">Displayed on SD simultaneously with sec_elec + sec_air_bleed</td>
+      <td class="flow-payload">* HYD G ENG1 PUMP LO PR  [CAUTION]</td>
+      <td><textarea class="editable" data-key="flow_sec_hyd" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_sec_hyd_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:sec_fail">
+      <td style="color:#9ca3af;font-size:11px">18</td>
+      <td><code style="font-size:10px">sec_elec</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">eng1_fire_pb+2s</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">eng1_fire_pb</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-sec" title="eng1_fire_pb afterEffect → sec failures appear simultaneously on SD">BATCH — fire_pb +2 s</span></td>
+      <td class="flow-effects">Displayed on SD simultaneously with sec_hyd + sec_air_bleed</td>
+      <td class="flow-payload">* ELEC / GEN 1 FAULT  [CAUTION]</td>
+      <td><textarea class="editable" data-key="flow_sec_elec" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_sec_elec_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="ecam" data-track="batch:sec_fail">
+      <td style="color:#9ca3af;font-size:11px">19</td>
+      <td><code style="font-size:10px">sec_air_bleed</code></td>
+      <td><span class="chip chip-ec">ECAM</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">eng1_fire_pb+2s</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">eng1_fire_pb</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-sec" title="eng1_fire_pb afterEffect → sec failures appear simultaneously on SD">BATCH — fire_pb +2 s</span></td>
+      <td class="flow-effects">Displayed on SD simultaneously with sec_hyd + sec_elec</td>
+      <td class="flow-payload">* AIR BLEED / ENG 1 BLEED FAULT  [CAUTION]</td>
+      <td><textarea class="editable" data-key="flow_sec_air_bleed" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_sec_air_bleed_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">20</td>
+      <td><code style="font-size:10px">continue_rotation</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">flightcheck</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><span style="color:#9ca3af">—</span></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PF · Cat: AV</td>
+      <td class="flow-payload">CONTINUE ROTATION — V2+10</td>
+      <td><textarea class="editable" data-key="flow_continue_rotation" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_continue_rotation_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">21</td>
+      <td><code style="font-size:10px">positive_rate_gear_up</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">flightcheck</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">continue_rotation</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PM · Cat: AV</td>
+      <td class="flow-payload">POSITIVE CLIMB — GEAR UP — CALL</td>
+      <td><textarea class="editable" data-key="flow_positive_rate_gear_up" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_positive_rate_gear_up_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">22</td>
+      <td><code style="font-size:10px">engage_ap_fma</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">flightcheck</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">positive_rate_gear_up</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PF · Cat: AV</td>
+      <td class="flow-payload">AP1 ENGAGE — READ FMA — CONFIRM</td>
+      <td><textarea class="editable" data-key="flow_engage_ap_fma" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_engage_ap_fma_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">23</td>
+      <td><code style="font-size:10px">cancel_master_warn</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">glareshield</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><span style="color:#9ca3af">—</span></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PM · Cat: AV · HW</td>
+      <td class="flow-payload">MASTER WARN — CANCEL</td>
+      <td><textarea class="editable" data-key="flow_cancel_master_warn" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_cancel_master_warn_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">24</td>
+      <td><code style="font-size:10px">four_hundred_ft_cmd</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">flightcheck</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">engage_ap_fma</code> <code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">cancel_master_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"> <span class="chip chip-join" title="JOIN — all upstream requires must complete">JOIN</span></td>
+      <td class="flow-effects">Crew: PM · Cat: AV</td>
+      <td class="flow-payload">400 FT — ECAM ACTIONS — ANNOUNCE</td>
+      <td><textarea class="editable" data-key="flow_four_hundred_ft_cmd" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_four_hundred_ft_cmd_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">25</td>
+      <td><code style="font-size:10px">thr_lever_idle</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">procedure</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">four_hundred_ft_cmd</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PF · Cat: EC · HW</td>
+      <td class="flow-payload">THR LEVER 1 — IDLE</td>
+      <td><textarea class="editable" data-key="flow_thr_lever_idle" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_thr_lever_idle_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">26</td>
+      <td><code style="font-size:10px">eng1_master_off</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">procedure</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">thr_lever_idle</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PM · Cat: EC · HW</td>
+      <td class="flow-payload">ENG 1 MASTER — OFF</td>
+      <td><textarea class="editable" data-key="flow_eng1_master_off" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_eng1_master_off_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">27</td>
+      <td><code style="font-size:10px">eng1_fire_pb</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">procedure</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">eng1_master_off</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PM · Cat: EC · HW</td>
+      <td class="flow-payload">ENG 1 FIRE P/B — PUSH</td>
+      <td><textarea class="editable" data-key="flow_eng1_fire_pb" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_eng1_fire_pb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">28</td>
+      <td><code style="font-size:10px">cancel_master_caut</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">glareshield</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><span style="color:#9ca3af">—</span></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PM · Cat: EC · HW</td>
+      <td class="flow-payload">MASTER CAUT — CANCEL</td>
+      <td><textarea class="editable" data-key="flow_cancel_master_caut" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_cancel_master_caut_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">29</td>
+      <td><code style="font-size:10px">agent1</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">procedure</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">eng1_fire_pb</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PM · Cat: EC · HW</td>
+      <td class="flow-payload">AGENT 1 — DISCH</td>
+      <td><textarea class="editable" data-key="flow_agent1" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_agent1_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">30</td>
+      <td><code style="font-size:10px">agent2</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">procedure</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">agent1</code> <code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_persists_30s</code></td>
+      <td style="font-size:11px;line-height:1.6"> <span class="chip chip-join" title="JOIN — all upstream requires must complete">JOIN</span></td>
+      <td class="flow-effects">Crew: PM · Cat: EC · HW · OPT</td>
+      <td class="flow-payload">AGENT 2 — DISCH</td>
+      <td><textarea class="editable" data-key="flow_agent2" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_agent2_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">31</td>
+      <td><code style="font-size:10px">engine_secured</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">agent1</code> <code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_extinguished</code></td>
+      <td style="font-size:11px;line-height:1.6"> <span class="chip chip-join" title="JOIN — all upstream requires must complete">JOIN</span></td>
+      <td class="flow-effects">Crew: PM · Cat: EC</td>
+      <td class="flow-payload">ENGINE SECURED — ANNOUNCE</td>
+      <td><textarea class="editable" data-key="flow_engine_secured" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_engine_secured_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">32</td>
+      <td><code style="font-size:10px">announce_land_asap</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">engine_secured</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PF · Cat: AV</td>
+      <td class="flow-payload">LAND ASAP — ANNOUNCE</td>
+      <td><textarea class="editable" data-key="flow_announce_land_asap" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_announce_land_asap_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">33</td>
+      <td><code style="font-size:10px">mayday_atc</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">engine_secured</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew: PM · Cat: ATC</td>
+      <td class="flow-payload">MAYDAY — DECLARE</td>
+      <td><textarea class="editable" data-key="flow_mayday_atc" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_mayday_atc_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">34</td>
+      <td><code style="font-size:10px">level_off_maa</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">procedure</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">engine_secured</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">Crew: PF · Cat: AV</td>
+      <td class="flow-payload">V/S 0 AT MAA — SELECT</td>
+      <td><textarea class="editable" data-key="flow_level_off_maa" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_level_off_maa_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">35</td>
+      <td><code style="font-size:10px">accel_clean</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">procedure</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">level_off_maa</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">Crew: PF · Cat: AV</td>
+      <td class="flow-payload">ACCEL / CLEAN — CONFIRM</td>
+      <td><textarea class="editable" data-key="flow_accel_clean" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_accel_clean_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">36</td>
+      <td><code style="font-size:10px">mct_open_clb</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">procedure</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">accel_clean</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">Crew: PF · Cat: AV</td>
+      <td class="flow-payload">MCT / OPEN CLB — SELECT</td>
+      <td><textarea class="editable" data-key="flow_mct_open_clb" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_mct_open_clb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">37</td>
+      <td><code style="font-size:10px">announce_sec_failures</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">mayday_atc</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew: PM · Cat: EC</td>
+      <td class="flow-payload">SECONDARY FAILURES — READ</td>
+      <td><textarea class="editable" data-key="flow_announce_sec_failures" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_announce_sec_failures_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">38</td>
+      <td><code style="font-size:10px">announce_status</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">announce_sec_failures</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew: PM · Cat: ST</td>
+      <td class="flow-payload">STATUS — ANNOUNCE — ANNOUNCE</td>
+      <td><textarea class="editable" data-key="flow_announce_status" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_announce_status_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">39</td>
+      <td><code style="font-size:10px">stop_ecam</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">announce_status</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew: PF · Cat: ST</td>
+      <td class="flow-payload">STOP ECAM — ORDER</td>
+      <td><textarea class="editable" data-key="flow_stop_ecam" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_stop_ecam_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">40</td>
+      <td><code style="font-size:10px">after_takeoff_cl</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">stop_ecam</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew: PM · Cat: ST</td>
+      <td class="flow-payload">AFTER TAKEOFF CL — COMPLETE</td>
+      <td><textarea class="editable" data-key="flow_after_takeoff_cl" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_after_takeoff_cl_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">41</td>
+      <td><code style="font-size:10px">oeb_check</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">after_takeoff_cl</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew: PF · Cat: ST</td>
+      <td class="flow-payload">OEB / COMPUTER RESETS — CHECK</td>
+      <td><textarea class="editable" data-key="flow_oeb_check" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_oeb_check_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">42</td>
+      <td><code style="font-size:10px">read_status</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">oeb_check</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew: PF · Cat: ST</td>
+      <td class="flow-payload">READ STATUS — CALL</td>
+      <td><textarea class="editable" data-key="flow_read_status" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_read_status_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">43</td>
+      <td><code style="font-size:10px">status_read_aloud</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">read_status</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew: PM · Cat: ST</td>
+      <td class="flow-payload">ECAM STATUS — PM READS — REVIEW</td>
+      <td><textarea class="editable" data-key="flow_status_read_aloud" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_status_read_aloud_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">44</td>
+      <td><code style="font-size:10px">crew_crosscheck</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">status_read_aloud</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew: PM · Cat: ST</td>
+      <td class="flow-payload">ECAM ACTIONS COMPLETE — ANNOUNCE</td>
+      <td><textarea class="editable" data-key="flow_crew_crosscheck" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_crew_crosscheck_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">45</td>
+      <td><code style="font-size:10px">wx_request</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">crew_crosscheck</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PM · Cat: PL</td>
+      <td class="flow-payload">WX / ATIS — REQUEST</td>
+      <td><textarea class="editable" data-key="flow_wx_request" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_wx_request_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">46</td>
+      <td><code style="font-size:10px">ldg_perf</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">wx_request</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PF · Cat: PL</td>
+      <td class="flow-payload">LDG PERF — CHECK</td>
+      <td><textarea class="editable" data-key="flow_ldg_perf" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_ldg_perf_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="">
+      <td style="color:#9ca3af;font-size:11px">47</td>
+      <td><code style="font-size:10px">fordec</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">ldg_perf</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Crew: PF · Cat: PL</td>
+      <td class="flow-payload">FORDEC — COMPLETE</td>
+      <td><textarea class="editable" data-key="flow_fordec" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fordec_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="post_fordec">
+      <td style="color:#9ca3af;font-size:11px">48</td>
+      <td><code style="font-size:10px">intention_to_atc</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fordec</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-ford" title="after intention stated to ATC: fmgc_prep + nis_brief run simultaneously, then emerg svcs request">POST-FORDEC PARALLEL</span></td>
+      <td class="flow-effects">Crew: PM · Cat: ATC</td>
+      <td class="flow-payload">INTENTION — ATC — ADVISE</td>
+      <td><textarea class="editable" data-key="flow_intention_to_atc" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_intention_to_atc_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="post_fordec">
+      <td style="color:#9ca3af;font-size:11px">49</td>
+      <td><code style="font-size:10px">fmgc_prep</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">intention_to_atc</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-ford" title="after intention stated to ATC: fmgc_prep + nis_brief run simultaneously, then emerg svcs request">POST-FORDEC PARALLEL</span></td>
+      <td class="flow-effects">Crew: PM · Cat: PL</td>
+      <td class="flow-payload">FMGC PREP — COMPLETE</td>
+      <td><textarea class="editable" data-key="flow_fmgc_prep" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fmgc_prep_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="post_fordec">
+      <td style="color:#9ca3af;font-size:11px">50</td>
+      <td><code style="font-size:10px">nis_brief</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">intention_to_atc</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-ford" title="after intention stated to ATC: fmgc_prep + nis_brief run simultaneously, then emerg svcs request">POST-FORDEC PARALLEL</span></td>
+      <td class="flow-effects">Crew: PM · Cat: PL</td>
+      <td class="flow-payload">NITS BRIEF — CONFIRM</td>
+      <td><textarea class="editable" data-key="flow_nis_brief" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_nis_brief_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="post_fordec">
+      <td style="color:#9ca3af;font-size:11px">51</td>
+      <td><code style="font-size:10px">pax_pa</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">nis_brief</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-ford" title="after intention stated to ATC: fmgc_prep + nis_brief run simultaneously, then emerg svcs request">POST-FORDEC PARALLEL</span></td>
+      <td class="flow-effects">Crew: PF · Cat: PL</td>
+      <td class="flow-payload">PASSENGER PA — CONFIRM</td>
+      <td><textarea class="editable" data-key="flow_pax_pa" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_pax_pa_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="post_fordec">
+      <td style="color:#9ca3af;font-size:11px">52</td>
+      <td><code style="font-size:10px">company_notify</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">pax_pa</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-ford" title="after intention stated to ATC: fmgc_prep + nis_brief run simultaneously, then emerg svcs request">POST-FORDEC PARALLEL</span></td>
+      <td class="flow-effects">Crew: PM · Cat: PL · OPT</td>
+      <td class="flow-payload">OPS NOTIFY — CONFIRM</td>
+      <td><textarea class="editable" data-key="flow_company_notify" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_company_notify_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">53</td>
+      <td><code style="font-size:10px">approach_prep</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fmgc_prep</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Crew: PM · Cat: AP</td>
+      <td class="flow-payload">APPROACH PREP — COMPLETE</td>
+      <td><textarea class="editable" data-key="flow_approach_prep" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_approach_prep_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">54</td>
+      <td><code style="font-size:10px">atc_emergency_services</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">nis_brief</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Crew: PM · Cat: ATC</td>
+      <td class="flow-payload">ATC — EMERG SVCS — ADVISE</td>
+      <td><textarea class="editable" data-key="flow_atc_emergency_services" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_emergency_services_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">55</td>
+      <td><code style="font-size:10px">approach_brief</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">atc_emergency_services</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Crew: PF · Cat: AP</td>
+      <td class="flow-payload">APPROACH BRIEF — COMPLETE</td>
+      <td><textarea class="editable" data-key="flow_approach_brief" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_approach_brief_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">56</td>
+      <td><code style="font-size:10px">go_around_review</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">comms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">approach_brief</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Crew: PF · Cat: AP</td>
+      <td class="flow-payload">GO-AROUND REVIEW — CONFIRM</td>
+      <td><textarea class="editable" data-key="flow_go_around_review" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_go_around_review_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">57</td>
+      <td><code style="font-size:10px">approach_cl</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">go_around_review</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Crew: PM · Cat: AP</td>
+      <td class="flow-payload">APPROACH CL — COMPLETE</td>
+      <td><textarea class="editable" data-key="flow_approach_cl" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_approach_cl_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="step" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">58</td>
+      <td><code style="font-size:10px">landing_cl</code></td>
+      <td><span class="chip chip-step">STEP</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">chclm</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">approach_cl</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Crew: PM · Cat: AP</td>
+      <td class="flow-payload">LANDING CL — COMPLETE</td>
+      <td><textarea class="editable" data-key="flow_landing_cl" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_landing_cl_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="">
+      <td style="color:#9ca3af;font-size:11px">59</td>
+      <td><code style="font-size:10px">fma_01</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T=0</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><span style="color:#9ca3af">—</span></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">SRS armed (cyan), TOGA set, RWY TRK mode</td>
+      <td class="flow-payload">MAN TOGA | SRS cyan | RWY | no AP | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_01" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_01_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="">
+      <td style="color:#9ca3af;font-size:11px">60</td>
+      <td><code style="font-size:10px">fma_02</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+6 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">after_v1</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Rotation — FMA frozen in takeoff config</td>
+      <td class="flow-payload">MAN TOGA | SRS cyan | RWY | no AP | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_02" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_02_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="batch:fire_warn">
+      <td style="color:#9ca3af;font-size:11px">61</td>
+      <td><code style="font-size:10px">fma_03</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+8 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">fire_warn</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-fire" title="trigger fires → all these ECAM lines appear simultaneously + MASTER WARN + CRC">BATCH — fire_warn fires all at once</span></td>
+      <td class="flow-effects">NAV captured, SRS active green — fires with all ECAM lines</td>
+      <td class="flow-payload">MAN TOGA | SRS green | NAV | no AP | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_03" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_03_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">62</td>
+      <td><code style="font-size:10px">fma_04</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+14 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">engage_ap_fma</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">AP1 annunciated — crew confirmed engagement</td>
+      <td class="flow-payload">MAN TOGA | SRS green | NAV | AP1 FD1 | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_04" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_04_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="">
+      <td style="color:#9ca3af;font-size:11px">63</td>
+      <td><code style="font-size:10px">fma_05</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+18 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">four_hundred_ft</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">400 ft gate — ECAM ACTIONS begin</td>
+      <td class="flow-payload">MAN TOGA | SRS green | NAV | AP1 | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_05" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_05_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="">
+      <td style="color:#9ca3af;font-size:11px">64</td>
+      <td><code style="font-size:10px">fma_06</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+25 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">thr_lever_idle</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">ENG 1 TL retarded to IDLE</td>
+      <td class="flow-payload">MAN TOGA | SRS green | NAV | AP1 | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_06" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_06_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="">
+      <td style="color:#9ca3af;font-size:11px">65</td>
+      <td><code style="font-size:10px">fma_07</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+32 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">eng1_master_off</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">LP + HP fuel SOVs closed</td>
+      <td class="flow-payload">MAN TOGA | SRS green | NAV | AP1 | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_07" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_07_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="">
+      <td style="color:#9ca3af;font-size:11px">66</td>
+      <td><code style="font-size:10px">fma_08</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+40 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">eng1_fire_pb</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Bleed + HYD SOVs closed · squibs armed · FADEC cut</td>
+      <td class="flow-payload">MAN TOGA | SRS green | NAV | AP1 | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_08" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_08_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="">
+      <td style="color:#9ca3af;font-size:11px">67</td>
+      <td><code style="font-size:10px">fma_09</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+50 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">agent1</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Agent 1 discharged — waiting fire_extinguished</td>
+      <td class="flow-payload">MAN TOGA | SRS green | NAV | AP1 | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_09" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_09_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="">
+      <td style="color:#9ca3af;font-size:11px">68</td>
+      <td><code style="font-size:10px">fma_10</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+60 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">engine_secured</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">Engine secured — PF AVIATE + PM COMMS parallel tracks OPEN simultaneously</td>
+      <td class="flow-payload">MAN TOGA | SRS green | NAV | AP1 | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_10" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_10_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">69</td>
+      <td><code style="font-size:10px">fma_11</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+75 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">level_off_maa</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">V/S 0 selected — level off at MAA</td>
+      <td class="flow-payload">MAN TOGA | V/S=0 green | NAV | AP1 | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_11" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_11_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">70</td>
+      <td><code style="font-size:10px">fma_12</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+95 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">accel_clean</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">Green dot reached — LVR MCT flashes white on FMA</td>
+      <td class="flow-payload">LVR MCT white | V/S=0 green | NAV | AP1 | A/THR armed</td>
+      <td><textarea class="editable" data-key="flow_fma_12" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_12_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="fma" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">71</td>
+      <td><code style="font-size:10px">fma_13</code></td>
+      <td><span class="chip chip-fma">FMA</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+100 000 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">mct_open_clb</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">OP CLB + THR MCT active — A/THR transitions armed→active</td>
+      <td class="flow-payload">THR MCT green | OP CLB green | NAV | AP1 | A/THR active</td>
+      <td><textarea class="editable" data-key="flow_fma_13" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_fma_13_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="">
+      <td style="color:#9ca3af;font-size:11px">72</td>
+      <td><code style="font-size:10px">atc_handoff</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">T+27 500 ms</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">continue_rotation</code></td>
+      <td style="font-size:11px;line-height:1.6"><span style="color:#d1d5db">—</span></td>
+      <td class="flow-effects">STANDBY expected during ECAM · resurfaces T+52 500 ms</td>
+      <td class="flow-payload">DELHI TWR: IFLY101, contact Delhi Departure 124.85.</td>
+      <td><textarea class="editable" data-key="flow_atc_handoff" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_handoff_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">73</td>
+      <td><code style="font-size:10px">atc_tower_mayday_ack</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">mayday_atc+2s</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">mayday_atc</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">TWR ACK: readback MAYDAY ack + Dep 124.85 + freq change</td>
+      <td class="flow-payload">DELHI TWR: IFLY101, MAYDAY acknowledged. Contact Departure 124.85.</td>
+      <td><textarea class="editable" data-key="flow_atc_tower_mayday_ack" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_tower_mayday_ack_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">74</td>
+      <td><code style="font-size:10px">atc_vectors_clb</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">mayday_atc+15s</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">mayday_atc</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Climb clearance readback + continue runway track</td>
+      <td class="flow-payload">DELHI DEP: Roger MAYDAY, continue runway track, climb 4 000 ft.</td>
+      <td><textarea class="editable" data-key="flow_atc_vectors_clb" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_vectors_clb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">75</td>
+      <td><code style="font-size:10px">atc_vectors_rdy</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on step</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">announce_sec_failures</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">Crew continues checklist or requests hold</td>
+      <td class="flow-payload">DELHI DEP: Vectors available when ready.</td>
+      <td><textarea class="editable" data-key="flow_atc_vectors_rdy" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_vectors_rdy_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="post_fordec">
+      <td style="color:#9ca3af;font-size:11px">76</td>
+      <td><code style="font-size:10px">atc_wx_brief</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on step</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">wx_request</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-ford" title="after intention stated to ATC: fmgc_prep + nis_brief run simultaneously, then emerg svcs request">POST-FORDEC PARALLEL</span></td>
+      <td class="flow-effects">Wind / QNH / runway readback expected</td>
+      <td class="flow-payload">DELHI APP: Wind 280/8, QNH 1013, RWY 28, ILS RWY 28.</td>
+      <td><textarea class="editable" data-key="flow_atc_wx_brief" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_wx_brief_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="pm_comms">
+      <td style="color:#9ca3af;font-size:11px">77</td>
+      <td><code style="font-size:10px">atc_pob_fuel</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on step</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">atc_vectors_clb</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pm" title="runs in PARALLEL with PF AVIATE after engine_secured · PM: MAYDAY → sec fails → STATUS">PM COMMS TRACK</span></td>
+      <td class="flow-effects">[D2] POB + endurance — PM responds STANDBY until ECAM done</td>
+      <td class="flow-payload">DELHI DEP: Say POB and endurance.</td>
+      <td><textarea class="editable" data-key="flow_atc_pob_fuel" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_pob_fuel_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">78</td>
+      <td><code style="font-size:10px">atc_emsvcs_ack</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on step</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">atc_emergency_services</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Category 3 CFR confirmed readback</td>
+      <td class="flow-payload">DELHI APP: Emergency services standing by RWY 28, Cat 3 confirmed.</td>
+      <td><textarea class="editable" data-key="flow_atc_emsvcs_ack" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_emsvcs_ack_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">79</td>
+      <td><code style="font-size:10px">atc_rdy_appr</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on step</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">approach_prep</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Request ILS vectors + advise ready</td>
+      <td class="flow-payload">DELHI APP: Advise when ready for approach.</td>
+      <td><textarea class="editable" data-key="flow_atc_rdy_appr" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_rdy_appr_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">80</td>
+      <td><code style="font-size:10px">atc_clrd_appr</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on step</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">approach_brief</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Full approach clearance readback required</td>
+      <td class="flow-payload">DELHI APP: Left hdg 240, descend 3 000, cleared ILS RWY 28.</td>
+      <td><textarea class="editable" data-key="flow_atc_clrd_appr" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_clrd_appr_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">81</td>
+      <td><code style="font-size:10px">atc_tower_cont</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on step</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">atc_clrd_appr</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Established report to Tower 118.10</td>
+      <td class="flow-payload">DELHI TWR: Continue ILS RWY 28, report established.</td>
+      <td><textarea class="editable" data-key="flow_atc_tower_cont" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_tower_cont_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="atc" data-track="approach">
+      <td style="color:#9ca3af;font-size:11px">82</td>
+      <td><code style="font-size:10px">atc_cleared_land</code></td>
+      <td><span class="chip chip-atc">ATC</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">on step</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">landing_cl</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-appr" title="single chain after post_fordec converges: prep → brief → CL → land CL">APPROACH SEQUENCE</span></td>
+      <td class="flow-effects">Landing clearance readback</td>
+      <td class="flow-payload">DELHI TWR: RWY 28 cleared to land, wind 280/8, emergency services in position.</td>
+      <td><textarea class="editable" data-key="flow_atc_cleared_land" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_atc_cleared_land_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="pfd" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">83</td>
+      <td><code style="font-size:10px">pfa_ap1</code></td>
+      <td><span class="chip chip-ap">PFD</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">phase 4</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">positive_rate_gear_up</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">Green pulsing ring on PFD · coach hint after 8 s</td>
+      <td class="flow-payload">AP1 ENGAGE</td>
+      <td><textarea class="editable" data-key="flow_pfa_ap1" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_pfa_ap1_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="pfd" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">84</td>
+      <td><code style="font-size:10px">pfa_vs_zero</code></td>
+      <td><span class="chip chip-ap">PFD</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">phase 11</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">engine_secured</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">Green pulsing ring on PFD · coach hint after 8 s</td>
+      <td class="flow-payload">V/S ZERO AT MAA — push V/S knob</td>
+      <td><textarea class="editable" data-key="flow_pfa_vs_zero" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_pfa_vs_zero_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="pfd" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">85</td>
+      <td><code style="font-size:10px">pfa_lvr_mct</code></td>
+      <td><span class="chip chip-ap">PFD</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">phase 12</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">accel_clean</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">Green pulsing ring on PFD · FMA col 1 flashes LVR MCT white</td>
+      <td class="flow-payload">LVR MCT → SET</td>
+      <td><textarea class="editable" data-key="flow_pfa_lvr_mct" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_pfa_lvr_mct_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr><tr data-flow-type="pfd" data-track="pf_aviate">
+      <td style="color:#9ca3af;font-size:11px">86</td>
+      <td><code style="font-size:10px">pfa_op_clb</code></td>
+      <td><span class="chip chip-ap">PFD</span></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">phase 13</td>
+      <td class="flow-req" style="font-size:11px;line-height:1.6"><code style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:2px">mct_open_clb</code></td>
+      <td style="font-size:11px;line-height:1.6"><span class="chip chip-track-pf" title="runs in PARALLEL with PM COMMS after engine_secured · PF: MAA level-off → accel → MCT">PF AVIATE TRACK</span></td>
+      <td class="flow-effects">Green pulsing ring on PFD · FMA col 2 changes V/S→OP CLB</td>
+      <td class="flow-payload">OP CLB CONFIRM — pull ALT knob</td>
+      <td><textarea class="editable" data-key="flow_pfa_op_clb" rows="2" placeholder="…" style="font-size:11px"></textarea></td>
+      <td><select class="flag-sel" data-key="flow_pfa_op_clb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+    </tr></tbody>
   </table>
 </div>
 
@@ -523,8 +2277,11 @@ function buildProcedureTable() {
 
 // ── ATC data ──────────────────────────────────────────────────────────────
 const atcCalls = [
-  { n:'①', id:'atc_handoff_to_departure', gate:'continue_rotation', from:'DELHI TOWER',    msg:'IFLY101, contact Delhi Departure 124.85.',
-    choices:[{t:'Delhi Departure 124.85, IFLY101',c:true},{t:'Roger, IFLY101',c:false},{t:'Delhi Departure 124.95, IFLY101',c:false},{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, standby',c:false}] },
+  { n:'①', id:'atc_handoff_to_departure', gate:'continue_rotation', from:'DELHI TOWER', msg:'IFLY101, contact Delhi Departure 124.85.',
+    choices:[{t:'STANDBY, IFLY101',c:true},{t:'Delhi Departure 124.85, IFLY101',c:false},{t:'Roger, IFLY101',c:false},{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT] feet, STANDBY',c:false}] },
+  { n:'①b', id:'mayday_tower_declare', gate:'engine_secured (+3s)', from:'PM → TOWER 118.10', msg:'Select MAYDAY call for Delhi Tower 118.10.',
+    choices:[{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT] feet, STANDBY',c:true},{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, STANDBY',c:false},{t:'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, returning Delhi runway 28, 186 POB, request full emergency',c:false},{t:'IFLY101, declaring emergency, engine fire, standby',c:false}],
+    note:'completesStep: mayday_atc' },
   { n:'②a', id:'atc_tower_mayday_ack', gate:'mayday_atc (+2s)', from:'DELHI TOWER', msg:'IFLY101, MAYDAY acknowledged. Contact Delhi Departure 124.85. Emergency services alerted.',
     choices:[{t:'MAYDAY acknowledged, Departure 124.85, IFLY101',c:true},{t:'Delhi Departure 124.85, IFLY101',c:false},{t:'Roger, IFLY101',c:false}] },
   { n:'②b', id:'pm_dep_initial_call', gate:'mayday_atc (+8s)', from:'PM → DEPARTURE 124.85', msg:'Select PM initial call on Departure 124.85.',
@@ -553,15 +2310,19 @@ function buildAtcTable() {
   const tbody = document.getElementById('atcBody');
   let html = '';
   atcCalls.forEach(a => {
+    const isPm      = a.from.startsWith('PM');
+    const rowCls    = isPm ? 'atc-row-blue'  : 'atc-row-green';
+    const chipCls   = isPm ? 'chip-from-blue' : 'chip-from-green';
     const choicesHtml = a.choices.map(c =>
       `<div class="atc-choice ${c.c?'correct':'wrong'}">${c.c?'✔':'✘'} ${c.t}</div>`
     ).join('');
     const key = `atc_${a.id}`;
-    html += `<tr>
+    const noteHtml = a.note ? `<div style="margin-top:4px;font-size:10px;color:#6b7280;font-style:italic">⚙ ${a.note}</div>` : '';
+    html += `<tr class="${rowCls}">
       <td style="font-weight:700;font-size:16px">${a.n}</td>
-      <td><code style="font-size:10px">${a.id}</code></td>
+      <td><code style="font-size:10px">${a.id}</code>${noteHtml}</td>
       <td><span class="chip chip-fc" style="font-size:10px">${a.gate}</span></td>
-      <td><span class="chip chip-atc">${a.from}</span></td>
+      <td><span class="${chipCls}">${a.from}</span></td>
       <td class="hint-text">"${a.msg}"</td>
       <td>${choicesHtml}</td>
       <td><textarea class="editable" data-key="${key}" rows="3" placeholder="Proposed change to message or choices…"></textarea></td>
@@ -867,5 +2628,6 @@ buildPhaseTable();
 buildFlowTable();
 loadAll();
 </script>
-</body>
-</html>
+
+
+</body></html>

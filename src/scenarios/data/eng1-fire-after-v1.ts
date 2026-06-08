@@ -415,20 +415,29 @@ export const eng1FireAfterV1: Scenario = {
       crew: "PF",
     },
 
-    // ── 7b ── FCTM PR-AEP-ENG FINAL TAKEOFF SEGMENT — at green dot
-    // [fctm:L12879-12882]:
-    //   "As the speed trend arrow reaches Green Dot speed, pull for OPEN CLIMB,
-    //    set THR MCT when the LVR MCT message flashes on the FMA (triggered as
-    //    the speed index reaches green dot) and resume climb using MCT. If the
-    //    thrust lever are already in the FLX/MCT detent, move lever to CL and
-    //    then back to MCT."
+    // ── 7b ── FCTM PR-AEP-ENG FINAL TAKEOFF SEGMENT — at green dot, step 1: PULL ALT
+    // [fctm:L12879]: "pull for OPEN CLIMB" — PF pulls ALT knob on FCU.
+    // FMA col 2 changes: V/S = 0 → OP CLB. LVR MCT cue still flashing.
     {
-      id: "mct_open_clb",
-      label: "MCT / OPEN CLB",
+      id: "pull_alt_op_clb",
+      label: "PULL ALT — OP CLB",
       action: "SELECT",
-      hint: "At green dot speed: FMA col 1 (thrust) shows 'LVR MCT' flashing white — request to set active lever to MCT (FCOM DSC-22-30-90: 'LVR MCT flashes white in the first column of the FMA'). PF moves live thrust lever to MCT detent (if already at FLX/MCT, recycle CL→MCT). PF pulls ALT knob → col 2 (vertical) changes from 'V/S = 0' to 'OP CLB'; col 1 changes to 'THR MCT'. FMA result: [THR MCT] [OP CLB] [RWY TRK] [AP1] [A/THR]. [fctm:L12879-12882]",
+      hint: "Pull ALT knob on FCU → col 2 FMA changes to OP CLB. LVR MCT still flashing. MCT not yet set. [fctm:L12879]",
       variant: "switch",
       requires: ["accel_clean"],
+      crew: "PF",
+    },
+
+    // ── 7c ── FCTM PR-AEP-ENG FINAL TAKEOFF SEGMENT — step 2: SET MCT
+    // [fctm:L12880-12882]: "set THR MCT when the LVR MCT message flashes on the FMA"
+    // PF moves live thrust lever to MCT detent → THR MCT active, A/THR managed.
+    {
+      id: "mct_open_clb",
+      label: "THRUST MCT",
+      action: "SELECT",
+      hint: "LVR MCT flashing — move live engine lever to MCT detent. FMA col 1: THR MCT (green). A/THR now active. [fctm:L12880-12882]",
+      variant: "switch",
+      requires: ["pull_alt_op_clb"],
       crew: "PF",
     },
 
@@ -461,6 +470,21 @@ export const eng1FireAfterV1: Scenario = {
         "GEN 1 FAULT.........OFF  — IDG1 deactivated by FIRE pb. BTC auto-closes, AC BUS 1 fed by GEN 2.",
         "ENG 1 BLEED......FAULT   — ENG 1 bleed SOV closed by FIRE pb. XBLEED AUTO opens, PACK 1 monitor.",
       ],
+    },
+
+    // ── COMMS: PM requests holding from Departure — optional gate step
+    //   Fires after OP CLB selected (single-engine climb established, crew needs time for STATUS/FORDEC).
+    //   Completed by selecting correct choice on the pm_hold_req_card distraction.
+    {
+      id: "pm_hold_req",
+      label: "HOLD REQUEST",
+      action: "REQUEST",
+      hint: "After OP CLB selected, PM requests holding at 15 DME DPN radial 260 from Delhi Departure.",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      optional: true,
+      requires: ["mct_open_clb"],
     },
 
     // ── 2 ── Announce STATUS page
@@ -833,49 +857,55 @@ export const eng1FireAfterV1: Scenario = {
   // MAYDAY is step-gated on engine_secured (via announce_land_asap → mayday_atc).
   // Declaring MAYDAY before engine secured is scored as fault (choice d below).
   distractions: [
-    // ① Tower → Departure handoff — fires mid-ECAM (T+27.5 s floor, STANDBY expected)
-    //   Crew says STANDBY during procedure; resurfaces at ~T+52 s (after engine secured).
+    // ① A1 (green — Tower initiates) — Tower calls for frequency change at rotation.
+    //   STANDBY is correct while ECAM is running — PM cannot switch freq mid-procedure.
+    //   Card resurfaces every 25 s. MAYDAY option is a training discriminator (wrong here
+    //   because engine is not yet secured; PM must stay on Tower until engine secured).
     {
       id: "atc_handoff_to_departure",
-      atMs: 27_500,
+      atMs: 5_000,
       requiresStep: "continue_rotation",
       kind: "atc",
       from: "DELHI TOWER",
       message: "IFLY101, contact Delhi Departure 124.85.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "Delhi Departure 124.85, IFLY101",                          correct: true  },
-        { id: "b", label: "Roger, IFLY101",                                            correct: false },
-        { id: "c", label: "Delhi Departure 124.95, IFLY101",                          correct: false },
-        // Wrong — MAYDAY before engine secured is a fault
-        { id: "d", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, standby",      correct: false },
+        // Correct — hold on Tower while ECAM running
+        { id: "a", label: "STANDBY, IFLY101",                                                                  correct: true  },
+        // Wrong — premature switch; ATC loses emergency awareness
+        { id: "b", label: "Delhi Departure 124.85, IFLY101",                                                   correct: false },
+        // Wrong — incomplete acknowledgement
+        { id: "c", label: "Roger, IFLY101",                                                                    correct: false },
+        // Wrong — MAYDAY not yet appropriate; engine not yet secured
+        { id: "d", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT] feet, STANDBY", correct: false },
       ],
     },
 
-    // ①b Tower — MAYDAY declaration — fires 5 s after engine_secured
-    //   PM initiates MAYDAY on Tower 118.10. Tests correct phraseology:
-    //   nature + heading + altitude + STANDBY only. No destination, no runway, no POB.
+    // ① A2 (blue — PM initiates) — After engine secured, PM declares MAYDAY on Tower 118.10.
+    //   Fires 3 s after engine_secured step. Correct selection also completes the
+    //   mayday_atc step, which gates the downstream Tower ACK and DEP calls.
     {
       id: "mayday_tower_declare",
-      atMs: 5_000,
+      atMs: 3_000,
       requiresStep: "engine_secured",
       kind: "crew",
       from: "PM → TOWER 118.10",
-      message: "Select MAYDAY phraseology for Tower 118.10.",
-      standbyResurfaceMs: 30_000,
+      message: "Select MAYDAY call for Delhi Tower 118.10.",
+      standbyResurfaceMs: 20_000,
+      completesStep: "mayday_atc",
       choices: [
-        // Correct — nature + heading + altitude + STANDBY
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one, heading 280, climbing [ALT] feet, STANDBY",            correct: true  },
-        // Wrong — missing heading and altitude
-        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one, STANDBY",                                              correct: false },
-        // Wrong — adds destination and runway prematurely
-        { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, returning Delhi runway 28, 186 POB, request full emergency",      correct: false },
-        // Wrong — incorrect format (no MAYDAY × 3)
-        { id: "d", label: "IFLY101, declaring emergency, engine fire, standby",                                                           correct: false },
+        // Correct — ICAO MAYDAY format: nature + heading + altitude + STANDBY
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT] feet, STANDBY", correct: true  },
+        // Wrong — missing heading and altitude (incomplete MAYDAY)
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, STANDBY",                      correct: false },
+        // Wrong — premature intentions (no destination/runway/POB at this point)
+        { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire, returning Delhi runway 28, 186 POB, request full emergency", correct: false },
+        // Wrong — informal, not ICAO MAYDAY format
+        { id: "d", label: "IFLY101, declaring emergency, engine fire, standby",                                 correct: false },
       ],
     },
 
-    // ② Tower ACKs MAYDAY → hands PM to Departure 124.85 (green — ATC-initiated)
+    // ② A3 (green — Tower ACK) — Tower acknowledges MAYDAY and hands to Departure 124.85.
     //   Fires 2 s after mayday_atc step confirmed.
     {
       id: "atc_tower_mayday_ack",
@@ -886,17 +916,15 @@ export const eng1FireAfterV1: Scenario = {
       message: "IFLY101, MAYDAY acknowledged. Contact Delhi Departure 124.85. Emergency services alerted.",
       standbyResurfaceMs: 20_000,
       choices: [
-        // Correct — ACK + freq change readback
-        { id: "a", label: "MAYDAY acknowledged, Departure 124.85, IFLY101",   correct: true  },
-        // Wrong — just reads freq, doesn't ACK MAYDAY
-        { id: "b", label: "Delhi Departure 124.85, IFLY101",                   correct: false },
+        // Correct — freq change readback (Tower ACK was Tower's words, not crew's readback)
+        { id: "a", label: "Delhi Departure 124.85, IFLY101",   correct: true  },
         // Wrong — no freq readback
-        { id: "c", label: "Roger, IFLY101",                                     correct: false },
+        { id: "b", label: "Roger, IFLY101",                     correct: false },
       ],
     },
 
-    // ② PM calls Departure on 124.85 — position report only (blue — PM-initiated)
-    //   Fires 8 s after mayday_atc. PM has switched freq; gives heading/alt/STANDBY.
+    // ③ A3 (blue — PM initiates) — PM calls Departure 124.85 with position report only.
+    //   Fires 8 s after mayday_atc. No second MAYDAY — just heading + altitude + STANDBY.
     {
       id: "pm_dep_initial_call",
       atMs: 8_000,
@@ -907,15 +935,16 @@ export const eng1FireAfterV1: Scenario = {
       standbyResurfaceMs: 25_000,
       choices: [
         // Correct — position report only, no second MAYDAY
-        { id: "a", label: "IFLY101, heading 280, climbing [ALT], STANDBY",                                        correct: true  },
+        { id: "a", label: "IFLY101, heading 280, climbing 4 000 ft, STANDBY",                                      correct: true  },
         // Wrong — repeats full MAYDAY (not required on DEP)
-        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT]",     correct: false },
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing 4 000 ft",  correct: false },
         // Wrong — states intentions prematurely
         { id: "c", label: "IFLY101, emergency, returning Delhi, request runway 28 ILS, full emergency services",   correct: false },
       ],
     },
 
-    // ③ Departure — MAYDAY confirmed, issues climb clearance — fires ~15 s after mayday step
+    // ③ Departure — MAYDAY confirmed, issues climb clearance — fires ~15 s after mayday step.
+    //   Information-only: no pilot response quiz — trainee acknowledges and moves on.
     {
       id: "atc_vectors_climb",
       atMs: 15_000,
@@ -924,18 +953,10 @@ export const eng1FireAfterV1: Scenario = {
       from: "DELHI DEPARTURE",
       message: "IFLY101, MAYDAY acknowledged, radar contact, continue runway track, climb 4 000 feet, QNH 1013.",
       standbyResurfaceMs: 25_000,
-      choices: [
-        // Correct — readback climb clearance only, no "MAYDAY acknowledged" in PM readback
-        { id: "a", label: "Continuing runway track, climbing 4 000, QNH 1013, IFLY101",          correct: true  },
-        // Wrong — PM should not repeat MAYDAY acknowledged in readback
-        { id: "b", label: "Radar contact, MAYDAY acknowledged, continuing runway track, climbing 4 000, IFLY101", correct: false },
-        // Wrong — premature intentions
-        { id: "c", label: "IFLY101, returning Delhi, request runway 28, 186 souls, 8.4 t fuel",  correct: false },
-      ],
+      choices: [],
     },
 
-    // ④ Departure — "vectors available when ready" — step-driven on announce_sec_failures
-    //   Crew response: hold and advise when ready (STANDBY is correct here).
+    // ④ A6 — Departure — "vectors available when ready" — step-driven on announce_sec_failures
     {
       id: "atc_vectors_when_ready",
       atMs: 5_000,
@@ -952,26 +973,43 @@ export const eng1FireAfterV1: Scenario = {
       ],
     },
 
-    // ⑥ Approach — delivers weather + runway info — step-driven on wx_request
+    // ⑤ A7 (blue — PM initiates) — PM requests holding at 15 DME DPN radial 260.
+    //   Fires 5 s after mct_open_clb (OP CLB selected, stable single-engine climb established).
+    //   Correct choice completes pm_hold_req step, which gates the ATC holding clearance response.
     {
-      id: "atc_provides_briefing_info",
+      id: "pm_hold_req_card",
       atMs: 5_000,
-      requiresStep: "wx_request",
-      kind: "atc",
-      from: "DELHI APPROACH",
-      message: "IFLY101, wind 280 at 8, QNH 1013, runway 28 in use, ILS runway 28 available.",
+      requiresStep: "mct_open_clb",
+      kind: "crew",
+      from: "PM → DELHI DEPARTURE",
+      message: "Select PM request to Delhi Departure for holding pattern.",
       standbyResurfaceMs: 30_000,
+      completesStep: "pm_hold_req",
       choices: [
-        // Correct — full readback including QNH
-        { id: "a", label: "Wind 280/8, QNH 1013, runway 28, ILS runway 28, IFLY101",  correct: true  },
-        { id: "b", label: "Roger, IFLY101",                                             correct: false },
-        // Wrong — missed QNH
-        { id: "c", label: "Wind 280 at 8, runway 28, ILS runway 28, IFLY101",          correct: false },
+        // Correct — holding request at specified fix, no specific track or turns specified yet
+        { id: "a", label: "Delhi Departure, IFLY101, request holding at 15 DME DPN, radial 260, need time to complete checks.",  correct: true  },
+        // Wrong — requesting immediate approach (skips holding — crew not ready yet)
+        { id: "b", label: "Delhi Departure, IFLY101, request immediate approach, runway 28 ILS.",                               correct: false },
+        // Wrong — requests return without confirming hold (wrong sequence for A320 abnormal)
+        { id: "c", label: "Delhi Departure, IFLY101, returning to Delhi, request direct runway 28.",                             correct: false },
       ],
     },
 
-    // [D2] Departure — POB + endurance — fires ~25 s after mayday_atc (after vectors_climb at 15 s)
-    //   Crew says STANDBY — ECAM checklist still running. POB + endurance given later (JOIN gate).
+    // ⑤b A8 — Departure grants holding clearance — step-driven on pm_hold_req.
+    //   Pilot reads back hold details: fix, inbound track, direction, time.
+    {
+      id: "atc_hold_clearance",
+      atMs: 5_000,
+      requiresStep: "pm_hold_req",
+      kind: "atc",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, hold at DPN VOR, 15 DME, inbound track 260, right-hand turns, 1-minute legs, expect further clearance in 10 minutes.",
+      standbyResurfaceMs: 30_000,
+      choices: [],
+    },
+
+    // [D2] A9 — Departure — POB + endurance — fires ~25 s after mayday_atc
+    //   Crew says STANDBY — ECAM checklist still running.
     {
       id: "atc_pob_fuel_services",
       atMs: 25_000,
@@ -980,6 +1018,7 @@ export const eng1FireAfterV1: Scenario = {
       from: "DELHI DEPARTURE",
       message: "IFLY101, say persons on board and endurance.",
       standbyResurfaceMs: 30_000,
+      standbyResurfaceOnStep: "wx_request",
       choices: [
         // Correct — STANDBY while ECAM running
         { id: "a", label: "Standby IFLY101",                                                   correct: true  },
@@ -990,34 +1029,98 @@ export const eng1FireAfterV1: Scenario = {
       ],
     },
 
-    // ⑧ Approach — confirms emergency services — step-driven on atc_emergency_services
+    // ⑥ A10 (blue — PM initiates) — PM requests weather / runway / approach from Delhi Approach.
+    //   After ECAM actions complete (crew_crosscheck). Correct choice completes wx_request step,
+    //   which gates atc_provides_briefing_info.
     {
-      id: "atc_emergency_services_ack",
+      id: "pm_wx_request",
       atMs: 5_000,
-      requiresStep: "atc_emergency_services",
-      kind: "atc",
-      from: "DELHI APPROACH",
-      message: "IFLY101, Roger, Category 3 crash fire rescue confirmed runway 28, ambulance and medical services on standby, advise ready for approach.",
+      requiresStep: "crew_crosscheck",
+      kind: "crew",
+      from: "PM → DELHI APPROACH",
+      message: "Select PM request to Delhi Approach for weather, runway in use, and approach details.",
       standbyResurfaceMs: 25_000,
+      completesStep: "wx_request",
       choices: [
-        { id: "a", label: "Cat 3 CFR runway 28, ambulance on standby, will advise ready for approach, IFLY101", correct: true  },
-        { id: "b", label: "Roger, IFLY101",                                                                       correct: false },
+        // Correct — standard weather + approach request after ECAM actions complete
+        { id: "a", label: "Delhi Approach, IFLY101, request latest weather, runway in use, and ILS approach details, runway 28.",  correct: true  },
+        // Wrong — mixes operational request with emergency services (incorrect sequencing)
+        { id: "b", label: "Delhi Approach, IFLY101, request full emergency services, runway 28 ILS, wind and QNH.",               correct: false },
+        // Wrong — requests intentions before gathering weather data (wrong sequence)
+        { id: "c", label: "Delhi Approach, IFLY101 declaring emergency, request vectors for immediate return runway 28.",          correct: false },
       ],
     },
 
-    // ⑨ Approach — prompts readiness — step-driven on approach_prep
+    // ⑦ A11 — Approach delivers weather + runway info — fires after pm_wx_request completes wx_request step
     {
-      id: "atc_ready_for_approach",
+      id: "atc_provides_briefing_info",
       atMs: 5_000,
-      requiresStep: "approach_prep",
+      requiresStep: "wx_request",
       kind: "atc",
       from: "DELHI APPROACH",
-      message: "IFLY101, advise when ready for approach.",
+      message: "IFLY101, wind 280 at 8, QNH 1013, runway 28 in use, ILS runway 28 available.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "IFLY101 ready, request vectors for ILS runway 28",   correct: true  },
-        { id: "b", label: "Ready, IFLY101",                                      correct: false },
-        { id: "c", label: "Standby IFLY101",                                     correct: false },
+        // Correct — full readback per workbook
+        { id: "a", label: "Wind 280 at 8, runway 28, ILS runway 28, no significant NOTAMs, IFLY101",  correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                                            correct: false },
+        // Wrong — abbreviated, missing NOTAMs
+        { id: "c", label: "Wind 280 at 8, runway 28, IFLY101",                                         correct: false },
+      ],
+    },
+
+    // ⑧ A12 (blue — PM initiates) — PM calls Approach requesting emergency services.
+    //   Fires after atc_emergency_services step completed in CommChecklist.
+    //   Correct selection completes emerg_svcs_confirmed, gating the Approach ACK card.
+    {
+      id: "pm_emerg_svcs_call",
+      atMs: 5_000,
+      requiresStep: "atc_emergency_services",
+      kind: "crew",
+      from: "PM → DELHI APPROACH",
+      message: "Select PM call to Delhi Approach requesting emergency services for runway 28.",
+      standbyResurfaceMs: 25_000,
+      completesStep: "emerg_svcs_confirmed",
+      choices: [
+        // Correct — Cat 3 CFR + POB + ambulance/medical on standby
+        { id: "a", label: "Delhi Approach, IFLY101, request Cat 3 crash fire rescue runway 28. 186 persons on board, ambulance and medical services on standby.", correct: true  },
+        // Wrong — too brief, missing POB and CFR category
+        { id: "b", label: "Delhi Approach, IFLY101, request full emergency services on standby.",                                                                  correct: false },
+        // Wrong — vague, no services detail
+        { id: "c", label: "Delhi Approach, IFLY101, we have an emergency, request services runway 28.",                                                            correct: false },
+      ],
+    },
+
+    // ⑧b A12 response (green — Approach confirms services) — fires after emerg_svcs_confirmed.
+    //   Acknowledge-only — no crew response quiz.
+    {
+      id: "atc_emerg_svcs_confirmed",
+      atMs: 5_000,
+      requiresStep: "emerg_svcs_confirmed",
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, Roger, emergency services standing by runway 28, full CFR, Category 3 confirmed.",
+      standbyResurfaceMs: 25_000,
+      choices: [],
+    },
+
+    // ⑨ A13 (blue — PM initiates) — PM reports ready for approach to Delhi Approach.
+    //   Step-driven on approach_prep. PM calls ATC to say IFLY101 ready, requests vectors.
+    {
+      id: "pm_ready_for_approach",
+      atMs: 5_000,
+      requiresStep: "approach_prep",
+      kind: "crew",
+      from: "PM → DELHI APPROACH",
+      message: "Select PM call to Delhi Approach reporting ready for approach.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — ready + specific request for ILS runway 28 vectors
+        { id: "a", label: "Delhi Approach, IFLY101, ready for approach, request ILS runway 28.",                     correct: true  },
+        // Wrong — missing runway/approach type
+        { id: "b", label: "Delhi Approach, IFLY101 ready.",                                                           correct: false },
+        // Wrong — premature, states intentions before getting clearance
+        { id: "c", label: "Delhi Approach, IFLY101, commencing approach runway 28, single engine.",                   correct: false },
       ],
     },
 
@@ -1047,27 +1150,50 @@ export const eng1FireAfterV1: Scenario = {
       message: "IFLY101, Delhi Tower, continue ILS approach runway 28, report established.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Wilco, will report established runway 28, IFLY101", correct: true  },
-        { id: "b", label: "Switching, IFLY101",                               correct: false },
+        { id: "a", label: "Wilco, will report established runway 28, IFLY101",               correct: true  },
+        { id: "b", label: "Continuing ILS runway 28, will report established, IFLY101",    correct: false },
+        { id: "c", label: "Switching, IFLY101",                                             correct: false },
       ],
     },
 
-    // ⑫ Tower — cleared to land — step-driven on landing_cl
+    // ⑫ A16 (blue — PM initiates) — PM calls Tower reporting established on ILS runway 28.
+    //   Fires 25 s after approach_cl (giving Tower contact card time to appear first).
+    //   Correct selection completes report_established, gating the Tower CTL card.
+    {
+      id: "pm_report_established",
+      atMs: 25_000,
+      requiresStep: "approach_cl",
+      kind: "crew",
+      from: "PM → DELHI TOWER 118.10",
+      message: "Select PM call to Delhi Tower reporting established on ILS runway 28.",
+      standbyResurfaceMs: 25_000,
+      completesStep: "report_established",
+      choices: [
+        // Correct — established + runway
+        { id: "a", label: "Delhi Tower, IFLY101, established ILS runway 28.",                correct: true  },
+        // Wrong — missing 'established' callout (just states callsign)
+        { id: "b", label: "IFLY101, on final runway 28.",                                    correct: false },
+        // Wrong — requests clearance directly (Tower hasn't cleared yet)
+        { id: "c", label: "IFLY101, established runway 28, request landing clearance.",      correct: false },
+      ],
+    },
+
+    // ⑫b Tower — cleared to land — fires after PM reports established
     {
       id: "atc_cleared_to_land",
       atMs: 5_000,
-      requiresStep: "landing_cl",
+      requiresStep: "report_established",
       kind: "atc",
       from: "DELHI TOWER",
       message: "IFLY101, runway 28 cleared to land, wind 280 at 8, emergency services in position.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Cleared to land runway 28, IFLY101",           correct: true  },
-        { id: "b", label: "Roger, IFLY101",                               correct: false },
+        { id: "a", label: "Cleared to land runway 28, IFLY101",              correct: true  },
+        { id: "b", label: "Roger, IFLY101",                                   correct: false },
         // Wrong — unnecessary wind readback (PM does not repeat wind)
-        { id: "c", label: "Cleared to land runway 28, wind 280/8, IFLY101", correct: false },
+        { id: "c", label: "Cleared to land runway 28, wind 280/8, IFLY101",   correct: false },
         // Wrong — runway mis-readback under stress
-        { id: "d", label: "Cleared to land runway 29, IFLY101",            correct: false },
+        { id: "d", label: "Cleared to land runway 29, IFLY101",               correct: false },
       ],
     },
   ],
@@ -1688,10 +1814,11 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["No overhead procedure action until 400 ft ECAM gate"],
       },
       pfAction: {
-        label: "AP1 ENGAGE",
-        hint: "FCOM DSC-22-30-30: AP cannot engage below 100 ft. Above 100 ft — press AP1 on FCU, read FMA: MAN TOGA · SRS · NAV · AP1",
+        label: "ENGAGE AP1",
+        hint: "Above 100 ft — press AP1 on FCU. Read FMA: MAN TOGA · SRS · NAV. AP1 annunciated top-right.",
         coachMs: 2_000,
         stepId: "engage_ap_fma",
+        prereqStep: "positive_rate_gear_up",
       },
     },
 
@@ -1739,6 +1866,13 @@ export const eng1FireAfterV1: Scenario = {
           { role: "PM", speech: "AVIATE COMPLETE — NAVIGATE SID/EO PROCEDURE" },
           { role: "PM", speech: "ECAM — ENG ONE FIRE. READING." },
         ],
+      },
+      pfAction: {
+        label: "START ECAM ACTIONS",
+        hint: "Flight path stabilized on SID/EO. Order: ECAM ACTIONS.",
+        coachMs: 2_000,
+        stepId: "four_hundred_ft_cmd",
+        prereqStep: "engage_ap_fma",
       },
     },
 
@@ -2091,10 +2225,11 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["After Takeoff CL follows after MCT / OP CLB phase"],
       },
       pfAction: {
-        label: "V/S ZERO",
-        hint: "Push V/S knob on FCU to level off — FMA col 2 changes SRS → V/S = 0",
+        label: "PUSH V/S ZERO",
+        hint: "Push V/S knob on FCU — FMA col 2: SRS → V/S = 0. Hold 2 300 ft MAA.",
         coachMs: 8_000,
         stepId: "level_off_maa",
+        prereqStep: "engine_secured",
       },
     },
 
@@ -2152,10 +2287,11 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["Next: PF pulls ALT knob → OP CLB engages → FMA changes to THR MCT / OP CLB"],
       },
       pfAction: {
-        label: "LVR MCT → SET",
-        hint: "Move live engine lever to MCT detent — then pull ALT knob for OP CLB",
+        label: "PULL OPEN CLB",
+        hint: "Pull ALT knob on FCU → OP CLB engages. FMA col 2: V/S = 0 → OP CLB. LVR MCT still flashing.",
         coachMs: 5_000,
-        stepId: "mct_open_clb",
+        stepId: "pull_alt_op_clb",
+        prereqStep: "accel_clean",
       },
     },
 
@@ -2212,10 +2348,11 @@ export const eng1FireAfterV1: Scenario = {
         notes: ["Final takeoff segment — OEI climb at MCT to assigned altitude"],
       },
       pfAction: {
-        label: "OP CLB CONFIRM",
-        hint: "Pull ALT knob on FCU — FMA col 2: OP CLB (green). A/THR now active.",
-        coachMs: 5_000,
+        label: "SET MCT",
+        hint: "LVR MCT flashing — move live engine lever to MCT detent. FMA col 1: THR MCT. A/THR active.",
+        coachMs: 3_000,
         stepId: "mct_open_clb",
+        prereqStep: "pull_alt_op_clb",
       },
     },
   ],
