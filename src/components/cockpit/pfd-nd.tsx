@@ -139,21 +139,21 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
     speed = 175; altitude = 2300; vs = 400; pitch = 2; bank = 0;
     gs    = 173; tas = 179;
   } else if (thrIdle) {
-    // ENG 1 TL at IDLE — climbing through ~1200 ft
-    speed = 168; altitude = 1200; vs = 2000; pitch = 8; bank = 0;
-    gs    = 166; tas = 172;
-  } else if (apEngaged) {
-    // AP1 engaged, SRS active — ~700 ft
-    speed = 166; altitude = 700; vs = 2100; pitch = 8; bank = 0;
-    gs    = 164; tas = 170;
-  } else if (fireActive) {
-    // Fire warning — 400 ft AGL, gear retracting
-    speed = 165; altitude = 400; vs = 2200; pitch = 9; bank = 0;
+    // THR LEVER IDLE — first ECAM action, at 400 ft RA / 1177 ft MSL (VIDP + 777)
+    speed = 165; altitude = 1177; vs = 2200; pitch = 9; bank = 0;
     gs    = 163; tas = 169;
+  } else if (apEngaged) {
+    // AP1 engaged — 100 ft RA / 877 ft MSL (A320 AP minimum after takeoff is 100 ft RA)
+    speed = 158; altitude = 877; vs = 2000; pitch = 12; bank = 0;
+    gs    = 156; tas = 162;
+  } else if (fireActive) {
+    // ENG 1 FIRE — triggered at V1+2s, climbing through ~50 ft RA / 827 ft MSL
+    speed = 152; altitude = 827; vs = 1500; pitch = 13; bank = 0;
+    gs    = 150; tas = 156;
   } else {
-    // Pre-fire: V1 rotation — 200 ft AGL
-    speed = 157; altitude = 200; vs = 1600; pitch = 10; bank = 0;
-    gs    = 155; tas = 161;
+    // V1 ground roll — fire not yet triggered, aircraft at VIDP runway elevation
+    speed = 145; altitude = 777; vs = 0; pitch = 6; bank = 0;
+    gs    = 143; tas = 149;
   }
 
   return {

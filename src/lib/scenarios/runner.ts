@@ -29,6 +29,9 @@ export type RunnerHandle = {
   /** Dev-mode undo of a fired trigger.  Removes the TRIGGER event and
    *  replays state.  The trigger becomes re-fireable. */
   undoTrigger: (triggerId: string) => void;
+  /** Dev-mode bidirectional phase seek.  Atomically resets state to contain
+   *  exactly the given steps and triggers — works forward AND backward. */
+  seekToCheckpoint: (steps: string[], triggers: string[]) => void;
 };
 
 export function useScenarioRunner(scenario: Scenario): RunnerHandle {
@@ -194,7 +197,76 @@ export function useScenarioRunner(scenario: Scenario): RunnerHandle {
     [events, replayEvents],
   );
 
-  return { state, events, elapsedMs, status, paused, perform, end, pause, resume, fireTrigger, undoStep, undoTrigger };
+  const seekToCheckpoint = useCallback(
+    (cpSteps: string[], cpTriggers: string[]) => {
+      const cpStepSet    = new Set(cpSteps);
+      const cpTriggerSet = new Set(cpTriggers);
+
+      // Identify afterEffect trigger IDs produced by steps being removed.
+      const removedEffectSources = new Set<string>(
+        scenario.steps
+          .filter(s => !cpStepSet.has(s.id) && s.afterEffect?.triggerId)
+          .map(s => s.afterEffect!.triggerId),
+      );
+
+      // Scenario-level trigger IDs not in the checkpoint.
+      const removedScenarioTriggers = new Set(
+        scenario.triggers.map(t => t.id).filter(id => !cpTriggerSet.has(id)),
+      );
+
+      // Filter the event log to keep only events relevant to the checkpoint.
+      const kept = events.filter(e => {
+        if (e.kind === "STEP"    && !cpStepSet.has(e.stepId ?? ""))              return false;
+        if (e.kind === "TRIGGER" && removedScenarioTriggers.has(e.triggerId ?? "")) return false;
+        if (e.kind === "EFFECT"  && removedEffectSources.has(e.sourceId ?? ""))  return false;
+        return true;
+      });
+
+      const tMs = pausedElapsedRef.current ?? (performance.now() - startedAtRef.current);
+
+      // Add TRIGGER events for checkpoint triggers that are not yet in kept.
+      const keptTriggerIds = new Set(kept.filter(e => e.kind === "TRIGGER").map(e => e.triggerId));
+      const trigEventsToAdd: ScenarioEvent[] = cpTriggers
+        .map(id => scenario.triggers.find(t => t.id === id))
+        .filter((t): t is NonNullable<typeof t> => !!t && !keptTriggerIds.has(t.id))
+        .map(t => ({ kind: "TRIGGER" as const, triggerId: t.id, effects: t.effects, tMs, source: "system" as const }));
+
+      // Add STEP events for checkpoint steps not yet in kept.
+      const keptStepIds = new Set(kept.filter(e => e.kind === "STEP").map(e => e.stepId));
+      const stepEventsToAdd: ScenarioEvent[] = cpSteps
+        .filter(id => !keptStepIds.has(id))
+        .map(id => ({ kind: "STEP" as const, stepId: id, tMs, source: "pilot" as const }));
+
+      // For steps in the checkpoint that have afterEffects, add the EFFECT event so
+      // triggersFired (e.g. fire_extinguished) is set correctly during replay.
+      const effectEventsToAdd: ScenarioEvent[] = cpSteps
+        .map(id => scenario.steps.find(s => s.id === id))
+        .filter((s): s is NonNullable<typeof s> => !!s?.afterEffect)
+        .filter(s => {
+          const src = s.afterEffect!.triggerId;
+          return !kept.some(e => e.kind === "EFFECT" && e.sourceId === src);
+        })
+        .map(s => ({
+          kind: "EFFECT" as const,
+          sourceId: s.afterEffect!.triggerId,
+          effects: s.afterEffect!.effects,
+          tMs,
+          source: "system" as const,
+        }));
+
+      const allEvents = [...kept, ...trigEventsToAdd, ...stepEventsToAdd, ...effectEventsToAdd];
+
+      // Reset firedTriggersRef to match the checkpoint's scenario-level triggers.
+      firedTriggersRef.current = new Set(
+        scenario.triggers.map(t => t.id).filter(id => cpTriggerSet.has(id)),
+      );
+
+      replayEvents(allEvents);
+    },
+    [scenario, events, replayEvents],
+  );
+
+  return { state, events, elapsedMs, status, paused, perform, end, pause, resume, fireTrigger, undoStep, undoTrigger, seekToCheckpoint };
 }
 
 export const TICK_INTERVAL_MS_PUBLIC = TICK_INTERVAL_MS;
