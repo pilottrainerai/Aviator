@@ -333,7 +333,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "announce_land_asap",
       label: "LAND ASAP",
       action: "ANNOUNCE",
-      hint: "PF announces 'LAND ASAP' (red on ECAM) — cue to declare MAYDAY on current frequency. PM cross-checks that MAYDAY is the next call. [fcom:L94604 RED LAND ASAP / abnormal-procs:L229-231]",
+      hint: "PF cross-checks LAND ASAP on ECAM STATUS — confirms commitment to land at nearest suitable airport. MAYDAY is being declared in parallel by PM (separate comms track). This is a cross-check reminder, not a call to declare. [fcom:L94604 RED LAND ASAP / abnormal-procs:L229-231]",
       variant: "warning",
       crew: "PF",
       group: "chclm",

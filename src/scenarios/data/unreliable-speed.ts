@@ -268,10 +268,11 @@ export const unreliableSpeed: Scenario = {
       message: "IFLY101, climb FL250, direct KARNAL.",
       standbyResurfaceMs: 20_000,
       choices: [
-        { id: "a", label: "PAN PAN PAN, IFLY101, unreliable airspeed, unable RVSM, request block altitude FL130 to FL150, possible return to Delhi, standby", correct: true  },
-        { id: "b", label: "IFLY101, climbing FL250 direct KARNAL",                                                                                              correct: false },
+        // Correct — PAN PAN × 3 = 6 words; nature + navigation (heading) + unable RVSM + block request + standby; no airport
+        { id: "a", label: "PAN PAN PAN PAN PAN PAN, IFLY101, unreliable airspeed, heading 280, unable RVSM, request block altitude FL130 to FL150, standby", correct: true  },
+        { id: "b", label: "IFLY101, climbing FL250 direct KARNAL",                                                                                             correct: false },
         // Wrong — premature MAYDAY for what is a PAN PAN situation
-        { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY101, declaring emergency",                                                                                  correct: false },
+        { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY101, declaring emergency",                                                                                 correct: false },
       ],
     },
 
@@ -304,6 +305,39 @@ export const unreliableSpeed: Scenario = {
         { id: "b", label: "Standby IFLY101",                                                                                                                                                   correct: false },
         // Wrong — under-informative for ATC routing
         { id: "c", label: "IFLY101, no issue, continuing climb",                                                                                                                                 correct: false },
+      ],
+    },
+
+    // ③b Hold request — PM requests holding at block altitude while completing FORDEC
+    {
+      id: "pm_hold_req",
+      atMs: 85_000,
+      requiresStep: "fordec_speed",
+      kind: "crew",
+      from: "PM",
+      message: "FORDEC complete. PM requests holding at block altitude to set up for the raw-data approach before accepting vectors. Select the correct call.",
+      choices: [
+        { id: "a", label: "Delhi Departure, IFLY101, request holding at block FL130 to FL150, completing approach brief", correct: true  },
+        // Wrong — selects approach before setup complete
+        { id: "b", label: "Delhi Departure, IFLY101, request immediate vectors ILS runway 28",                              correct: false },
+        // Wrong — continues climb into restricted airspace
+        { id: "c", label: "Delhi Departure, IFLY101, request climb FL250",                                                  correct: false },
+      ],
+    },
+
+    // ③c ATC grants hold — crew reads back
+    {
+      id: "atc_hold_clr",
+      atMs: 100_000,
+      kind: "atc",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, roger, maintain block FL130 to FL150, report ready for approach, Delhi Approach on 124.50 when ready.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Maintaining block FL130 to FL150, Delhi Approach 124.50 when ready, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                                                                  correct: false },
+        // Wrong — drops the frequency
+        { id: "c", label: "Maintaining block FL130 to FL150, IFLY101",                                      correct: false },
       ],
     },
 

@@ -404,3 +404,27 @@ FCTM technique notes from real work. Add a new entry each time intake is confirm
   FIRE"` — that contradicts callouts.txt L617-618. Pilot review flagged
   the error; corrected in this revision. Also fleshed out FMA cycle,
   parallel-procedure rule, and the memory-items vs ECAM-first distinction.
+
+### [2026-06-07] ATC comms colour rule — ENG 1 FIRE after V1 (VIDP departure)
+
+**HARD RULE — applies to every ATC distraction in the scenario:**
+- `kind: "crew"` → **blue** — PM or PF initiates the call
+- `kind: "atc"`  → **green** — ATC (Tower / Departure / Approach) calls the crew
+
+**Full MAYDAY comms sequence after ENGINE SECURED (Tower 118.10 → DEP 124.85):**
+
+| # | Who initiates | kind | Colour | Content |
+|---|---|---|---|---|
+| ①b | PM → Tower 118.10 | `"crew"` | blue | `MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one, heading 280, climbing [ALT] feet, STANDBY` |
+| ② | Tower → PM | `"atc"` | green | `IFLY101, MAYDAY acknowledged. Contact Delhi Departure 124.85. Emergency services alerted.` |
+| PM readback | PM → Tower | `"crew"` | blue | `MAYDAY acknowledged, Departure 124.85, IFLY101` → then selects 124.85 |
+| ③ | PM → Departure 124.85 | `"crew"` | blue | `IFLY101, heading 280, climbing [ALT], STANDBY` — position report ONLY, no second MAYDAY |
+| ④ | Departure → PM | `"atc"` | green | `IFLY101, MAYDAY acknowledged, radar contact, continue runway track, climb 4 000 feet, QNH 1013.` |
+
+**Key rules:**
+- Freq change (Tower → Departure) happens ONLY after Tower tells PM to change (`kind: "atc"`, green).
+- PM's first call on Departure is heading + climbing alt + STANDBY only — no second MAYDAY.
+- MAYDAY × 3 is called on Tower (current freq); NOT repeated on Departure.
+- Scenario IDs: `mayday_tower_declare` (crew, blue) → `atc_tower_mayday_ack` (atc, green) → `pm_dep_initial_call` (crew, blue) → `atc_vectors_climb` (atc, green).
+- If a distraction is initiated by PM/PF it is ALWAYS `kind: "crew"`. Never mark a PM-initiated call as `kind: "atc"`.
+- File: `src/scenarios/data/eng1-fire-after-v1.ts` · distractions block.

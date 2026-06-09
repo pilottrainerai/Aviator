@@ -423,7 +423,7 @@
       <td><span class="chip chip-pf">PF</span></td>
       <td><span class="chip chip-av">AVIATE</span></td>
       <td><strong>LAND ASAP</strong><br><span style="color:#6b7280;font-size:10px">ANNOUNCE</span></td>
-      <td class="hint-text">PF announces LAND ASAP (red on ECAM) — cue to declare MAYDAY on current frequency. PM cross-checks that MAYDAY is the next call.</td>
+      <td class="hint-text">PF cross-checks LAND ASAP on ECAM STATUS — confirms commitment to land at nearest suitable airport. Cross-check reminder only; MAYDAY is being declared in parallel by PM on comms track.</td>
       <td>—</td>
       <td><textarea class="editable" data-key="step_announce_land_asap" rows="3" placeholder="Proposed change…"></textarea></td>
       <td><select class="flag-sel" data-key="step_announce_land_asap_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
@@ -466,18 +466,30 @@
       <td style="font-size:10px;color:#6b7280;font-family:monospace">level_off_maa</td>
     </tr><tr class="cat-av">
       <td>17</td>
+      <td><code style="font-size:10px">pull_alt_op_clb</code></td>
+      <td><span class="chip chip-fc">procedure</span></td>
+      <td><span class="chip chip-pf">PF</span></td>
+      <td><span class="chip chip-av">AVIATE</span></td>
+      <td><strong>PULL ALT — OP CLB</strong><br><span style="color:#6b7280;font-size:10px">SELECT</span></td>
+      <td class="hint-text">Pull ALT knob on FCU → FMA col 2 changes to OP CLB. LVR MCT cue still flashing. MCT not yet set.</td>
+      <td>—</td>
+      <td><textarea class="editable" data-key="step_pull_alt_op_clb" rows="3" placeholder="Proposed change…"></textarea></td>
+      <td><select class="flag-sel" data-key="step_pull_alt_op_clb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">accel_clean</td>
+    </tr><tr class="cat-av">
+      <td>18</td>
       <td><code style="font-size:10px">mct_open_clb</code></td>
       <td><span class="chip chip-fc">procedure</span></td>
       <td><span class="chip chip-pf">PF</span></td>
       <td><span class="chip chip-av">AVIATE</span></td>
-      <td><strong>MCT / OPEN CLB</strong><br><span style="color:#6b7280;font-size:10px">SELECT</span></td>
-      <td class="hint-text">At green dot: LVR MCT flashes white. PF moves live lever to MCT. Pulls ALT knob → OP CLB. FMA: THR MCT · OP CLB · NAV · AP1 · A/THR.</td>
+      <td><strong>THRUST MCT</strong><br><span style="color:#6b7280;font-size:10px">SELECT</span></td>
+      <td class="hint-text">LVR MCT flashing — PF moves live engine lever to MCT detent. FMA col 1: THR MCT (green). A/THR now active.</td>
       <td>—</td>
       <td><textarea class="editable" data-key="step_mct_open_clb" rows="3" placeholder="Proposed change…"></textarea></td>
       <td><select class="flag-sel" data-key="step_mct_open_clb_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
-      <td style="font-size:10px;color:#6b7280;font-family:monospace">accel_clean</td>
+      <td style="font-size:10px;color:#6b7280;font-family:monospace">pull_alt_op_clb</td>
     </tr><tr class="phase-divider"><td colspan="11">ECAM PROCEDURE + POST-ECAM</td></tr><tr class="cat-ec">
-      <td>18</td>
+      <td>19</td>
       <td><code style="font-size:10px">announce_sec_failures</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -489,7 +501,7 @@
       <td><select class="flag-sel" data-key="step_announce_sec_failures_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">mayday_atc</td>
     </tr><tr class="phase-divider"><td colspan="11">STATUS PAGE REVIEW</td></tr><tr class="cat-st">
-      <td>19</td>
+      <td>20</td>
       <td><code style="font-size:10px">announce_status</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -501,7 +513,7 @@
       <td><select class="flag-sel" data-key="step_announce_status_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">announce_sec_failures</td>
     </tr><tr class="cat-st">
-      <td>20</td>
+      <td>21</td>
       <td><code style="font-size:10px">stop_ecam</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pf">PF</span></td>
@@ -513,7 +525,7 @@
       <td><select class="flag-sel" data-key="step_stop_ecam_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">announce_status</td>
     </tr><tr class="cat-st">
-      <td>21</td>
+      <td>22</td>
       <td><code style="font-size:10px">after_takeoff_cl</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -525,7 +537,7 @@
       <td><select class="flag-sel" data-key="step_after_takeoff_cl_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">stop_ecam</td>
     </tr><tr class="cat-st">
-      <td>22</td>
+      <td>23</td>
       <td><code style="font-size:10px">oeb_check</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pf">PF</span></td>
@@ -537,7 +549,7 @@
       <td><select class="flag-sel" data-key="step_oeb_check_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">after_takeoff_cl</td>
     </tr><tr class="cat-st">
-      <td>23</td>
+      <td>24</td>
       <td><code style="font-size:10px">read_status</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pf">PF</span></td>
@@ -549,7 +561,7 @@
       <td><select class="flag-sel" data-key="step_read_status_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">oeb_check</td>
     </tr><tr class="cat-st">
-      <td>24</td>
+      <td>25</td>
       <td><code style="font-size:10px">status_read_aloud</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -561,7 +573,7 @@
       <td><select class="flag-sel" data-key="step_status_read_aloud_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">read_status</td>
     </tr><tr class="cat-st">
-      <td>25</td>
+      <td>26</td>
       <td><code style="font-size:10px">crew_crosscheck</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -573,7 +585,7 @@
       <td><select class="flag-sel" data-key="step_crew_crosscheck_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">status_read_aloud</td>
     </tr><tr class="phase-divider"><td colspan="11">CRM PLANNING (FORDEC / COMMS)</td></tr><tr class="cat-pl">
-      <td>26</td>
+      <td>27</td>
       <td><code style="font-size:10px">wx_request</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -585,7 +597,7 @@
       <td><select class="flag-sel" data-key="step_wx_request_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">crew_crosscheck</td>
     </tr><tr class="cat-pl">
-      <td>27</td>
+      <td>28</td>
       <td><code style="font-size:10px">ldg_perf</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pf">PF</span></td>
@@ -597,7 +609,7 @@
       <td><select class="flag-sel" data-key="step_ldg_perf_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">wx_request</td>
     </tr><tr class="cat-pl">
-      <td>28</td>
+      <td>29</td>
       <td><code style="font-size:10px">fordec</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pf">PF</span></td>
@@ -609,7 +621,7 @@
       <td><select class="flag-sel" data-key="step_fordec_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">ldg_perf</td>
     </tr><tr class="phase-divider"><td colspan="11">ATC COMMS</td></tr><tr class="cat-atc">
-      <td>29</td>
+      <td>30</td>
       <td><code style="font-size:10px">intention_to_atc</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -621,7 +633,7 @@
       <td><select class="flag-sel" data-key="step_intention_to_atc_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">fordec</td>
     </tr><tr class="phase-divider"><td colspan="11">CRM PLANNING (FORDEC / COMMS)</td></tr><tr class="cat-pl">
-      <td>30</td>
+      <td>31</td>
       <td><code style="font-size:10px">fmgc_prep</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -633,7 +645,7 @@
       <td><select class="flag-sel" data-key="step_fmgc_prep_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">intention_to_atc</td>
     </tr><tr class="cat-pl">
-      <td>31</td>
+      <td>32</td>
       <td><code style="font-size:10px">nis_brief</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -645,7 +657,7 @@
       <td><select class="flag-sel" data-key="step_nis_brief_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">intention_to_atc</td>
     </tr><tr class="cat-pl">
-      <td>32</td>
+      <td>33</td>
       <td><code style="font-size:10px">pax_pa</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pf">PF</span></td>
@@ -657,7 +669,7 @@
       <td><select class="flag-sel" data-key="step_pax_pa_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">nis_brief</td>
     </tr><tr class="cat-pl">
-      <td>33</td>
+      <td>34</td>
       <td><code style="font-size:10px">company_notify</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -669,7 +681,7 @@
       <td><select class="flag-sel" data-key="step_company_notify_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">pax_pa</td>
     </tr><tr class="phase-divider"><td colspan="11">APPROACH &amp; LANDING</td></tr><tr class="cat-ap">
-      <td>34</td>
+      <td>35</td>
       <td><code style="font-size:10px">approach_prep</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -681,7 +693,7 @@
       <td><select class="flag-sel" data-key="step_approach_prep_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">fmgc_prep</td>
     </tr><tr class="phase-divider"><td colspan="11">ATC COMMS</td></tr><tr class="cat-atc">
-      <td>35</td>
+      <td>36</td>
       <td><code style="font-size:10px">atc_emergency_services</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -693,7 +705,7 @@
       <td><select class="flag-sel" data-key="step_atc_emergency_services_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">nis_brief</td>
     </tr><tr class="phase-divider"><td colspan="11">APPROACH &amp; LANDING</td></tr><tr class="cat-ap">
-      <td>36</td>
+      <td>37</td>
       <td><code style="font-size:10px">approach_brief</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pf">PF</span></td>
@@ -705,7 +717,7 @@
       <td><select class="flag-sel" data-key="step_approach_brief_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">atc_emergency_services</td>
     </tr><tr class="cat-ap">
-      <td>37</td>
+      <td>38</td>
       <td><code style="font-size:10px">go_around_review</code></td>
       <td><span class="chip chip-fc">comms</span></td>
       <td><span class="chip chip-pf">PF</span></td>
@@ -717,7 +729,7 @@
       <td><select class="flag-sel" data-key="step_go_around_review_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">approach_brief</td>
     </tr><tr class="cat-ap">
-      <td>38</td>
+      <td>39</td>
       <td><code style="font-size:10px">approach_cl</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -729,7 +741,7 @@
       <td><select class="flag-sel" data-key="step_approach_cl_flag"><option value="">–</option><option value="🔴 Critical">🔴 Critical</option><option value="🟡 Review">🟡 Review</option><option value="✅ OK">✅ OK</option></select></td>
       <td style="font-size:10px;color:#6b7280;font-family:monospace">go_around_review</td>
     </tr><tr class="cat-ap">
-      <td>39</td>
+      <td>40</td>
       <td><code style="font-size:10px">landing_cl</code></td>
       <td><span class="chip chip-fc">chclm</span></td>
       <td><span class="chip chip-pm">PM</span></td>
@@ -2202,12 +2214,13 @@ const steps = [
   { n:11, id:'agent2',               group:'procedure',   crew:'PM', cat:'ec',  label:'AGENT 2',                    action:'DISCH',    hw:true,  opt:true,  req:'agent1 + fire_persists_30s', hint:'PM: wait 30 s after AGENT 1 — IF FIRE WARN persists, discharge AGENT 2. Last bottle, no restart possible.' },
   // POST-ECAM (parallel tracks)
   { n:12, id:'engine_secured',       group:'chclm',       crew:'PM', cat:'ec',  label:'ENGINE SECURED',             action:'ANNOUNCE', hw:false, opt:false, req:'agent1 + fire_extinguished', hint:'Once fire light is out and engine secured, PM announces ENGINE SECURED and PRIMARY ECAM ACTIONS COMPLETE.' },
-  { n:13, id:'announce_land_asap',   group:'chclm',       crew:'PF', cat:'av',  label:'LAND ASAP',                  action:'ANNOUNCE', hw:false, opt:false, req:'engine_secured',         hint:'PF announces LAND ASAP (red on ECAM) — cue to declare MAYDAY on current frequency. PM cross-checks that MAYDAY is the next call.' },
+  { n:13, id:'announce_land_asap',   group:'chclm',       crew:'PF', cat:'av',  label:'LAND ASAP',                  action:'ANNOUNCE', hw:false, opt:false, req:'engine_secured',         hint:'PF cross-checks LAND ASAP on ECAM STATUS — confirms commitment to land at nearest suitable airport. Cross-check reminder only; MAYDAY is being declared in parallel by PM on comms track.' },
   { n:14, id:'mayday_atc',           group:'comms',       crew:'PM', cat:'atc', label:'MAYDAY',                     action:'DECLARE',  hw:false, opt:false, req:'engine_secured',         hint:'Call on CURRENT frequency (Tower if handoff not yet accepted): MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing [ALT] feet, STANDBY. No destination, no runway, no POB yet.', notes:['MAYDAY × 3','Callsign','Nature: engine fire engine 1','Heading + altitude only','STANDBY — defer POB / fuel / intentions until workload eases'] },
   // PF AVIATE TRACK (parallel)
   { n:15, id:'level_off_maa',        group:'procedure',   crew:'PF', cat:'av',  label:'V/S 0 AT MAA',               action:'SELECT',   hw:false, opt:false, req:'engine_secured',         hint:'PF: at minimum acceleration altitude (~2300 ft AMSL), push V/S knob → FMA col 2 changes SRS → V/S = 0.' },
   { n:16, id:'accel_clean',          group:'procedure',   crew:'PF', cat:'av',  label:'ACCEL / CLEAN',              action:'CONFIRM',  hw:false, opt:false, req:'level_off_maa',          hint:'PF calls FLAPS 1 at F speed and FLAPS UP at S speed; PM checks speed, repeats callouts, selects accordingly.' },
-  { n:17, id:'mct_open_clb',         group:'procedure',   crew:'PF', cat:'av',  label:'MCT / OPEN CLB',             action:'SELECT',   hw:false, opt:false, req:'accel_clean',            hint:'At green dot: LVR MCT flashes white. PF moves live lever to MCT. Pulls ALT knob → OP CLB. FMA: THR MCT · OP CLB · NAV · AP1 · A/THR.' },
+  { n:17, id:'pull_alt_op_clb',       group:'procedure',   crew:'PF', cat:'av',  label:'PULL ALT — OP CLB',          action:'SELECT',   hw:false, opt:false, req:'accel_clean',            hint:'Pull ALT knob on FCU → FMA col 2 changes to OP CLB. LVR MCT cue still flashing. MCT not yet set.' },
+  { n:18, id:'mct_open_clb',         group:'procedure',   crew:'PF', cat:'av',  label:'THRUST MCT',                 action:'SELECT',   hw:false, opt:false, req:'pull_alt_op_clb',        hint:'LVR MCT flashing — PF moves live engine lever to MCT detent. FMA col 1: THR MCT (green). A/THR now active.' },
   // PM COMMS TRACK (parallel)
   { n:18, id:'announce_sec_failures',group:'chclm',       crew:'PM', cat:'ec',  label:'SECONDARY FAILURES',         action:'READ',     hw:false, opt:false, req:'mayday_atc',             hint:'PM reads secondary system failures from SD after engine secured. PF cross-checks and acknowledges each item.', notes:['HYD G ENG1 PUMP...LO PR — Green sys ENG1 pump SOV closed by FIRE pb. PTU may transfer YELLOW→GREEN.','GEN 1 FAULT.........OFF — IDG1 deactivated by FIRE pb. BTC auto-closes, AC BUS 1 fed by GEN 2.','ENG 1 BLEED......FAULT — ENG 1 bleed SOV closed by FIRE pb. XBLEED AUTO opens, PACK 1 monitor.'] },
   { n:19, id:'announce_status',      group:'chclm',       crew:'PM', cat:'st',  label:'STATUS — ANNOUNCE',          action:'ANNOUNCE', hw:false, opt:false, req:'announce_sec_failures',  hint:'When STATUS page appears: PM announces STATUS.' },

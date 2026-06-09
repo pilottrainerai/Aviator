@@ -429,7 +429,8 @@ export const navAdr12Fault: Scenario = {
       message: "IFLY101, confirm passing altitude and advise if able higher.",
       standbyResurfaceMs: 20_000,
       choices: [
-        { id: "a", label: "PAN PAN PAN, IFLY101, unreliable airspeed, NAV ADR 1 plus 2 fault, unable RVSM, request block FL140 to FL160, standby", correct: true },
+        // Correct — PAN PAN × 3 = 6 words; nature + heading + unable RVSM + block request + standby
+        { id: "a", label: "PAN PAN PAN PAN PAN PAN, IFLY101, unreliable airspeed, heading 282, NAV ADR 1 plus 2 fault, unable RVSM, request block FL140 to FL160, standby", correct: true },
         { id: "b", label: "IFLY101 passing FL150, able higher", correct: false },
         { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire", correct: false },
       ],
@@ -442,7 +443,8 @@ export const navAdr12Fault: Scenario = {
       message: "IFLY101, roger PAN PAN, block altitude FL140 to FL160 approved, turn left heading 240 and advise intentions.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "Block FL140 to FL160, left heading 240, standby for intentions, IFLY101", correct: true },
+        // Correct — readback contains only ATC instructions; no crew-added notes
+        { id: "a", label: "Block FL140 to FL160, left heading 240, IFLY101", correct: true },
         { id: "b", label: "Roger IFLY101", correct: false },
         { id: "c", label: "Left heading 240, climbing FL200, IFLY101", correct: false },
       ],
@@ -485,6 +487,135 @@ export const navAdr12Fault: Scenario = {
         { id: "a", label: "IFLY101, 186 persons on board, fuel endurance 1 hour 45, request emergency services standby as a precaution, IFLY101", correct: true },
         { id: "b", label: "Standby IFLY101", correct: false },
         { id: "c", label: "No services required, IFLY101", correct: false },
+      ],
+    },
+
+    // ⑥ ATC delivers weather for diversion airport — full readback
+    {
+      id: "atc_weather_delivery",
+      atMs: 215_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, Mumbai weather — wind 270 at 6, runway 27 in use, NOTAMs nil significant, expect ILS runway 27, QNH 1013.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Wind 270 at 6, runway 27, ILS runway 27, QNH 1013, no significant NOTAMs, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                                                                        correct: false },
+        // Wrong — partial readback, missed QNH and approach type
+        { id: "c", label: "Wind 270 at 6, runway 27, IFLY101",                                                    correct: false },
+      ],
+    },
+
+    // ⑦ Intentions crew card — PM advises diversion to Mumbai after ECAM complete / STATUS review
+    {
+      id: "pm_intentions",
+      atMs: 235_000,
+      requiresStep: "ecam_complete",
+      kind: "crew",
+      from: "PM",
+      message: "ECAM complete and STATUS reviewed. PM advises ATC of final diversion intentions. Select the correct call.",
+      choices: [
+        // Correct — states airport + flap 3 raw-data approach constraints
+        { id: "a", label: "Mumbai Approach, IFLY101, diverting Mumbai, request vectors runway 27, flap 3 approach, no autoland", correct: true  },
+        // Wrong — continues toward destination without stating degradation
+        { id: "b", label: "Mumbai Approach, IFLY101, continuing to destination, no issues",                                       correct: false },
+        // Wrong — returns to departure without stating approach constraints
+        { id: "c", label: "Mumbai Approach, IFLY101, returning Delhi, request ILS",                                               correct: false },
+      ],
+    },
+
+    // ⑧ Hold request crew card — PM requests hold while completing approach brief
+    {
+      id: "pm_hold_req",
+      atMs: 250_000,
+      requiresStep: "ecam_complete",
+      kind: "crew",
+      from: "PM",
+      message: "PM requests holding to complete approach brief before accepting vectors. Select the correct call.",
+      choices: [
+        { id: "a", label: "Mumbai Approach, IFLY101, request holding FL140 while completing approach brief, flap 3 raw-data ILS", correct: true  },
+        // Wrong — requests immediate vectors before brief is complete
+        { id: "b", label: "Mumbai Approach, IFLY101, request immediate ILS runway 27",                                             correct: false },
+        // Wrong — crew card must not offer standby (§0 rule 9)
+        { id: "c", label: "Mumbai Approach, IFLY101, request descent to FL60",                                                     correct: false },
+      ],
+    },
+
+    // ⑨ ATC issues hold clearance — crew reads back
+    {
+      id: "atc_hold_clr",
+      atMs: 265_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, cleared to hold at FONAK FL140, right turns, expect ILS runway 27 in 10 minutes.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Holding FONAK FL140, right turns, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                               correct: false },
+        // Wrong — altitude mis-readback
+        { id: "c", label: "Holding FONAK FL150, right turns, IFLY101",  correct: false },
+      ],
+    },
+
+    // ⑩ ATC asks when ready for approach
+    {
+      id: "atc_ready_for_approach",
+      atMs: 295_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, advise when ready for approach.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — states approach constraints so ATC can plan separation
+        { id: "a", label: "IFLY101 ready, request vectors for ILS runway 27, flap 3 approach, VREF plus 10, no autoland", correct: true  },
+        { id: "b", label: "Ready, IFLY101",                                                                                  correct: false },
+        { id: "c", label: "Standby IFLY101",                                                                                  correct: false },
+      ],
+    },
+
+    // ⑪ Approach clearance — full readback (heading, altitude, ILS, frequency)
+    {
+      id: "atc_cleared_approach",
+      atMs: 325_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, turn right heading 060, descend 3000 feet, cleared ILS runway 27 approach, contact Mumbai Tower 118.10 when established.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Right heading 060, descend 3000, cleared ILS runway 27, contact Tower 118.10 when established, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                                                                                            correct: false },
+        // Wrong — partial readback
+        { id: "c", label: "Cleared ILS runway 27, IFLY101",                                                                           correct: false },
+      ],
+    },
+
+    // ⑫ Tower contact — report established, emergency services acknowledged
+    {
+      id: "atc_tower_contact",
+      atMs: 355_000,
+      kind: "atc",
+      from: "MUMBAI TOWER",
+      message: "IFLY101, Mumbai Tower, continue ILS approach runway 27, report established, emergency services standing by.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Continuing ILS runway 27, will report established, IFLY101", correct: true  },
+        { id: "b", label: "Switching, IFLY101",                                          correct: false },
+      ],
+    },
+
+    // ⑬ Cleared to land
+    {
+      id: "atc_cleared_to_land",
+      atMs: 385_000,
+      kind: "atc",
+      from: "MUMBAI TOWER",
+      message: "IFLY101, runway 27 cleared to land, wind 270 at 6, emergency services in position.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Cleared to land runway 27, IFLY101", correct: true  },
+        { id: "b", label: "Roger IFLY101",                       correct: false },
+        // Wrong — runway mis-readback
+        { id: "c", label: "Cleared to land runway 28, IFLY101", correct: false },
       ],
     },
   ],

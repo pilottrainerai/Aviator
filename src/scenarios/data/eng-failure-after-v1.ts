@@ -648,10 +648,11 @@ export const engFailureAfterV1: Scenario = {
   // as a *correct* discipline.  A correct = "standby" run still scores well —
   // resurface delays simulate ATC giving the crew room.
   distractions: [
-    // ① Tower → Departure handoff (low workload, just before failure)
+    // ① Tower → Departure handoff — gates on 400 ft (ECAM actions called)
     {
       id: "atc_handoff_to_departure",
       atMs: 25_000,
+      requiresStep: "four_hundred_ft_cmd",
       kind: "atc",
       from: "DELHI TOWER",
       message: "IFLY101, contact Delhi Departure 124.85.",
@@ -661,10 +662,14 @@ export const engFailureAfterV1: Scenario = {
         { id: "b", label: "Roger, IFLY101",                                                  correct: false },
         // Wrong — off-by-one-digit frequency readback (classic stress error)
         { id: "c", label: "Delhi Departure 124.95, IFLY101",                                 correct: false },
+        // Wrong — STANDBY here delays the switch; relight wait = lower workload, switch now
+        { id: "d", label: "Standby IFLY101",                                                 correct: false },
       ],
     },
 
-    // ② Initial PAN PAN — BRIEF, essential info only.  No runway, no intentions.
+    // ② Departure radar contact — mid-ECAM (relight wait in progress, MASTER OFF not done).
+    //    STANDBY is correct: engine not yet secured [fctm:L15835].
+    //    PAN PAN declaration belongs AFTER ENG MASTER OFF — see card below.
     {
       id: "atc_radar_contact_pan_pan",
       atMs: 42_000,
@@ -673,21 +678,45 @@ export const engFailureAfterV1: Scenario = {
       message: "IFLY101, Delhi Departure, radar contact.",
       standbyResurfaceMs: 25_000,
       choices: [
-        // Correct — short, no premature commitments
-        { id: "a", label: "PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, no fire, maintaining runway track, climbing 3 000 feet, standby", correct: true  },
-        // Wrong — over-committal during high workload
-        { id: "b", label: "PAN PAN IFLY101, engine failure, returning immediate, request runway 28 ILS, full emergency",                                 correct: false },
-        // Wrong — under-informative (no PAN PAN urgency call)
-        { id: "c", label: "Maintaining runway track, climbing 3 000, IFLY101",                                                                            correct: false },
-        // Wrong — MAYDAY over-declared for a clean shutdown without damage
+        // Correct — engine not secured yet; finish the checklist first
+        { id: "a", label: "Standby IFLY101",                                                                                                              correct: true  },
+        // Wrong — PAN PAN premature: ENG MASTER OFF not yet done [fctm:L15835]
+        { id: "b", label: "PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, no fire, maintaining runway track, climbing 3 000 feet, standby", correct: false },
+        // Wrong — bare acknowledgement, no standby discipline
+        { id: "c", label: "Roger, IFLY101",                                                                                                               correct: false },
+        // Wrong — MAYDAY over-declared AND premature
         { id: "d", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine failure engine 1, no fire, maintaining runway track, climbing 3 000 feet, standby",     correct: false },
       ],
     },
 
-    // ③ ATC acknowledges + provides vectors/altitude — NO questions during workload
+    // ③ PAN PAN declaration — PM picks up radio after ENG MASTER OFF.
+    //    Engine secured = ENG MASTER OFF for failure without damage [fctm:L15835].
+    //    kind:"crew" — PM selects the correct PAN PAN call.
+    {
+      id: "eng_failure_panpan_declare",
+      atMs: 58_000,
+      requiresStep: "eng1_master_off",
+      kind: "crew",
+      from: "PM → DELHI DEPARTURE 124.85",
+      message: "Engine secured. Select PAN PAN call for Delhi Departure 124.85.",
+      standbyResurfaceMs: 20_000,
+      choices: [
+        // Correct — ICAO PAN PAN: nature + heading + altitude + STANDBY [fctm:L15835]
+        { id: "a", label: "PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, heading 280, climbing 2 500 feet, standby",                        correct: true  },
+        // Wrong — MAYDAY over-declared (no fire, no structural damage, no immediate danger)
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine failure engine 1, heading 280, 2 500 feet, standby",                                    correct: false },
+        // Wrong — missing position (heading + altitude required per ICAO)
+        { id: "c", label: "PAN PAN PAN PAN PAN PAN, IFLY101, engine failure engine 1, standby",                                                          correct: false },
+        // Wrong — informal, not ICAO phraseology
+        { id: "d", label: "IFLY101, declaring urgency, engine failure engine 1, standby",                                                                 correct: false },
+      ],
+    },
+
+    // ④ ATC acknowledges PAN PAN + vectors — gates on ENG MASTER OFF [fctm:L15835]
     {
       id: "atc_vectors_climb",
       atMs: 70_000,
+      requiresStep: "eng1_master_off",
       kind: "atc",
       from: "DELHI DEPARTURE",
       message: "IFLY101, roger PAN PAN, radar contact, continue runway track, climb 4 000 feet.",
@@ -718,7 +747,47 @@ export const engFailureAfterV1: Scenario = {
       ],
     },
 
-    // ⑤ ATC prompts for briefing requirements — STEP-TRIGGERED on
+    // ⑤ Hold request — PM requests holding pattern once ECAM complete.
+    //    Crew needs time for FORDEC + approach brief before committing to approach.
+    //    Gates on ecam_completed (PM: "ECAM ACTIONS COMPLETED").
+    {
+      id: "pm_hold_req",
+      atMs: 120_000,
+      requiresStep: "ecam_completed",
+      kind: "crew",
+      from: "PM → DELHI APPROACH 124.85",
+      message: "ECAM complete. Select hold request for Delhi Approach.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — crew needs time for FORDEC + approach brief
+        { id: "a", label: "Request holding, IFLY101, require time for crew coordination and approach preparation", correct: true  },
+        // Wrong — committing to vectors before FORDEC complete
+        { id: "b", label: "Ready for vectors, request ILS runway 28, IFLY101",                                    correct: false },
+        // Wrong — refuses holding, commits to direct routing without FORDEC
+        { id: "c", label: "Delhi Approach, IFLY101, unable holding, request direct runway 28 ILS",                correct: false },
+      ],
+    },
+
+    // ⑥ ATC issues hold clearance — full readback of fix, altitude, direction required.
+    {
+      id: "atc_hold_clr",
+      atMs: 125_000,
+      requiresStep: "ecam_completed",
+      kind: "atc",
+      from: "DELHI APPROACH",
+      message: "IFLY101, hold over UKASO, maintain 4 000 feet, left-hand pattern, expect further clearance time 30.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — full readback: fix + altitude + direction
+        { id: "a", label: "Hold over UKASO, 4 000 feet, left-hand, IFLY101",                    correct: true  },
+        // Wrong — partial readback (altitude missing)
+        { id: "b", label: "Hold over UKASO, left-hand, IFLY101",                                correct: false },
+        // Wrong — bare roger
+        { id: "c", label: "Roger, IFLY101",                                                     correct: false },
+      ],
+    },
+
+    // ⑦ ATC prompts for briefing requirements — STEP-TRIGGERED on
     //   crew_crosscheck ("ECAM ACTIONS COMPLETED") so this only fires once
     //   the crew has finished ECAM, not on a fixed clock.  atMs is a floor
     //   (won't fire before this even if the step is done early).

@@ -334,9 +334,12 @@ export const elecEmerConfig: Scenario = {
       message: "IFLY101, Mumbai Control, checking in, maintain FL330.",
       standbyResurfaceMs: 15_000,
       choices: [
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, electrical emergency configuration, batteries only, request immediate vectors nearest suitable airport, standby", correct: true  },
-        { id: "b", label: "IFLY101, FL330, good day",                                                                                                                       correct: false },
-        { id: "c", label: "Standby IFLY101",                                                                                                                                  correct: false },
+        // Correct — nature + heading + descent request + standby; no airport selection in initial MAYDAY
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, total electrical failure, heading 160, RAT deployed, 30 minutes battery only, request immediate descent, standby", correct: true  },
+        // Wrong — airport selection in initial MAYDAY (airport only after FORDEC)
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, electrical emergency, request immediate vectors nearest suitable airport, standby",                                  correct: false },
+        // Wrong — no emergency declared
+        { id: "c", label: "IFLY101, FL330, good day",                                                                                                                          correct: false },
       ],
     },
 
@@ -377,6 +380,25 @@ export const elecEmerConfig: Scenario = {
       ],
     },
 
+    // ③b Weather request crew card — PM proactively calls for weather/runway/approach info
+    //    Gated on atc_mayday_elec (MAYDAY declared) — tests correct proactive call phraseology.
+    //    No hold card here (ELEC EMER CONFIG exception: 30-min battery makes holding unacceptable).
+    {
+      id: "pm_weather_request",
+      atMs: 100_000,
+      requiresStep: "atc_mayday_elec",
+      kind: "crew",
+      from: "PM",
+      message: "PM makes the proactive call to Mumbai Approach for weather, runway, and approach info before computing landing performance. Select the correct call.",
+      choices: [
+        { id: "a", label: "Mumbai Approach, IFLY101, request latest weather, runway in use, NOTAMs, and expected approach type",  correct: true  },
+        // Wrong — requests immediate vectors (routing decision) instead of weather info
+        { id: "b", label: "Mumbai Approach, IFLY101, request immediate vectors ILS runway 27",                                   correct: false },
+        // Wrong — vague; ATC cannot respond without specific data request
+        { id: "c", label: "Mumbai Approach, IFLY101, we have an emergency, advise",                                               correct: false },
+      ],
+    },
+
     // ④ ATC delivers requested info — STEP-TRIGGERED on pm_request_info.
     //   The PILOT initiated the call earlier (pm_request_info step) BEFORE
     //   the LDG PERF calculation, since that data feeds performance.  ATC
@@ -399,6 +421,24 @@ export const elecEmerConfig: Scenario = {
       ],
     },
 
+    // ⑤b Intentions crew card — PM advises final airport selection after FORDEC
+    //    No hold for ELEC EMER CONFIG (battery constraint) — go direct to airport
+    {
+      id: "pm_intentions",
+      atMs: 155_000,
+      requiresStep: "fordec_elec",
+      kind: "crew",
+      from: "PM",
+      message: "FORDEC is complete. PM advises ATC of final diversion airport and requests direct routing. Select the correct call.",
+      choices: [
+        { id: "a", label: "Mumbai Approach, IFLY101, diverting Mumbai, request direct Mumbai, descend 3000 feet for ILS runway 27", correct: true  },
+        // Wrong — selects wrong airport (Ahmedabad is not the established nearest suitable)
+        { id: "b", label: "Mumbai Approach, IFLY101, diverting Ahmedabad, request vectors Ahmedabad ILS",                          correct: false },
+        // Wrong — continuing on track without a diversion decision
+        { id: "c", label: "Mumbai Approach, IFLY101, unable divert, maintaining current track",                                     correct: false },
+      ],
+    },
+
     // ⑥ POB / fuel / services
     {
       id: "atc_pob_fuel_services",
@@ -408,10 +448,11 @@ export const elecEmerConfig: Scenario = {
       message: "IFLY101, say persons on board and assistance required.",
       standbyResurfaceMs: 25_000,
       choices: [
-        { id: "a", label: "IFLY101, 186 persons on board, 9 tonnes fuel, request full emergency services in position, expect manual ILS, batteries limited, no autoland", correct: true  },
-        { id: "b", label: "Standby IFLY101",                                                                                                                                  correct: false },
+        // Correct — POB + fuel + endurance + services only; no technical aircraft status
+        { id: "a", label: "IFLY101, 186 persons on board, 9 tonnes fuel, 20 minutes endurance, request full emergency services in position", correct: true  },
+        { id: "b", label: "Standby IFLY101",                                                                                                   correct: false },
         // Wrong — under-informative
-        { id: "c", label: "IFLY101, 186 POB, normal approach",                                                                                                                  correct: false },
+        { id: "c", label: "IFLY101, 186 POB, normal approach",                                                                                  correct: false },
       ],
     },
 

@@ -66,6 +66,7 @@ body{background:#0a0e1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
       </marker>
     </defs>
     <g id="gWorld"></g>
+    <g id="gDrag"></g>
   </svg>
 </div>
 
@@ -136,7 +137,7 @@ const nodes = [
 
   // PHASE 2 — FLIGHTCHECK
   {id:'continue_rotation', type:'step',    x:COL.ctr,  y:268,  w:NW,h:NH, label:'CONTINUE ROTATION',         sub:'PF · AVIATE — V2+10 / FD bars / SRS', req:['after_v1']},
-  {id:'atc_handoff',       type:'atc',     x:COL.atc,  y:640,  w:SW,h:SH, label:'① TWR: CHANGEOVER — PM STANDBY', sub:'after V1 rotation · TWR calls for 124.85 · PM: "STANDBY, IFLY101" (resurfaces every 25s)', req:['continue_rotation']},
+  {id:'atc_handoff',       type:'atc',     x:COL.atc,  y:640,  w:SW,h:SH, label:'① TWR: CHANGEOVER — PM STANDBY', sub:'after V1 rotation · TWR calls for 124.85 · PM: "STANDBY, IFLY101" (resurfaces every 25s)', req:['four_hundred_ft']},
   {id:'positive_rate_gear_up',type:'step', x:COL.ctr,  y:372,  w:NW,h:NH, label:'POSITIVE CLIMB — GEAR UP',  sub:'PM · AVIATE — CALL + select UP', req:['continue_rotation']},
   {id:'pfa_ap1',           type:'pfd',     x:COL.pf,   y:372,  w:NW,h:SH, label:'PFD: AP1 ENGAGE',           sub:'Green pulsing ring · phase 4', req:['positive_rate_gear_up']},
   {id:'engage_ap_fma',     type:'step',    x:COL.ctr,  y:476,  w:NW,h:NH, label:'AP1 ENGAGE — READ FMA',     sub:'PF · AVIATE — confirm A/THR armed', req:['positive_rate_gear_up']},
@@ -177,16 +178,17 @@ const nodes = [
 
   // PF AVIATE PARALLEL TRACK
   {id:'pfa_vs_zero',       type:'pfd',     x:COL.fma,  y:1653, w:SW,h:SH, label:'PFD: V/S ZERO',             sub:'Green box · MAA reached · PFD cues PF to select', req:['min_accel_alt']},
-  {id:'level_off_maa',     type:'step',    x:COL.pf,   y:1708, w:NW,h:NH, label:'PF SELECTS V/S 0',          sub:'PF · FCU — push V/S knob (confirms PFD cue)', req:['pfa_vs_zero']},
+  {id:'level_off_maa',     type:'step',    x:COL.pf,   y:1708, w:NW,h:NH, label:'PF SELECTS V/S 0',          sub:'PF · FCU — push V/S knob (confirms PFD cue)', req:['engine_secured']},
   {id:'fma_11',            type:'fma',     x:COL.fma,  y:1760, w:SW,h:SH, label:'FMA 11',                    sub:'MAN TOGA | V/S=0 green | NAV | AP1 | A/THR', req:['level_off_maa']},
-  {id:'accel_clean',       type:'step',    x:COL.pf,   y:1818, w:NW,h:NH, label:'ACCEL / CLEAN',             sub:'PF · AVIATE — FLAPS 1@F · FLAPS 0@S speed', req:['fma_11']},
+  {id:'accel_clean',       type:'step',    x:COL.pf,   y:1818, w:NW,h:NH, label:'ACCEL / CLEAN',             sub:'PF · AVIATE — FLAPS 1@F · FLAPS 0@S speed', req:['level_off_maa']},
   {id:'pfa_lvr_mct',       type:'pfd',     x:COL.fma,  y:1828, w:SW,h:SH, label:'PFD: LVR MCT',              sub:'Green ring · phase 12', req:['accel_clean']},
   {id:'fma_12',            type:'fma',     x:COL.fma,  y:1878, w:SW,h:SH, label:'FMA 12',                    sub:'LVR MCT white | V/S=0 | NAV | AP1 | A/THR', req:['accel_clean']},
-  {id:'mct_open_clb',      type:'step',    x:COL.pf,   y:1928, w:NW,h:NH, label:'MCT / OPEN CLB',            sub:'PF · AVIATE — live lever MCT + pull ALT knob', req:['accel_clean']},
+  {id:'pull_alt_op_clb',   type:'step',    x:COL.pf,   y:1873, w:NW,h:NH, label:'PULL ALT — OP CLB',         sub:'PF · FCU — pull ALT knob → OP CLB', req:['accel_clean']},
+  {id:'mct_open_clb',      type:'step',    x:COL.pf,   y:1928, w:NW,h:NH, label:'THRUST MCT',                sub:'PF · AVIATE — live lever to MCT detent', req:['pull_alt_op_clb']},
   {id:'pfa_op_clb',        type:'pfd',     x:COL.fma,  y:1938, w:SW,h:SH, label:'PFD: OP CLB',               sub:'Green ring · phase 13 · THR MCT active', req:['mct_open_clb']},
   {id:'fma_13',            type:'fma',     x:COL.fma,  y:1988, w:SW,h:SH, label:'FMA 13',                    sub:'THR MCT green | OP CLB green | NAV | AP1 | A/THR active', req:['mct_open_clb']},
-  {id:'pm_hold_inform',    type:'step',    x:COL.pm,   y:1968, w:NW,h:NH, label:'HOLD — INFORM ATC',          sub:'PM · ATC — proceeding hold 15 DME radial 060 DPN', req:['mct_open_clb']},
-  {id:'atc_hold_clr',      type:'atc',     x:COL.atc,  y:1968, w:SW,h:SH, label:'DEP: HOLD CLEARED',          sub:'DEP: cleared hold 15 DME radial 060 DPN · report established', req:['pm_hold_inform']},
+  {id:'pm_hold_req',        type:'step',    x:COL.pm,   y:1968, w:NW,h:NH, label:'HOLD REQUEST',               sub:'PM · ATC — proceeding hold 15 DME radial 060 DPN', req:['mct_open_clb']},
+  {id:'atc_hold_clr',      type:'atc',     x:COL.atc,  y:1968, w:SW,h:SH, label:'DEP: HOLD CLEARED',          sub:'DEP: cleared hold 15 DME radial 060 DPN · report established', req:['pm_hold_req']},
   {id:'atc_endurance_ask', type:'atc',     x:COL.atc,  y:2018, w:SW,h:SH, label:'DEP: ENDURANCE + POB?',      sub:'DEP: say fuel endurance + POB → PM: "STANDBY" (STATUS running)', req:['atc_hold_clr']},
 
   // PM COMMS PARALLEL TRACK
@@ -210,7 +212,7 @@ const nodes = [
   {id:'wx_request',        type:'step',    x:COL.ctr,  y:2700, w:NW,h:NH, label:'WX + RWY + APPR TYPE',      sub:'PM · ATC — request latest WX · runway in use · approach type', req:['crew_crosscheck']},
   {id:'atc_wx_brief',      type:'atc',     x:COL.atc,  y:2755, w:SW,h:SH, label:'⑥ WX BRIEF + RWY + APPR',  sub:'APP: wind 280/8 · QNH 1013 · RWY 28 in use · ILS RWY 28', req:['wx_request']},
   {id:'pm_wx_readback',    type:'step',    x:COL.pm,   y:2810, w:NW,h:NH, label:'WX + RWY READBACK',         sub:'PM · ATC — reads back wind / runway / approach type', req:['atc_wx_brief']},
-  {id:'ldg_perf',          type:'step',    x:COL.ctr,  y:2810, w:NW,h:NH, label:'LDG PERF CHECK',            sub:'PF · PLAN — Vapp+5 kt, RWY 28 LDA 4430 m adequate', req:['pm_wx_readback']},
+  {id:'ldg_perf',          type:'step',    x:COL.ctr,  y:2810, w:NW,h:NH, label:'LDG PERF CHECK',            sub:'PF · PLAN — Vapp+5 kt, RWY 28 LDA 4430 m adequate', req:['wx_request']},
   {id:'fordec',            type:'step',    x:COL.ctr,  y:2920, w:NW,h:NH, label:'FORDEC',                    sub:'PF · PLAN — F·O·R·D·E·C decision', req:['ldg_perf']},
 
   // POST-FORDEC PARALLEL — 3 threads simultaneously
@@ -226,7 +228,7 @@ const nodes = [
   {id:'atc_emsvcs_ack',    type:'atc',     x:COL.atc,  y:3194, w:SW,h:SH, label:'⑧ EMSVCS ACK',             sub:'DEP: Cat 3 CFR + ambulance + emerg svcs confirmed RWY 28 · advise ready approach · PM reads back', req:['atc_emergency_services']},
 
   // APPROACH SEQUENCE
-  {id:'approach_brief',    type:'step',    x:COL.ctr,  y:3362, w:NW,h:NH, label:'APPROACH BRIEF',            sub:'PF · APPROACH — ILS RWY 28, OEI CAT 1, Vapp+5', req:['atc_emsvcs_ack']},
+  {id:'approach_brief',    type:'step',    x:COL.ctr,  y:3362, w:NW,h:NH, label:'APPROACH BRIEF',            sub:'PF · APPROACH — ILS RWY 28, OEI CAT 1, Vapp+5', req:['atc_emergency_services']},
   {id:'go_around_review',  type:'step',    x:COL.ctr,  y:3472, w:NW,h:NH, label:'GO-AROUND REVIEW',          sub:'PF · APPROACH — TOGA ENG2 only / SRS / V2+10', req:['approach_brief']},
   {id:'approach_cl',       type:'step',    x:COL.ctr,  y:3582, w:NW,h:NH, label:'APPROACH CL',               sub:'PM · APPROACH — BARO/DH/BELTS/AUTOBRK/SPOILERS', req:['go_around_review']},
   {id:'pm_req_vectors',    type:'step',    x:COL.pm,   y:3600, w:NW,h:NH, label:'REQUEST VECTORS',           sub:'PM · ATC — ready · request ILS vectors RWY 28', req:['approach_cl']},
@@ -379,7 +381,7 @@ PM response:
 WHY STANDBY: Crew in ECAM checklist — not yet ready for approach vectors.
              Will request vectors after FORDEC and approach prep complete.`,
 
-  pm_hold_inform:`PM INFORMS DEPARTURE — PROCEEDING TO HOLD
+  pm_hold_req:`PM INFORMS DEPARTURE — PROCEEDING TO HOLD
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
 
@@ -685,7 +687,7 @@ try { nodeNotes = JSON.parse(localStorage.getItem(NOTES_KEY)||'{}'); } catch{}
 const ATC_NODES = [
   'atc_handoff','mayday_tower_declare','mayday_atc','atc_tower_mayday_ack','atc_vectors_clb',
   'pm_dep_initial_call','atc_pob_fuel_services','atc_vectors_rdy',
-  'pm_hold_inform','atc_hold_clr','atc_endurance_ask','pm_endurance_pob',
+  'pm_hold_req','atc_hold_clr','atc_endurance_ask','pm_endurance_pob',
   'wx_request','atc_wx_brief','pm_wx_readback',
   'intention_to_atc','atc_emergency_services','atc_emsvcs_ack','atc_rdy_appr',
   'pm_req_vectors','atc_clrd_appr','atc_tower_cont','atc_cleared_land',
@@ -710,6 +712,16 @@ let dayMode = false;
 let edgeNotes = Object.assign({}, DEFAULT_EDGE_NOTES);
 try { const s=localStorage.getItem(EDGE_NOTES_KEY); if(s){ Object.assign(edgeNotes,JSON.parse(s)); } } catch{}
 let edgeEditMode = false;
+
+// __EDGE_OVERRIDES_START__
+const DEFAULT_EDGE_OVERRIDES = {
+};
+// __EDGE_OVERRIDES_END__
+const EDGE_OVERRIDES_KEY = 'flowgraph_edge_overrides_v1';
+let edgeOverrides = Object.assign({}, DEFAULT_EDGE_OVERRIDES);
+try { const s=localStorage.getItem(EDGE_OVERRIDES_KEY); if(s){ Object.assign(edgeOverrides,JSON.parse(s)); } } catch{}
+let dragEdge = null; // { origKey, end:'from'|'to', fixedId } — active drag state
+let dragHoverId = null; // node id currently under cursor during drag
 let selEdge = null; // { key:'from→to', from, to }
 const svgNS = 'http://www.w3.org/2000/svg';
 // undo stack — each entry: {nodeId, before, after}
@@ -735,10 +747,26 @@ function buildEdges(){
   nodes.forEach(n => {
     (n.req||[]).forEach(r => {
       if(r==='—') return;
-      if(byId[r]) edges.push({from:r, to:n.id});
+      if(!byId[r]) return;
+      const origKey = r+'→'+n.id;
+      const ov = edgeOverrides[origKey];
+      const from = (ov&&ov.from) ? ov.from : r;
+      const to   = (ov&&ov.to)   ? ov.to   : n.id;
+      if(byId[from] && byId[to]) edges.push({from, to, origKey});
     });
   });
   return edges;
+}
+
+function screenToWorld(cx, cy){
+  const r = document.getElementById('mainSvg').getBoundingClientRect();
+  return { x:(cx-r.left-vp.x)/vp.scale, y:(cy-r.top-vp.y)/vp.scale };
+}
+function nodeAtWorld(wx, wy){
+  for(const n of nodes){
+    if(wx>=n.x && wx<=n.x+nW(n) && wy>=n.y && wy<=n.y+nH(n)) return n;
+  }
+  return null;
 }
 
 const joinSet = new Set();
@@ -795,12 +823,12 @@ function render(){
     // Thicker stroke + note-dot indicator when edge has notes
     const ek=e.from+'→'+e.to;
     if(edgeNotes[ek]){ p.setAttribute('stroke-width','2'); p.setAttribute('stroke-dasharray','3,2'); }
-    if(edgeEditMode){ p.style.cursor='crosshair'; p.setAttribute('stroke-width','3'); }
+    if(edgeEditMode){ p.style.cursor='crosshair'; p.setAttribute('stroke-width','3'); p.setAttribute('stroke', edgeNotes[ek] ? '#f59e0b' : '#38bdf8'); }
     // Edge click — open note panel when line-edit mode active
     p.addEventListener('click', ev=>{
       if(!edgeEditMode) return;
       ev.stopPropagation();
-      selectEdge(e.from, e.to);
+      selectEdge(e.origKey||ek, e.from, e.to);
     });
     // Edge hover tooltip
     p.addEventListener('mouseenter', ev=>{
@@ -864,12 +892,35 @@ function render(){
       slT.textContent=n.sub.length>maxC?n.sub.slice(0,maxC)+'…':n.sub;
     }
   });
+
+  // Edge endpoint handles — shown when an edge is selected in edit mode
+  if(edgeEditMode && selEdge){
+    const activeEdges=buildEdges();
+    const ae=activeEdges.find(e=>(e.origKey||e.from+'→'+e.to)===selEdge.key);
+    if(ae){
+      const sn=byId[ae.from], tn=byId[ae.to];
+      const gH=svgEl('g',{id:'gHandles'},gw);
+      if(sn){
+        const sh=svgEl('circle',{cx:nCX(sn),cy:nBot(sn)-6,r:'8',fill:'#38bdf8',stroke:'#fff','stroke-width':'2',cursor:'grab'},gH);
+        sh.addEventListener('mousedown',ev=>{ev.stopPropagation();ev.preventDefault();dragEdge={origKey:selEdge.key,end:'from',fixedId:ae.to};});
+        const sl=svgEl('text',{x:nCX(sn),y:nBot(sn)-17,'font-size':'8','font-weight':'700',fill:'#38bdf8','text-anchor':'middle'},gH);
+        sl.textContent='SOURCE';
+      }
+      if(tn){
+        const th=svgEl('circle',{cx:nCX(tn),cy:tn.y+6,r:'8',fill:'#f59e0b',stroke:'#fff','stroke-width':'2',cursor:'grab'},gH);
+        th.addEventListener('mousedown',ev=>{ev.stopPropagation();ev.preventDefault();dragEdge={origKey:selEdge.key,end:'to',fixedId:ae.from};});
+        const tl=svgEl('text',{x:nCX(tn),y:tn.y-4,'font-size':'8','font-weight':'700',fill:'#f59e0b','text-anchor':'middle'},gH);
+        tl.textContent='TARGET';
+      }
+    }
+  }
 }
 
 // ── VIEW ──────────────────────────────────────────────────────────────────
 function applyVp(){
-  document.getElementById('gWorld').setAttribute('transform',
-    `translate(${vp.x},${vp.y}) scale(${vp.scale})`);
+  const t=`translate(${vp.x},${vp.y}) scale(${vp.scale})`;
+  document.getElementById('gWorld').setAttribute('transform',t);
+  document.getElementById('gDrag').setAttribute('transform',t);
   localStorage.setItem(VP_KEY, JSON.stringify({x:vp.x,y:vp.y,scale:vp.scale}));
   positionNote();
 }
@@ -969,11 +1020,62 @@ function toggleLineEdit(){
     : 'Scroll=pan · Ctrl+Scroll=zoom · Click=notes · Esc=close · Ctrl+Z=undo';
 }
 
-function selectEdge(from, to){
-  const k=from+'→'+to;
+function selectEdge(origKey, from, to){
+  const k=origKey||from+'→'+to;
   selEdge = (selEdge&&selEdge.key===k) ? null : {key:k, from, to};
+  render(); applyVp();
   positionEdgeNote();
 }
+
+// ── EDGE DRAG — reroute endpoint to a different node ──────────────────────
+document.addEventListener('mousemove', ev=>{
+  if(!dragEdge) return;
+  const wp=screenToWorld(ev.clientX, ev.clientY);
+  const gd=document.getElementById('gDrag');
+  gd.innerHTML='';
+  const fixedN=byId[dragEdge.fixedId];
+  if(fixedN){
+    let fx,fy,tx,ty;
+    if(dragEdge.end==='to'){
+      fx=nCX(fixedN); fy=nBot(fixedN); tx=wp.x; ty=wp.y;
+    } else {
+      fx=wp.x; fy=wp.y; tx=nCX(fixedN); ty=fixedN.y;
+    }
+    const mY=(fy+ty)/2;
+    svgEl('path',{d:`M${fx},${fy} C${fx},${mY} ${tx},${mY} ${tx},${ty}`,
+      fill:'none',stroke:'#38bdf8','stroke-width':'2','stroke-dasharray':'8,5',
+      opacity:'0.85','marker-end':'url(#arr)'},gd);
+  }
+  // Highlight node under cursor
+  const hn=nodeAtWorld(wp.x,wp.y);
+  const newId=hn?hn.id:null;
+  if(newId!==dragHoverId){
+    dragHoverId=newId;
+    document.querySelectorAll('#gNodes > g').forEach(g=>{
+      g.style.filter = g.getAttribute('data-id')===dragHoverId ? 'brightness(2) drop-shadow(0 0 6px #38bdf8)' : '';
+    });
+  }
+});
+
+document.addEventListener('mouseup', ev=>{
+  if(!dragEdge) return;
+  const wp=screenToWorld(ev.clientX, ev.clientY);
+  const dropN=nodeAtWorld(wp.x,wp.y);
+  if(dropN && dropN.id!==dragEdge.fixedId){
+    const ov=Object.assign({},edgeOverrides[dragEdge.origKey]||{});
+    ov[dragEdge.end]=dropN.id;
+    // If result matches original, remove override
+    const parts=dragEdge.origKey.split('→');
+    if((ov.from||parts[0])===parts[0] && (ov.to||parts[1])===parts[1]) delete edgeOverrides[dragEdge.origKey];
+    else edgeOverrides[dragEdge.origKey]=ov;
+    localStorage.setItem(EDGE_OVERRIDES_KEY,JSON.stringify(edgeOverrides));
+  }
+  document.getElementById('gDrag').innerHTML='';
+  document.querySelectorAll('#gNodes > g').forEach(g=>{ g.style.filter=''; });
+  dragHoverId=null; dragEdge=null;
+  render(); applyVp();
+  document.getElementById('hint').textContent='LINE EDIT — click any arrow to add notes  ·  Esc=exit';
+});
 
 function positionEdgeNote(){
   const ov=document.getElementById('edgeNoteOverlay');
@@ -1130,6 +1232,13 @@ function saveHTML(){
   const newNotesBlock =
     `// __NOTES_BLOCK_START__\nconst DEFAULT_NOTES = {\n${entries}\n};\n// __NOTES_BLOCK_END__`;
 
+  // Bake edge overrides into a stable block
+  const ovEntries = Object.entries(edgeOverrides)
+    .map(([k,v]) => `  ${JSON.stringify(k)}:${JSON.stringify(v)}`)
+    .join(',\n');
+  const newOvBlock =
+    `// __EDGE_OVERRIDES_START__\nconst DEFAULT_EDGE_OVERRIDES = {\n${ovEntries}\n};\n// __EDGE_OVERRIDES_END__`;
+
   // Bake edge notes into a stable block
   const edgeEntries = Object.entries(edgeNotes)
     .map(([k,v]) => `  ${JSON.stringify(k)}:${JSON.stringify(v)}`)
@@ -1154,8 +1263,16 @@ function saveHTML(){
       newEdgeBlock
     );
   } else {
-    // First save — inject edge notes block after the node notes block
     html = html.replace(newNotesBlock, newNotesBlock+'\n'+newEdgeBlock);
+  }
+  // Replace edge overrides block
+  if(html.includes('// __EDGE_OVERRIDES_START__')){
+    html = html.replace(
+      /\/\/ __EDGE_OVERRIDES_START__[\s\S]*?\/\/ __EDGE_OVERRIDES_END__/,
+      newOvBlock
+    );
+  } else {
+    html = html.replace(newEdgeBlock, newEdgeBlock+'\n'+newOvBlock);
   }
   // Replace VP between stable markers — works on any saved version
   html = html.replace(
@@ -1214,10 +1331,12 @@ function resetNotes(){
   // Clear localStorage overrides
   localStorage.removeItem(NOTES_KEY);
   localStorage.removeItem(EDGE_NOTES_KEY);
+  localStorage.removeItem(EDGE_OVERRIDES_KEY);
 
   // Restore from baked-in defaults
-  nodeNotes  = Object.assign({}, DEFAULT_NOTES);
-  edgeNotes  = Object.assign({}, DEFAULT_EDGE_NOTES);
+  nodeNotes     = Object.assign({}, DEFAULT_NOTES);
+  edgeNotes     = Object.assign({}, DEFAULT_EDGE_NOTES);
+  edgeOverrides = Object.assign({}, DEFAULT_EDGE_OVERRIDES);
 
   // Close any open overlays
   closeNote();

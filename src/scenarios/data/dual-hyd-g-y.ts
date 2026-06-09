@@ -572,12 +572,16 @@ export const dualHydGY: Scenario = {
     { id: "st_inop_steep",line: "STEEP APPR",          severity: "caution",  inopSys: true },
   ],
 
-  // ── ATC sequence — mirrors eng1-fire-after-v1 ──────────────────────────────
-  // High-workload phase (ECAM + degraded FCTL handling): keep ATC brief,
-  // STANDBY is correct discipline.  After ECAM completion + approach prep:
-  // crew advises intentions and accepts operational questions.
+  // ── ATC sequence — cruise phase rule: first ATC contact IS the MAYDAY ────────
+  // Phase rule (cruise): no prior Tower handoff/STANDBY sequence; the routine
+  // check-in call from Mumbai Control triggers the immediate MAYDAY declaration.
+  // STANDBY discipline: ATC queries during ECAM → STANDBY correct on kind:"atc"
+  // cards. Kind:"crew" cards test deliberate crew-initiated calls — no standby
+  // option (rule §0.9 of atc-comms skill).
   distractions: [
-    // ① Routine handoff frequency check before the event
+    // ① ATC routine check-in fires just after failure — crew responds with MAYDAY
+    // Correct MAYDAY: nature + unable RVSM + request descent + standby.
+    // No airport / vectors in the initial call — intentions come after FORDEC.
     {
       id: "atc_handoff_checkin",
       atMs: 10_000,
@@ -586,148 +590,276 @@ export const dualHydGY: Scenario = {
       message: "IFLY101, Mumbai Control, checking in, maintain FL350.",
       standbyResurfaceMs: 20_000,
       choices: [
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, dual hydraulic failure G and Y, maintaining FL350, request immediate vectors nearest suitable airport with 3 000 m runway, standby", correct: true  },
-        { id: "b", label: "IFLY101, FL350, good day",                                                                                                                                          correct: false },
-        { id: "c", label: "Standby IFLY101",                                                                                                                                                     correct: false },
+        // Correct — nature + heading + offset request + unable RVSM + descent request + standby
+        // Heading states current navigation; offset gives lateral separation; descent exits RVSM block
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, dual hydraulic failure, heading 200, unable RVSM, request 2 miles right offset and descent flight level two five zero, standby",  correct: true  },
+        // Wrong — missing heading and offset; ATC cannot plan separation without navigation info
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, dual hydraulic failure, unable RVSM, request descent flight level two five zero, standby",                                          correct: false },
+        // Wrong — standby only; MAYDAY must be declared immediately
+        { id: "c", label: "Standby IFLY101",                                                                                                                                                   correct: false },
+        // Wrong — airports and vectors in initial MAYDAY; intentions come after FORDEC
+        { id: "d", label: "MAYDAY MAYDAY MAYDAY, IFLY101, dual hydraulic failure, maintaining FL350, request immediate vectors nearest suitable airport with 3 000 m runway, standby",        correct: false },
       ],
     },
 
-    // ② PM-initiated MAYDAY → ATC acknowledges + offers runway options
+    // ② ATC acknowledges MAYDAY — crew reads back BOTH offset and descent level
     {
-      id: "atc_nearest_options",
-      atMs: 30_000,
+      id: "atc_mayday_ack",
+      atMs: 25_000,
       kind: "atc",
       from: "MUMBAI CONTROL",
-      pilotSays: "MAYDAY MAYDAY MAYDAY, Mumbai Control, IFLY101, dual hydraulic failure GREEN and YELLOW, flight controls degraded, maintaining FL350, request immediate vectors to nearest suitable airport with at least 3 000 m runway, 186 souls on board.",
-      message: "IFLY101, Mumbai Control, roger MAYDAY, radar contact. Nearest: VAAH Ahmedabad 80 nm, runway 23, 2 743 m. Alternate: VABB Mumbai 140 nm, runway 27, 3 445 m. Advise.",
+      message: "IFLY101, roger MAYDAY, radar contact. Maintain 2 miles right offset, descend flight level two four zero.",
       standbyResurfaceMs: 25_000,
       choices: [
-        // Correct — picks the longer runway (3 000 m+) per dual-hyd brake/distance constraints
-        { id: "a", label: "Request vectors VABB Mumbai runway 27 — long runway required, accumulator brakes only, IFLY101", correct: true  },
-        // Wrong — VAAH 2 743 m is too short for accumulator-brake landing
-        { id: "b", label: "Accepting VAAH Ahmedabad runway 23, IFLY101",                                                     correct: false },
-        // Wrong — premature commitment without runway analysis
-        { id: "c", label: "IFLY101 standard ILS, nearest airfield",                                                          correct: false },
+        // Correct — both items read back (offset is a safety separation instruction)
+        { id: "a", label: "2 miles right offset, descending flight level two four zero, IFLY101",  correct: true  },
+        // Wrong — offset dropped (protects against conflicting traffic in RVSM block)
+        { id: "b", label: "Descending flight level two four zero, IFLY101",                         correct: false },
+        // Wrong — bare acknowledgement
+        { id: "c", label: "Roger IFLY101",                                                          correct: false },
       ],
     },
 
-    // ③ ATC unsolicited offer of vectors — pilot defers (no prior pilot call)
+    // ③ ATC asks if assistance required — STANDBY while ECAM not yet started
+    {
+      id: "atc_assistance_req",
+      atMs: 70_000,
+      kind: "atc",
+      from: "MUMBAI CONTROL",
+      message: "IFLY101, assistance required?",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — ECAM not yet running; focus on aircraft; advise when ready
+        { id: "a", label: "Standby IFLY101",                                               correct: true  },
+        // Wrong — requests routing before ECAM started (too early to commit)
+        { id: "b", label: "Request vectors nearest suitable airport, IFLY101",             correct: false },
+        // Wrong — "negative" implies no assistance needed; serious emergency is active
+        { id: "c", label: "Negative IFLY101",                                              correct: false },
+      ],
+    },
+
+    // ④ ATC offers vectors — crew defers while checklist running
     {
       id: "atc_vectors_when_ready",
-      atMs: 60_000,
+      atMs: 120_000,
       kind: "atc",
       from: "MUMBAI CONTROL",
       message: "IFLY101, vectors available when ready, descend at your discretion.",
       standbyResurfaceMs: 30_000,
       choices: [
+        // Correct — acknowledge without committing; ECAM in progress
         { id: "a", label: "Continuing checklist, will advise when ready, IFLY101", correct: true  },
-        { id: "b", label: "Standby IFLY101",                                       correct: true  },
-        // Wrong — premature commitment before checklist done
-        { id: "c", label: "IFLY101 turn left direct Mumbai, descend FL100",        correct: false },
+        { id: "b", label: "Standby IFLY101",                                        correct: true  },
+        // Wrong — premature routing commitment before ECAM and FORDEC done
+        { id: "c", label: "IFLY101, turn left direct Mumbai, descend FL100",        correct: false },
       ],
     },
 
-    // ④ PM-initiated briefing request → ATC delivers info
+    // ⑤ ECAM complete — crew requests Mumbai weather before FORDEC
+    // Kind:"crew" — deliberate crew-initiated call; no standby option.
     {
-      id: "atc_briefing_info",
-      atMs: 165_000,
-      requiresStep: "inform_atc_intentions",
+      id: "atc_weather_request",
+      atMs: 250_000,
+      requiresStep: "crew_crosscheck",
+      kind: "crew",
+      from: "PM → MUMBAI APPROACH",
+      message: "ECAM complete. Select the correct weather request.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — weather request only; airport decision comes after landing performance + FORDEC
+        { id: "a", label: "Mumbai Approach, IFLY101, request latest weather Mumbai, runway in use, QNH",   correct: true  },
+        // Wrong — airport/runway stated before FORDEC and landing performance are done
+        { id: "b", label: "Mumbai Approach, IFLY101, diverting Mumbai, request weather runway 27",          correct: false },
+        // Wrong — skips weather entirely; requests vectors prematurely
+        { id: "c", label: "Mumbai Approach, IFLY101, request immediate vectors ILS runway 27",              correct: false },
+      ],
+    },
+
+    // ⑥ ATC delivers weather — full readback required (QNH critical for landing distance)
+    {
+      id: "atc_weather_delivery",
+      atMs: 260_000,
+      requiresStep: "crew_crosscheck",
       kind: "atc",
       from: "MUMBAI APPROACH",
-      pilotSays: "Mumbai Approach, IFLY101 — established with you, request latest Mumbai weather, runway in use, NOTAMs, and expected approach type.",
-      message: "IFLY101, Mumbai Approach, roger your request. Wind 270 at 6, runway 27 in use, NOTAMs nil significant, expect ILS runway 27, QNH 1013.",
+      pilotSays: "Mumbai Approach, IFLY101, request latest weather Mumbai, runway in use, QNH.",
+      message: "IFLY101, Mumbai Approach, wind 270 at 6, runway 27 in use, QNH 1013, expect ILS runway 27.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Wind 270 at 6, runway 27, ILS runway 27, QNH 1013, no significant NOTAMs, IFLY101", correct: true  },
-        { id: "b", label: "Roger IFLY101",                                                                      correct: false },
-        // Wrong — missed QNH (critical for accumulator-brake landing distance)
-        { id: "c", label: "Wind 270 at 6, runway 27, ILS, IFLY101",                                            correct: false },
+        // Correct — full readback including QNH (needed for landing distance computation)
+        { id: "a", label: "Wind 270 at 6, runway 27, QNH 1013, ILS runway 27, IFLY101",  correct: true  },
+        // Wrong — QNH dropped (affects landing distance at accumulator-brake approach speed)
+        { id: "b", label: "Wind 270 at 6, runway 27, ILS runway 27, IFLY101",             correct: false },
+        // Wrong — bare acknowledgement
+        { id: "c", label: "Roger IFLY101",                                                 correct: false },
       ],
     },
 
-    // ⑤ ATC asks ops info (POB / fuel / services) — ATC-initiated
+    // ⑦ Hold request — crew needs time for FORDEC + approach brief
+    // Kind:"crew" — deliberate crew-initiated call; no standby option.
+    {
+      id: "pm_hold_req",
+      atMs: 300_000,
+      requiresStep: "crew_crosscheck",
+      kind: "crew",
+      from: "PM → MUMBAI APPROACH",
+      message: "Request holding from Mumbai Approach.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — states reason; gives ATC expectation of further delay
+        { id: "a", label: "Mumbai Approach, IFLY101, request holding, require time for crew coordination and approach preparation",  correct: true  },
+        // Wrong — commits to descent/approach before FORDEC and approach brief done
+        { id: "b", label: "Mumbai Approach, IFLY101, request descent 3 000 feet, vectors ILS runway 27",                            correct: false },
+        // Wrong — vague; no hold requested; ATC cannot plan separation
+        { id: "c", label: "Mumbai Approach, IFLY101, not ready, continuing on track",                                                correct: false },
+      ],
+    },
+
+    // ⑧ ATC issues hold clearance — full readback: fix + altitude + direction
+    {
+      id: "atc_hold_clr",
+      atMs: 310_000,
+      requiresStep: "crew_crosscheck",
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, hold SAPAV, maintain 7 000 feet, left-hand pattern, expect further clearance time 25.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — fix + altitude + direction all read back
+        { id: "a", label: "Hold SAPAV, 7 000 feet, left-hand, IFLY101",  correct: true  },
+        // Wrong — altitude dropped
+        { id: "b", label: "Hold SAPAV, left-hand, IFLY101",               correct: false },
+        // Wrong — bare acknowledgement
+        { id: "c", label: "Roger IFLY101",                                 correct: false },
+      ],
+    },
+
+    // ⑨ ATC asks POB + endurance — respond with facts; no technical aircraft status
     {
       id: "atc_pob_fuel_services",
-      atMs: 195_000,
+      atMs: 330_000,
       kind: "atc",
       from: "MUMBAI APPROACH",
       message: "IFLY101, say persons on board, fuel endurance, and assistance required.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "IFLY101, 186 persons on board, 12 tonnes fuel, endurance 2 hours 30, request full emergency services, flapless approach, long rollout expected, no anti-skid, no nose-wheel steering", correct: true  },
-        { id: "b", label: "Standby IFLY101",                                                                                                                                                                          correct: false },
-        // Wrong — under-informative (ARFF needs to know about accumulator brakes / long rollout)
-        { id: "c", label: "IFLY101, 186 POB, standard approach",                                                                                                                                                       correct: false },
+        // Correct — POB + fuel + endurance; no technical aircraft status (ATC does not need it)
+        { id: "a", label: "186 persons on board, 12 tonnes fuel, endurance 2 hours 30, IFLY101",                                                                                              correct: true  },
+        // Wrong — standby not acceptable once ECAM complete and holding
+        { id: "b", label: "Standby IFLY101",                                                                                                                                                  correct: false },
+        // Wrong — under-informative; no fuel or endurance stated
+        { id: "c", label: "IFLY101, 186 POB, standard approach",                                                                                                                              correct: false },
       ],
     },
 
-    // ⑥ ATC asks ready-for-approach — ATC-initiated prompt
+    // ⑩ Advise intentions — FORDEC complete; commit to VABB (training test: VAAH too short)
+    // Kind:"crew" — deliberate crew-initiated call; no standby option.
+    {
+      id: "atc_intentions_advise",
+      atMs: 380_000,
+      requiresStep: "fordec_hyd",
+      kind: "crew",
+      from: "PM → MUMBAI APPROACH",
+      message: "FORDEC complete. Advise intentions to ATC.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — VABB RWY 27 (3 445 m): adequate for flapless + accumulator-brake landing
+        { id: "a", label: "Mumbai Approach, IFLY101, diverting Mumbai, request vectors ILS runway 27, flap 3 approach",  correct: true  },
+        // Wrong — VAAH RWY 23 (2 743 m): insufficient for flapless with accumulator brakes only
+        { id: "b", label: "Mumbai Approach, IFLY101, diverting Ahmedabad, request vectors runway 23",                   correct: false },
+        // Wrong — no clear divert decision communicated to ATC
+        { id: "c", label: "Mumbai Approach, IFLY101, requesting descent 3 000 feet",                                    correct: false },
+      ],
+    },
+
+    // ⑪ Emergency services — concise; no technical aircraft status
+    // Kind:"crew" — deliberate crew-initiated call; no standby option.
+    {
+      id: "atc_emg_services_req",
+      atMs: 390_000,
+      requiresStep: "fordec_hyd",
+      kind: "crew",
+      from: "PM → MUMBAI APPROACH",
+      message: "Request emergency services for runway 27.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — "full emergency services" only; ATC does not need technical aircraft details
+        { id: "a", label: "Mumbai Approach, IFLY101, request full emergency services runway 27",                                                                                                              correct: true  },
+        // Wrong — overloads frequency with technical status ATC cannot act on
+        { id: "b", label: "Mumbai Approach, IFLY101, request full emergency services runway 27, flapless approach, accumulator brakes only, no anti-skid, no nose-wheel steering, long rollout expected",  correct: false },
+        // Wrong — piecemeal; "fire trucks only" is not "full emergency services"
+        { id: "c", label: "Mumbai Approach, IFLY101, request fire trucks and foam runway 27",                                                                                                                correct: false },
+      ],
+    },
+
+    // ⑫ ATC asks ready for approach
     {
       id: "atc_ready_for_approach",
-      atMs: 225_000,
+      atMs: 450_000,
+      requiresStep: "fordec_hyd",
       kind: "atc",
       from: "MUMBAI APPROACH",
       message: "IFLY101, advise when ready for approach.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "IFLY101 ready, request vectors for ILS runway 27, flap 3 approach, Vapp plus 25 knots", correct: true  },
-        { id: "b", label: "Ready, IFLY101",                                                                          correct: false },
-        { id: "c", label: "Standby IFLY101",                                                                          correct: false },
+        { id: "a", label: "IFLY101 ready, request vectors ILS runway 27, flap 3 approach, Vapp plus 25 knots",  correct: true  },
+        { id: "b", label: "Ready, IFLY101",                                                                       correct: false },
+        { id: "c", label: "Standby IFLY101",                                                                      correct: false },
       ],
     },
 
-    // ⑦ PM declares ready → ATC issues approach clearance with intercept hdg
+    // ⑬ ILS clearance — full readback including frequency change
     {
       id: "atc_cleared_approach",
-      atMs: 255_000,
+      atMs: 480_000,
       kind: "atc",
       from: "MUMBAI APPROACH",
       pilotSays: "Mumbai Approach, IFLY101, ready for the approach, request vectors for ILS runway 27.",
       message: "IFLY101, roger, turn left heading 240, descend 3 000 feet, cleared ILS runway 27 approach, contact Mumbai Tower 118.10 when established.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Left heading 240, descend 3 000, cleared ILS runway 27, contact Tower 118.10 when established, IFLY101", correct: true  },
-        { id: "b", label: "Roger IFLY101",                                                                                            correct: false },
-        { id: "c", label: "Cleared ILS runway 27, IFLY101",                                                                            correct: false },
+        { id: "a", label: "Left heading 240, descend 3 000, cleared ILS runway 27, contact Tower 118.10 when established, IFLY101",  correct: true  },
+        { id: "b", label: "Roger IFLY101",                                                                                             correct: false },
+        { id: "c", label: "Cleared ILS runway 27, IFLY101",                                                                           correct: false },
       ],
     },
 
-    // ⑧ Tower contact — ATC-initiated handoff (no prior pilot call here)
+    // ⑭ Tower contact
     {
       id: "atc_tower_contact",
-      atMs: 285_000,
+      atMs: 510_000,
       kind: "atc",
       from: "MUMBAI TOWER",
       pilotSays: "Mumbai Tower, IFLY101, established ILS runway 27, MAYDAY confirmed.",
       message: "IFLY101, Mumbai Tower, roger, continue ILS approach runway 27, report established, emergency services on standby.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Continuing ILS runway 27, will report established, IFLY101", correct: true  },
-        { id: "b", label: "Switching, IFLY101",                                          correct: false },
+        { id: "a", label: "Continuing ILS runway 27, will report established, IFLY101",  correct: true  },
+        { id: "b", label: "Switching, IFLY101",                                           correct: false },
       ],
     },
 
-    // ⑨ Cleared to land — pilot's on-final report triggers ATC's landing clearance
+    // ⑮ Cleared to land
     {
       id: "atc_cleared_to_land",
-      atMs: 310_000,
+      atMs: 540_000,
       kind: "atc",
       from: "MUMBAI TOWER",
       pilotSays: "Mumbai Tower, IFLY101, established ILS runway 27, gear gravity, FLAP 3.",
       message: "IFLY101, runway 27 cleared to land, wind 270 at 6, ARFF in position, long rollout acknowledged.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Cleared to land runway 27, IFLY101", correct: true  },
-        { id: "b", label: "Roger IFLY101",                       correct: false },
+        { id: "a", label: "Cleared to land runway 27, IFLY101",  correct: true  },
+        { id: "b", label: "Roger IFLY101",                        correct: false },
         // Wrong — runway mis-readback under stress
-        { id: "c", label: "Cleared to land runway 28, IFLY101", correct: false },
+        { id: "c", label: "Cleared to land runway 28, IFLY101",  correct: false },
       ],
     },
 
-    // ⑩ After landing — aircraft stopped on runway, PM requests tow / follow-me
+    // ⑯ After landing — aircraft stopped, NW steering INOP; request tow
     {
       id: "atc_taxi_to_stand",
-      atMs: 360_000,
+      atMs: 600_000,
       requiresStep: "request_taxi_to_stand",
       kind: "atc",
       from: "MUMBAI TOWER",
@@ -735,12 +867,12 @@ export const dualHydGY: Scenario = {
       message: "IFLY101, roger, hold position, parking brake on. Tug and follow-me dispatched, ETA two minutes. Contact Mumbai Ground 121.9 when tug connected.",
       standbyResurfaceMs: 30_000,
       choices: [
-        // Correct — full readback per ICAO §5.6.1 (taxi + frequency)
-        { id: "a", label: "Holding position, parking brake on, will contact Ground 121.9 when tug connected, IFLY101", correct: true  },
-        // Wrong — bare ack drops the instructions
-        { id: "b", label: "Roger IFLY101", correct: false },
-        // Wrong — pilot offering to taxi without tug (no NW steering)
-        { id: "c", label: "Vacating runway 27 to the left, IFLY101", correct: false },
+        // Correct — full readback: position + brake + frequency
+        { id: "a", label: "Holding position, parking brake on, will contact Ground 121.9 when tug connected, IFLY101",  correct: true  },
+        // Wrong — bare ack drops the tug/frequency instructions
+        { id: "b", label: "Roger IFLY101",                                                                               correct: false },
+        // Wrong — offers to taxi without a tug (NW steering INOP)
+        { id: "c", label: "Vacating runway 27 to the left, IFLY101",                                                    correct: false },
       ],
     },
   ],

@@ -347,9 +347,16 @@ export const rapidDepress: Scenario = {
       message: "IFLY202, confirm FL350.",
       standbyResurfaceMs: 15_000,
       choices: [
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY202, cabin depressurisation, emergency descent FL350 to FL100, squawking 7700", correct: true  },
-        { id: "b", label: "IFLY202 descending, just a precaution",                                                                    correct: false },
-        { id: "c", label: "Standby IFLY202",                                                                                            correct: false },
+        // Correct — nature + navigation (turning right) + level + standby; squawk 7700 is a
+        // transponder action, NOT stated verbally in the MAYDAY call
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY202, cabin depressurisation, turning right heading 270, emergency descent to FL100, standby",  correct: true  },
+        // Wrong — includes squawk verbally (transponder action, not a voice call item) and
+        // omits navigation heading
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY202, cabin depressurisation, emergency descent FL350 to FL100, squawking 7700",               correct: false },
+        // Wrong — downplays severity; no MAYDAY declared
+        { id: "c", label: "IFLY202 descending, just a precaution",                                                                                    correct: false },
+        // Wrong — standby only; MAYDAY must be declared immediately
+        { id: "d", label: "Standby IFLY202",                                                                                                          correct: false },
       ],
     },
 
@@ -378,12 +385,12 @@ export const rapidDepress: Scenario = {
       message: "IFLY202, vectors available, nearest suitable Mumbai VABB 45 nm, advise intentions.",
       standbyResurfaceMs: 30_000,
       choices: [
-        // Correct — concise discipline phrase while still completing checklists
-        { id: "a", label: "Continuing checklist, will advise intentions, IFLY202", correct: true  },
-        // Also valid — concrete deferral with the diversion intent declared
-        { id: "b", label: "Request vectors Mumbai, level FL100, will confirm requirements shortly, IFLY202", correct: true  },
-        // Wrong — over-committal on approach type before brief is done
-        { id: "c", label: "IFLY202 request immediate ILS runway 27 Mumbai",       correct: false },
+        // Correct — deferral only; airport selection requires checklist + FORDEC first
+        { id: "a", label: "Continuing checklist, will advise intentions, IFLY202",                          correct: true  },
+        // Wrong — selects airport before checklist and FORDEC are done
+        { id: "b", label: "Request vectors Mumbai, level FL100, will confirm requirements shortly, IFLY202", correct: false },
+        // Wrong — commits to approach type before any brief done
+        { id: "c", label: "IFLY202 request immediate ILS runway 27 Mumbai",                                  correct: false },
       ],
     },
 
@@ -403,7 +410,40 @@ export const rapidDepress: Scenario = {
       ],
     },
 
-    // ⑤ Briefing prompt — step-gated on checklist completion
+    // ⑤ Hold request — crew requests orbit at FL100 to complete FORDEC
+    {
+      id: "pm_hold_req",
+      atMs: 120_000,
+      requiresStep: "level_off_10k",
+      kind: "crew",
+      from: "PM",
+      message: "PM requests holding at FL100 to complete FORDEC before committing to approach. Select the correct call.",
+      choices: [
+        { id: "a", label: "Mumbai Control, IFLY202, request holding FL100, completing assessment and FORDEC before approach", correct: true  },
+        // Wrong — selects airport before FORDEC complete
+        { id: "b", label: "Mumbai Control, IFLY202, request immediate divert Mumbai runway 27",                                correct: false },
+        // Wrong — crew cannot request further descent without reason
+        { id: "c", label: "Mumbai Control, IFLY202, request descent to FL50",                                                  correct: false },
+      ],
+    },
+
+    // ⑥ ATC approves hold — crew reads back altitude + turns
+    {
+      id: "atc_hold_clr",
+      atMs: 133_000,
+      kind: "atc",
+      from: "MUMBAI CONTROL",
+      message: "IFLY202, roger, cleared to hold position FL100, right-hand turns, report ready for approach.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Holding FL100, right turns, will report ready, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                                            correct: false },
+        // Wrong — altitude mis-readback
+        { id: "c", label: "Holding FL110, right turns, IFLY202",                      correct: false },
+      ],
+    },
+
+    // ⑦ Briefing prompt — step-gated on checklist completion
     {
       id: "atc_briefing_prompt",
       atMs: 140_000,

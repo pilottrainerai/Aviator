@@ -293,7 +293,8 @@ export const smokeCabin: Scenario = {
       message: "IFLY202, everything OK?",
       standbyResurfaceMs: 20_000,
       choices: [
-        { id: "a", label: "PAN PAN PAN, IFLY202, smoke in cabin, investigating source per QRH, standby", correct: true  },
+        // Correct — PAN PAN × 3 = 6 words; nature + navigation (heading) + standby
+        { id: "a", label: "PAN PAN PAN PAN PAN PAN, IFLY202, smoke in cabin, investigating source, heading 090, standby", correct: true  },
         { id: "b", label: "IFLY202, all OK, continuing",                                                  correct: false },
         // Wrong — premature MAYDAY before assessment of source
         { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY202, smoke, descending immediately", correct: false },
@@ -325,11 +326,12 @@ export const smokeCabin: Scenario = {
       message: "IFLY202, say status and intentions.",
       standbyResurfaceMs: 25_000,
       choices: [
-        // Correct — escalates to MAYDAY because source isn't 100 % isolated (QRH rule)
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY202, smoke source not isolated, declaring full emergency, request immediate vectors nearest suitable airport", correct: true  },
-        { id: "b", label: "IFLY202 continuing to destination, smoke is minor",                                                                                          correct: false },
-        // Wrong — under-commits when QRH requires immediate land
-        { id: "c", label: "PAN PAN IFLY202, plan to continue, will advise",                                                                                              correct: false },
+        // Correct — MAYDAY + navigation (turning right) + standby; no airport in initial MAYDAY
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY202, smoke source not isolated, turning right heading 090, standby", correct: true  },
+        // Wrong — downplays severity; no MAYDAY declared
+        { id: "b", label: "IFLY202 continuing to destination, smoke is minor",                                              correct: false },
+        // Wrong — includes airport selection in MAYDAY (airport only after FORDEC)
+        { id: "c", label: "MAYDAY MAYDAY MAYDAY, IFLY202, smoke source not isolated, request immediate vectors nearest suitable airport", correct: false },
       ],
     },
 
@@ -349,7 +351,40 @@ export const smokeCabin: Scenario = {
       ],
     },
 
-    // ⑤ Approach briefing prompt
+    // ⑤ Hold request — PM requests holding while completing approach brief and FORDEC
+    {
+      id: "pm_hold_req",
+      atMs: 115_000,
+      requiresStep: "fordec_smk",
+      kind: "crew",
+      from: "PM",
+      message: "FORDEC complete. PM requests holding to finish approach brief before accepting vectors. Select the correct call.",
+      choices: [
+        { id: "a", label: "Mumbai Approach, IFLY202, request holding FL150, completing approach brief", correct: true  },
+        // Wrong — selects approach before brief complete
+        { id: "b", label: "Mumbai Approach, IFLY202, request immediate ILS runway 27",                   correct: false },
+        // Wrong — no intention stated
+        { id: "c", label: "Mumbai Approach, IFLY202, still on the frequency",                            correct: false },
+      ],
+    },
+
+    // ⑥ ATC grants hold — crew reads back
+    {
+      id: "atc_hold_clr",
+      atMs: 128_000,
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY202, cleared to hold at IGAMA FL150, right turns, expect approach in 10 minutes.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Holding IGAMA FL150, right turns, IFLY202", correct: true  },
+        { id: "b", label: "Roger IFLY202",                               correct: false },
+        // Wrong — altitude mis-readback
+        { id: "c", label: "Holding IGAMA FL160, right turns, IFLY202",  correct: false },
+      ],
+    },
+
+    // ⑦ Approach briefing prompt
     {
       id: "atc_briefing_prompt",
       atMs: 140_000,
