@@ -5,6 +5,11 @@ import type { ScenarioState } from "@/engine/state";
 import type { Scenario, ScenarioPhase } from "@/scenarios/types";
 import { defaultAircraftState, type AircraftState } from "@/avionics/core/aircraftState";
 
+function lerp(a: number, b: number, alpha: number): number {
+  const v = a + (b - a) * alpha;
+  return Math.abs(b - v) < 0.5 ? b : v;   // snap when close enough
+}
+
 // ENG 1 FIRE after V1 — scenario-phase flight model
 // Each completed step advances the aircraft to a physically accurate snapshot.
 // Values match FCTM OP-020 technique and FCOM SRS/CLB performance data for VIDP ISA.
@@ -83,8 +88,11 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
 
   const fireActive  = fired("fire_warn");
   const eng1Failed  = fireActive;
-  const apEngaged   = step("engage_ap_fma");
-  const thrIdle     = step("thr_lever_idle");
+  const gearUp              = step("positive_rate_gear_up");
+  const apEngaged           = step("engage_ap_fma");
+  const atFourHundredFt     = fired("four_hundred_ft");
+  const ecamActionsStarted  = step("four_hundred_ft_cmd");
+  const thrIdle             = step("thr_lever_idle");
   const mwCancelled = step("cancel_master_warn");
   const ecamDone    = step("engine_secured") || fired("fire_extinguished");
   // Aircraft reaches minimum acceleration altitude (2300 ft baro / 1500 ft RA at VIDP)
@@ -138,12 +146,18 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
     // V/S push pending. PF ring prompts PUSH V/S ZERO.
     speed = 175; altitude = 2300; vs = 400; pitch = 2; bank = 0;
     gs    = 173; tas = 179;
-  } else if (thrIdle) {
-    // THR LEVER IDLE — first ECAM action, at 400 ft RA / 1177 ft MSL (VIDP + 777)
-    speed = 165; altitude = 1177; vs = 2200; pitch = 9; bank = 0;
+  } else if (ecamActionsStarted) {
+    // ECAM actions running — aircraft climbs continuously toward MAA (2 300 ft / 1 500 ft RA)
+    // No freeze here; individual ECAM steps happen during the climb.
+    speed = 165; altitude = 2300; vs = 2200; pitch = 9; bank = 0;
     gs    = 163; tas = 169;
-  } else if (apEngaged) {
-    // AP1 engaged — 100 ft RA / 877 ft MSL (A320 AP minimum after takeoff is 100 ft RA)
+  } else if (atFourHundredFt && apEngaged) {
+    // 400 ft gate reached — ECAM ACTIONS unlocked, climbing through 400 ft RA / 1177 ft MSL
+    speed = 163; altitude = 1177; vs = 2100; pitch = 10; bank = 0;
+    gs    = 161; tas = 167;
+  } else if (apEngaged || gearUp) {
+    // Gear up + positive climb confirmed — at 100 ft RA / 877 ft MSL.
+    // AP1 prompt appears here (not at 50 ft). Altitude stays 877 until 400 ft trigger.
     speed = 158; altitude = 877; vs = 2000; pitch = 12; bank = 0;
     gs    = 156; tas = 162;
   } else if (fireActive) {
@@ -246,16 +260,17 @@ export function PfdCanvas({
   elapsedMs?: number;
   onPfAction?: (phaseId: string) => void;
 }) {
-  const mountRef  = useRef<HTMLDivElement>(null);
-  const stateRef  = useRef<AircraftState>(buildAircraftState(state, scenario, elapsedMs));
+  const mountRef   = useRef<HTMLDivElement>(null);
+  const stateRef   = useRef<AircraftState>(buildAircraftState(state, scenario, elapsedMs));
+  const targetRef  = useRef<AircraftState>(buildAircraftState(state, scenario, elapsedMs));
   const cleanupRef = useRef<(() => void) | null>(null);
 
   // Track which phases the PF has already confirmed so the ring doesn't reappear.
   const [confirmedPhases, setConfirmedPhases] = useState<Set<string>>(new Set());
 
-  // Keep stateRef in sync with React props
+  // Keep targetRef in sync with React props — stateRef lerps toward it each frame
   useEffect(() => {
-    stateRef.current = buildAircraftState(state, scenario, elapsedMs);
+    targetRef.current = buildAircraftState(state, scenario, elapsedMs);
   }, [elapsedMs, scenario, state]);
 
   const activePhase  = getActivePfActionPhase(scenario, state);
@@ -300,7 +315,30 @@ export function PfdCanvas({
       const pfd = new PFDRenderer();
       app.stage.addChild(pfd);
 
-      app.ticker.add(() => { pfd.update(stateRef.current); });
+      app.ticker.add(() => {
+        const t = targetRef.current;
+        const c = stateRef.current;
+        const dt = app.ticker.deltaMS / 1000;   // seconds since last frame
+
+        // Altitude — constant 2 000 ft/min so 100→400 ft takes ~9 s
+        const CLIMB_FT_PER_SEC = 2000 / 60;
+        const altDiff  = t.altitude - c.altitude;
+        const altStep  = Math.sign(altDiff) * Math.min(Math.abs(altDiff), CLIMB_FT_PER_SEC * dt);
+        const newAlt   = Math.abs(altDiff) < 0.5 ? t.altitude : c.altitude + altStep;
+
+        // VS — follows altitude movement. Frozen when altitude is frozen.
+        const isMoving = Math.abs(t.altitude - newAlt) > 0.5;
+        const newVs    = isMoving ? lerp(c.vs, altDiff > 0 ? t.vs : -t.vs, 0.08) : c.vs;
+
+        stateRef.current = {
+          ...t,                                  // FMA modes, flags, AP state — instant
+          altitude: newAlt,
+          vs:       newVs,
+          speed:    lerp(c.speed, t.speed, 0.015),
+          pitch:    lerp(c.pitch, t.pitch, 0.02),
+        };
+        pfd.update(stateRef.current);
+      });
 
       cleanupRef.current = () => { app.destroy(true, true); };
     })();

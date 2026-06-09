@@ -148,6 +148,7 @@ export const eng1FireAfterV1: Scenario = {
       hint: "At 400 ft AGL with the flight path stabilised, PM confirms the failure and reads the ECAM title. PF then orders 'ECAM ACTIONS'. Master Warning must be cancelled first.",
       variant: "advisory",
       group: "flightcheck",
+      requiresTrigger: "four_hundred_ft",
       requires: ["engage_ap_fma", "cancel_master_warn"],
       crew: "PM",
     },
