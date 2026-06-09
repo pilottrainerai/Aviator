@@ -688,79 +688,76 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
     };
 
     // ── VS TAPE ────────────────────────────────────────────────────────────
-    // FCOM "banana" shape: scale's right edge bulges outward at zero VS and
-    // pulls inward at the ±2000 fpm ends, making the strip look like a `)`.
+    // Layout: vertical green bar on the left of the strip (the level indicator)
+    // + horizontal pointer extending right to the banana-curve scale edge.
+    // Scale labels: "1" = 1000 fpm, "2" = 2000 fpm (above and below centre).
     const drawVS = () => {
       const x = VX, w = VW, top = VT, h = VH;
+      const MAX_VS = 6000;
       ctx.fillStyle = "#1e1e1e"; ctx.fillRect(x, top, w, h);
 
-      const mid = top + h / 2;
-      const halfH = h / 2 - 22;
-      const BULGE = 14;                                  // px the ends pull inward
-
-      // yFrac in [-1..+1], -1 at top of scale (climb), +1 at bottom (descent)
-      const xForYFrac = (yFrac: number) => (x + w - 2) - BULGE * yFrac * yFrac;
-
-      // Curved right edge of the scale
-      ctx.strokeStyle = "#666"; ctx.lineWidth = 1;
+      const mid   = top + h / 2;
+      const halfH = h / 2 - 22;   // ±160 px full scale range
+      // Right-side banana curve — prominent decorative right boundary (BULGE=14)
+      const BULGE  = 14;
+      const xCurve = (yFrac: number) => (x + w - 1) - BULGE * yFrac * yFrac;
+      ctx.strokeStyle = "#666"; ctx.lineWidth = 1.5;
       ctx.beginPath();
-      for (let i = 0; i <= 30; i++) {
-        const yFrac = -1 + (2 * i) / 30;
-        const yy = mid + yFrac * halfH;
-        const xx = xForYFrac(yFrac);
-        if (i === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+      for (let i = 0; i <= 40; i++) {
+        const yf = -1 + 2 * i / 40;
+        if (i === 0) ctx.moveTo(xCurve(yf), mid + yf * halfH);
+        else         ctx.lineTo(xCurve(yf), mid + yf * halfH);
       }
       ctx.stroke();
 
-      // Tick marks (1, 2, 6 above and below mid)
-      const marks: [number, string][] = [[2000, "6"], [1000, "2"], [500, "1"]];
-      marks.forEach(([r, lbl]) => {
-        [-1, 1].forEach(s => {
-          const yFrac = -s * (r / 2000);              // climb (s=+1) → yFrac negative (above)
-          const yy = mid + yFrac * halfH;
-          const xx = xForYFrac(yFrac);
-          ctx.strokeStyle = "#999"; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(xx - 8, yy); ctx.lineTo(xx, yy); ctx.stroke();
-          txt(lbl, xx - 10, yy, 11, "#999", "right");
+      // Y for any fpm — linear, full strip height
+      const yFor = (fpm: number) => mid - (fpm / MAX_VS) * halfH;
+
+      // Scale marks: digit at LEFT edge, tick immediately to its right
+      // Layout per mark: [digit 6px][tick 5px] — all inside the strip
+      const TX = x + 1;   // bar tip x / left edge reference (469)
+      const marks: [number, string | null][] = [
+        [6000, "6"], [4000, null], [2000, "2"], [1000, "1"], [500, null],
+      ];
+      marks.forEach(([fpm, lbl]) => {
+        [1, -1].forEach(sign => {
+          const yy    = yFor(sign * fpm);
+          const tickX = TX + (lbl ? 7 : 2);   // tick starts after digit (labeled) or at edge (unlabeled)
+          const tL    = lbl ? 5 : 3;
+          ctx.strokeStyle = "#aaa"; ctx.lineWidth = lbl ? 1.5 : 1;
+          ctx.beginPath(); ctx.moveTo(tickX, yy); ctx.lineTo(tickX + tL, yy); ctx.stroke();
+          if (lbl) txt(lbl, tickX - 1, yy, 10, "#ddd", "right", true);   // bold, right-aligned just before tick
         });
       });
 
-      // Pointer — clock-hand sweeping around the zero-VS pivot on the right.
-      //   VS = 0      → 9 o'clock (horizontal LEFT)
-      //   VS = +500   → ~9:45     (slight rotation up)
-      //   VS = +1000  → ~10 o'clock
-      //   VS = +2000  → ~11 o'clock (max climb)
-      //   VS = -2000  → ~7 o'clock (max descent, mirror)
-      // Equal-radius sweep so the visual angle is linear with VS — no steep
-      // jump at low values.  Max angle capped at 60° from horizontal (11 / 7
-      // o'clock) — going further would overflow the narrow VS strip.
-      const vc       = Math.max(-2000, Math.min(2000, d.vs));
-      const pivotX   = xForYFrac(0);                   // curve apex = zero VS center
-      const pivotY   = mid;
-      const NEEDLE_LEN = 26;                           // fits within the strip
-      const MAX_ANGLE  = Math.PI / 3;                  // 60° = 11 o'clock cap
-      const sweep    = (vc / 2000) * MAX_ANGLE;        // 0 at VS=0, ±60° at extremes
-      const tipX     = pivotX - NEEDLE_LEN * Math.cos(sweep);
-      const tipY     = pivotY - NEEDLE_LEN * Math.sin(sweep);
-      ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(pivotX, pivotY);
-      ctx.lineTo(tipX, tipY);
-      ctx.stroke();
+      // Zero tick — full width; bar lies flat on this line at VS=0
+      ctx.strokeStyle = "#666"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, mid); ctx.lineTo(x + w, mid); ctx.stroke();
 
-      // Boxed digit at the pointer tip — tens of fpm (e.g. "5" = 500 fpm).
-      // Box centred on the rotating tip.
-      if (Math.abs(d.vs) > 50) {
-        const vsHundreds = Math.round(Math.abs(d.vs) / 100);
-        const digit = String(vsHundreds <= 9 ? vsHundreds : Math.floor(vsHundreds / 10));
-        const boxW = 16, boxH = 14;
-        const boxX = tipX - boxW / 2;
-        const boxY = tipY - boxH / 2;
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(boxX, boxY, boxW, boxH);
-        ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 1.2;
-        ctx.strokeRect(boxX, boxY, boxW, boxH);
-        txt(digit, boxX + boxW / 2, boxY + boxH / 2, 12, "#00cc00", "center", true);
+      // ── VS bar ─────────────────────────────────────────────────────────────
+      // Right end fixed at datum (x+w−1, mid). Left end: fixed TX, y = yFor(vc).
+      // At VS=0 bar is horizontal on the zero tick. Length grows as VS increases.
+      const PX = x + w - 1;   // datum (497)
+      const vc = Math.max(-MAX_VS, Math.min(MAX_VS, d.vs));
+      if (Math.abs(vc) > 30) {
+        const tipY = yFor(vc);
+
+        ctx.save();
+        ctx.beginPath(); ctx.rect(x, top, w, h); ctx.clip();
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(PX, mid); ctx.lineTo(TX, tipY); ctx.stroke();
+        ctx.lineCap = "butt";
+        ctx.restore();
+
+        // Readout at the tip — inside strip, at the left end of the bar
+        const vsHundreds = Math.round(Math.abs(vc) / 100);
+        const boxW = 18, boxH = 12;
+        const boxX = TX + 1;   // 470
+        const boxY = Math.max(top + 2, Math.min(top + h - boxH - 2, tipY - boxH / 2));
+        ctx.fillStyle = "#000"; ctx.fillRect(boxX, boxY, boxW, boxH);
+        ctx.strokeStyle = "#00cc00"; ctx.lineWidth = 1; ctx.strokeRect(boxX, boxY, boxW, boxH);
+        txt(String(vsHundreds), boxX + boxW / 2, boxY + boxH / 2, 10, "#00cc00", "center", true);
       }
     };
 
@@ -818,41 +815,55 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
     };
 
     // ── Main animation loop ────────────────────────────────────────────────
-    // Smooth lerp targets: initialised to -1 so first frame snaps to live values.
+    // Altitude rate follows lerpVs (the animated VS) so the 0–50 ft RA segment
+    // climbs gradually as VS builds from zero. For large gaps (>200 ft) a 2000
+    // ft/min cap prevents very slow catch-ups mid-scenario.
+    // Freeze rule: all tapes hold while a PF-action ring is visible AND
+    // lerpAlt has already reached the ring's target altitude.
     let lerpAlt = -1, lerpSpd = -1, lerpVs = 0;
-    let prevHadRing = false;
-    let prevPhaseId: string | null = null;
+    let prevTimestamp = performance.now();
     let t = 0;
     let rafId = 0;
-    const animate = () => {
-      if (!pausedRef.current) t += 0.004;   // freeze shimmer when paused
+    const animate = (timestamp: number) => {
+      const deltaMs = Math.min(timestamp - prevTimestamp, 100);
+      prevTimestamp = timestamp;
+      if (!pausedRef.current) t += 0.004;           // freeze shimmer when paused
       const live = stateRef.current
         ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current)
         : null;
       if (live) {
-        // Wired to scenario — use derived AircraftState.  Pitch/roll get a tiny
-        // shimmer so the ADI feels alive.  Altitude, speed, and VS are smoothly
-        // lerped toward the step-driven target so the tapes slide rather than jump
-        // when a procedure step is completed.
         const tgtAlt = live.altitude;
         const tgtSpd = live.speed;
-        const tgtVs  = Math.round(live.vs / 10) * 10;
+        const tgtVs  = live.vs;
         const nowHasRing = !!pendingPhaseRef.current;
-        const nowPhaseId = pendingPhaseRef.current?.id ?? null;
-        if (lerpAlt < 0 || (nowHasRing && nowPhaseId !== prevPhaseId)) {
-          // First frame OR ring appeared / changed phase (e.g. dev seek jumped to a
-          // different checkpoint) — snap tapes immediately to the step-driven target.
-          lerpAlt = tgtAlt; lerpSpd = tgtSpd; lerpVs = tgtVs;
-        } else if (!nowHasRing) {
-          // No PF action ring visible — advance tapes smoothly toward target.
-          // Factor 0.04 → ~1.5 s to reach 95 % at 60 fps.
-          lerpAlt += (tgtAlt - lerpAlt) * 0.04;
-          lerpSpd += (tgtSpd - lerpSpd) * 0.05;
-          lerpVs  += (tgtVs  - lerpVs)  * 0.06;
+        if (lerpAlt < 0) {
+          // First frame: start altitude from ground when near ground so RA climbs
+          // smoothly 0→50→100 ft. Snap to target only when resuming mid-scenario.
+          lerpAlt = tgtAlt < 900 ? 777 : tgtAlt;
+          lerpSpd = tgtSpd;
+          lerpVs  = tgtAlt < 900 ? 0 : tgtVs;
+        } else {
+          const altDiff = tgtAlt - lerpAlt;
+          const atTarget = Math.abs(altDiff) < 1;
+          const frozen = nowHasRing && atTarget;
+          if (!frozen) {
+            // VS updates first so the altitude uses the freshly-animated VS rate.
+            lerpSpd += (tgtSpd - lerpSpd) * 0.05;
+            lerpVs  += (tgtVs  - lerpVs)  * 0.06;
+            // For large gaps use capped 2000 ft/min; near the target use lerpVs
+            // so the RA climbs gradually from 0 (vs ramps from 0 on first flight).
+            const vsMs   = Math.abs(lerpVs) / 60000;
+            const rateMs = Math.abs(altDiff) > 200
+              ? 2000 / 60000
+              : Math.max(vsMs, 50 / 60000);
+            const altStep = Math.sign(altDiff) * Math.min(Math.abs(altDiff), rateMs * deltaMs);
+            lerpAlt = atTarget ? tgtAlt : lerpAlt + altStep;
+          } else {
+            // Ring visible and at target — freeze all tapes. Snap to exact target
+            // so RA always reads a clean value (100, 400) rather than 99, 399.
+            lerpAlt = tgtAlt;
+          }
         }
-        prevHadRing = nowHasRing;
-        prevPhaseId = nowPhaseId;
-        // else: PF action ring is showing — hold tapes frozen until PF clicks.
         d.pitch  = live.pitch  + Math.sin(t) * 0.15;
         d.roll   = live.bank;
         d.speed  = Math.round(lerpSpd);
@@ -868,11 +879,10 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
         d.ra = Math.max(0, Math.round(Math.min(2500, lerpAlt - 777)));
       } else {
         // Demo / standalone mode — only the attitude indicator shimmers.
-        // Digital readouts (alt, vs, speed) stay frozen to keep digits stable.
         d.pitch = 2    + Math.sin(t) * 0.4;
         d.speed = 145;
         d.alt   = 3740;
-        d.vs    = 500;                                // demo climb (digit "5", pointer rotates clockwise UP from right-mid pivot)
+        d.vs    = 500;
       }
 
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
@@ -889,7 +899,7 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
 
       rafId = requestAnimationFrame(animate);
     };
-    animate();
+    animate(performance.now());
 
     return () => cancelAnimationFrame(rafId);
   }, []);
