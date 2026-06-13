@@ -42,7 +42,7 @@ const HDRI_URL = "/hdri/braustuble_alley_2k.hdr";
 // + HDRI sheen + markings). Rendered UNLIT it matches Blender's colour exactly.
 // PBR-metallic reflection of the muted HDRI rendered dark grey-green (#414543) —
 // that was the "dull" look — so we do NOT light the face.
-const FACE_TEX_URL = "/models/fire_test_face_combined_v2.png"; // v2 = guard shadow painted out (cache-bust)
+const FACE_TEX_URL = "/models/fire_test_face_combined_v3.png"; // v3 = baked guard shadow above ENG1 FIRE pb painted out (per-row clean-blue lift)
 
 const C3 = {
   red: new THREE.Color("#ff2218"),

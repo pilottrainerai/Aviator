@@ -11,8 +11,9 @@ User-approved state of the ENG1 FIRE drill legends.
   it to yellow — flat unlit fixes that). Glow halo sprite DISABLED (was spilling).
 - Sequence: cold = both dim -> push FIRE pb = SQUIB white -> discharge = DISCH amber.
 
-## KNOWN ISSUE still open at this checkpoint
-- Baked guard shadow remains on the blue panel above the ENG1 FIRE pb in
-  fire_test_face_combined_v2.png — to be painted out next.
+## Baked guard shadow — FIXED
+- Painted the soft guard shadow off the blue panel above the ENG1 FIRE pb.
+  New texture: fire_test_face_combined_v3.png (per-row clean-blue lift of the
+  darker bluish pixels; cutouts/text/screws preserved). FACE_TEX_URL points to v3.
 
 ## Still TEMP (strip before final): top-left status readout + bottom-right tuning panel (page.tsx).
