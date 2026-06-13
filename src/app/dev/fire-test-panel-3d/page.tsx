@@ -45,9 +45,10 @@ export default function FireTestPanel3DDevPage() {
     dischLight: 5, // DISCH glow intensity
   } as const;
   const [firePopOut, setFirePopOut] = useState<number>(TUNING_DEFAULTS.firePopOut);
-  // Button only for now (no screws-radius control in this panel). Kept so the
-  // component prop stays wired; raise it later if the screws need to travel too.
-  const fireAsmRadius = 0;
+  // Carry the FIRE pb's two screws (Cylinder024/025, ~0.19 from the button centre)
+  // OUT with the button when it pops. 0.25 includes both and nothing else (the
+  // assembly list is already filtered to small parts within 0.34 of the button).
+  const fireAsmRadius = 0.25;
   const [fireCasingColor, setFireCasingColor] = useState<string>(TUNING_DEFAULTS.fireCasingColor);
   const [agentShrink, setAgentShrink] = useState<number>(TUNING_DEFAULTS.agentShrink);
   const [agentCapLight, setAgentCapLight] = useState<number>(TUNING_DEFAULTS.agentCapLight);
