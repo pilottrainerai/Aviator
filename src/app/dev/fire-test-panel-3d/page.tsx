@@ -36,8 +36,16 @@ export default function FireTestPanel3DDevPage() {
   }, []);
 
   const [tunerOpen, setTunerOpen] = useState(false);
+  const [lastClick, setLastClick] = useState("(no clicks yet)");
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    const h = (e: ErrorEvent) => setErr(e.message || String(e.error));
+    window.addEventListener("error", h);
+    return () => window.removeEventListener("error", h);
+  }, []);
   const reset = useCallback(() => { setFireDetected(false); setResetSignal((n) => n + 1); }, []);
   const onState = useCallback((s: { guardOpen: boolean[]; pbDone: boolean[]; disch: boolean[][] }) => setDrill(s), []);
+  const onClickDetected = useCallback((s: string) => setLastClick(s), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "r" || e.key === "R") reset(); };
@@ -64,12 +72,16 @@ export default function FireTestPanel3DDevPage() {
         squibLight={squibLight}
         dischColor={dischColor}
         dischLight={dischLight}
+        onClickDetected={onClickDetected}
       />
 
       {/* TEMP per-section status readout (top-left). Strip before final. */}
       <div style={{ position: "fixed", top: 16, left: 16, zIndex: 10, background: "rgba(8,12,18,0.92)",
         border: "1px solid #2b3a4d", borderRadius: 8, padding: "8px 12px", color: "#dfe8f2",
         font: "12px ui-monospace, monospace", display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ color: "#7fb0ff" }}>build: pos-click v2</div>
+        <div style={{ color: "#ffd479" }}>last click → {lastClick}</div>
+        {err && <div style={{ color: "#ff6b6b" }}>ERR: {err}</div>}
         {chip(fireDetected, "FIRE (TEST)")}
         {SECTIONS.map((sec, i) => (
           <div key={sec} style={{ display: "flex", gap: 8 }}>

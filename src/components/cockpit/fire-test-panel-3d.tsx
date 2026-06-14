@@ -85,6 +85,8 @@ export interface FireTestPanel3DProps {
   resetSignal?: number;
   /** Reports the live per-section drill state up to the page (for the status readout). */
   onState?: (s: { guardOpen: boolean[]; pbDone: boolean[]; disch: boolean[][] }) => void;
+  /** DEBUG: reports what each click resolved to, so we can see clicks land in the live browser. */
+  onClickDetected?: (info: string) => void;
   // ── live tuning (shared across all sections) ──
   firePopOut?: number;
   fireAsmRadius?: number;
@@ -120,7 +122,7 @@ type Section = {
 
 function FireTestPanelScene(props: FireTestPanel3DProps) {
   const {
-    fireDetected, resetSignal, onState,
+    fireDetected, resetSignal, onState, onClickDetected,
     firePopOut, fireAsmRadius, agentShrink, agentCapLight, agentAsmLight,
     guardClosedDeg, guardOpenDeg, squibColor, squibLight, dischColor, dischLight, pressOverride,
   } = props;
@@ -439,8 +441,10 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       if (s.firePbGroup) consider(s.firePbGroup.getWorldPosition(new THREE.Vector3()), "guardpb", i, -1);
       s.agents.forEach((a, j) => { if (a.cap) consider(a.cap.getWorldPosition(new THREE.Vector3()), "agent", i, j); });
     });
-    if (!best || best.dist > 0.45) return; // clicked away from every control
-    const { kind, i, j } = best;
+    if (!best) { onClickDetected?.("click but no control found"); return; }
+    const { kind, i, j, dist } = best;
+    onClickDetected?.(`${SECTION_KEYS[i]} ${kind}${kind === "agent" ? j : ""} d=${dist.toFixed(2)}`);
+    if (dist > 0.45) return; // clicked away from every control
     if (kind === "guardpb") {
       if (!d.guardOpen[i]) { d.guardOpen[i] = true; bump(); return; }
       if (fireDetected && !d.pbDone[i]) {
