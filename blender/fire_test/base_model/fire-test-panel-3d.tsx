@@ -37,8 +37,12 @@ const C3 = {
 
 const PRESS_SHRINK = 0.1;
 const PRESS_DARKEN = 0.55;
-const PRESS_ATTACK_MS = 90;
-const PRESS_RELEASE_MS = 520;
+// Press FEEL (timing only — depth is PRESS_SHRINK, unchanged). A real mechanical
+// button, not an instant snap: ease IN over ATTACK, stay down for HOLD, ease back
+// OUT over RELEASE (~1s total). Bump ATTACK/HOLD up for an even more deliberate press.
+const PRESS_ATTACK_MS = 130;
+const PRESS_HOLD_MS = 60;
+const PRESS_RELEASE_MS = 400;
 const AGENT_CAP_COLOR = new THREE.Color("#222730");
 const LEGEND_OFF = "#41464d"; // dim, unlit legend at rest
 // Guard OPEN angle as a DELTA from its closed rest (≈ −140° about local X). ENG1's
@@ -48,10 +52,12 @@ const GUARD_OPEN_DELTA = -2.443;
 
 function pressCurve(elapsed: number): number {
   if (elapsed < 0 || !Number.isFinite(elapsed)) return 0;
-  if (elapsed <= PRESS_ATTACK_MS) return elapsed / PRESS_ATTACK_MS;
-  const t = (elapsed - PRESS_ATTACK_MS) / PRESS_RELEASE_MS;
+  const smooth = (t: number) => t * t * (3 - 2 * t); // smoothstep ease
+  if (elapsed <= PRESS_ATTACK_MS) return smooth(elapsed / PRESS_ATTACK_MS); // press IN
+  if (elapsed <= PRESS_ATTACK_MS + PRESS_HOLD_MS) return 1;                 // held down
+  const t = (elapsed - PRESS_ATTACK_MS - PRESS_HOLD_MS) / PRESS_RELEASE_MS;
   if (t >= 1) return 0;
-  return Math.exp(-3.2 * t) * Math.cos(4.6 * t);
+  return 1 - smooth(t); // ease back OUT, settles clean (no toy bounce)
 }
 
 const HIT_MAT = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
