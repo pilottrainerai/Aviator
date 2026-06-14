@@ -432,10 +432,15 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     const d = drillRef.current;
     for (let i = 0; i < 3; i++) {
       const key = SECTION_KEYS[i];
+      const s = sections[i];
+      // Match on the invisible hitbox OR the real mesh/group name (fallback, in case
+      // the hitbox is ever missed) — the original working ENG1 did both.
+      const guardHit = has(`HIT_${key}_GUARD`) || (!!s?.guard && has(s.guard.name));
+      const pbHit = has(`HIT_${key}_PB`) || (!!s?.firePbGroup && has(s.firePbGroup.name)) || (!!s?.firePbMesh && has(s.firePbMesh.name));
       // guard (only when closed, so it can't swallow the pb click once open)
-      if (!d.guardOpen[i] && has(`HIT_${key}_GUARD`)) { d.guardOpen[i] = true; bump(); return; }
+      if (!d.guardOpen[i] && guardHit) { d.guardOpen[i] = true; bump(); return; }
       // FIRE pb (guard open, fire detected, not yet pushed)
-      if (has(`HIT_${key}_PB`) && d.guardOpen[i] && fireDetected && !d.pbDone[i]) {
+      if (pbHit && d.guardOpen[i] && fireDetected && !d.pbDone[i]) {
         d.pbDone[i] = true;
         if (pbWallRef.current[i] == null) pbWallRef.current[i] = Date.now();
         bump();
@@ -443,7 +448,8 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       }
       // AGENTs (armed in order; pb pushed + arm delay elapsed)
       for (let j = 0; j < AGENT_COUNTS[i]; j++) {
-        if (!has(`HIT_${key}_A${j}`)) continue;
+        const aHit = has(`HIT_${key}_A${j}`) || (!!s?.agents[j]?.cap && has(s.agents[j].cap.name));
+        if (!aHit) continue;
         const prevDone = j === 0 ? true : d.disch[i][j - 1];
         const armed = d.pbDone[i] && prevDone && !d.disch[i][j]
           && !!pbWallRef.current[i] && Date.now() - (pbWallRef.current[i] as number) >= ARM_MS;
