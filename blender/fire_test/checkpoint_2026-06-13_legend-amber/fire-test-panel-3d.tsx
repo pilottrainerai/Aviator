@@ -24,7 +24,7 @@ import * as THREE from "three";
 const ARM_MS = 0;
 const MODEL_URL = "/models/fire_test_panel.glb";
 const HDRI_URL = "/hdri/braustuble_alley_2k.hdr";
-const FACE_TEX_URL = "/models/fire_test_face_combined_v5.png";
+const FACE_TEX_URL = "/models/fire_test_face_combined_v6.png";
 
 // Section layout is fixed: 3 FIRE pbs left→right = ENG1, APU, ENG2; agent counts 2/1/2.
 const SECTION_KEYS = ["ENG1", "APU", "ENG2"] as const;
