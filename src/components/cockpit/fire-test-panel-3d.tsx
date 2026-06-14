@@ -191,6 +191,14 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
         if (m.name === "orange housijng") { if ("metalness" in c) c.metalness = 0.7; if ("roughness" in c) c.roughness = 0.32; }
         if (m.name === "hinge metal") { if ("metalness" in c) c.metalness = 1.0; if ("roughness" in c) c.roughness = 0.18; }
         if (m.name === "black button") { if ("color" in c) c.color.set("#050608"); if ("roughness" in c) c.roughness = 0.7; if ("metalness" in c) c.metalness = 0.0; }
+        // DISCH window box: render UNLIT + on top (depthTest off, renderOrder set below)
+        // so it's visible for EVERY agent. APU's box sits in a lower row and was
+        // occluded by its cap, so APU's DISCH had no box while ENG's did.
+        if (m.name === "legend_box") {
+          const mb = new THREE.MeshBasicMaterial({ color: "#dfe6f0", toneMapped: false, depthTest: false });
+          mb.name = "legend_box";
+          return mb;
+        }
         if (m.name === "Blue base") {
           const base = new THREE.MeshPhysicalMaterial({ color: "#7e9fc6", metalness: 0.5, roughness: 0.34, clearcoat: 0.6, clearcoatRoughness: 0.22, envMapIntensity: 1.35 });
           base.name = "Blue base";
@@ -232,6 +240,10 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       const basic = new THREE.MeshBasicMaterial({ color: LEGEND_OFF, toneMapped: false, depthTest: false });
       basic.name = "legend_text";
       o.material = basic;
+    });
+    // DISCH window boxes draw just BELOW the text (29 < 30) so the word sits on top.
+    clone.traverse((o) => {
+      if (o instanceof THREE.Mesh && matNames(o).has("legend_box")) o.renderOrder = 29;
     });
     return clone;
   }, [scene, faceTex]);
