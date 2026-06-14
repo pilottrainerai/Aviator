@@ -421,44 +421,42 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     }
   });
 
+  // POSITION-BASED click resolution — no dependence on hitbox placement or mangled
+  // node names (those lined up for ENG1 but not APU/ENG2). e.point is the exact 3D
+  // world point clicked; we act on whichever control (a section's guard/pb centre,
+  // or one of its agents) is nearest. Same behaviour for every section.
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    const names = new Set<string>();
-    const collect = (obj: THREE.Object3D | null | undefined) => { let c = obj; for (let k = 0; k < 8 && c; k++) { if (c.name) names.add(c.name); c = c.parent; } };
-    collect(e.object);
-    for (const hit of e.intersections) collect(hit.object);
-    const has = (t: string) => names.has(t);
-
+    if (!e.point) return;
+    const p = e.point;
     const d = drillRef.current;
-    for (let i = 0; i < 3; i++) {
-      const key = SECTION_KEYS[i];
-      const s = sections[i];
-      // Match on the invisible hitbox OR the real mesh/group name (fallback, in case
-      // the hitbox is ever missed) — the original working ENG1 did both.
-      const guardHit = has(`HIT_${key}_GUARD`) || (!!s?.guard && has(s.guard.name));
-      const pbHit = has(`HIT_${key}_PB`) || (!!s?.firePbGroup && has(s.firePbGroup.name)) || (!!s?.firePbMesh && has(s.firePbMesh.name));
-      // guard (only when closed, so it can't swallow the pb click once open)
-      if (!d.guardOpen[i] && guardHit) { d.guardOpen[i] = true; bump(); return; }
-      // FIRE pb (guard open, fire detected, not yet pushed)
-      if (pbHit && d.guardOpen[i] && fireDetected && !d.pbDone[i]) {
+    let best: { kind: "guardpb" | "agent"; i: number; j: number; dist: number } | null = null;
+    const consider = (wp: THREE.Vector3, kind: "guardpb" | "agent", i: number, j: number) => {
+      const dist = wp.distanceTo(p);
+      if (!best || dist < best.dist) best = { kind, i, j, dist };
+    };
+    sections.forEach((s, i) => {
+      if (s.firePbGroup) consider(s.firePbGroup.getWorldPosition(new THREE.Vector3()), "guardpb", i, -1);
+      s.agents.forEach((a, j) => { if (a.cap) consider(a.cap.getWorldPosition(new THREE.Vector3()), "agent", i, j); });
+    });
+    if (!best || best.dist > 0.45) return; // clicked away from every control
+    const { kind, i, j } = best;
+    if (kind === "guardpb") {
+      if (!d.guardOpen[i]) { d.guardOpen[i] = true; bump(); return; }
+      if (fireDetected && !d.pbDone[i]) {
         d.pbDone[i] = true;
         if (pbWallRef.current[i] == null) pbWallRef.current[i] = Date.now();
         bump();
-        return;
       }
-      // AGENTs (armed in order; pb pushed + arm delay elapsed)
-      for (let j = 0; j < AGENT_COUNTS[i]; j++) {
-        const aHit = has(`HIT_${key}_A${j}`) || (!!s?.agents[j]?.cap && has(s.agents[j].cap.name));
-        if (!aHit) continue;
-        const prevDone = j === 0 ? true : d.disch[i][j - 1];
-        const armed = d.pbDone[i] && prevDone && !d.disch[i][j]
-          && !!pbWallRef.current[i] && Date.now() - (pbWallRef.current[i] as number) >= ARM_MS;
-        if (!armed) return;
-        pressRef.current[`${i}-${j}`] = Date.now();
-        d.disch[i][j] = true; bump();
-        return;
-      }
+      return;
     }
+    // agent
+    const prevDone = j === 0 ? true : d.disch[i][j - 1];
+    const armed = d.pbDone[i] && prevDone && !d.disch[i][j]
+      && !!pbWallRef.current[i] && Date.now() - (pbWallRef.current[i] as number) >= ARM_MS;
+    if (!armed) return;
+    pressRef.current[`${i}-${j}`] = Date.now();
+    d.disch[i][j] = true; bump();
   };
 
   const groupRef = useRef<THREE.Group>(null);
