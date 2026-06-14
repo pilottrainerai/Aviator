@@ -110,6 +110,43 @@ export interface FireTestPanel3DProps {
   dischColor?: string;
   dischLight?: number;
   pressOverride?: number;
+
+  // ── Controlled mode (scenario integration) ──────────────────────────────────
+  // When `controlled` is set, the ENG1 section (index 0) is driven by the
+  // scenario engine instead of the internal drillRef: its FIRE-pb / AGENT state
+  // comes from props and clicks emit the onPush* callbacks (which the runner maps
+  // to perform({kind:"STEP"})). The guard two-tap stays UI-local, exactly like the
+  // legacy FirePanel3D. APU/ENG2 (indices 1,2) remain self-driven, so the dev page
+  // — which passes none of these — behaves byte-for-byte as before.
+  /** Enable engine-driven mode for the ENG1 section. */
+  controlled?: boolean;
+  /** ENG1 `eng1_fire_pb` step done (pb pushed / popped out). */
+  firePbDone?: boolean;
+  /** ENG1 `agent1` step done. */
+  agent1Disch?: boolean;
+  /** ENG1 `agent2` step done. */
+  agent2Disch?: boolean;
+  onPushFirePb?: () => void;
+  onPushAgent1?: () => void;
+  onPushAgent2?: () => void;
+  /**
+   * Camera framing. "all" (default) fits the whole 3-section panel; "eng1"
+   * frames just the ENG1 cluster so it fills the view ~3× larger — used in the
+   * ENG1 FIRE scenario, where APU/ENG2 aren't relevant and the squeezed
+   * all-sections view makes SQUIB/DISCH unreadable.
+   */
+  framing?: "all" | "eng1";
+  /**
+   * Pan the model WITHIN the frame, as a fraction of the visible half-extent
+   * (−1..1+). panX>0 slides the model left (reveals more to its right); panY>0
+   * slides it down. Lets the panel be re-centered when stretched so the ENG1
+   * cluster isn't stuck off to one side with empty space beside it.
+   */
+  panX?: number;
+  panY?: number;
+  /** Zoom factor for the framed view (1 = fit; >1 zooms in). Used in controlled
+   *  mode where the camera is driven deterministically instead of by OrbitControls. */
+  zoom?: number;
 }
 
 type Agent = {
@@ -135,6 +172,8 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     fireDetected, resetSignal, onState, onClickDetected,
     firePopOut, fireAsmRadius, agentShrink, agentCapLight, agentAsmLight,
     guardClosedDeg, guardOpenDeg, squibColor, squibLight, dischColor, dischLight, pressOverride,
+    controlled, firePbDone, agent1Disch, agent2Disch,
+    onPushFirePb, onPushAgent1, onPushAgent2, framing, panX, panY, zoom,
   } = props;
 
   const { scene } = useGLTF(MODEL_URL);
@@ -155,6 +194,14 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   const drillRef = useRef(fresh());
   const [drillVer, setDrillVer] = useState(0);
   const bump = () => setDrillVer((v) => v + 1);
+
+  // In controlled mode the ENG1 section (index 0) reads its FIRE-pb / AGENT state
+  // from props instead of the local drill. Everything else (guard two-tap, APU,
+  // ENG2) stays on drillRef, so the uncontrolled dev path is unchanged.
+  const isCtrl = (i: number) => controlled === true && i === 0;
+  const effPbDone = (i: number) => (isCtrl(i) ? !!firePbDone : drillRef.current.pbDone[i]);
+  const effDisch = (i: number, j: number) =>
+    isCtrl(i) ? (j === 0 ? !!agent1Disch : !!agent2Disch) : drillRef.current.disch[i][j];
 
   const resetDrill = () => {
     pbWallRef.current = [null, null, null];
@@ -403,7 +450,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
         if (fp.color) fp.color.set(fireDetected ? "#b40909" : "#841010");
         setMaterialLight(s.firePbMesh, C3.fireRed, fireDetected ? 2.0 : 0);
       }
-      const pop = d.pbDone[i] ? popY : 0;
+      const pop = effPbDone(i) ? popY : 0;
       if (s.firePbGroup) s.firePbGroup.position.y = THREE.MathUtils.lerp(s.firePbGroup.position.y, s.restY + pop, 0.14);
       for (const sc of s.screws) {
         const t = sc.restY + (sc.dist <= asmR ? pop : 0);
@@ -412,9 +459,9 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
 
       // agents: SQUIB white while armed (pb pushed, not yet discharged); DISCH amber once discharged
       s.agents.forEach((a, j) => {
-        const dischd = d.disch[i][j];
-        const prevDone = j === 0 ? true : d.disch[i][j - 1]; // AGENT 2 arms after AGENT 1
-        const squibOn = d.pbDone[i] && prevDone && !dischd;
+        const dischd = effDisch(i, j);
+        const prevDone = j === 0 ? true : effDisch(i, j - 1); // AGENT 2 arms after AGENT 1
+        const squibOn = effPbDone(i) && prevDone && !dischd;
         setLegend(a.squib, squibOn, squibHex);
         setLegend(a.disch, dischd, dischHex);
         setMaterialLight(a.squib, squibCol, squibOn ? squibInt : 0);
@@ -468,7 +515,13 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     onClickDetected?.(`${SECTION_KEYS[i]} ${kind}${kind === "agent" ? j : ""} d=${dist.toFixed(2)}`);
     if (dist > 0.45) return; // clicked away from every control
     if (kind === "guardpb") {
+      // Guard two-tap is always UI-local (same as legacy FirePanel3D).
       if (!d.guardOpen[i]) { d.guardOpen[i] = true; bump(); return; }
+      if (isCtrl(i)) {
+        // ENG1 driven by the engine: emit the push; the runner advances the step.
+        if (fireDetected && !firePbDone) onPushFirePb?.();
+        return;
+      }
       if (fireDetected && !d.pbDone[i]) {
         d.pbDone[i] = true;
         if (pbWallRef.current[i] == null) pbWallRef.current[i] = Date.now();
@@ -477,6 +530,14 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       return;
     }
     // agent
+    if (isCtrl(i)) {
+      const prevDone = j === 0 ? true : effDisch(i, j - 1);
+      const armed = effPbDone(i) && prevDone && !effDisch(i, j);
+      if (!armed) return;
+      pressRef.current[`${i}-${j}`] = Date.now();
+      (j === 0 ? onPushAgent1 : onPushAgent2)?.();
+      return;
+    }
     const prevDone = j === 0 ? true : d.disch[i][j - 1];
     const armed = d.pbDone[i] && prevDone && !d.disch[i][j]
       && !!pbWallRef.current[i] && Date.now() - (pbWallRef.current[i] as number) >= ARM_MS;
@@ -494,7 +555,37 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     let faceMesh: THREE.Mesh | null = null;
     group.traverse((o) => { if (o instanceof THREE.Mesh && matNames(o).has("DECALS")) faceMesh = o; });
     const target: THREE.Object3D = faceMesh ?? group;
-    const box = new THREE.Box3().setFromObject(target);
+    let box = new THREE.Box3().setFromObject(target);
+    // ENG1 framing fits exactly (no margin) so it can be anchored gap-free.
+    const fitMargin = framing === "eng1" ? 1.0 : 1.12;
+    if (framing === "eng1" && sections[0]) {
+      // Frame the ENG1 zone, ANCHORED to the panel's physical LEFT edge so there's
+      // no empty gap to the left of the FIRE label. We keep the face's full Y/Z
+      // (head-on orientation) and, for wide frames, extend the right edge toward
+      // APU by exactly the amount needed to fill the frame — never the left.
+      const s0 = sections[0];
+      const xs: number[] = [];
+      const addX = (o?: THREE.Object3D | null) => {
+        if (!o) return;
+        const b = new THREE.Box3().setFromObject(o);
+        if (Number.isFinite(b.min.x)) xs.push(b.min.x, b.max.x);
+      };
+      addX(s0.firePbGroup); addX(s0.guard);
+      s0.agents.forEach((a) => addX(a.rig ?? a.cap));
+      if (xs.length) {
+        const maxX = Math.max(...xs);
+        const padX = (maxX - Math.min(...xs)) * 0.08;
+        const x0 = box.min.x;            // panel's physical left edge → viewport left
+        let x1 = maxX + padX;
+        const aspect = size.width / Math.max(1, size.height);
+        const fillW = (box.max.y - box.min.y) * aspect; // width that exactly fills the frame
+        if (fillW > x1 - x0) x1 = x0 + fillW;           // wide frame: grow to the RIGHT only
+        box = new THREE.Box3(
+          new THREE.Vector3(x0, box.min.y, box.min.z),
+          new THREE.Vector3(x1, box.max.y, box.max.z),
+        );
+      }
+    }
     const center = box.getCenter(new THREE.Vector3());
     const dim = box.getSize(new THREE.Vector3());
     const dims = [{ axis: "x" as const, v: dim.x }, { axis: "y" as const, v: dim.y }, { axis: "z" as const, v: dim.z }].sort((a, b) => a.v - b.v);
@@ -503,18 +594,28 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     const vFov = (cam.fov * Math.PI) / 180;
     const aspect = size.width / Math.max(1, size.height);
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-    const dist = Math.max(w / 2 / Math.tan(hFov / 2), h / 2 / Math.tan(vFov / 2)) * 1.12 + dim[normalAxis];
+    const dist = (Math.max(w / 2 / Math.tan(hFov / 2), h / 2 / Math.tan(vFov / 2)) * fitMargin) / Math.max(0.2, zoom ?? 1) + dim[normalAxis];
     const viewDir = new THREE.Vector3(normalAxis === "x" ? 1 : 0, normalAxis === "y" ? 1 : 0, normalAxis === "z" ? 1 : 0);
     const heightAxis = dims[1].axis;
     cam.up.set(heightAxis === "x" ? 1 : 0, heightAxis === "y" ? 1 : 0, heightAxis === "z" ? 1 : 0);
-    cam.position.copy(center).addScaledVector(viewDir, dist);
+
+    // Pan: shift the look-at target within the view plane by a fraction of the
+    // visible half-extent, so the model can be slid left/right/up/down in-frame.
+    const halfH = dist * Math.tan(vFov / 2);
+    const halfW = halfH * aspect;
+    const right = new THREE.Vector3().crossVectors(viewDir, cam.up).normalize();
+    const lookAt = center.clone()
+      .addScaledVector(right, (panX ?? 0) * halfW)
+      .addScaledVector(cam.up, -(panY ?? 0) * halfH);
+
+    cam.position.copy(lookAt).addScaledVector(viewDir, dist);
     cam.near = Math.max(0.01, dist * 0.02);
     cam.far = dist * 6;
     cam.updateProjectionMatrix();
-    cam.lookAt(center);
+    cam.lookAt(lookAt);
     const orbit = controls as unknown as { target: THREE.Vector3; update: () => void } | null;
-    if (orbit?.target) { orbit.target.copy(center); orbit.update(); }
-  }, [camera, size.width, size.height, controls, root]);
+    if (orbit?.target) { orbit.target.copy(lookAt); orbit.update(); }
+  }, [camera, size.width, size.height, controls, root, framing, sections, panX, panY, zoom]);
 
   return (
     <group ref={groupRef}>
@@ -543,7 +644,12 @@ export function FireTestPanel3D(props: FireTestPanel3DProps) {
         <Environment files={HDRI_URL} environmentIntensity={1.5} />
         <FireTestPanelScene {...props} />
       </Suspense>
-      <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+      {/* Free orbit only on the standalone dev page. In controlled (scenario) mode
+          the camera is driven deterministically by panX/panY/zoom so positioning
+          stays predictable and never produces black voids. */}
+      {!props.controlled && (
+        <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+      )}
     </Canvas>
   );
 }

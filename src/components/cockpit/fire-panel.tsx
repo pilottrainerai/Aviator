@@ -2,13 +2,171 @@
 
 // HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
 import type { Scenario, SysSwState } from "@/scenarios/types";
 import { evalSysCase, SYS_COLORS } from "@/components/cockpit/system-display";
 import { EngineFireScenarioPanel } from "@/components/cockpit/engine-fire-panel-scenario";
 import { FirePanel3D } from "@/components/cockpit/fire-panel-3d";
+import { FireTestPanel3D } from "@/components/cockpit/fire-test-panel-3d";
+
+// ── Dev-only swap to the new (3-section) FireTestPanel3D ─────────────────────
+// Under `next dev` we render the new panel + on-screen size controls so the fit
+// inside the scenario can be dialed in. A production build keeps the legacy
+// FirePanel3D untouched until we promote the new one explicitly.
+const USE_NEW_FIRE_PANEL = process.env.NODE_ENV !== "production";
+// Dev layout editor: every action-panel element is a freely movable + scalable
+// frame, positioned in viewport coords and persisted per-element in localStorage.
+// Lets the whole action panel be laid out by hand (inside OR outside its column).
+const DEV_BOX_PREFIX = "fireDevBox.v6.";
+type DevBox = { x: number; y: number; w: number; h: number };
+function readDevBox(id: string, def: DevBox): DevBox {
+  if (typeof window === "undefined") return def;
+  try {
+    const raw = window.localStorage.getItem(DEV_BOX_PREFIX + id);
+    if (raw) return { ...def, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return def;
+}
+function writeDevBox(id: string, b: DevBox) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(DEV_BOX_PREFIX + id, JSON.stringify(b)); } catch { /* ignore */ }
+}
+function resetDevBoxes() {
+  if (typeof window === "undefined") return;
+  Object.keys(window.localStorage)
+    .filter((k) => k.startsWith(DEV_BOX_PREFIX))
+    .forEach((k) => window.localStorage.removeItem(k));
+}
+
+// Wraps ONE action-panel element. In edit mode you MOVE it by dragging the body
+// (an overlay scrim) and RESIZE it from ALL FOUR edges + FOUR corners — left/right
+// stretch X, top/bottom stretch Y, anchoring the opposite edge. `fill` elements
+// (the 3D panel) get a real pixel canvas at the box size so stretching is crisp;
+// others scale to fit. When edit mode is off the element is fully interactive
+// (clickable / orbitable) with no chrome. Dev-only; production untouched.
+function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd, onWheel, popDelay, children }: {
+  id: string; label: string; def: DevBox; fill?: boolean; editMode: boolean;
+  // When onBodyDrag is set, dragging the BODY pans content (normalized deltas) and
+  // the wheel calls onWheel (zoom) — used for the 3D panel. Otherwise the body just
+  // moves the frame. The move BAR always moves the frame.
+  onBodyDrag?: (ndx: number, ndy: number) => void; onBodyDragEnd?: () => void; onWheel?: (e: React.WheelEvent) => void;
+  // Stagger (ms) for the spring-in animation when the frame mounts (pops out).
+  popDelay?: number;
+  children: React.ReactNode;
+}) {
+  const MINW = 48, MINH = 40;
+  const [box, setBox] = useState<DevBox>(def);
+  const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { setBox(readDevBox(id, def)); /* hydrate once */ // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  const measuring = !fill && !nat;
+  useEffect(() => {
+    if (fill || nat || !measureRef.current) return;
+    const r = measureRef.current.getBoundingClientRect();
+    if (r.width && r.height) {
+      const n = { w: Math.round(r.width), h: Math.round(r.height) };
+      setNat(n);
+      setBox((b) => (b.w && b.h ? b : { ...b, w: n.w, h: n.h }));
+    }
+  });
+  const ref = useRef(box); ref.current = box;
+  // Generic pointer gesture: `apply` maps the pointer delta to a new box.
+  const gesture = (apply: (dx: number, dy: number, b0: DevBox) => DevBox) => (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    // Capture the pointer so the live 3D canvas under the scrim can't steal the drag.
+    try { (e.currentTarget as Element).setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    const b0 = ref.current; const ox = e.clientX, oy = e.clientY;
+    const onMove = (ev: PointerEvent) => setBox(apply(ev.clientX - ox, ev.clientY - oy, b0));
+    const onUp = () => { writeDevBox(id, ref.current); window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  const move = gesture((dx, dy, b0) => ({ ...b0, x: b0.x + dx, y: b0.y + dy }));
+  const resize = (edges: { l?: boolean; r?: boolean; t?: boolean; b?: boolean }) => gesture((dx, dy, b0) => {
+    let { x, y, w, h } = b0;
+    if (edges.r) w = Math.max(MINW, b0.w + dx);
+    if (edges.l) { const nw = Math.max(MINW, b0.w - dx); x = b0.x + (b0.w - nw); w = nw; }
+    if (edges.b) h = Math.max(MINH, b0.h + dy);
+    if (edges.t) { const nh = Math.max(MINH, b0.h - dy); y = b0.y + (b0.h - nh); h = nh; }
+    return { x, y, w, h };
+  });
+  // Body-pan gesture: reports incremental normalized deltas (fraction of the box).
+  const bodyPan = (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    try { (e.currentTarget as Element).setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    let lx = e.clientX, ly = e.clientY;
+    const onMove = (ev: PointerEvent) => {
+      onBodyDrag?.((ev.clientX - lx) / Math.max(1, ref.current.w), (ev.clientY - ly) / Math.max(1, ref.current.h));
+      lx = ev.clientX; ly = ev.clientY;
+    };
+    const onUp = () => { onBodyDragEnd?.(); window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  const A = "#8aabbb", EDGE = 10, COR = 18;
+  const handle = (on: React.PointerEventHandler, style: React.CSSProperties) =>
+    (<div onPointerDown={on} style={{ position: "absolute", touchAction: "none", zIndex: 4, ...style }} />);
+  return (
+    <div style={{ position: "fixed", left: box.x, top: box.y, width: measuring ? "auto" : box.w, height: measuring ? "auto" : box.h, zIndex: 45,
+      animation: `fire-pop-in 0.42s cubic-bezier(.34,1.45,.55,1) ${popDelay ?? 0}ms both` }}>
+      <div style={{ position: "relative", width: measuring ? "auto" : box.w, height: measuring ? "auto" : box.h, overflow: measuring ? "visible" : "hidden", border: editMode ? `1px dashed ${A}66` : "none" }}>
+        {fill ? (
+          <div style={{ position: "absolute", inset: 0, pointerEvents: editMode ? "none" : undefined }}>{children}</div>
+        ) : (
+          <div ref={measureRef} style={{ position: measuring ? "static" : "absolute", top: 0, left: 0, display: "inline-block",
+            pointerEvents: editMode ? "none" : undefined, transformOrigin: "top left",
+            transform: (!measuring && nat) ? `scale(${box.w / (nat.w || 1)}, ${box.h / (nat.h || 1)})` : undefined }}>
+            {children}
+          </div>
+        )}
+        {/* Edit mode chrome: a body scrim (pans the 3D model + wheel-zooms when
+            onBodyDrag is set, else moves the frame) plus a move bar (always moves
+            the frame). */}
+        {editMode && !measuring && (
+          <>
+            <div onPointerDown={onBodyDrag ? bodyPan : move} onWheel={onWheel}
+              title={onBodyDrag ? "drag = move panel · wheel = zoom" : "drag anywhere to move"}
+              style={{ position: "absolute", inset: 0, cursor: onBodyDrag ? "grab" : "move", touchAction: "none", zIndex: 2, background: "rgba(138,171,187,0.06)" }} />
+            <div onPointerDown={move} title="drag to move"
+              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: 18, zIndex: 3, cursor: "move", touchAction: "none", userSelect: "none",
+                display: "flex", alignItems: "center", gap: 6, padding: "0 7px", boxSizing: "border-box",
+                background: "rgba(14,20,28,0.92)", borderBottom: `1px solid ${A}66`,
+                fontFamily: "monospace", fontSize: 9, letterSpacing: "0.06em", color: A, whiteSpace: "nowrap" }}>
+              ✥ {label} · {Math.round(box.w)}×{Math.round(box.h)}
+              <span style={{ marginLeft: "auto", color: "#7c8696" }}>{onBodyDrag ? "bar=move · drag=pan · wheel=zoom" : "drag to move"}</span>
+            </div>
+          </>
+        )}
+      </div>
+      {/* Resize from all 4 edges + 4 corners, on the un-clipped outer frame. */}
+      {editMode && !measuring && (
+        <>
+          {handle(resize({ l: true }),        { top: 0, left: -4, width: EDGE, height: box.h, cursor: "ew-resize" })}
+          {handle(resize({ r: true }),        { top: 0, right: -4, width: EDGE, height: box.h, cursor: "ew-resize" })}
+          {handle(resize({ t: true }),        { top: -4, left: 0, width: box.w, height: EDGE, cursor: "ns-resize" })}
+          {handle(resize({ b: true }),        { bottom: -4, left: 0, width: box.w, height: EDGE, cursor: "ns-resize" })}
+          {handle(resize({ t: true, l: true }), { top: -5, left: -5, width: COR, height: COR, cursor: "nwse-resize" })}
+          {handle(resize({ t: true, r: true }), { top: -5, right: -5, width: COR, height: COR, cursor: "nesw-resize" })}
+          {handle(resize({ b: true, l: true }), { bottom: -5, left: -5, width: COR, height: COR, cursor: "nesw-resize" })}
+          {handle(resize({ b: true, r: true }), { bottom: -5, right: -5, width: COR, height: COR, cursor: "nwse-resize", background: `linear-gradient(135deg, transparent 42%, ${A} 42%)` })}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Baked default layout for the popped-out action panel (exported from the dev
+// layout editor). Used when there's no per-element localStorage override, so a
+// fresh session / production shows this exact arrangement when the procedure pops.
+const LAYOUT_DEFAULTS: Record<string, DevBox> = {
+  thr_lever_idle:  { x: 385, y: 136, w: 149, h: 377 },
+  eng1_master_off: { x: 536, y: 134, w: 116, h: 380 },
+  panel3d:         { x: 652, y: 134, w: 1230, h: 380 },
+};
+const VIEW_DEFAULT = { x: -0.2976, y: -0.0142, zoom: 0.7032 };
 
 // ─── CSS keyframes (AGENT arming pulse, TEST pulse) ─────────────────────────
 // Injected once via <style> in the panel root.
@@ -24,6 +182,11 @@ const FIRE_PANEL_CSS = `
 @keyframes fire-light-pulse {
   0%, 100% { opacity: 0.85; }
   50%      { opacity: 1; }
+}
+@keyframes fire-pop-in {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.94); }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 `;
 
@@ -1618,8 +1781,76 @@ function DslControlPanel({
   const isDone   = (id: string) => !!state.completedSteps[id];
   const allDone  = controls.every(c => isDone(c.stepId));
 
+  // Dev layout-edit mode: ON = drag bodies to move + edge/corner resize handles;
+  // OFF = elements are fully interactive (clickable / orbitable). Persisted.
+  const [editMode, setEditMode] = useState(true);
+  useEffect(() => { try { const v = window.localStorage.getItem("fireDevEdit"); if (v != null) setEditMode(v === "1"); } catch { /* ignore */ } }, []);
+  const toggleEdit = () => setEditMode((p) => { const n = !p; try { window.localStorage.setItem("fireDevEdit", n ? "1" : "0"); } catch { /* ignore */ } return n; });
+
+  // Deterministic view of the 3D model within its (fixed) frame: pan x/y + zoom.
+  // Drag the body to pan (move the whole panel left/right/up/down), wheel to zoom.
+  const [view3d, setView3d] = useState(VIEW_DEFAULT);
+  useEffect(() => { try { const r = window.localStorage.getItem("fire3dView.v1"); if (r) setView3d({ ...VIEW_DEFAULT, ...JSON.parse(r) }); } catch { /* ignore */ } }, []);
+  const view3dRef = useRef(view3d); view3dRef.current = view3d;
+  const persistView = () => { try { window.localStorage.setItem("fire3dView.v1", JSON.stringify(view3dRef.current)); } catch { /* ignore */ } };
+  const PAN_GAIN = 2;
+  const onPanDrag = (ndx: number, ndy: number) => setView3d((v) => ({ ...v, x: v.x + ndx * PAN_GAIN, y: v.y - ndy * PAN_GAIN }));
+  const onZoom = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    setView3d((v) => {
+      const next = { ...v, zoom: Math.max(0.5, Math.min(5, v.zoom * factor)) };
+      try { window.localStorage.setItem("fire3dView.v1", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  // Export the current arrangement (every element's box + the 3D view) as JSON so
+  // it can be baked in as the default layout.
+  const exportLayout = () => {
+    const boxes: Record<string, unknown> = {};
+    try {
+      Object.keys(window.localStorage)
+        .filter((k) => k.startsWith(DEV_BOX_PREFIX))
+        .forEach((k) => { boxes[k.slice(DEV_BOX_PREFIX.length)] = JSON.parse(window.localStorage.getItem(k) || "null"); });
+    } catch { /* ignore */ }
+    const json = JSON.stringify({ boxes, view: view3dRef.current }, null, 2);
+    try { void navigator.clipboard?.writeText(json); } catch { /* ignore */ }
+    console.log("FIRE PANEL LAYOUT EXPORT >>>\n" + json);
+    window.prompt("Layout copied to clipboard — paste this to Claude:", json);
+  };
+
   return (
     <div style={{ borderTop: "1px solid #1C2130", backgroundColor: warningActive ? "#060A12" : "#050709", padding: "6px 10px 8px" }}>
+      {/* Dev-only layout editor. Each action-panel element is a movable/resizable
+          frame (see DevMovable) when edit mode is on; positions persist per element. */}
+      {USE_NEW_FIRE_PANEL && (
+        <div style={{
+          position: "fixed", bottom: 12, left: 12, zIndex: 60,
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "8px 12px", borderRadius: 8,
+          background: "rgba(10,14,20,0.92)", border: "1px solid #2a313b",
+          fontFamily: "monospace", color: "#cdd6e0", fontSize: 10,
+        }}>
+          <span style={{ letterSpacing: 1, color: "#8aabbb", textTransform: "uppercase" }}>layout · dev</span>
+          <button type="button" onClick={toggleEdit}
+            style={{ padding: "3px 9px", fontSize: 10, fontWeight: 700, color: editMode ? "#05070a" : "#cdd6e0",
+              background: editMode ? "#8aabbb" : "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
+            Edit: {editMode ? "ON" : "OFF"}
+          </button>
+          <span style={{ color: "#7c8696" }}>drag body = move · edges/corners = resize</span>
+          <button type="button" onClick={exportLayout}
+            style={{ padding: "3px 9px", fontSize: 10, fontWeight: 700, color: "#05070a",
+              background: "#7ad9a5", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
+            ⤓ Export layout
+          </button>
+          <button type="button" onClick={() => { resetDevBoxes(); try { window.localStorage.removeItem("fire3dView.v1"); } catch { /* ignore */ } window.location.reload(); }}
+            style={{ padding: "3px 8px", fontSize: 10, color: "#eef6ff",
+              background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
+            Reset layout
+          </button>
+        </div>
+      )}
       {/* Section header */}
       <div className="flex items-center gap-2 mb-2">
         <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
@@ -1650,48 +1881,80 @@ function DslControlPanel({
           fp3dFirePbDone  && !fp3dAgent1Disch  ? "agent1" :
           fp3dAgent1Disch && !fp3dAgent2Disch && agent2Available ? "agent2" : undefined;
 
+        // Render one side control (lever / master / etc.) at natural size.
+        const renderCtrl = (ctrl: import("@/scenarios/types").EngControlDef) => {
+          const done      = isDone(ctrl.stepId);
+          const step      = scenario.steps.find(s => s.id === ctrl.stepId);
+          const reqsMet   = (step?.requires ?? []).every(r => !!state.completedSteps[r]);
+          const active    = !done && reqsMet && warningActive;
+          const clickable = !done && reqsMet && warningActive && !disabled;
+          const onClick   = () => { if (clickable) perform({ kind: "STEP", stepId: ctrl.stepId }); };
+          switch (ctrl.kind) {
+            case "thr_lever":   return <DslThrLeverCtrl  done={done} active={active} clickable={clickable} onClick={onClick} />;
+            case "mode_sel":    return <DslModeSelCtrl   done={done} active={active} clickable={clickable} onClick={onClick} />;
+            case "master":      return <DslMasterSwCtrl  done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={fireLit} />;
+            case "cancel_warn": return <DslCancelWarnCtrl done={done} active={active} clickable={clickable} onClick={onClick} />;
+            case "cancel_caut": return <DslCancelCautCtrl done={done} active={active} clickable={clickable} onClick={onClick} />;
+            case "o2_mask":     return <DslO2MaskCtrl     done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+            case "toggle_sw":   return <DslToggleSwCtrl   done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+            case "emer_pb":     return <DslEmerPbCtrl     done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+            case "spd_brk":     return <DslSpdBrkCtrl     done={done} active={active} clickable={clickable} onClick={onClick} />;
+            default:            return <DslMonitorCtrl    done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
+          }
+        };
+
+        const panel3d = USE_NEW_FIRE_PANEL ? (
+          <FireTestPanel3D
+            controlled framing="eng1" panX={view3d.x} panY={view3d.y} zoom={view3d.zoom}
+            fireDetected={fp3dFireDetected} firePbDone={fp3dFirePbDone}
+            agent1Disch={fp3dAgent1Disch} agent2Disch={fp3dAgent2Disch}
+            onPushFirePb={() => performStep(firePbCtrl?.stepId)}
+            onPushAgent1={() => performStep(agent1Ctrl?.stepId)}
+            onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
+          />
+        ) : (
+          <FirePanel3D
+            fireDetected={fp3dFireDetected} firePbDone={fp3dFirePbDone}
+            agent1Disch={fp3dAgent1Disch} agent2Disch={fp3dAgent2Disch}
+            agent2Available={agent2Available} activeStepId={fp3dActiveStepId}
+            onPushFirePb={() => performStep(firePbCtrl?.stepId)}
+            onPushAgent1={() => performStep(agent1Ctrl?.stepId)}
+            onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
+          />
+        );
+
+        // NEW PANEL: while the procedure is ACTIVE the action panel POPS OUT into
+        // the saved/baked floating layout (3D panel + thrust levers + master as
+        // freely placed frames). Before the action starts it stays inline in the
+        // action panel (the branch below).
+        if (USE_NEW_FIRE_PANEL && warningActive) {
+          return (
+            <>
+              {firePbCtrl && (
+                <DevMovable id="panel3d" label="3D FIRE PANEL" fill editMode={editMode} onBodyDrag={onPanDrag} onBodyDragEnd={persistView} onWheel={onZoom} popDelay={0} def={LAYOUT_DEFAULTS.panel3d}>
+                  <div style={{ position: "absolute", inset: 0, background: "#080C12" }}>{panel3d}</div>
+                </DevMovable>
+              )}
+              {sideControls.map((ctrl, i) => (
+                <DevMovable key={ctrl.stepId} id={ctrl.stepId} label={(ctrl.label || ctrl.kind).toUpperCase()} editMode={editMode} popDelay={110 + i * 90}
+                  def={LAYOUT_DEFAULTS[ctrl.stepId] ?? { x: 372, y: 110 + i * 112, w: 0, h: 0 }}>
+                  <div style={{ padding: 8, background: "#0A0F18" }}>{renderCtrl(ctrl)}</div>
+                </DevMovable>
+              ))}
+            </>
+          );
+        }
+
+        // INLINE: idle (action not yet started) and production — the panels stay in
+        // the action panel column.
         return (
           <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-            {/* Left 40%: thrust levers + engine master */}
             <div style={{ flex: "0 0 38%", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
-              {sideControls.map((ctrl) => {
-                const done      = isDone(ctrl.stepId);
-                const step      = scenario.steps.find(s => s.id === ctrl.stepId);
-                const reqsMet   = (step?.requires ?? []).every(r => !!state.completedSteps[r]);
-                const active    = !done && reqsMet && warningActive;
-                const clickable = !done && reqsMet && warningActive && !disabled;
-                const onClick   = () => { if (clickable) perform({ kind: "STEP", stepId: ctrl.stepId }); };
-                switch (ctrl.kind) {
-                  case "thr_lever": return <DslThrLeverCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                  case "mode_sel":  return <DslModeSelCtrl  key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                  case "master":    return <DslMasterSwCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} warningActive={fireLit} />;
-                  case "cancel_warn": return <DslCancelWarnCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                  case "cancel_caut": return <DslCancelCautCtrl key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                  case "o2_mask":     return <DslO2MaskCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-                  case "toggle_sw":   return <DslToggleSwCtrl   key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-                  case "emer_pb":     return <DslEmerPbCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-                  case "spd_brk":     return <DslSpdBrkCtrl     key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} />;
-                  default:            return <DslMonitorCtrl    key={ctrl.stepId} done={done} active={active} clickable={clickable} onClick={onClick} label={ctrl.label} sub={ctrl.sub} />;
-                }
-              })}
+              {sideControls.map((ctrl) => <div key={ctrl.stepId}>{renderCtrl(ctrl)}</div>)}
             </div>
-
-            {/* Right 60%: 3D Blender fire panel — 30% taller than original 155px */}
             {firePbCtrl && (
               <div style={{ flex: "1 1 0", height: "202px", position: "relative", background: "#080C12" }}>
-                <div style={{ position: "absolute", inset: 0 }}>
-                  <FirePanel3D
-                    fireDetected={fp3dFireDetected}
-                    firePbDone={fp3dFirePbDone}
-                    agent1Disch={fp3dAgent1Disch}
-                    agent2Disch={fp3dAgent2Disch}
-                    agent2Available={agent2Available}
-                    activeStepId={fp3dActiveStepId}
-                    onPushFirePb={() => performStep(firePbCtrl?.stepId)}
-                    onPushAgent1={() => performStep(agent1Ctrl?.stepId)}
-                    onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
-                  />
-                </div>
+                <div style={{ position: "absolute", inset: 0 }}>{panel3d}</div>
               </div>
             )}
           </div>
