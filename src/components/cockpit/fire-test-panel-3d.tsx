@@ -41,6 +41,10 @@ const PRESS_ATTACK_MS = 90;
 const PRESS_RELEASE_MS = 520;
 const AGENT_CAP_COLOR = new THREE.Color("#222730");
 const LEGEND_OFF = "#41464d"; // dim, unlit legend at rest
+// Guard OPEN angle as a DELTA from its closed rest (≈ −140° about local X). ENG1's
+// guard happened to be authored at this open pose, but APU/ENG2 are authored CLOSED
+// (0,0,0) — so we must rotate by a fixed delta, NOT reuse each guard's authored value.
+const GUARD_OPEN_DELTA = -2.443;
 
 function pressCurve(elapsed: number): number {
   if (elapsed < 0 || !Number.isFinite(elapsed)) return 0;
@@ -372,7 +376,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     sections.forEach((s, i) => {
       // guard
       if (s.guard) {
-        const target = d.guardOpen[i] ? (guardOpenOverride ?? s.guardOpenRot) : guardClosedRot;
+        const target = d.guardOpen[i] ? (guardOpenOverride ?? (guardClosedRot + GUARD_OPEN_DELTA)) : guardClosedRot;
         s.guard.rotation.x = THREE.MathUtils.lerp(s.guard.rotation.x, target, 0.08);
       }
       // FIRE pb: light red on fire; pop out when pushed; carry screws
