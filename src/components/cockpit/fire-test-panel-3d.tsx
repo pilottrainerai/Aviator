@@ -141,7 +141,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   // the onState report. (ENG1=2 agents, APU=1, ENG2=2.)
   const fresh = () => ({ guardOpen: [false, false, false], pbDone: [false, false, false], disch: [[false, false], [false], [false, false]] as boolean[][] });
   const drillRef = useRef(fresh());
-  const [, setDrillVer] = useState(0);
+  const [drillVer, setDrillVer] = useState(0);
   const bump = () => setDrillVer((v) => v + 1);
 
   const resetDrill = () => {
@@ -156,7 +156,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   useEffect(() => {
     const d = drillRef.current;
     onState?.({ guardOpen: [...d.guardOpen], pbDone: [...d.pbDone], disch: d.disch.map((r) => [...r]) });
-  });
+  }, [drillVer, onState]); // ONLY when the drill changes — a no-deps effect here looped forever
 
   // ── Clone + apply the base-case material treatment (keyed by material name, so it
   // covers ALL sections at once), then convert legend WORDS to flat unlit text. ──
