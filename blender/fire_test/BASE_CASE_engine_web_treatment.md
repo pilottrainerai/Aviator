@@ -1,5 +1,11 @@
 # BASE CASE — Blender→GLB engine FIRE panel web treatment (from ENG1)
 
+> **Superseded by the full skill:** `.claude/skills/blender-panels-to-web/SKILL.md`
+> is the authoritative, repeatable playbook (intake → export/bake → render →
+> interaction code → verify → save base model). This file remains as a quick
+> per-section checklist for the FIRE panel specifically.
+
+
 The proven recipe to make ONE engine section of the fire panel render + behave correctly
 on the web. Replicate per section (ENG1 done; APU, ENG2 follow the same steps).
 

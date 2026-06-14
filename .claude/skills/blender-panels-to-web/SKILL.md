@@ -1,0 +1,243 @@
+---
+name: blender-panels-to-web
+description: The repeatable bridge that turns a Blender cockpit panel into a working, interactive React-Three-Fiber panel on localhost. Use whenever the user hands over a Blender/GLB cockpit panel (FIRE, overhead, pedestal, glareshield, any pushbutton/switch/guard/indicator) and wants it rendered faithfully AND clickable on the web app, with lights/guards/buttons behaving per FCOM/FO logic. Sibling of `blender-panels` (which authors the panel IN Blender) and `cockpit-ui` (FCOM visual spec). This skill owns the GLB→localhost→interaction conversion. It encodes the lessons that cost weeks on the FIRE panel so the next panel takes hours. Proven base case: the FIRE panel (ENG1+APU+ENG2) at /dev/fire-test-panel-3d.
+---
+
+# Blender Panels → Web — the conversion & interaction playbook
+
+**Goal:** user gives a Blender file (or GLB) → you produce a faithful, interactive
+panel at `localhost:3004/dev/<panel>-3d`, lights/guards/buttons working to FCOM/FO
+logic, then save it as that panel's base model. The FIRE panel is the proven base
+case — copy `src/components/cockpit/fire-test-panel-3d.tsx` and adapt.
+
+> **Two sibling skills, one job each.** `blender-panels` builds the geometry IN
+> Blender from references. `cockpit-ui` / `a320-fcom-trainer` give the FCOM visual
+> + behaviour spec. THIS skill converts the resulting GLB into a live web panel.
+> For the "lights working per FO logic" step, pull the spec from
+> `a320-fcom-trainer` (procedure/ECAM/light logic) — never invent behaviour.
+
+---
+
+## 0. Hard rules (the expensive lessons — never relearn them)
+
+1. **Never break working state.** A committed base model must exist before you
+   touch anything (see [[feedback_do_not_break_working_state]]). Change only what's
+   asked. Prefer surgical edits over rewrites — broad "remakes" reintroduce bugs.
+2. **Select parts by MATERIAL + WORLD POSITION, never by node name.** `GLTFLoader`
+   sanitizes names (spaces/dots → `_`) and turns multi-primitive nodes into Groups.
+   Names that lined up for one section won't for the next. Material name + position
+   is stable across every section.
+3. **Click resolution is POSITION-BASED (`e.point`), not hitbox/name-based.**
+   Hitbox + name approaches passed headless tests but failed in the real browser
+   for some sections. Acting on the control nearest the clicked 3D world point is
+   the only approach that worked for ALL sections. (§5)
+4. **Colors come from UNLIT MeshBasicMaterial.** A lit material + `NoToneMapping`
+   clips amber→yellow. Face and legend words must be `MeshBasicMaterial`
+   (`toneMapped:false`). Renderer uses `NoToneMapping`. (§3, §6)
+5. **A guard's "open" pose is a FIXED DELTA from its closed rest — not its authored
+   rotation.** Only the first guard may be authored open; the rest are authored
+   closed (0,0,0). Rotating each by `GUARD_OPEN_DELTA` (≈ −2.443 rad ≈ −140°)
+   lifts them all identically. (§5)
+6. **The onState/report effect MUST have a dependency array.** A no-deps
+   `useEffect` that reports drill state loops forever and FREEZES the live browser.
+   It passes headless tests only because of inter-click sleeps. Use
+   `}, [drillVer, onState]);`. (§5)
+7. **Prefer a clean Blender RE-BAKE over pixel-patching the texture.** Patching the
+   baked PNG creates seams / double borders / color drift that compound. If the
+   face is wrong (shadows, marks, mismatched blue), fix it in Blender and re-bake
+   COMBINED with shadow-casters hidden. (§7)
+8. **Keep the Blender source pristine.** Re-bake via a *script* that hides meshes,
+   bakes, saves the PNG, and exits WITHOUT saving the .blend. Default answer to
+   "save the .blend?" is DON'T SAVE.
+
+---
+
+## 1. Intake — collect before starting
+
+- **The Blender file** (`.blend`) or an already-exported GLB. Confirm the canonical
+  copy (NOT a stale `~/Downloads` original — work from `blender/<panel>/`).
+- **Panel name + section list** (e.g. FIRE = ENG1, APU, ENG2). How many of each
+  repeated control per section (e.g. agents: 2/1/2).
+- **Reference pics** of the real panel (for the face + legend colors/text).
+- **FCOM section** for the behaviour (e.g. DSC-26-20-20 for ENG FIRE) — pull the
+  light/guard/discharge logic from `a320-fcom-trainer`.
+- **Which controls are interactive** and their **FO logic** (trigger → guard lift →
+  pb push → agent discharge; which legend lights when, what color).
+
+---
+
+## 2. Pipeline overview (Blender → live panel)
+
+```
+.blend ──(export_glb.py)──▶ <panel>.glb            → public/models/
+.blend ──(rebake script)──▶ <panel>_face.png        → public/models/   (COMBINED bake, shadow-casters hidden)
+                              │
+        component loads GLB (geometry) + face PNG (applied over the face mesh)
+                              │
+        part selection by material+position → interaction logic → camera fit
+                              │
+        page: <panel>-3d/page.tsx (trigger + reset)  → localhost:3004/dev/<panel>-3d
+                              │
+        headless CDP verify every control → commit base model
+```
+
+---
+
+## 3. Export & bake (Blender side)
+
+- **GLB:** export geometry + materials with `blender/<panel>/export_glb.py` (adapt
+  from `blender/fire_test/export_glb.py`). glTF can't carry Blender's Mix-Shader
+  node graph, so the painted face must be **baked** to a flat albedo PNG separately.
+- **Face bake:** Cycles **COMBINED** bake of the face mesh to a PNG. Hide ALL other
+  meshes (shadow casters) first so no shadows/marks bake in. Template:
+  `blender/fire_test/rebake_face_no_shadows.py` (hides everything except the face
+  curve, bakes, saves PNG, exits without saving the .blend).
+- Drop both into `public/models/`. The component references the PNG via a single
+  constant: `const FACE_TEX_URL = "/models/<panel>_face.png";`
+
+---
+
+## 4. Render fidelity (keyed by material — applies to all sections at once)
+
+```ts
+const { scene } = useGLTF(MODEL_URL);
+const faceTex = useTexture(FACE_TEX_URL);
+faceTex.flipY = false;                       // glTF UVs
+faceTex.colorSpace = THREE.SRGBColorSpace;
+faceTex.anisotropy = 8;
+```
+- **Face** (material e.g. `DECALS`): replace with `new THREE.MeshBasicMaterial({
+  map: faceTex, side: THREE.DoubleSide, toneMapped: false })`.
+- **Renderer:** `NoToneMapping` (lit materials + tone mapping clip amber→yellow).
+- **HDRI environment** (`<Environment files="/hdri/....hdr" />`) — metals read as
+  reflection; without it they look dead.
+- **Metals by material name:** guard housing metalness ~0.7; hinge chrome; button
+  caps matte near-black; painted-aluminium base; FIRE lens = translucent ruby red.
+- **`updateWorldMatrix(true,true)` before any `Box3.setFromObject`** (camera fit /
+  bbox), or measurements are stale.
+
+---
+
+## 5. Interaction logic (the core — copy from the base case)
+
+**Part selection** (in a `useMemo` over the loaded root): per section, find the
+pb by its lit material sorted by world X; the guard = the large housing mesh
+nearest that pb; agents = the cap meshes adjacent to each legend window; SQUIB =
+higher-Z legend text, DISCH = lower-Z; screws = small meshes within ~0.25 of the
+pb center (they travel with the pb).
+
+**Guard open = fixed delta:**
+```ts
+const GUARD_OPEN_DELTA = -2.443; // ≈ −140°, applied to EVERY guard's closed rest
+const target = d.guardOpen[i] ? (guardClosedRot + GUARD_OPEN_DELTA) : guardClosedRot;
+s.guard.rotation.x = THREE.MathUtils.lerp(s.guard.rotation.x, target, 0.08);
+```
+
+**Position-based click resolution** (works for every section):
+```ts
+const handleClick = (e: ThreeEvent<MouseEvent>) => {
+  e.stopPropagation();
+  if (!e.point) return;
+  const p = e.point; const d = drillRef.current;
+  let best = null;
+  const consider = (wp, kind, i, j) => {
+    const dist = wp.distanceTo(p);
+    if (!best || dist < best.dist) best = { kind, i, j, dist };
+  };
+  sections.forEach((s, i) => {
+    if (s.firePbGroup) consider(s.firePbGroup.getWorldPosition(new THREE.Vector3()), "guardpb", i, -1);
+    s.agents.forEach((a, j) => consider(a.cap.getWorldPosition(new THREE.Vector3()), "agent", i, j));
+  });
+  if (!best || best.dist > 0.45) return;          // clicked away from every control
+  const { kind, i, j } = best;
+  if (kind === "guardpb") {
+    if (!d.guardOpen[i]) { d.guardOpen[i] = true; bump(); return; }   // 1st click lifts guard
+    if (fireDetected && !d.pbDone[i]) { d.pbDone[i] = true; bump(); } // 2nd click pushes pb
+    return;
+  }
+  // agent: armed only after the pb is pushed + ARM delay + previous agent done
+  const prevDone = j === 0 ? true : d.disch[i][j - 1];
+  if (!(d.pbDone[i] && prevDone && !d.disch[i][j])) return;
+  pressRef.current[`${i}-${j}`] = Date.now();
+  d.disch[i][j] = true; bump();
+};
+```
+- **Gate the guard branch on `!guardOpen`** so the open guard's hitbox can't
+  swallow the pb click.
+- **State lives in a `useRef` (`drillRef`); bump a `useState` version to re-render.**
+  Report out via an effect WITH deps: `useEffect(() => { onState?.(...) }, [drillVer, onState]);`
+
+**Legend lights (FCOM colors, unlit, on top):**
+```ts
+// SQUIB white once pb pushed & not yet discharged; DISCH amber once discharged
+const squibHex = "#ffffff", dischHex = "#ff9f00"; // true Airbus amber
+setLegend(a.squib, d.pbDone[i] && !dischd, squibHex);
+setLegend(a.disch, dischd, dischHex);
+```
+Legend words render as **MeshBasicMaterial (unlit), `depthTest:false`,
+`renderOrder` high (≈30)** so the lit letters sit over the baked-dark text. OFF =
+dim grey `#41464d`. The cap itself NEVER illuminates — only the legend words.
+
+**Press FEEL (timing separate from depth)** — a real mechanical button, not a snap:
+```ts
+const PRESS_SHRINK = 0.1;       // DEPTH (how far it goes in) — independent of timing
+const PRESS_ATTACK_MS = 130, PRESS_HOLD_MS = 60, PRESS_RELEASE_MS = 400; // approved feel
+function pressCurve(elapsed) {
+  if (elapsed < 0 || !Number.isFinite(elapsed)) return 0;
+  const smooth = t => t*t*(3-2*t);                       // smoothstep, no toy bounce
+  if (elapsed <= PRESS_ATTACK_MS) return smooth(elapsed/PRESS_ATTACK_MS);     // in
+  if (elapsed <= PRESS_ATTACK_MS+PRESS_HOLD_MS) return 1;                     // hold
+  const t = (elapsed-PRESS_ATTACK_MS-PRESS_HOLD_MS)/PRESS_RELEASE_MS;
+  return t >= 1 ? 0 : 1 - smooth(t);                                          // out
+}
+```
+
+---
+
+## 6. Page wiring (dev page = trigger + reset only, no debug for final)
+
+The final page passes only `fireDetected` + `resetSignal` to the component, plus a
+TEST trigger and an `R`-key reset. ALL debug overlays (status readout, tuning
+drawer) are stripped for the saved base model. During bring-up you MAY add a
+temporary status readout to drive headless verification — strip it before saving.
+
+---
+
+## 7. Texture is wrong? RE-BAKE, don't patch
+
+Shadows under buttons, stray marks, double borders, or mismatched panel-blue across
+sections = re-bake in Blender (§3), don't pixel-edit the PNG. Pixel patches create
+seams and compounding artifacts. Known acceptable residual: a COMBINED (lit) bake
+can leave one section's blue slightly darker — only chase it if the user asks.
+
+---
+
+## 8. Verification (headless Chrome + CDP, no deps — Node 25 has global WebSocket)
+
+Launch headless Chrome with WebGL, drive real clicks, confirm each control fires
+and there are **no JS errors**:
+```
+--headless=new --enable-webgl --ignore-gpu-blocklist --enable-unsafe-swiftshader
+--use-gl=angle --window-size=1400,900 --remote-debugging-port=PORT --user-data-dir=/tmp/...
+```
+- Connect over the page's `webSocketDebuggerUrl`; `Runtime.enable` + `Page.enable`.
+- Click with `Input.dispatchMouseEvent` (mousePressed+mouseReleased).
+- Read state from a temporary status readout (`document.body.innerText`) OR probe
+  internal state; capture frames with `Page.captureScreenshot`.
+- Verify the FULL drill on EVERY section (guard → pb → each agent), and assert
+  `window.__err` is empty after listening for `error` events.
+- Working scripts to copy/adapt: `/tmp/cdp_manual_flow.mjs`, `/tmp/cdp_verify_clean.mjs`.
+
+---
+
+## 9. Save the base model (definition of done)
+
+1. Strip debug overlays. 2. Re-run headless verification — all controls, no errors.
+2. Copy the 4 files that ARE the panel into `blender/<panel>/base_model/` with a
+   README + cold preview PNG: the page, the component, the GLB, the face PNG.
+3. Commit (`Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`).
+4. Record a memory pointer so it survives sessions (see
+   [[project_aviator_fire_test_base_model]]). This is the rollback state.
+
+This base model then pushes into the PilotTrain hub and gets wired to live FCOM/FO
+scenario logic.
