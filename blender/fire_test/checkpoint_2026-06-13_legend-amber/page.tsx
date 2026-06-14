@@ -35,6 +35,7 @@ export default function FireTestPanel3DDevPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [tunerOpen, setTunerOpen] = useState(false);
   const reset = useCallback(() => { setFireDetected(false); setResetSignal((n) => n + 1); }, []);
   const onState = useCallback((s: { guardOpen: boolean[]; pbDone: boolean[]; disch: boolean[][] }) => setDrill(s), []);
 
@@ -80,8 +81,18 @@ export default function FireTestPanel3DDevPage() {
         ))}
       </div>
 
+      {/* Toggle for the tuning drawer — collapsed by default so the whole 3D panel
+          (incl. APU + ENG2 right side) is clickable. Strip before final. */}
+      <button type="button" onClick={() => setTunerOpen((o) => !o)}
+        style={{ position: "fixed", bottom: 16, right: 16, zIndex: 11, padding: "8px 12px",
+          background: "rgba(8,12,18,0.92)", border: "1px solid #2b3a4d", borderRadius: 8,
+          color: "#dfe8f2", font: "13px ui-monospace, monospace", cursor: "pointer" }}>
+        {tunerOpen ? "✕ close tuning" : "⚙ tuning"}
+      </button>
+
       {/* TEMP tuning panel (shared across all sections). Strip before final. */}
-      <div style={{ position: "fixed", bottom: 16, right: 16, zIndex: 10, background: "rgba(8,12,18,0.92)",
+      {tunerOpen && (
+      <div style={{ position: "fixed", bottom: 56, right: 16, zIndex: 10, background: "rgba(8,12,18,0.92)",
         border: "1px solid #2b3a4d", borderRadius: 8, padding: "12px 16px", color: "#dfe8f2",
         font: "13px ui-monospace, monospace", width: 290, display: "flex", flexDirection: "column", gap: 10 }}>
         <span style={{ fontSize: 11, opacity: 0.65 }}>Run on any section: TEST → lift guard → push FIRE pb (SQUIB) → AGENT 1/2 (DISCH). R resets.</span>
@@ -106,6 +117,7 @@ export default function FireTestPanel3DDevPage() {
           <input type="range" min={0} max={12} step={0.5} value={dischLight} onChange={(e) => setDischLight(Number(e.target.value))} style={{ width: "100%" }} /></label>
         <button type="button" onClick={resetTuning} style={{ padding: "6px 10px", background: "transparent", color: "#dfe8f2", border: "1px solid #4a5a6d", borderRadius: 6, cursor: "pointer", fontWeight: 600 }}>↺ Reset tuning</button>
       </div>
+      )}
 
       {/* TEST trigger (stands in for the FCOM ENG FIRE TEST pb). */}
       <button type="button" onClick={() => (fireDetected ? reset() : setFireDetected(true))}
