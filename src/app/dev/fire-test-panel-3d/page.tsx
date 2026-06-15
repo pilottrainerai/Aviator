@@ -11,10 +11,10 @@ type PanelSet = { color: string; roughness: number; metalness: number; clearcoat
 type AgentKey = "capBlack" | "aroundBlack" | "capBlackApu" | "aroundBlackApu";
 // Separate blackness for the ENG agents (capBlack/aroundBlack) and the APU agent
 // (…Apu), because the APU pb sits in shadow and needs its own values. 0 = base grey, 100 = full black.
-const AGENT_DEF = { capBlack: 40, aroundBlack: 22, capBlackApu: 40, aroundBlackApu: 22 };
+const AGENT_DEF = { capBlack: 100, aroundBlack: 80, capBlackApu: 100, aroundBlackApu: 85 }; // baked tuned values
 const CAP_BASE = [70, 80, 92];      // grey the cap darkens from
 const AROUND_BASE = [92, 104, 120]; // grey the surround darkens from
-const toneDef = (): PanelSet => ({ color: "#ffffff", roughness: 0.6, metalness: 0.2, clearcoat: 0.0, env: 1.2 });
+const toneDef = (): PanelSet => ({ color: "#ffffff", roughness: 0.6, metalness: 1.5, clearcoat: 1.0, env: 1.8 }); // baked tuned finish
 
 const rgbToHex = (a: number[]) => "#" + a.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
 const blackHex = (base: number[], b: number) => rgbToHex(base.map((v) => v * (1 - b / 100)));
