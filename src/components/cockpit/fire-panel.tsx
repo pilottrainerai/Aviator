@@ -36,7 +36,7 @@ function writeDevBox(id: string, b: DevBox) {
 function resetDevBoxes() {
   if (typeof window === "undefined") return;
   Object.keys(window.localStorage)
-    .filter((k) => k.startsWith(DEV_BOX_PREFIX))
+    .filter((k) => k.startsWith(DEV_BOX_PREFIX) || k.startsWith("fireDevContent."))
     .forEach((k) => window.localStorage.removeItem(k));
 }
 
@@ -46,7 +46,7 @@ function resetDevBoxes() {
 // (the 3D panel) get a real pixel canvas at the box size so stretching is crisp;
 // others scale to fit. When edit mode is off the element is fully interactive
 // (clickable / orbitable) with no chrome. Dev-only; production untouched.
-function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd, onWheel, popDelay, children }: {
+function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd, onWheel, popDelay, relative, container, children }: {
   id: string; label: string; def: DevBox; fill?: boolean; editMode: boolean;
   // When onBodyDrag is set, dragging the BODY pans content (normalized deltas) and
   // the wheel calls onWheel (zoom) — used for the 3D panel. Otherwise the body just
@@ -54,6 +54,10 @@ function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd,
   onBodyDrag?: (ndx: number, ndy: number) => void; onBodyDragEnd?: () => void; onWheel?: (e: React.WheelEvent) => void;
   // Stagger (ms) for the spring-in animation when the frame mounts (pops out).
   popDelay?: number;
+  // relative: position ABSOLUTE within the parent (a nested item) instead of fixed.
+  // container: a wrapper frame — no body scrim, children stay interactive so nested
+  // items receive their own drags; only the bar moves it.
+  relative?: boolean; container?: boolean;
   children: React.ReactNode;
 }) {
   const MINW = 48, MINH = 40;
@@ -106,19 +110,36 @@ function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd,
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
+  // Content pan (non-fill controls): reposition the control INSIDE its frame.
+  // The control keeps its aspect (uniform scale-to-fit) and is offset by cpan.
+  const CONTENT_KEY = `fireDevContent.${id}`;
+  const [cpan, setCpan] = useState({ cx: 0, cy: 0 });
+  useEffect(() => { if (fill) return; try { const r = window.localStorage.getItem(CONTENT_KEY); if (r) setCpan({ cx: 0, cy: 0, ...JSON.parse(r) }); } catch { /* ignore */ } // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  const cpanRef = useRef(cpan); cpanRef.current = cpan;
+  const contentPan = (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    try { (e.currentTarget as Element).setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    const c0 = cpanRef.current; const ox = e.clientX, oy = e.clientY;
+    const onMove = (ev: PointerEvent) => setCpan({ cx: c0.cx + (ev.clientX - ox), cy: c0.cy + (ev.clientY - oy) });
+    const onUp = () => { try { window.localStorage.setItem(CONTENT_KEY, JSON.stringify(cpanRef.current)); } catch { /* ignore */ } window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  const fit = (!fill && nat) ? Math.min(box.w / nat.w, box.h / nat.h) : 1;
   const A = "#8aabbb", EDGE = 10, COR = 18;
   const handle = (on: React.PointerEventHandler, style: React.CSSProperties) =>
     (<div onPointerDown={on} style={{ position: "absolute", touchAction: "none", zIndex: 4, ...style }} />);
   return (
-    <div style={{ position: "fixed", left: box.x, top: box.y, width: measuring ? "auto" : box.w, height: measuring ? "auto" : box.h, zIndex: 45,
-      animation: `fire-pop-in 0.42s cubic-bezier(.34,1.45,.55,1) ${popDelay ?? 0}ms both` }}>
+    <div style={{ position: relative ? "absolute" : "fixed", left: box.x, top: box.y, width: measuring ? "auto" : box.w, height: measuring ? "auto" : box.h, zIndex: 45,
+      animation: relative ? undefined : `fire-pop-in 0.5s cubic-bezier(.2,.85,.3,1) ${popDelay ?? 0}ms both` }}>
       <div style={{ position: "relative", width: measuring ? "auto" : box.w, height: measuring ? "auto" : box.h, overflow: measuring ? "visible" : "hidden", border: editMode ? `1px dashed ${A}66` : "none" }}>
         {fill ? (
-          <div style={{ position: "absolute", inset: 0, pointerEvents: editMode ? "none" : undefined }}>{children}</div>
+          <div style={{ position: "absolute", inset: 0, pointerEvents: (editMode && !container) ? "none" : undefined }}>{children}</div>
         ) : (
-          <div ref={measureRef} style={{ position: measuring ? "static" : "absolute", top: 0, left: 0, display: "inline-block",
-            pointerEvents: editMode ? "none" : undefined, transformOrigin: "top left",
-            transform: (!measuring && nat) ? `scale(${box.w / (nat.w || 1)}, ${box.h / (nat.h || 1)})` : undefined }}>
+          <div ref={measureRef} style={{ position: measuring ? "static" : "absolute", top: measuring ? 0 : "50%", left: measuring ? 0 : "50%",
+            display: "inline-block", pointerEvents: editMode ? "none" : undefined, transformOrigin: "center center",
+            transform: measuring ? undefined : `translate(-50%, -50%) translate(${cpan.cx}px, ${cpan.cy}px) scale(${fit})` }}>
             {children}
           </div>
         )}
@@ -127,16 +148,18 @@ function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd,
             the frame). */}
         {editMode && !measuring && (
           <>
-            <div onPointerDown={onBodyDrag ? bodyPan : move} onWheel={onWheel}
-              title={onBodyDrag ? "drag = move panel · wheel = zoom" : "drag anywhere to move"}
-              style={{ position: "absolute", inset: 0, cursor: onBodyDrag ? "grab" : "move", touchAction: "none", zIndex: 2, background: "rgba(138,171,187,0.06)" }} />
+            {!container && (
+            <div onPointerDown={onBodyDrag ? bodyPan : contentPan} onWheel={onWheel}
+              title={onBodyDrag ? "drag = pan model · wheel = zoom" : "drag = position inside · bar = move frame"}
+              style={{ position: "absolute", inset: 0, cursor: "grab", touchAction: "none", zIndex: 2, background: "transparent" }} />
+            )}
             <div onPointerDown={move} title="drag to move"
               style={{ position: "absolute", top: 0, left: 0, width: "100%", height: 18, zIndex: 3, cursor: "move", touchAction: "none", userSelect: "none",
                 display: "flex", alignItems: "center", gap: 6, padding: "0 7px", boxSizing: "border-box",
                 background: "rgba(14,20,28,0.92)", borderBottom: `1px solid ${A}66`,
                 fontFamily: "monospace", fontSize: 9, letterSpacing: "0.06em", color: A, whiteSpace: "nowrap" }}>
               ✥ {label} · {Math.round(box.w)}×{Math.round(box.h)}
-              <span style={{ marginLeft: "auto", color: "#7c8696" }}>{onBodyDrag ? "bar=move · drag=pan · wheel=zoom" : "drag to move"}</span>
+              <span style={{ marginLeft: "auto", color: "#7c8696" }}>{onBodyDrag ? "bar=move · drag=pan · wheel=zoom" : "bar=move · drag=position inside"}</span>
             </div>
           </>
         )}
@@ -161,12 +184,18 @@ function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd,
 // Baked default layout for the popped-out action panel (exported from the dev
 // layout editor). Used when there's no per-element localStorage override, so a
 // fresh session / production shows this exact arrangement when the procedure pops.
-const LAYOUT_DEFAULTS: Record<string, DevBox> = {
-  thr_lever_idle:  { x: 385, y: 136, w: 149, h: 377 },
-  eng1_master_off: { x: 536, y: 134, w: 116, h: 380 },
-  panel3d:         { x: 652, y: 134, w: 1230, h: 380 },
-};
 const VIEW_DEFAULT = { x: -0.2976, y: -0.0142, zoom: 0.7032 };
+
+// Combined action-panel layout: ONE outer frame (fixed viewport coords) holding
+// the thrust levers, master, and 3D fire panel as nested items positioned
+// RELATIVE to the outer. Outer moves/resizes/pops as a unit; each item nudges
+// inside it. (New keys — leaves the old separate-frame layout untouched.)
+const COMBO_OUTER: DevBox = { x: 380, y: 130, w: 1500, h: 392 };
+const COMBO_INNER: Record<string, DevBox> = {
+  panel3d:         { x: 284, y: 24, w: 1210, h: 360 },
+  thr_lever_idle:  { x: 6,   y: 24, w: 150,  h: 360 },
+  eng1_master_off: { x: 162, y: 24, w: 116,  h: 360 },
+};
 
 // ─── CSS keyframes (AGENT arming pulse, TEST pulse) ─────────────────────────
 // Injected once via <style> in the panel root.
@@ -184,8 +213,7 @@ const FIRE_PANEL_CSS = `
   50%      { opacity: 1; }
 }
 @keyframes fire-pop-in {
-  0%   { opacity: 0; transform: translateY(14px) scale(0.94); }
-  55%  { opacity: 1; }
+  0%   { opacity: 0; transform: translateY(40px) scale(0.98); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 `;
@@ -1805,16 +1833,33 @@ function DslControlPanel({
     });
   };
 
+  // Pop-out lifecycle: the action panel rises out once the PF commands ECAM ACTIONS
+  // at 400 ft (step `four_hundred_ft_cmd`), and retracts 3 s after AGENT 2 is
+  // discharged (or the fire is extinguished, for the agent-1-only path).
+  const ecamActionsStarted = !!state.completedSteps["four_hundred_ft_cmd"];
+  const retractTrigger = !!state.completedSteps["agent2"] || !!state.triggersFired["fire_extinguished"];
+  const [retracted, setRetracted] = useState(false);
+  useEffect(() => {
+    if (!retractTrigger) { setRetracted(false); return; }
+    const t = setTimeout(() => setRetracted(true), 3000);
+    return () => clearTimeout(t);
+  }, [retractTrigger]);
+  // Edit mode keeps it popped so the layout can be arranged anytime. With edit
+  // off it follows the real trigger: pop on ECAM ACTIONS, retract 3 s after agent 2.
+  const popped = USE_NEW_FIRE_PANEL && (editMode || (ecamActionsStarted && !retracted));
+
   // Export the current arrangement (every element's box + the 3D view) as JSON so
   // it can be baked in as the default layout.
   const exportLayout = () => {
     const boxes: Record<string, unknown> = {};
+    const content: Record<string, unknown> = {};
     try {
-      Object.keys(window.localStorage)
-        .filter((k) => k.startsWith(DEV_BOX_PREFIX))
-        .forEach((k) => { boxes[k.slice(DEV_BOX_PREFIX.length)] = JSON.parse(window.localStorage.getItem(k) || "null"); });
+      Object.keys(window.localStorage).forEach((k) => {
+        if (k.startsWith(DEV_BOX_PREFIX)) boxes[k.slice(DEV_BOX_PREFIX.length)] = JSON.parse(window.localStorage.getItem(k) || "null");
+        else if (k.startsWith("fireDevContent.")) content[k.slice("fireDevContent.".length)] = JSON.parse(window.localStorage.getItem(k) || "null");
+      });
     } catch { /* ignore */ }
-    const json = JSON.stringify({ boxes, view: view3dRef.current }, null, 2);
+    const json = JSON.stringify({ boxes, content, view: view3dRef.current }, null, 2);
     try { void navigator.clipboard?.writeText(json); } catch { /* ignore */ }
     console.log("FIRE PANEL LAYOUT EXPORT >>>\n" + json);
     window.prompt("Layout copied to clipboard — paste this to Claude:", json);
@@ -1923,25 +1968,29 @@ function DslControlPanel({
           />
         );
 
-        // NEW PANEL: while the procedure is ACTIVE the action panel POPS OUT into
-        // the saved/baked floating layout (3D panel + thrust levers + master as
-        // freely placed frames). Before the action starts it stays inline in the
-        // action panel (the branch below).
-        if (USE_NEW_FIRE_PANEL && warningActive) {
+        // NEW PANEL: the action panel POPS OUT (rises) into the saved/baked floating
+        // layout once the PF commands ECAM ACTIONS at 400 ft, and retracts 3 s after
+        // AGENT 2 / fire out (see `popped`). Otherwise it stays inline in the column.
+        if (popped) {
+          // One combined ACTION PANEL frame (moves/resizes/pops as a unit) holding
+          // the 3D fire panel + thrust levers + master, each nudgeable inside it.
           return (
-            <>
+            <DevMovable id="combo_outer" label="ACTION PANEL" fill container editMode={editMode} popDelay={0} def={COMBO_OUTER}>
+              {/* Shared container surface so the three items read as ONE panel/box. */}
+              <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(180deg,#0c121b,#070b11)", border: "1px solid #283140", borderRadius: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 30px rgba(0,0,0,0.5)" }} />
               {firePbCtrl && (
-                <DevMovable id="panel3d" label="3D FIRE PANEL" fill editMode={editMode} onBodyDrag={onPanDrag} onBodyDragEnd={persistView} onWheel={onZoom} popDelay={0} def={LAYOUT_DEFAULTS.panel3d}>
-                  <div style={{ position: "absolute", inset: 0, background: "#080C12" }}>{panel3d}</div>
+                <DevMovable id="combo_panel3d" label="3D FIRE PANEL" fill relative editMode={editMode}
+                  onBodyDrag={onPanDrag} onBodyDragEnd={persistView} onWheel={onZoom} def={COMBO_INNER.panel3d}>
+                  <div style={{ position: "absolute", inset: 0, background: "transparent" }}>{panel3d}</div>
                 </DevMovable>
               )}
               {sideControls.map((ctrl, i) => (
-                <DevMovable key={ctrl.stepId} id={ctrl.stepId} label={(ctrl.label || ctrl.kind).toUpperCase()} editMode={editMode} popDelay={110 + i * 90}
-                  def={LAYOUT_DEFAULTS[ctrl.stepId] ?? { x: 372, y: 110 + i * 112, w: 0, h: 0 }}>
-                  <div style={{ padding: 8, background: "#0A0F18" }}>{renderCtrl(ctrl)}</div>
+                <DevMovable key={ctrl.stepId} id={`combo_${ctrl.stepId}`} label={(ctrl.label || ctrl.kind).toUpperCase()} relative editMode={editMode}
+                  def={COMBO_INNER[ctrl.stepId] ?? { x: 6 + i * 156, y: 24, w: 150, h: 360 }}>
+                  <div style={{ padding: 8 }}>{renderCtrl(ctrl)}</div>
                 </DevMovable>
               ))}
-            </>
+            </DevMovable>
           );
         }
 

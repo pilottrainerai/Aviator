@@ -18,7 +18,8 @@
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
-import { useGLTF, useTexture, Environment, OrbitControls } from "@react-three/drei";
+import { useGLTF, useTexture, Environment, OrbitControls, Text, Billboard } from "@react-three/drei";
+import { EffectComposer, N8AO, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
 
 const ARM_MS = 0;
@@ -44,7 +45,7 @@ const PRESS_ATTACK_MS = 130;
 const PRESS_HOLD_MS = 60;
 const PRESS_RELEASE_MS = 400;
 const AGENT_CAP_COLOR = new THREE.Color("#222730");
-const LEGEND_OFF = "#41464d"; // dim, unlit legend at rest
+const LEGEND_OFF = "#8b95a3"; // unlit legend at rest — kept visibly readable (was too dim)
 // Guard OPEN angle as a DELTA from its closed rest (≈ −140° about local X). ENG1's
 // guard happened to be authored at this open pose, but APU/ENG2 are authored CLOSED
 // (0,0,0) — so we must rotate by a fixed delta, NOT reuse each guard's authored value.
@@ -180,7 +181,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   const faceTex = useTexture(FACE_TEX_URL);
   faceTex.flipY = false;
   faceTex.colorSpace = THREE.SRGBColorSpace;
-  faceTex.anisotropy = 8;
+  faceTex.anisotropy = 16; // max-ish: sharper baked text/decals at the panel angle
 
   const pressRef = useRef<Record<string, number>>({});
   const dischSeenRef = useRef<Set<string>>(new Set());
@@ -248,12 +249,14 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
         // so it's visible for EVERY agent. APU's box sits in a lower row and was
         // occluded by its cap, so APU's DISCH had no box while ENG's did.
         if (m.name === "legend_box") {
-          const mb = new THREE.MeshBasicMaterial({ color: "#dfe6f0", toneMapped: false, depthTest: false });
+          const mb = new THREE.MeshBasicMaterial({ color: "#eef3fa", toneMapped: false, depthTest: false, depthWrite: false });
           mb.name = "legend_box";
           return mb;
         }
         if (m.name === "Blue base") {
-          const base = new THREE.MeshPhysicalMaterial({ color: "#7e9fc6", metalness: 0.5, roughness: 0.34, clearcoat: 0.6, clearcoatRoughness: 0.22, envMapIntensity: 1.35 });
+          // Matte painted metal (was glossy/plasticky): no clearcoat, higher roughness,
+          // lower metalness + env reflection.
+          const base = new THREE.MeshPhysicalMaterial({ color: "#7e9fc6", metalness: 0.2, roughness: 0.66, clearcoat: 0.08, clearcoatRoughness: 0.6, envMapIntensity: 0.8 });
           base.name = "Blue base";
           return base;
         }
@@ -290,7 +293,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     clone.traverse((o) => {
       if (!(o instanceof THREE.Mesh) || !matNames(o).has("label_white")) return;
       o.renderOrder = 30;
-      const basic = new THREE.MeshBasicMaterial({ color: LEGEND_OFF, toneMapped: false, depthTest: false });
+      const basic = new THREE.MeshBasicMaterial({ color: LEGEND_OFF, toneMapped: false, depthTest: false, depthWrite: false });
       basic.name = "legend_text";
       o.material = basic;
     });
@@ -546,6 +549,42 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     d.disch[i][j] = true; bump();
   };
 
+  // ── Crisp white SDF text labels overlaid on the panel (replaces the soft, grey
+  // baked-texture labels). Positions/sizes are scale-relative to the panel face so
+  // they work regardless of the model's world units. Tunable constants below. ──
+  const panelLabels = useMemo(() => {
+    let faceMesh: THREE.Mesh | null = null;
+    root.traverse((o) => { if (o instanceof THREE.Mesh && matNames(o).has("DECALS")) faceMesh = o; });
+    if (!faceMesh) return [] as { key: string; text: string; pos: THREE.Vector3; size: number; weight?: number }[];
+    root.updateWorldMatrix(true, true);
+    const fbox = new THREE.Box3().setFromObject(faceMesh);
+    const fs = fbox.getSize(new THREE.Vector3());
+    const dims = [{ a: "x" as const, v: fs.x }, { a: "y" as const, v: fs.y }, { a: "z" as const, v: fs.z }].sort((p, q) => p.v - q.v);
+    const S = dims[2].v; // panel width (largest dim) = scale reference
+    const upAxis = dims[1].a; // height axis = screen "up"
+    const up = new THREE.Vector3(upAxis === "x" ? 1 : 0, upAxis === "y" ? 1 : 0, upAxis === "z" ? 1 : 0);
+    const nAxis = dims[0].a; // panel normal = toward camera
+    const fwd = new THREE.Vector3(nAxis === "x" ? 1 : 0, nAxis === "y" ? 1 : 0, nAxis === "z" ? 1 : 0).multiplyScalar(S * 0.06);
+    const wp = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
+    const SECT = ["ENG 1", "APU", "ENG 2"];
+    const out: { key: string; text: string; pos: THREE.Vector3; size: number; weight?: number }[] = [];
+    sections.forEach((s, i) => {
+      if (s.firePbGroup) {
+        const c = wp(s.firePbGroup);
+        const pb = (s.firePbMesh ? wp(s.firePbMesh) : c).add(fwd); // button face, pulled toward camera (in front of the glass lens)
+        out.push({ key: `t${i}`, text: SECT[i] ?? "", pos: c.clone().addScaledVector(up, S * 0.135), size: S * 0.042 });
+        out.push({ key: `f${i}`, text: "FIRE", pos: pb.clone().addScaledVector(up, S * 0.012), size: S * 0.05 });
+        out.push({ key: `p${i}`, text: "PUSH", pos: pb.clone().addScaledVector(up, -S * 0.03), size: S * 0.026 });
+      }
+      s.agents.forEach((a, j) => {
+        if (!a.cap) return;
+        const lbl = SECT[i] === "APU" ? "AGENT" : `AGENT ${j + 1}`;
+        out.push({ key: `a${i}_${j}`, text: lbl, pos: wp(a.cap).clone().addScaledVector(up, S * 0.085), size: S * 0.028 });
+      });
+    });
+    return out;
+  }, [root, sections]);
+
   const groupRef = useRef<THREE.Group>(null);
   const { camera, size, controls } = useThree();
   useLayoutEffect(() => {
@@ -622,6 +661,16 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       <group rotation={[Math.PI / 2, 0, 0]}>
         <primitive object={root} onClick={handleClick} />
       </group>
+      {/* Crisp white labels, billboarded to the camera, drawn on top. */}
+      {panelLabels.map((l) => (
+        <Billboard key={l.key} position={l.pos}>
+          <Text fontSize={l.size} color="#ffffff" anchorX="center" anchorY="middle"
+            outlineWidth={l.size * 0.07} outlineColor="#05070a" letterSpacing={0.02}
+            renderOrder={999} material-toneMapped={false} material-depthTest={false} material-depthWrite={false}>
+            {l.text}
+          </Text>
+        </Billboard>
+      ))}
     </group>
   );
 }
@@ -632,10 +681,10 @@ export function FireTestPanel3D(props: FireTestPanel3DProps) {
   if (!mounted) return <div style={{ width: "100%", height: "100%", background: "#070a0e" }} />;
   return (
     <Canvas
-      dpr={[1, 2]}
+      dpr={Math.min((typeof window !== "undefined" ? window.devicePixelRatio : 1.5) * 1.5, 3)}
       camera={{ fov: 28, near: 0.01, far: 100, position: [0, 0, 4] }}
-      gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
-      style={{ width: "100%", height: "100%", background: "#05070a" }}
+      gl={{ antialias: true, alpha: true, toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.15, outputColorSpace: THREE.SRGBColorSpace }}
+      style={{ width: "100%", height: "100%", background: "transparent" }}
     >
       <ambientLight intensity={0.18} color="#9fb0c4" />
       <directionalLight position={[2.6, 3.2, 4.5]} intensity={2.8} color="#ffffff" />
@@ -650,6 +699,12 @@ export function FireTestPanel3D(props: FireTestPanel3DProps) {
       {!props.controlled && (
         <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
       )}
+      {/* Blender-ish depth: N8AO contact/ambient occlusion in the recesses
+          (around buttons, screws, guard) + subtle bloom on lit elements. */}
+      <EffectComposer multisampling={4} enableNormalPass={false}>
+        <N8AO quality="high" screenSpaceRadius aoRadius={40} distanceFalloff={1.0} intensity={1.7} />
+        <Bloom luminanceThreshold={0.9} luminanceSmoothing={0.15} intensity={0.3} mipmapBlur radius={0.4} />
+      </EffectComposer>
     </Canvas>
   );
 }
