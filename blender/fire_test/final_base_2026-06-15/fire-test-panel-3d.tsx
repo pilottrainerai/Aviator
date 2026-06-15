@@ -295,7 +295,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
           // panel, never the baked text.
           const std = new THREE.MeshPhysicalMaterial({
             map: faceTex, side: THREE.DoubleSide,
-            roughness: 0.6, metalness: 1.5, clearcoat: 1.0, clearcoatRoughness: 0.2, envMapIntensity: 1.8, // baked tuned finish
+            roughness: 0.6, metalness: 1.5, clearcoat: 0.4, clearcoatRoughness: 0.2, envMapIntensity: 1.0, // baked tuned finish (reduced glare)
             metalnessMap: faceMask ?? undefined,
             clearcoatMap: faceMask ?? undefined,
           });
@@ -324,7 +324,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
           return mb;
         }
         if (m.name === "Blue base") {
-          const base = new THREE.MeshPhysicalMaterial({ color: "#7e9fc6", metalness: 1.5, roughness: 0.6, clearcoat: 1.0, clearcoatRoughness: 0.22, envMapIntensity: 1.8 }); // baked tuned finish
+          const base = new THREE.MeshPhysicalMaterial({ color: "#7e9fc6", metalness: 1.5, roughness: 0.6, clearcoat: 0.4, clearcoatRoughness: 0.22, envMapIntensity: 1.0 }); // baked tuned finish (reduced glare)
           base.name = "Blue base";
           return base;
         }
@@ -527,7 +527,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     // parts keep envMap=null → they reflect via scene.environmentIntensity (fixed),
     // so the slider changes the panel ONLY. One-time per material set (ref-guarded).
     if (!envBoundRef.current && frameScene.environment) {
-      panelMats.forEach((m) => { m.envMap = frameScene.environment; m.envMapIntensity = envIntensity ?? 1.8; m.needsUpdate = true; });
+      panelMats.forEach((m) => { m.envMap = frameScene.environment; m.envMapIntensity = envIntensity ?? 1.0; m.needsUpdate = true; });
       envBoundRef.current = true;
     }
     const squibHex = squibColor ?? "#ffffff";
@@ -626,7 +626,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       s.agents.forEach((a, j) => { if (a.cap) consider(a.cap.getWorldPosition(new THREE.Vector3()), "agent", i, j); });
     });
     if (!best) { onClickDetected?.("click but no control found"); return; }
-    const { kind, i, j, dist } = best;
+    const { kind, i, j, dist } = best as { kind: "guardpb" | "agent"; i: number; j: number; dist: number };
     onClickDetected?.(`${SECTION_KEYS[i]} ${kind}${kind === "agent" ? j : ""} d=${dist.toFixed(2)}`);
     if (dist > 0.45) return; // clicked away from every control
     if (kind === "guardpb") {

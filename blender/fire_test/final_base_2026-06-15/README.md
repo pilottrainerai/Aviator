@@ -14,7 +14,7 @@ The shipped look. This replaces the panel in the Pilot Trainer app. Tag: **`fire
 | `REFERENCE_RENDER.png` | reference only |
 
 ## What's in this final (full recipe in `.claude/skills/blender-panels-to-web/SKILL.md` §10)
-- **Metallic finish** baked on the blue panel: roughness 0.6 · metalness 1.5 · clearcoat 1.0 · reflections(envMapIntensity) 1.8.
+- **Metallic finish** baked on the blue panel: roughness 0.6 · metalness 1.5 · clearcoat 0.4 · reflections(envMapIntensity) 1.0 (glare reduced 2026-06-15).
 - **Text protected** by a mask derived from the face texture (metalness/clearcoat hit only the blue, never the lettering).
 - **Reflections isolated** to the panel (env map bound per-material; FIRE pbs/agents keep constant reflection).
 - **Agents:** size-based cap/surround detection; independent black-amount for ENGINE vs APU; caps go true-black at 100.
