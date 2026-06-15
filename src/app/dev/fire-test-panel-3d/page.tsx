@@ -8,7 +8,10 @@ import { FireTestPanel3D } from "@/components/cockpit/fire-test-panel-3d";
 // front-face material — settings stored PER tone-map.
 type Tone = "none" | "agx" | "aces";
 type PanelSet = { color: string; roughness: number; metalness: number; clearcoat: number; env: number };
-const AGENT_DEF = { capBlack: 40, aroundBlack: 22 }; // 0 = base grey, 100 = full black
+type AgentKey = "capBlack" | "aroundBlack" | "capBlackApu" | "aroundBlackApu";
+// Separate blackness for the ENG agents (capBlack/aroundBlack) and the APU agent
+// (…Apu), because the APU pb sits in shadow and needs its own values. 0 = base grey, 100 = full black.
+const AGENT_DEF = { capBlack: 40, aroundBlack: 22, capBlackApu: 40, aroundBlackApu: 22 };
 const CAP_BASE = [70, 80, 92];      // grey the cap darkens from
 const AROUND_BASE = [92, 104, 120]; // grey the surround darkens from
 const toneDef = (): PanelSet => ({ color: "#ffffff", roughness: 0.6, metalness: 0.2, clearcoat: 0.0, env: 1.2 });
@@ -28,13 +31,15 @@ export default function FireTestPanel3DDevPage() {
     try { const a = localStorage.getItem("fireAgentBlack.v1"); if (a) setAgent({ ...AGENT_DEF, ...JSON.parse(a) }); } catch { /* ignore */ }
     try { const p = localStorage.getItem("firePanelByTone.v1"); if (p) { const o = JSON.parse(p); setByTone((b) => ({ none: { ...b.none, ...o.none }, agx: { ...b.agx, ...o.agx }, aces: { ...b.aces, ...o.aces } })); if (o.tone) setTone(o.tone); } } catch { /* ignore */ }
   }, []);
-  const setAgentVal = (k: "capBlack" | "aroundBlack", v: number) =>
+  const setAgentVal = (k: AgentKey, v: number) =>
     setAgent((a) => { const n = { ...a, [k]: v }; try { localStorage.setItem("fireAgentBlack.v1", JSON.stringify(n)); } catch { /* ignore */ } return n; });
   const savePanel = (b: Record<Tone, PanelSet>, t: Tone) => { try { localStorage.setItem("firePanelByTone.v1", JSON.stringify({ ...b, tone: t })); } catch { /* ignore */ } };
   const setPanelVal = (k: keyof PanelSet, v: string | number) => setByTone((b) => { const n = { ...b, [tone]: { ...b[tone], [k]: v } }; savePanel(n, tone); return n; });
   const cur = byTone[tone];
   const capHex = blackHex(CAP_BASE, agent.capBlack);
   const aroundHex = blackHex(AROUND_BASE, agent.aroundBlack);
+  const capHexApu = blackHex(CAP_BASE, agent.capBlackApu);
+  const aroundHexApu = blackHex(AROUND_BASE, agent.aroundBlackApu);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "r" || e.key === "R") reset(); };
@@ -47,24 +52,31 @@ export default function FireTestPanel3DDevPage() {
   const rowS: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
   const btn: React.CSSProperties = { marginTop: 2, padding: "4px 8px", fontSize: 11, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" };
 
-  const BlackSlider = ({ label, hex, k }: { label: string; hex: string; k: "capBlack" | "aroundBlack" }) => (
-    <label style={rowS}>
+  const numStyle: React.CSSProperties = { width: 46, background: "#161b22", color: "#eef6ff", border: "1px solid #3a434f", borderRadius: 4, padding: "2px 4px", fontFamily: "monospace", fontSize: 11, textAlign: "right" };
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number.isFinite(v) ? v : lo));
+  // Called INLINE ({blackRow(...)}) — NOT as <Component/> — so the inputs aren't
+  // remounted on every change (that remount was what made the slider jump/stick).
+  const blackRow = (label: string, hex: string, k: AgentKey) => (
+    <label key={k} style={rowS}>
       <span style={{ width: 14, height: 14, borderRadius: 3, background: hex, border: "1px solid #3a434f" }} />
-      <span style={{ width: 96 }}>{label}</span>
+      <span style={{ width: 74 }}>{label}</span>
       <input type="range" min={0} max={100} step={1} value={agent[k]} onChange={(e) => setAgentVal(k, Number(e.target.value))} style={{ flex: 1 }} />
-      <span style={{ color: "#7c8696", width: 28, textAlign: "right" }}>{agent[k]}</span>
+      <input type="number" min={0} max={100} step={1} value={agent[k]} onChange={(e) => setAgentVal(k, clamp(Number(e.target.value), 0, 100))} style={numStyle} />
     </label>
   );
-  const Slider = ({ label, k, min, max, step }: { label: string; k: keyof PanelSet; min: number; max: number; step: number }) => (
-    <label style={rowS}><span style={{ width: 78 }}>{label}</span>
+  const panelRow = (label: string, k: keyof PanelSet, min: number, max: number, step: number) => (
+    <label key={k} style={rowS}>
+      <span style={{ width: 74 }}>{label}</span>
       <input type="range" min={min} max={max} step={step} value={cur[k] as number} onChange={(e) => setPanelVal(k, Number(e.target.value))} style={{ flex: 1 }} />
-      <span style={{ color: "#7c8696", width: 34, textAlign: "right" }}>{Number(cur[k]).toFixed(2)}</span></label>
+      <input type="number" min={min} max={max} step={step} value={cur[k] as number} onChange={(e) => setPanelVal(k, clamp(Number(e.target.value), min, max))} style={numStyle} />
+    </label>
   );
 
   return (
     <main style={{ position: "fixed", inset: 0, background: "#05070a", overflow: "hidden" }}>
       <FireTestPanel3D fireDetected={fireDetected} resetSignal={resetSignal}
         agentCapColor={capHex} agentAsmColor={aroundHex}
+        agentCapColorApu={capHexApu} agentAsmColorApu={aroundHexApu}
         panelRoughness={cur.roughness} panelMetalness={cur.metalness}
         panelClearcoat={cur.clearcoat} envIntensity={cur.env} toneMapping={tone} />
 
@@ -74,12 +86,16 @@ export default function FireTestPanel3DDevPage() {
         {fireDetected ? "↺ RESET" : "🔥 TEST — trigger FIRE"}
       </button>
 
-      {/* AGENT darkness — more black on the cap + surround */}
+      {/* AGENT darkness — separate controls for the ENG agents vs the APU agent */}
       <div style={{ ...box, left: 16 }}>
-        <div style={title}>agent — black amount</div>
-        <BlackSlider label="Button (cap)" hex={capHex} k="capBlack" />
-        <BlackSlider label="Around it" hex={aroundHex} k="aroundBlack" />
-        <button type="button" style={btn} onClick={() => { setAgent(AGENT_DEF); try { localStorage.setItem("fireAgentBlack.v1", JSON.stringify(AGENT_DEF)); } catch { /* ignore */ } }}>Reset agent</button>
+        <div style={title}>agents — black amount</div>
+        <div style={{ color: "#7c8696", fontSize: 10, marginTop: 2 }}>ENGINE 1 &amp; 2 agents</div>
+        {blackRow("Button (cap)", capHex, "capBlack")}
+        {blackRow("Around it", aroundHex, "aroundBlack")}
+        <div style={{ color: "#7c8696", fontSize: 10, marginTop: 6 }}>APU agent</div>
+        {blackRow("Button (cap)", capHexApu, "capBlackApu")}
+        {blackRow("Around it", aroundHexApu, "aroundBlackApu")}
+        <button type="button" style={btn} onClick={() => { setAgent(AGENT_DEF); try { localStorage.setItem("fireAgentBlack.v1", JSON.stringify(AGENT_DEF)); } catch { /* ignore */ } }}>Reset agents</button>
       </div>
 
       {/* PANEL front-face material — per tone-map */}
@@ -91,10 +107,10 @@ export default function FireTestPanel3DDevPage() {
             <option value="none">None</option><option value="agx">AgX</option><option value="aces">ACES</option>
           </select>
         </div>
-        <Slider label="Roughness" k="roughness" min={0} max={1} step={0.02} />
-        <Slider label="Metalness" k="metalness" min={0} max={3} step={0.02} />
-        <Slider label="Clearcoat" k="clearcoat" min={0} max={1} step={0.02} />
-        <Slider label="Reflections" k="env" min={0} max={6} step={0.05} />
+        {panelRow("Roughness", "roughness", 0, 1, 0.02)}
+        {panelRow("Metalness", "metalness", 0, 3, 0.02)}
+        {panelRow("Clearcoat", "clearcoat", 0, 1, 0.02)}
+        {panelRow("Reflections", "env", 0, 6, 0.05)}
         <span style={{ color: "#7c8696", fontSize: 10 }}>saved per tone-map ({tone})</span>
         <button type="button" style={btn} onClick={() => { const n = { ...byTone, [tone]: toneDef() }; setByTone(n); savePanel(n, tone); }}>Reset {tone}</button>
       </div>

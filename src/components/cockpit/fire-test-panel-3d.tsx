@@ -103,10 +103,15 @@ export interface FireTestPanel3DProps {
   agentShrink?: number;
   agentCapLight?: number;
   agentAsmLight?: number;
-  /** Direct color for the AGENT push-button cap (overrides agentCapLight). */
+  /** Direct color for the ENG agents' push-button cap (overrides agentCapLight). */
   agentCapColor?: string;
-  /** Direct color for the AGENT housing/surround around the cap (overrides agentAsmLight). */
+  /** Direct color for the ENG agents' housing/surround around the cap (overrides agentAsmLight). */
   agentAsmColor?: string;
+  /** APU-agent cap colour — independent of the ENG agents (the APU pb sits in
+   *  shadow, so it needs its own blackness). Falls back to agentCapColor if unset. */
+  agentCapColorApu?: string;
+  /** APU-agent surround colour — independent of the ENG agents. Falls back to agentAsmColor. */
+  agentAsmColorApu?: string;
   // ── Blue panel ("Blue base") live tuning (dev editor) ──
   panelColor?: string;
   panelRoughness?: number;
@@ -184,7 +189,7 @@ type Section = {
 function FireTestPanelScene(props: FireTestPanel3DProps) {
   const {
     fireDetected, resetSignal, onState, onClickDetected,
-    firePopOut, fireAsmRadius, agentShrink, agentCapLight, agentAsmLight, agentCapColor, agentAsmColor,
+    firePopOut, fireAsmRadius, agentShrink, agentCapLight, agentAsmLight, agentCapColor, agentAsmColor, agentCapColorApu, agentAsmColorApu,
     panelColor, panelRoughness, panelMetalness, panelClearcoat, envIntensity, toneMapping,
     guardClosedDeg, guardOpenDeg, squibColor, squibLight, dischColor, dischLight, pressOverride,
     controlled, firePbDone, agent1Disch, agent2Disch,
@@ -342,9 +347,9 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
         (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
           const sm = m as THREE.MeshStandardMaterial;
           if ("color" in sm) sm.color.copy(AGENT_CAP_COLOR);
-          if ("roughness" in sm) sm.roughness = 0.9;
+          if ("roughness" in sm) sm.roughness = 1.0;   // fully matte — kills the sheen so black reads black
           if ("metalness" in sm) sm.metalness = 0.0;
-          if ("envMapIntensity" in sm) sm.envMapIntensity = 0.25;
+          if ("envMapIntensity" in sm) sm.envMapIntensity = 0.0; // no reflection so "Button cap" at 100 is a true deep black
         });
       }
     });
@@ -490,6 +495,23 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     return Array.from(set);
   }, [root]);
 
+  // The housing mesh belonging to the APU agent (nearest housing to its cap) —
+  // brightened alongside the APU cap so the shadowed APU agent matches the others.
+  const apuHousing = useMemo(() => {
+    const cap = sections[1]?.agents[0]?.cap;
+    if (!cap) return null;
+    const cp = cap.getWorldPosition(new THREE.Vector3());
+    let best: THREE.Mesh | null = null, bd = Infinity;
+    agentHousings.forEach((h) => { const dd = h.getWorldPosition(new THREE.Vector3()).distanceTo(cp); if (dd < bd) { bd = dd; best = h; } });
+    return best;
+  }, [sections, agentHousings]);
+
+  // APU layering quirk: on the APU agent the SURROUND mesh (apuHousing) is the visible
+  // front face, while its "cap" mesh sits behind it (reverse of the ENG agents). So for
+  // APU "Button cap" drives the visible surround mesh; "Around it" drives the hidden cap
+  // mesh (little visible effect — the model exposes only one APU surface; a true border
+  // would need the APU button rebuilt in Blender like AGENT 1/2).
+
   const guardClosedRot = useMemo(() => ((guardClosedDeg ?? 0) * Math.PI) / 180, [guardClosedDeg]);
   const guardOpenOverride = useMemo(() => (guardOpenDeg != null ? (guardOpenDeg * Math.PI) / 180 : null), [guardOpenDeg]);
 
@@ -550,8 +572,13 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
           const p = pressOverride ?? pressCurve(elapsed);
           const f = 1 - (agentShrink ?? PRESS_SHRINK) * p;
           a.rig.scale.set(f, 1, f);
-          const capBase = agentCapColor
-            ? new THREE.Color(agentCapColor)
+          // APU (section 1) is SWAPPED: its physical cap mesh sits BEHIND the visible
+          // surround, so the cap mesh takes the "Around it" value; the visible surround
+          // (apuHousing) takes the "Button cap" value in the housing pass below. ENG
+          // agents are normal (cap mesh = "Button cap").
+          const capCol = i === 1 ? (agentAsmColorApu ?? agentAsmColor) : agentCapColor;
+          const capBase = capCol
+            ? new THREE.Color(capCol)
             : agentCapLight != null
             ? new THREE.Color().setHSL(0.58, 0.12, Math.max(0, Math.min(1, agentCapLight / 100)))
             : AGENT_CAP_COLOR;
@@ -562,11 +589,21 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       });
     });
 
-    if (agentAsmColor || agentAsmLight != null) {
-      const asm = agentAsmColor
-        ? new THREE.Color(agentAsmColor)
-        : new THREE.Color().setHSL(0.58, 0.1, Math.max(0, Math.min(1, agentAsmLight! / 100)));
-      agentHousings.forEach((h) => { const m = getMat(h) as THREE.MeshStandardMaterial; if (m.color) m.color.copy(asm); });
+    if (agentAsmColor || agentAsmColorApu || agentCapColorApu || agentAsmLight != null) {
+      const mk = (c?: string) =>
+        c ? new THREE.Color(c)
+        : agentAsmLight != null ? new THREE.Color().setHSL(0.58, 0.1, Math.max(0, Math.min(1, agentAsmLight / 100)))
+        : null;
+      const asmEng = mk(agentAsmColor);
+      // APU's surround mesh is the VISIBLE front face → it takes the "Button cap"
+      // value (swapped; see cap pass above), so dragging "Button cap" for the APU
+      // agent darkens the face the user actually sees.
+      const apuFace = mk(agentCapColorApu ?? agentCapColor);
+      agentHousings.forEach((h) => {
+        const m = getMat(h) as THREE.MeshStandardMaterial;
+        const c = h === apuHousing ? apuFace : asmEng;
+        if (m.color && c) m.color.copy(c);
+      });
     }
   });
 
