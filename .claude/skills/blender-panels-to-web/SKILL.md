@@ -241,3 +241,93 @@ and there are **no JS errors**:
 
 This base model then pushes into the PilotTrain hub and gets wired to live FCOM/FO
 scenario logic.
+
+---
+
+## 10. FINAL panel treatment — the look we ship (FIRE panel, 2026-06-15)
+
+The base case was finished to a **metallic, light-correct, fully-tunable** standard.
+Tag `fire-panel-FINAL-2026-06-15`; snapshot `blender/fire_test/final_base_2026-06-15/`
+(component + page + GLB + face PNG + reference render). Reproduce this for EVERY new
+panel — these are the exact treatments + values.
+
+### 10a. Face is LIT now (supersedes the old "face = unlit MeshBasic" rule for the FACE only)
+The painted blue face (`DECALS`) is a **`MeshPhysicalMaterial`** so it takes a real
+metallic finish + reflections. **Only the LEGEND WORDS stay unlit `MeshBasicMaterial`**
+(rule §4 still holds for SQUIB/DISCH text + legend boxes, `toneMapped:false`,
+`depthTest:false`, `renderOrder` 29–30). Renderer still `NoToneMapping` by default
+(a live tone-map toggle None/AgX/ACES exists for tuning).
+
+### 10b. Baked material finish (the metallic look)
+```ts
+// DECALS (front face) and "Blue base" (body) — baked tuned values:
+roughness 0.6, metalness 1.5, clearcoat 1.0, envMapIntensity 1.8
+// metalness >1 deliberately over-drives the metallic reflection (looks like brushed metal).
+```
+### 10c. Protect the text from the finish (MASK)
+The face PNG carries blue panel + white lettering on ONE mesh, so metalness/clearcoat
+would turn the text into a tinted mirror. Build a **mask CanvasTexture from the face
+texture** (blue texels → panel, white/dark → text) and feed it as BOTH `metalnessMap`
+and `clearcoatMap` on the DECALS material. Finish then lands ONLY on the blue; the
+lettering stays a flat matte decal. (G channel =255 = roughness no-op; R/B =255 on
+panel, 0 on text.)
+
+### 10d. Reflections isolated to the panel (don't light the buttons)
+Per-material `envMapIntensity` is IGNORED when a material has no own `envMap` (it
+falls back to `scene.environmentIntensity`). So **bind the scene env map onto the
+panel materials** (`m.envMap = scene.environment` in a ref-guarded `useFrame`), keep
+`<Environment environmentIntensity={1.5}>` FIXED, and drive the "Reflections" slider
+via the panel materials' `envMapIntensity` only. FIRE pbs / hinges / agents keep
+`envMap=null` → constant reflection. Reflections range 0–6.
+
+### 10e. Push-button + part colours/materials (by material name)
+- **FIRE lens** (`fire pb1 LIT`/`red fire push`): translucent ruby — `MeshPhysicalMaterial`
+  `{ color:#841010, transmission:0.58, thickness:0.7, ior:1.5, attenuationColor:#7a0d0d,
+  clearcoat:1, clearcoatRoughness:0.08, emissive:#ff0505 (emissiveIntensity 0 off / 2 lit),
+  envMapIntensity:1.7 }`. Lights red on fire (`fireDetected`), pops out `+0.15` Y when pushed.
+- **Agent cap + surround** (`black button`): matte black. `roughness 1.0, metalness 0,
+  envMapIntensity 0` so the "black amount" slider reads as a TRUE deep black at 100.
+- **Guard housing** (`orange housijng`) metalness 0.7 / rough 0.32; **hinge metal** 1.0/0.18;
+  **legend_box** unlit `#dfe6f0`.
+
+### 10f. Agents — size-based parts + independent darkness (the APU lesson)
+- **Identify cap vs surround by SIZE, not proximity** (cap = the SMALLER cube;
+  surround = larger). Proximity-to-legend detection is fragile and flips when a part
+  is repositioned — size is stable. The surround sits just behind the cap and peeks
+  out as the border.
+- The dev editor exposes **independent black-amount** for ENGINE agents vs the APU
+  agent (each: Button-cap + Around-it), with **number-entry boxes** beside sliders.
+  IMPORTANT: define slider rows as **inline function calls** (`{row(...)}`), NOT as
+  components used via `<Row/>` — inline-defined components remount on every change and
+  make the slider jump/stick.
+
+### 10g. THE APU FIX — when one repeated control is misplaced in the model
+Symptom: APU agent's cap rendered ~0.05 BEHIND its surround (authored that way), so
+only the surround showed and "around it" painted the whole face. Fix done **headlessly
+in Blender** (`/Applications/Blender.app/.../Blender --background --python script.py`):
+import the GLB, **move the offending object forward** (`obj.location.z += 0.052`),
+re-export GLB. Then make detection size-based (10f). Repro:
+`blender/fire_test/move_apu_cap_forward.py`.
+- **NEVER bake ROTATION on export** — it destroys the guards (they rely on the authored
+  open-pose node rotation; see §0.5). `transform_apply(scale=True)` or a pure object
+  MOVE is safe; rotation/location bakes are not.
+- Round-trip preserves legends/text/materials **only if material names are unchanged**.
+- three.js and Blender resolved that node's depth ~0.05 differently — **moving the
+  object is reliable; transform-baking is not needed and is risky.**
+
+### 10h. Lighting rig (the "not plastic" look)
+`ambientLight 0.18 #9fb0c4` + `directionalLight [2.6,3.2,4.5] 2.8 #fff` +
+`directionalLight [-2.4,1.0,3.0] 1.1 #cfe0ff` + HDRI `braustuble_alley_2k.hdr`
+(`environmentIntensity 1.5`, fixed). Camera `fov 28`, framing fits the bbox of the
+FACE mesh; `dpr [1,2]`, `antialias`, `outputColorSpace sRGB`.
+
+### 10i. Colours are RUNTIME, not baked in the GLB
+All tunable colours/finish are applied by the component at runtime (baked as code
+defaults + a dev editor persisting to localStorage `fireAgentBlack.v1` /
+`firePanelByTone.v1`). So re-importing a fixed GLB keeps every colour — provided the
+material names survive. When the user gives final slider values, bake them into the
+material construction + the dev-page defaults (don't leave them browser-only).
+
+> **Bringing a NEW panel to "final like this":** copy the FINAL component, keep §10a–10h
+> treatments, swap the GLB + face PNG + material-name map + section/agent counts, then
+> tune in the dev editor and bake. The recipe is panel-agnostic.
