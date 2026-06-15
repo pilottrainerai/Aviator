@@ -528,6 +528,9 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     // so the slider changes the panel ONLY. One-time per material set (ref-guarded).
     if (!envBoundRef.current && frameScene.environment) {
       panelMats.forEach((m) => { m.envMap = frameScene.environment; m.envMapIntensity = envIntensity ?? 1.0; m.needsUpdate = true; });
+      // Agent caps/surrounds: bind env map + intensity 0 so the HDRI can't haze the
+      // black (envMapIntensity is otherwise ignored without an own envMap → grey sheen).
+      agentMats.forEach((m) => { m.envMap = frameScene.environment; m.envMapIntensity = 0; m.needsUpdate = true; });
       envBoundRef.current = true;
     }
     const squibHex = squibColor ?? "#ffffff";
@@ -670,6 +673,15 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     const mats: THREE.MeshStandardMaterial[] = [];
     root.traverse((o) => {
       if (o instanceof THREE.Mesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.name === "Blue base" || m.name === "DECALS") mats.push(m as THREE.MeshStandardMaterial); });
+    });
+    return mats;
+  }, [root]);
+  // Agent cap/surround ("black button") materials — env map bound to them too (with
+  // envMapIntensity 0) so they don't pick up the HDRI as a grey/white haze and read TRUE black.
+  const agentMats = useMemo(() => {
+    const mats: THREE.MeshStandardMaterial[] = [];
+    root.traverse((o) => {
+      if (o instanceof THREE.Mesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.name === "black button") mats.push(m as THREE.MeshStandardMaterial); });
     });
     return mats;
   }, [root]);
