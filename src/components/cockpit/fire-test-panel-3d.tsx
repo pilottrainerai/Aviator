@@ -185,7 +185,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   const {
     fireDetected, resetSignal, onState, onClickDetected,
     firePopOut, fireAsmRadius, agentShrink, agentCapLight, agentAsmLight, agentCapColor, agentAsmColor,
-    panelColor, panelRoughness, panelMetalness, panelClearcoat, toneMapping,
+    panelColor, panelRoughness, panelMetalness, panelClearcoat, envIntensity, toneMapping,
     guardClosedDeg, guardOpenDeg, squibColor, squibLight, dischColor, dischLight, pressOverride,
     controlled, firePbDone, agent1Disch, agent2Disch,
     onPushFirePb, onPushAgent1, onPushAgent2, framing, panX, panY, zoom,
@@ -197,9 +197,51 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   faceTex.colorSpace = THREE.SRGBColorSpace;
   faceTex.anisotropy = 8;
 
+  // ── Front-face FINISH MASK ─────────────────────────────────────────────────
+  // The baked face texture carries BOTH the blue panel AND the white/dark text
+  // (ENG/AGENT/TEST/FIRE). Material finish is per-mesh, so cranking metalness or
+  // clearcoat would otherwise turn the LETTERING into a tinted mirror and shift
+  // its colour. We classify each texel: blue-ish = PANEL, everything else (white
+  // text, dark markings, screws) = TEXT, and feed that as metalnessMap + clearcoat
+  // Map. Result: finish lands ONLY on the blue panel; the text stays a flat matte
+  // decal (its baked colour, no reflection, no coat). G channel = 1 (roughness no-op).
+  const faceMask = useMemo(() => {
+    const img = faceTex.image as (HTMLImageElement | HTMLCanvasElement | ImageBitmap) | undefined;
+    const w = (img as { width?: number })?.width ?? 0;
+    const h = (img as { height?: number })?.height ?? 0;
+    if (!img || !w || !h) return null;
+    try {
+      const cnv = document.createElement("canvas");
+      cnv.width = w; cnv.height = h;
+      const ctx = cnv.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(img as CanvasImageSource, 0, 0);
+      const data = ctx.getImageData(0, 0, w, h);
+      const d = data.data;
+      for (let p = 0; p < d.length; p += 4) {
+        const r = d[p], b = d[p + 2];
+        const isPanel = b - r > 12 && b > 60; // blue-dominant field = panel
+        const v = isPanel ? 255 : 0;
+        d[p] = v;        // R → clearcoatMap (clearcoat only on panel)
+        d[p + 1] = 255;  // G → roughnessMap (multiplier 1 = leave roughness to the scalar)
+        d[p + 2] = v;    // B → metalnessMap (metalness only on panel)
+        d[p + 3] = 255;
+      }
+      ctx.putImageData(data, 0, 0);
+      const tex = new THREE.CanvasTexture(cnv);
+      tex.flipY = false;
+      tex.colorSpace = THREE.NoColorSpace; // data map, not colour
+      tex.needsUpdate = true;
+      return tex;
+    } catch { return null; }
+  }, [faceTex]);
+
   const pressRef = useRef<Record<string, number>>({});
   const dischSeenRef = useRef<Set<string>>(new Set());
   const pbWallRef = useRef<(number | null)[]>([null, null, null]);
+  // Whether the panel materials have had the scene's environment map bound to
+  // them (so their per-material envMapIntensity is honoured — see useFrame).
+  const envBoundRef = useRef(false);
 
   // Per-section drill state held in a REF (source of truth) so a click reads the
   // CURRENT state synchronously — a rapid guard→pb→agent sequence in the same tick
@@ -242,9 +284,16 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       if (/cut$/i.test(obj.name)) { drop.push(obj); return; }
       const remap = (m: THREE.Material) => {
         if (m.name === "DECALS") {
-          // FRONT face — lit so the panel editor's finish controls actually affect
-          // it (this is the surface the user sees, not the Blue-base body/edges).
-          const std = new THREE.MeshStandardMaterial({ map: faceTex, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.1 });
+          // FRONT face — lit so the panel editor's finish controls affect it (this
+          // is the surface the user sees). Physical material so CLEARCOAT works, and
+          // metalness/clearcoat are MASKED by faceMask so they hit only the blue
+          // panel, never the baked text.
+          const std = new THREE.MeshPhysicalMaterial({
+            map: faceTex, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.1,
+            clearcoat: 0, clearcoatRoughness: 0.2,
+            metalnessMap: faceMask ?? undefined,
+            clearcoatMap: faceMask ?? undefined,
+          });
           std.name = "DECALS";
           return std;
         }
@@ -316,7 +365,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       if (o instanceof THREE.Mesh && matNames(o).has("legend_box")) o.renderOrder = 29;
     });
     return clone;
-  }, [scene, faceTex]);
+  }, [scene, faceTex, faceMask]);
 
   // ── Build the 3 sections by MATERIAL + POSITION. ──
   const sections = useMemo<Section[]>(() => {
@@ -444,7 +493,15 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   const guardClosedRot = useMemo(() => ((guardClosedDeg ?? 0) * Math.PI) / 180, [guardClosedDeg]);
   const guardOpenOverride = useMemo(() => (guardOpenDeg != null ? (guardOpenDeg * Math.PI) / 180 : null), [guardOpenDeg]);
 
-  useFrame(() => {
+  useFrame(({ scene: frameScene }) => {
+    // Bind the scene environment map onto the PANEL materials once it's loaded, so
+    // their per-material envMapIntensity (the Reflections slider) is honoured. Other
+    // parts keep envMap=null → they reflect via scene.environmentIntensity (fixed),
+    // so the slider changes the panel ONLY. One-time per material set (ref-guarded).
+    if (!envBoundRef.current && frameScene.environment) {
+      panelMats.forEach((m) => { m.envMap = frameScene.environment; m.envMapIntensity = envIntensity ?? 1.2; m.needsUpdate = true; });
+      envBoundRef.current = true;
+    }
     const squibHex = squibColor ?? "#ffffff";
     const dischHex = dischColor ?? "#ff9f00";
     const squibInt = squibLight ?? 6.0;
@@ -579,6 +636,8 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     });
     return mats;
   }, [root]);
+  // New material set (model/mask rebuild) → re-bind the env map next frame.
+  useEffect(() => { envBoundRef.current = false; }, [panelMats]);
   useEffect(() => {
     panelMats.forEach((m) => {
       // Colour tints the FRONT face (DECALS) over its texture (default white = no
@@ -587,9 +646,13 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       if (panelRoughness != null && "roughness" in m) m.roughness = panelRoughness;
       if (panelMetalness != null && "metalness" in m) m.metalness = panelMetalness;
       if (panelClearcoat != null && "clearcoat" in m) (m as THREE.MeshPhysicalMaterial).clearcoat = panelClearcoat;
+      // Reflections drive envMapIntensity PER PANEL MATERIAL (not the global
+      // environment) so the FIRE pbs / hinges / agents keep their own reflection
+      // and only the panel changes.
+      if (envIntensity != null && "envMapIntensity" in m) m.envMapIntensity = envIntensity;
       m.needsUpdate = true;
     });
-  }, [panelMats, panelColor, panelRoughness, panelMetalness, panelClearcoat]);
+  }, [panelMats, panelColor, panelRoughness, panelMetalness, panelClearcoat, envIntensity]);
 
   // ── Renderer tone mapping (live; recompiles materials) ──
   useEffect(() => {
@@ -691,7 +754,10 @@ export function FireTestPanel3D(props: FireTestPanel3DProps) {
       <directionalLight position={[2.6, 3.2, 4.5]} intensity={2.8} color="#ffffff" />
       <directionalLight position={[-2.4, 1.0, 3.0]} intensity={1.1} color="#cfe0ff" />
       <Suspense fallback={null}>
-        <Environment files={HDRI_URL} environmentIntensity={props.envIntensity ?? 1.5} />
+        {/* Global environment is FIXED — the Reflections slider now drives
+            envMapIntensity on the panel materials only (see panelMats effect), so
+            the FIRE pbs and other parts keep a constant reflection. */}
+        <Environment files={HDRI_URL} environmentIntensity={1.5} />
         <FireTestPanelScene {...props} />
       </Suspense>
       {/* Free orbit only on the standalone dev page. In controlled (scenario) mode

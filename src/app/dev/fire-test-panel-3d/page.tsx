@@ -65,7 +65,7 @@ export default function FireTestPanel3DDevPage() {
     <main style={{ position: "fixed", inset: 0, background: "#05070a", overflow: "hidden" }}>
       <FireTestPanel3D fireDetected={fireDetected} resetSignal={resetSignal}
         agentCapColor={capHex} agentAsmColor={aroundHex}
-        panelColor={cur.color} panelRoughness={cur.roughness} panelMetalness={cur.metalness}
+        panelRoughness={cur.roughness} panelMetalness={cur.metalness}
         panelClearcoat={cur.clearcoat} envIntensity={cur.env} toneMapping={tone} />
 
       <button type="button" onClick={() => (fireDetected ? reset() : setFireDetected(true))}
@@ -92,9 +92,9 @@ export default function FireTestPanel3DDevPage() {
           </select>
         </div>
         <Slider label="Roughness" k="roughness" min={0} max={1} step={0.02} />
-        <Slider label="Metalness" k="metalness" min={0} max={1} step={0.02} />
+        <Slider label="Metalness" k="metalness" min={0} max={3} step={0.02} />
         <Slider label="Clearcoat" k="clearcoat" min={0} max={1} step={0.02} />
-        <Slider label="Reflections" k="env" min={0} max={3} step={0.05} />
+        <Slider label="Reflections" k="env" min={0} max={6} step={0.05} />
         <span style={{ color: "#7c8696", fontSize: 10 }}>saved per tone-map ({tone})</span>
         <button type="button" style={btn} onClick={() => { const n = { ...byTone, [tone]: toneDef() }; setByTone(n); savePanel(n, tone); }}>Reset {tone}</button>
       </div>
