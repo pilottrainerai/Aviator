@@ -11,11 +11,12 @@ import { EngineFireScenarioPanel } from "@/components/cockpit/engine-fire-panel-
 import { FirePanel3D } from "@/components/cockpit/fire-panel-3d";
 import { FireTestPanel3D } from "@/components/cockpit/fire-test-panel-3d";
 
-// ── Dev-only swap to the new (3-section) FireTestPanel3D ─────────────────────
-// Under `next dev` we render the new panel + on-screen size controls so the fit
-// inside the scenario can be dialed in. A production build keeps the legacy
-// FirePanel3D untouched until we promote the new one explicitly.
-const USE_NEW_FIRE_PANEL = process.env.NODE_ENV !== "production";
+// ── New (3-section) FireTestPanel3D ──────────────────────────────────────────
+// PROMOTED 2026-06-15: the FINAL panel (tag fire-panel-FINAL-2026-06-15) now renders
+// in production too, replacing the legacy FirePanel3D in the scenario.
+const USE_NEW_FIRE_PANEL = true;
+// The on-screen layout/edit tooling stays DEV-ONLY — trainees never see or trigger it.
+const SHOW_LAYOUT_EDITOR = process.env.NODE_ENV !== "production";
 // Dev layout editor: every action-panel element is a freely movable + scalable
 // frame, positioned in viewport coords and persisted per-element in localStorage.
 // Lets the whole action panel be laid out by hand (inside OR outside its column).
@@ -1814,6 +1815,9 @@ function DslControlPanel({
   const [editMode, setEditMode] = useState(true);
   useEffect(() => { try { const v = window.localStorage.getItem("fireDevEdit"); if (v != null) setEditMode(v === "1"); } catch { /* ignore */ } }, []);
   const toggleEdit = () => setEditMode((p) => { const n = !p; try { window.localStorage.setItem("fireDevEdit", n ? "1" : "0"); } catch { /* ignore */ } return n; });
+  // Edit only takes effect where the dev editor is available — never in production
+  // (so a stale localStorage `fireDevEdit=1` can't leave the panel popped/editable for trainees).
+  const edit = SHOW_LAYOUT_EDITOR && editMode;
 
   // Deterministic view of the 3D model within its (fixed) frame: pan x/y + zoom.
   // Drag the body to pan (move the whole panel left/right/up/down), wheel to zoom.
@@ -1846,7 +1850,7 @@ function DslControlPanel({
   }, [retractTrigger]);
   // Edit mode keeps it popped so the layout can be arranged anytime. With edit
   // off it follows the real trigger: pop on ECAM ACTIONS, retract 3 s after agent 2.
-  const popped = USE_NEW_FIRE_PANEL && (editMode || (ecamActionsStarted && !retracted));
+  const popped = USE_NEW_FIRE_PANEL && (edit || (ecamActionsStarted && !retracted));
 
   // Export the current arrangement (every element's box + the 3D view) as JSON so
   // it can be baked in as the default layout.
@@ -1869,7 +1873,7 @@ function DslControlPanel({
     <div style={{ borderTop: "1px solid #1C2130", backgroundColor: warningActive ? "#060A12" : "#050709", padding: "6px 10px 8px" }}>
       {/* Dev-only layout editor. Each action-panel element is a movable/resizable
           frame (see DevMovable) when edit mode is on; positions persist per element. */}
-      {USE_NEW_FIRE_PANEL && (
+      {SHOW_LAYOUT_EDITOR && (
         <div style={{
           position: "fixed", bottom: 12, left: 12, zIndex: 60,
           display: "flex", alignItems: "center", gap: 10,
@@ -1975,17 +1979,17 @@ function DslControlPanel({
           // One combined ACTION PANEL frame (moves/resizes/pops as a unit) holding
           // the 3D fire panel + thrust levers + master, each nudgeable inside it.
           return (
-            <DevMovable id="combo_outer" label="ACTION PANEL" fill container editMode={editMode} popDelay={0} def={COMBO_OUTER}>
+            <DevMovable id="combo_outer" label="ACTION PANEL" fill container editMode={edit} popDelay={0} def={COMBO_OUTER}>
               {/* Shared container surface so the three items read as ONE panel/box. */}
               <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(180deg,#0c121b,#070b11)", border: "1px solid #283140", borderRadius: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 30px rgba(0,0,0,0.5)" }} />
               {firePbCtrl && (
-                <DevMovable id="combo_panel3d" label="3D FIRE PANEL" fill relative editMode={editMode}
+                <DevMovable id="combo_panel3d" label="3D FIRE PANEL" fill relative editMode={edit}
                   onBodyDrag={onPanDrag} onBodyDragEnd={persistView} onWheel={onZoom} def={COMBO_INNER.panel3d}>
                   <div style={{ position: "absolute", inset: 0, background: "transparent" }}>{panel3d}</div>
                 </DevMovable>
               )}
               {sideControls.map((ctrl, i) => (
-                <DevMovable key={ctrl.stepId} id={`combo_${ctrl.stepId}`} label={(ctrl.label || ctrl.kind).toUpperCase()} relative editMode={editMode}
+                <DevMovable key={ctrl.stepId} id={`combo_${ctrl.stepId}`} label={(ctrl.label || ctrl.kind).toUpperCase()} relative editMode={edit}
                   def={COMBO_INNER[ctrl.stepId] ?? { x: 6 + i * 156, y: 24, w: 150, h: 360 }}>
                   <div style={{ padding: 8 }}>{renderCtrl(ctrl)}</div>
                 </DevMovable>

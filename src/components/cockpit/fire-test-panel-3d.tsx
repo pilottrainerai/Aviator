@@ -626,7 +626,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       s.agents.forEach((a, j) => { if (a.cap) consider(a.cap.getWorldPosition(new THREE.Vector3()), "agent", i, j); });
     });
     if (!best) { onClickDetected?.("click but no control found"); return; }
-    const { kind, i, j, dist } = best;
+    const { kind, i, j, dist } = best as { kind: "guardpb" | "agent"; i: number; j: number; dist: number };
     onClickDetected?.(`${SECTION_KEYS[i]} ${kind}${kind === "agent" ? j : ""} d=${dist.toFixed(2)}`);
     if (dist > 0.45) return; // clicked away from every control
     if (kind === "guardpb") {
