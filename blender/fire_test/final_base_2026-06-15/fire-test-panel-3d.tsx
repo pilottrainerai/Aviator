@@ -43,7 +43,8 @@ const PRESS_DARKEN = 0.55;
 const PRESS_ATTACK_MS = 130;
 const PRESS_HOLD_MS = 60;
 const PRESS_RELEASE_MS = 400;
-const AGENT_CAP_COLOR = new THREE.Color("#070a0e"); // near-black default (matches the dark canvas) — used when no agent colour props are passed, e.g. the scenario
+const AGENT_CAP_COLOR = new THREE.Color("#070a0e"); // near-black default for the CAP face (matches the dark canvas) — used when no agent colour props are passed, e.g. the scenario
+const AGENT_SURROUND_COLOR = new THREE.Color("#222730"); // original border/surround tone — kept distinct from the black cap so the frame stays visible
 const LEGEND_OFF = "#8b95a3"; // unlit legend at rest — readable (was too dim at #41464d)
 // Guard OPEN angle as a DELTA from its closed rest (≈ −140° about local X). ENG1's
 // guard happened to be authored at this open pose, but APU/ENG2 are authored CLOSED
@@ -595,11 +596,14 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       });
     });
 
-    if (agentAsmColor || agentAsmColorApu || agentCapColorApu || agentAsmLight != null) {
+    {
+      // Surround/border ALWAYS gets a colour. With no props (the scenario) it defaults
+      // to AGENT_SURROUND_COLOR — the original frame tone — so the border keeps its look
+      // while only the cap goes near-black. The dev page passes its own values.
       const mk = (c?: string) =>
         c ? new THREE.Color(c)
         : agentAsmLight != null ? new THREE.Color().setHSL(0.58, 0.1, Math.max(0, Math.min(1, agentAsmLight / 100)))
-        : null;
+        : AGENT_SURROUND_COLOR;
       const asmEng = mk(agentAsmColor);
       const asmApu = mk(agentAsmColorApu ?? agentAsmColor); // APU surround, its own colour
       agentHousings.forEach((h) => {
