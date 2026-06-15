@@ -10,11 +10,16 @@ import { evalSysCase, SYS_COLORS } from "@/components/cockpit/system-display";
 import { EngineFireScenarioPanel } from "@/components/cockpit/engine-fire-panel-scenario";
 import { FirePanel3D } from "@/components/cockpit/fire-panel-3d";
 import { FireTestPanel3D } from "@/components/cockpit/fire-test-panel-3d";
+import { EngStartPanel3D, ENG_TUNE_DEFAULT, type EngTune } from "@/components/cockpit/eng-start-panel-3d";
 
 // ── New (3-section) FireTestPanel3D ──────────────────────────────────────────
 // PROMOTED 2026-06-15: the FINAL panel (tag fire-panel-FINAL-2026-06-15) now renders
 // in production too, replacing the legacy FirePanel3D in the scenario.
 const USE_NEW_FIRE_PANEL = true;
+// ENG START pedestal panel (3D) — mounted alongside the fire panel and wired to the
+// SAME live state: its FIRE pushbutton lights while the engine fire is present, and
+// ENG MASTER reflects/drives the eng1_master_off step. Position/size is dev-editable.
+const USE_ENG_START_PANEL = true;
 // The on-screen layout/edit tooling stays DEV-ONLY — trainees never see or trigger it.
 const SHOW_LAYOUT_EDITOR = process.env.NODE_ENV !== "production";
 // Dev layout editor: every action-panel element is a freely movable + scalable
@@ -197,6 +202,9 @@ const COMBO_INNER: Record<string, DevBox> = {
   thr_lever_idle:  { x: 6,   y: 24, w: 150,  h: 360 },
   eng1_master_off: { x: 162, y: 24, w: 116,  h: 360 },
 };
+// ENG START pedestal panel — its own floating frame (dev-movable). Default sits
+// below the action panel; the user readjusts size/position in dev mode.
+const ENG_START_BOX: DevBox = { x: 380, y: 540, w: 760, h: 380 };
 
 // ─── CSS keyframes (AGENT arming pulse, TEST pulse) ─────────────────────────
 // Injected once via <style> in the panel root.
@@ -1837,6 +1845,31 @@ function DslControlPanel({
     });
   };
 
+  // ── ENG START panel (3D): live colour/lighting TUNE + pan/zoom VIEW, both
+  // dev-editable and persisted. The cockpit lighting differs from the dev sandbox,
+  // so the parts editor lets the look be re-tuned here.
+  const [engTune, setEngTune] = useState<EngTune>(ENG_TUNE_DEFAULT);
+  useEffect(() => { try { const v = window.localStorage.getItem("engStartTune.v1"); if (v) setEngTune({ ...ENG_TUNE_DEFAULT, ...JSON.parse(v) }); } catch { /* ignore */ } }, []);
+  const setEng = (grp: keyof EngTune, key: string | null, val: number | string) =>
+    setEngTune((t) => { const n = (key == null ? { ...t, [grp]: val } : { ...t, [grp]: { ...(t[grp] as object), [key]: val } }) as EngTune;
+      try { window.localStorage.setItem("engStartTune.v1", JSON.stringify(n)); } catch { /* ignore */ } return n; });
+  const [engView, setEngView] = useState({ x: 0, y: 0, zoom: 1 });
+  useEffect(() => { try { const r = window.localStorage.getItem("engStart3dView.v1"); if (r) setEngView({ x: 0, y: 0, zoom: 1, ...JSON.parse(r) }); } catch { /* ignore */ } }, []);
+  const engViewRef = useRef(engView); engViewRef.current = engView;
+  const persistEngView = () => { try { window.localStorage.setItem("engStart3dView.v1", JSON.stringify(engViewRef.current)); } catch { /* ignore */ } };
+  const onEngPan = (ndx: number, ndy: number) => setEngView((v) => ({ ...v, x: v.x + ndx * 600, y: v.y + ndy * 600 }));
+  const onEngZoom = (e: React.WheelEvent) => { e.preventDefault(); const f = e.deltaY < 0 ? 1.08 : 0.92;
+    setEngView((v) => { const n = { ...v, zoom: Math.max(0.3, Math.min(4, v.zoom * f)) }; try { window.localStorage.setItem("engStart3dView.v1", JSON.stringify(n)); } catch { /* ignore */ } return n; }); };
+  const engRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6 };
+  const engNum = (label: string, grp: keyof EngTune, key: string | null, min: number, max: number, step: number) => {
+    const cur = key ? (engTune[grp] as Record<string, number>)[key] : (engTune[grp] as unknown as number);
+    return (<label key={`${grp}.${key ?? "v"}`} style={engRow}><span style={{ width: 78 }}>{label}</span>
+      <input type="range" min={min} max={max} step={step} value={cur} onChange={(e) => setEng(grp, key, Number(e.target.value))} style={{ flex: 1 }} /></label>);
+  };
+  const engColor = (label: string, grp: keyof EngTune, key: string | null, val: string) => (
+    <label key={`${grp}.col`} style={engRow}><span style={{ width: 78 }}>{label}</span>
+      <input type="color" value={val} onChange={(e) => setEng(grp, key, e.target.value)} style={{ flex: 1, height: 20, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} /></label>);
+
   // Pop-out lifecycle: the action panel rises out once the PF commands ECAM ACTIONS
   // at 400 ft (step `four_hundred_ft_cmd`), and retracts 3 s after AGENT 2 is
   // discharged (or the fire is extinguished, for the agent-1-only path).
@@ -1919,7 +1952,9 @@ function DslControlPanel({
           perform({ kind: "STEP", stepId: id });
         };
 
-        const sideControls = controls.filter(c => c.kind !== "fire_pb" && c.kind !== "agent");
+        // The ENG MASTER now lives on the 3D ENG START panel, so drop the old 2D
+        // master control from the side controls (the eng1_master_off step is unchanged).
+        const sideControls = controls.filter(c => c.kind !== "fire_pb" && c.kind !== "agent" && c.kind !== "master");
 
         const fp3dFireDetected = fireLit;
         const fp3dFirePbDone   = isDone(firePbCtrl?.stepId ?? "");
@@ -1972,6 +2007,64 @@ function DslControlPanel({
           />
         );
 
+        // ENG START pedestal panel — its own dev-movable frame (always visible: part
+        // of the starting layout). Shares the fire panel's live state: the FIRE legend
+        // glows red while the fire is present; ENG MASTER reflects/drives the
+        // eng1_master_off step (pilot-selected only, forward = ON, back = OFF). In dev
+        // mode: drag body to pan, wheel to zoom, bar to move, edges to resize, plus the
+        // PARTS editor to re-tune colours/lighting for the cockpit environment.
+        const engStartSection = USE_ENG_START_PANEL ? (
+          <>
+            <DevMovable id="engstart_panel" label="ENG START" fill editMode={edit}
+              onBodyDrag={onEngPan} onBodyDragEnd={persistEngView} onWheel={onEngZoom} def={ENG_START_BOX}>
+              <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+                <div style={{ position: "absolute", inset: 0, transformOrigin: "center center",
+                  transform: `translate(${engView.x}px, ${engView.y}px) scale(${engView.zoom})` }}>
+                  <EngStartPanel3D
+                    tune={engTune}
+                    fires={[fp3dFireDetected, false]}
+                    masters={[!isDone("eng1_master_off"), false]}
+                    mode={1}
+                    onToggleMaster={(i) => { if (i === 0) performStep("eng1_master_off"); }}
+                    onCycleMode={() => {}}
+                  />
+                </div>
+              </div>
+            </DevMovable>
+            {edit && (
+              <div style={{ position: "fixed", top: 56, left: 12, zIndex: 60, width: 232, maxHeight: "84vh", overflowY: "auto",
+                display: "flex", flexDirection: "column", gap: 4, padding: "10px 12px", borderRadius: 9, background: "rgba(10,14,20,0.95)",
+                border: "1px solid #2a313b", fontFamily: "monospace", fontSize: 11, color: "#cdd6e0" }}>
+                <div style={{ letterSpacing: 1, color: "#dfe6f0", fontWeight: 700 }}>ENG START · PARTS</div>
+                <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 4 }}>PANEL (blue base)</div>
+                {engNum("Roughness", "panel", "roughness", 0, 1, 0.02)}
+                {engNum("Metalness", "panel", "metalness", 0, 3, 0.02)}
+                {engNum("Clearcoat", "panel", "clearcoat", 0, 1, 0.02)}
+                {engNum("Reflections", "panel", "env", 0, 6, 0.05)}
+                <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 4 }}>MASTER / KNOBS (metal)</div>
+                {engColor("Colour", "knob", "color", engTune.knob.color)}
+                {engNum("Roughness", "knob", "roughness", 0, 1, 0.02)}
+                {engNum("Metalness", "knob", "metalness", 0, 1, 0.02)}
+                {engNum("Reflections", "knob", "env", 0, 4, 0.05)}
+                <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 4 }}>BUTTONS (black)</div>
+                {engNum("Blackness", "buttonBlack", null, 0, 100, 1)}
+                <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 4 }}>CENTRE (mode knob)</div>
+                {engColor("Colour", "center", "color", engTune.center.color)}
+                {engNum("Roughness", "center", "roughness", 0, 1, 0.02)}
+                {engNum("Metalness", "center", "metalness", 0, 1, 0.02)}
+                <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 4 }}>DECALS</div>
+                {engColor("Colour", "decalColor", null, engTune.decalColor)}
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <button type="button" onClick={() => { setEngTune(ENG_TUNE_DEFAULT); try { window.localStorage.setItem("engStartTune.v1", JSON.stringify(ENG_TUNE_DEFAULT)); } catch { /* ignore */ } }}
+                    style={{ flex: 1, padding: "4px 6px", fontSize: 10, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>Reset look</button>
+                  <button type="button" onClick={() => { setEngView({ x: 0, y: 0, zoom: 1 }); try { window.localStorage.setItem("engStart3dView.v1", JSON.stringify({ x: 0, y: 0, zoom: 1 })); } catch { /* ignore */ } }}
+                    style={{ flex: 1, padding: "4px 6px", fontSize: 10, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>Reset view</button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : null;
+
         // NEW PANEL: the action panel POPS OUT (rises) into the saved/baked floating
         // layout once the PF commands ECAM ACTIONS at 400 ft, and retracts 3 s after
         // AGENT 2 / fire out (see `popped`). Otherwise it stays inline in the column.
@@ -1979,6 +2072,7 @@ function DslControlPanel({
           // One combined ACTION PANEL frame (moves/resizes/pops as a unit) holding
           // the 3D fire panel + thrust levers + master, each nudgeable inside it.
           return (
+            <>
             <DevMovable id="combo_outer" label="ACTION PANEL" fill container editMode={edit} popDelay={0} def={COMBO_OUTER}>
               {/* Shared container surface so the three items read as ONE panel/box. */}
               <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(180deg,#0c121b,#070b11)", border: "1px solid #283140", borderRadius: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 30px rgba(0,0,0,0.5)" }} />
@@ -1995,12 +2089,15 @@ function DslControlPanel({
                 </DevMovable>
               ))}
             </DevMovable>
+            {engStartSection}
+            </>
           );
         }
 
         // INLINE: idle (action not yet started) and production — the panels stay in
-        // the action panel column.
+        // the action panel column. The ENG START panel renders alongside (starting layout).
         return (
+          <>
           <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
             <div style={{ flex: "0 0 38%", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
               {sideControls.map((ctrl) => <div key={ctrl.stepId}>{renderCtrl(ctrl)}</div>)}
@@ -2011,6 +2108,8 @@ function DslControlPanel({
               </div>
             )}
           </div>
+          {engStartSection}
+          </>
         );
       })()}
 
