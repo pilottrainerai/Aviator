@@ -441,7 +441,13 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
       const agents: Agent[] = [];
       myBoxes.forEach((box, j) => {
         const bp = wpos(box);
-        const cap = caps.slice().sort((a, b) => wpos(a).distanceTo(bp) - wpos(b).distanceTo(bp))[0];
+        // CAP = the SMALLER of the two black-button cubes by this legend (the pressable
+        // face; the surround is larger). Size-based so it's robust to depth (the APU cap
+        // was repositioned in Blender). Fallback to nearest if none cluster here.
+        const maxDim = (o: THREE.Object3D) => { const v = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()); return Math.max(v.x, v.y, v.z); };
+        const cluster = caps.filter((c) => wpos(c).distanceTo(bp) < 0.14);
+        const cap = (cluster.length ? cluster.slice().sort((a, b) => maxDim(a) - maxDim(b))
+          : caps.slice().sort((a, b) => wpos(a).distanceTo(bp) - wpos(b).distanceTo(bp)))[0];
         // two nearest legend texts; higher (more negative z) = SQUIB, lower = DISCH
         const near = texts.map((t) => ({ t, p: wpos(t) })).filter((e) => e.p.distanceTo(bp) < 0.18)
           .sort((a, b) => a.p.z - b.p.z);
@@ -487,10 +493,12 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     root.traverse((o) => { if (o instanceof THREE.Mesh && matNames(o).has("legend_box")) boxes.push(o.getWorldPosition(new THREE.Vector3())); });
     const cubes: { m: THREE.Mesh; p: THREE.Vector3 }[] = [];
     root.traverse((o) => { if (o instanceof THREE.Mesh && matNames(o).has("black button")) cubes.push({ m: o, p: o.getWorldPosition(new THREE.Vector3()) }); });
+    const maxDim = (o: THREE.Mesh) => { const v = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()); return Math.max(v.x, v.y, v.z); };
     const set = new Set<THREE.Mesh>();
     for (const L of boxes) {
-      const near = cubes.filter((c) => c.p.distanceTo(L) < 0.1).sort((a, b) => a.p.distanceTo(L) - b.p.distanceTo(L));
-      near.slice(1).forEach((c) => set.add(c.m));
+      // Surround/housing = the LARGER cube(s) by this legend; the smallest is the cap.
+      const near = cubes.filter((c) => c.p.distanceTo(L) < 0.14).sort((a, b) => maxDim(b.m) - maxDim(a.m));
+      near.slice(0, Math.max(0, near.length - 1)).forEach((c) => set.add(c.m));
     }
     return Array.from(set);
   }, [root]);
@@ -506,11 +514,9 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     return best;
   }, [sections, agentHousings]);
 
-  // APU layering quirk: on the APU agent the SURROUND mesh (apuHousing) is the visible
-  // front face, while its "cap" mesh sits behind it (reverse of the ENG agents). So for
-  // APU "Button cap" drives the visible surround mesh; "Around it" drives the hidden cap
-  // mesh (little visible effect — the model exposes only one APU surface; a true border
-  // would need the APU button rebuilt in Blender like AGENT 1/2).
+  // APU agent: own housing lookup so its surround can be coloured independently of ENG.
+  // (The model was normalised in Blender — node scales baked into geometry — so the APU
+  // cap now sits in front of its surround like AGENT 1/2; no swap needed.)
 
   const guardClosedRot = useMemo(() => ((guardClosedDeg ?? 0) * Math.PI) / 180, [guardClosedDeg]);
   const guardOpenOverride = useMemo(() => (guardOpenDeg != null ? (guardOpenDeg * Math.PI) / 180 : null), [guardOpenDeg]);
@@ -572,11 +578,8 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
           const p = pressOverride ?? pressCurve(elapsed);
           const f = 1 - (agentShrink ?? PRESS_SHRINK) * p;
           a.rig.scale.set(f, 1, f);
-          // APU (section 1) is SWAPPED: its physical cap mesh sits BEHIND the visible
-          // surround, so the cap mesh takes the "Around it" value; the visible surround
-          // (apuHousing) takes the "Button cap" value in the housing pass below. ENG
-          // agents are normal (cap mesh = "Button cap").
-          const capCol = i === 1 ? (agentAsmColorApu ?? agentAsmColor) : agentCapColor;
+          // APU (section 1) has its own cap colour, independent of the ENG agents.
+          const capCol = i === 1 ? (agentCapColorApu ?? agentCapColor) : agentCapColor;
           const capBase = capCol
             ? new THREE.Color(capCol)
             : agentCapLight != null
@@ -595,13 +598,10 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
         : agentAsmLight != null ? new THREE.Color().setHSL(0.58, 0.1, Math.max(0, Math.min(1, agentAsmLight / 100)))
         : null;
       const asmEng = mk(agentAsmColor);
-      // APU's surround mesh is the VISIBLE front face → it takes the "Button cap"
-      // value (swapped; see cap pass above), so dragging "Button cap" for the APU
-      // agent darkens the face the user actually sees.
-      const apuFace = mk(agentCapColorApu ?? agentCapColor);
+      const asmApu = mk(agentAsmColorApu ?? agentAsmColor); // APU surround, its own colour
       agentHousings.forEach((h) => {
         const m = getMat(h) as THREE.MeshStandardMaterial;
-        const c = h === apuHousing ? apuFace : asmEng;
+        const c = h === apuHousing ? asmApu : asmEng;
         if (m.color && c) m.color.copy(c);
       });
     }
