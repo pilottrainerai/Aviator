@@ -43,7 +43,7 @@ const PRESS_DARKEN = 0.55;
 const PRESS_ATTACK_MS = 130;
 const PRESS_HOLD_MS = 60;
 const PRESS_RELEASE_MS = 400;
-const AGENT_CAP_COLOR = new THREE.Color("#222730");
+const AGENT_CAP_COLOR = new THREE.Color("#070a0e"); // near-black default (matches the dark canvas) — used when no agent colour props are passed, e.g. the scenario
 const LEGEND_OFF = "#8b95a3"; // unlit legend at rest — readable (was too dim at #41464d)
 // Guard OPEN angle as a DELTA from its closed rest (≈ −140° about local X). ENG1's
 // guard happened to be authored at this open pose, but APU/ENG2 are authored CLOSED
