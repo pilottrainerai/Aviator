@@ -1,8 +1,10 @@
-# FIRE panel — FINAL BASE (2026-06-15)
+# FIRE panel — BEST BASE (2026-06-15)
 
-The shipped look. This replaces the panel in the Pilot Trainer app. Tag: **`fire-panel-FINAL-2026-06-15`**.
+✅ **User-approved "complete best panel" — this is THE base going forward.** Future work = minor changes on top of this. Tags: **`fire-panel-BEST-2026-06-15`** and **`fire-panel-FINAL-2026-06-15`** (same commit). Live in the Pilot Trainer scenario (promoted to prod).
 
-`REFERENCE_RENDER.png` is the target look (metallic panel, black agents, all 3 sections, guards closed).
+`REFERENCE_RENDER.png` = the target look (standalone). `REFERENCE_RENDER_scenario.png` = how it reads in the scenario. Metallic blue panel · agents true-black face with original border · reduced glare · guards closed.
+
+Also includes `fire-panel.tsx` (the scenario wrapper, USE_NEW_FIRE_PANEL=true).
 
 ## The 5 files that ARE this panel
 | File | Goes to |
