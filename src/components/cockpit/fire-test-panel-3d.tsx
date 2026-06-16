@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { cockpitDpr } from "@/components/cockpit/cockpit-dpr";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import { useGLTF, useTexture, Environment, OrbitControls } from "@react-three/drei";
@@ -248,6 +249,9 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   // Whether the panel materials have had the scene's environment map bound to
   // them (so their per-material envMapIntensity is honoured — see useFrame).
   const envBoundRef = useRef(false);
+  // First frame after (re)building sections: snap guards/pb/screws to their resting
+  // state instead of easing, so nothing animates when the panel first pops out.
+  const settledRef = useRef(false);
 
   // Per-section drill state held in a REF (source of truth) so a click reads the
   // CURRENT state synchronously — a rapid guard→pb→agent sequence in the same tick
@@ -263,6 +267,9 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   // ENG2) stays on drillRef, so the uncontrolled dev path is unchanged.
   const isCtrl = (i: number) => controlled === true && i === 0;
   const effPbDone = (i: number) => (isCtrl(i) ? !!firePbDone : drillRef.current.pbDone[i]);
+  // Guard stays OPEN once the pb is pushed (firePbDone) — derived from the prop in
+  // controlled mode so it survives a remount when the action panel collapses.
+  const effGuardOpen = (i: number) => (isCtrl(i) ? (!!firePbDone || drillRef.current.guardOpen[i]) : drillRef.current.guardOpen[i]);
   const effDisch = (i: number, j: number) =>
     isCtrl(i) ? (j === 0 ? !!agent1Disch : !!agent2Disch) : drillRef.current.disch[i][j];
 
@@ -273,7 +280,11 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     bump();
   };
 
-  useEffect(() => { if (!fireDetected) resetDrill(); }, [fireDetected]);
+  // In CONTROLLED (scenario) mode the fire going out must NOT reset the panel: the
+  // FIRE pb stays OUT (already pushed), the guard stays OPEN, only the light goes off.
+  // The drill only resets on an explicit resetSignal. The dev page (uncontrolled) still
+  // resets when its TEST toggle clears `fireDetected`.
+  useEffect(() => { if (!fireDetected && !controlled) resetDrill(); }, [fireDetected, controlled]);
   useEffect(() => { if (resetSignal) resetDrill(); }, [resetSignal]);
   useEffect(() => {
     const d = drillRef.current;
@@ -543,12 +554,16 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     const popY = firePopOut ?? 0.15;
     const asmR = fireAsmRadius ?? 0.25;
     const d = drillRef.current;
+    // On the first frame after build, snap everything to rest (guard closed, pb seated)
+    // so the panel shows no pop-in motion; ease only on later state changes.
+    const settle = !settledRef.current;
+    settledRef.current = true;
 
     sections.forEach((s, i) => {
       // guard
       if (s.guard) {
-        const target = d.guardOpen[i] ? (guardOpenOverride ?? (guardClosedRot + GUARD_OPEN_DELTA)) : guardClosedRot;
-        s.guard.rotation.x = THREE.MathUtils.lerp(s.guard.rotation.x, target, 0.08);
+        const target = effGuardOpen(i) ? (guardOpenOverride ?? (guardClosedRot + GUARD_OPEN_DELTA)) : guardClosedRot;
+        s.guard.rotation.x = settle ? target : THREE.MathUtils.lerp(s.guard.rotation.x, target, 0.08);
       }
       // FIRE pb: light red on fire; pop out when pushed; carry screws
       if (s.firePbMesh) {
@@ -557,10 +572,10 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
         setMaterialLight(s.firePbMesh, C3.fireRed, fireDetected ? 2.0 : 0);
       }
       const pop = effPbDone(i) ? popY : 0;
-      if (s.firePbGroup) s.firePbGroup.position.y = THREE.MathUtils.lerp(s.firePbGroup.position.y, s.restY + pop, 0.14);
+      if (s.firePbGroup) s.firePbGroup.position.y = settle ? s.restY + pop : THREE.MathUtils.lerp(s.firePbGroup.position.y, s.restY + pop, 0.14);
       for (const sc of s.screws) {
         const t = sc.restY + (sc.dist <= asmR ? pop : 0);
-        sc.mesh.position.y = THREE.MathUtils.lerp(sc.mesh.position.y, t, 0.14);
+        sc.mesh.position.y = settle ? t : THREE.MathUtils.lerp(sc.mesh.position.y, t, 0.14);
       }
 
       // agents: SQUIB white while armed (pb pushed, not yet discharged); DISCH amber once discharged
@@ -691,6 +706,8 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
   }, [root]);
   // New material set (model/mask rebuild) → re-bind the env map next frame.
   useEffect(() => { envBoundRef.current = false; }, [panelMats]);
+  // Sections rebuilt (model rebuild / drill reset) → snap to rest next frame.
+  useEffect(() => { settledRef.current = false; }, [sections]);
   useEffect(() => {
     panelMats.forEach((m) => {
       // Colour tints the FRONT face (DECALS) over its texture (default white = no
@@ -798,7 +815,7 @@ export function FireTestPanel3D(props: FireTestPanel3DProps) {
   if (!mounted) return <div style={{ width: "100%", height: "100%", background: "#070a0e" }} />;
   return (
     <Canvas
-      dpr={[1, 2]}
+      dpr={cockpitDpr()}
       camera={{ fov: 28, near: 0.01, far: 100, position: [0, 0, 4] }}
       gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
       style={{ width: "100%", height: "100%", background: "#05070a" }}

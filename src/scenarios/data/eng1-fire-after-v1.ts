@@ -257,20 +257,17 @@ export const eng1FireAfterV1: Scenario = {
       hardware: true,
       ecamRef: "ecam_agent1",
       afterEffect: {
-        // Base learning path: the fire goes out after the first bottle.
-        // A persistent-fire variant can instead schedule `fire_persists_30s`
-        // to unlock the AGENT 2 branch.
+        // BOTH bottles required: AGENT 1 does NOT put the fire out — the warning
+        // persists, which unlocks the AGENT 2 branch. (The persistent-fire variant
+        // overrides this with a longer 30 s conditional gate.)
         delayMs: 5_000,
-        triggerId: "fire_extinguished",
+        triggerId: "fire_persists_30s",
         effects: [
-          { type: "SET_MASTER_WARN", active: false },
-          { type: "SET_ALARM_LABEL", label: null },
           {
             type: "CLEAR_ECAM",
-            // Clear the primary fire-warning slice once the fire is out.
-            // LAND ASAP and ATC NOTIFY remain until their own training steps
-            // are handled, but the conditional AGENT 2 branch disappears.
-            ids: ["eng1_fire", "ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft", "ecam_if_persist", "ecam_agent2"],
+            // Clear the primary action lines once AGENT 1 is done; keep the ENG 1
+            // FIRE warning + the conditional AGENT 2 branch until the fire is out.
+            ids: ["ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft"],
           },
         ],
       },
@@ -290,16 +287,17 @@ export const eng1FireAfterV1: Scenario = {
       hardware: true,
       ecamRef: "ecam_agent2",
       afterEffect: {
-        // 5 s: bottle discharges, fire dies out, FIRE pb red light goes off,
-        // FIRE light on master panel goes off, ENG ✕ marker clears.
-        // Per FCOM, the AGENT 2 + "IF FIRE WARN AFTER 30 S" + LAND ASAP
-        // ECAM lines clear once the fire is extinguished.
-        delayMs: 5_000,
+        // ~2 s after AGENT 2 (the last bottle) the fire dies: FIRE pb red light off,
+        // MASTER WARN off, ENG ✕ clears. The crew sees the fire-out state (pb still
+        // OUT, guard still OPEN) before the action panel collapses 5 s after AGENT 2.
+        delayMs: 2_000,
         triggerId: "fire_extinguished",
         effects: [
+          { type: "SET_MASTER_WARN", active: false },
+          { type: "SET_ALARM_LABEL", label: null },
           {
             type: "CLEAR_ECAM",
-            ids: ["ecam_agent2", "ecam_if_persist", "land_asap"],
+            ids: ["eng1_fire", "ecam_agent2", "ecam_if_persist", "land_asap"],
           },
         ],
       },
@@ -322,7 +320,7 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["agent1"],
+      requires: ["agent2"],
       requiresTrigger: "fire_extinguished",
     },
 

@@ -38,6 +38,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { cockpitDpr } from "@/components/cockpit/cockpit-dpr";
 import { Canvas, useFrame } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
@@ -439,7 +440,7 @@ export function FirePanel3D(props: FirePanel3DProps) {
 
   return (
     <Canvas
-      dpr={2}
+      dpr={cockpitDpr()}
       camera={{
         fov:      20,
         near:     0.01,

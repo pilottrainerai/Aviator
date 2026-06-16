@@ -1854,15 +1854,15 @@ function DslControlPanel({
     setEngTune((t) => { const n = (key == null ? { ...t, [grp]: val } : { ...t, [grp]: { ...(t[grp] as object), [key]: val } }) as EngTune;
       try { window.localStorage.setItem("engStartTune.v1", JSON.stringify(n)); } catch { /* ignore */ } return n; });
   const [engView, setEngView] = useState({ x: 0, y: 0, zoom: 1 });
-  useEffect(() => { try { const r = window.localStorage.getItem("engStart3dView.v1"); if (r) setEngView({ x: 0, y: 0, zoom: 1, ...JSON.parse(r) }); } catch { /* ignore */ } }, []);
+  useEffect(() => { try { const r = window.localStorage.getItem("engStart3dView.v2"); if (r) setEngView({ x: 0, y: 0, zoom: 1, ...JSON.parse(r) }); } catch { /* ignore */ } }, []);
   const engViewRef = useRef(engView); engViewRef.current = engView;
-  const persistEngView = () => { try { window.localStorage.setItem("engStart3dView.v1", JSON.stringify(engViewRef.current)); } catch { /* ignore */ } };
-  const onEngPan = (ndx: number, ndy: number) => setEngView((v) => ({ ...v, x: v.x + ndx * 600, y: v.y + ndy * 600 }));
+  const persistEngView = () => { try { window.localStorage.setItem("engStart3dView.v2", JSON.stringify(engViewRef.current)); } catch { /* ignore */ } };
+  const onEngPan = (ndx: number, ndy: number) => setEngView((v) => ({ ...v, x: v.x + ndx * 1.5, y: v.y - ndy * 1.5 }));
   const onEngZoom = (e: React.WheelEvent) => { e.preventDefault(); const f = e.deltaY < 0 ? 1.08 : 0.92;
-    setEngView((v) => { const n = { ...v, zoom: Math.max(0.3, Math.min(4, v.zoom * f)) }; try { window.localStorage.setItem("engStart3dView.v1", JSON.stringify(n)); } catch { /* ignore */ } return n; }); };
+    setEngView((v) => { const n = { ...v, zoom: Math.max(0.3, Math.min(4, v.zoom * f)) }; try { window.localStorage.setItem("engStart3dView.v2", JSON.stringify(n)); } catch { /* ignore */ } return n; }); };
   const engRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6 };
   const engNum = (label: string, grp: keyof EngTune, key: string | null, min: number, max: number, step: number) => {
-    const cur = key ? (engTune[grp] as Record<string, number>)[key] : (engTune[grp] as unknown as number);
+    const cur = key ? (engTune[grp] as unknown as Record<string, number>)[key] : (engTune[grp] as unknown as number);
     return (<label key={`${grp}.${key ?? "v"}`} style={engRow}><span style={{ width: 78 }}>{label}</span>
       <input type="range" min={min} max={max} step={step} value={cur} onChange={(e) => setEng(grp, key, Number(e.target.value))} style={{ flex: 1 }} /></label>);
   };
@@ -1870,15 +1870,37 @@ function DslControlPanel({
     <label key={`${grp}.col`} style={engRow}><span style={{ width: 78 }}>{label}</span>
       <input type="color" value={val} onChange={(e) => setEng(grp, key, e.target.value)} style={{ flex: 1, height: 20, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} /></label>);
 
+  // ── AGENT 1 — FCOM 10-second arming. After the FIRE pb is pushed, the crew must
+  // WAIT the ECAM 10 s countdown (N1 decay maximises agent concentration) before
+  // AGENT 1 can be discharged. The countdown used to live on the old 2D agent button;
+  // the 3D panel bypassed it, so it's re-implemented here (gate + on-panel badge).
+  const a1Arming = !!state.completedSteps["eng1_fire_pb"] && !state.completedSteps["agent1"];
+  const [a1ActiveAt, setA1ActiveAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (a1Arming && a1ActiveAt === null) setA1ActiveAt(Date.now());
+    else if (!a1Arming && a1ActiveAt !== null) setA1ActiveAt(null);
+  }, [a1Arming, a1ActiveAt]);
+  const [, a1Tick] = useState(0);
+  useEffect(() => {
+    if (!a1ActiveAt) return;
+    const t = setInterval(() => a1Tick((n) => n + 1), 100);
+    return () => clearInterval(t);
+  }, [a1ActiveAt]);
+  const a1Elapsed = a1ActiveAt ? Date.now() - a1ActiveAt : 0;
+  const a1Armed = !a1ActiveAt || a1Elapsed >= AGENT_ARM_DELAY_MS;
+  const a1CountdownSec = a1ActiveAt && a1Elapsed < AGENT_ARM_DELAY_MS ? Math.max(1, Math.ceil((AGENT_ARM_DELAY_MS - a1Elapsed) / 1000)) : 0;
+
   // Pop-out lifecycle: the action panel rises out once the PF commands ECAM ACTIONS
-  // at 400 ft (step `four_hundred_ft_cmd`), and retracts 3 s after AGENT 2 is
-  // discharged (or the fire is extinguished, for the agent-1-only path).
+  // at 400 ft (step `four_hundred_ft_cmd`). It collapses 5 s AFTER AGENT 2 is
+  // discharged — by then the fire has extinguished (~2 s) so the crew sees the FIRE
+  // light go out with the pb still OUT + guard still OPEN, then it retracts. The
+  // pb/guard keep their actuated state (the 3D panel doesn't reset in controlled mode).
   const ecamActionsStarted = !!state.completedSteps["four_hundred_ft_cmd"];
-  const retractTrigger = !!state.completedSteps["agent2"] || !!state.triggersFired["fire_extinguished"];
+  const retractTrigger = !!state.completedSteps["agent2"];
   const [retracted, setRetracted] = useState(false);
   useEffect(() => {
     if (!retractTrigger) { setRetracted(false); return; }
-    const t = setTimeout(() => setRetracted(true), 3000);
+    const t = setTimeout(() => setRetracted(true), 5000);
     return () => clearTimeout(t);
   }, [retractTrigger]);
   // Edit mode keeps it popped so the layout can be arranged anytime. With edit
@@ -1987,13 +2009,23 @@ function DslControlPanel({
           }
         };
 
+        // FCOM 10-s AGENT 1 arming badge — shown on the action panel while counting down.
+        const agent1Badge = a1CountdownSec > 0 ? (
+          <div style={{ position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", zIndex: 30,
+            padding: "4px 12px", borderRadius: 6, background: "rgba(22,9,4,0.94)", border: "1px solid #b4641e",
+            fontFamily: "monospace", fontWeight: 800, fontSize: 12, letterSpacing: 0.5, color: "#ffb300",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>
+            ⏱ AGENT 1 — DISCH IN {a1CountdownSec}s
+          </div>
+        ) : null;
+
         const panel3d = USE_NEW_FIRE_PANEL ? (
           <FireTestPanel3D
             controlled framing="eng1" panX={view3d.x} panY={view3d.y} zoom={view3d.zoom}
             fireDetected={fp3dFireDetected} firePbDone={fp3dFirePbDone}
             agent1Disch={fp3dAgent1Disch} agent2Disch={fp3dAgent2Disch}
             onPushFirePb={() => performStep(firePbCtrl?.stepId)}
-            onPushAgent1={() => performStep(agent1Ctrl?.stepId)}
+            onPushAgent1={() => { if (a1Armed) performStep(agent1Ctrl?.stepId); }}
             onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
           />
         ) : (
@@ -2002,7 +2034,7 @@ function DslControlPanel({
             agent1Disch={fp3dAgent1Disch} agent2Disch={fp3dAgent2Disch}
             agent2Available={agent2Available} activeStepId={fp3dActiveStepId}
             onPushFirePb={() => performStep(firePbCtrl?.stepId)}
-            onPushAgent1={() => performStep(agent1Ctrl?.stepId)}
+            onPushAgent1={() => { if (a1Armed) performStep(agent1Ctrl?.stepId); }}
             onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
           />
         );
@@ -2018,17 +2050,16 @@ function DslControlPanel({
             <DevMovable id="engstart_panel" label="ENG START" fill editMode={edit}
               onBodyDrag={onEngPan} onBodyDragEnd={persistEngView} onWheel={onEngZoom} def={ENG_START_BOX}>
               <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-                <div style={{ position: "absolute", inset: 0, transformOrigin: "center center",
-                  transform: `translate(${engView.x}px, ${engView.y}px) scale(${engView.zoom})` }}>
-                  <EngStartPanel3D
-                    tune={engTune}
-                    fires={[fp3dFireDetected, false]}
-                    masters={[!isDone("eng1_master_off"), false]}
-                    mode={1}
-                    onToggleMaster={(i) => { if (i === 0) performStep("eng1_master_off"); }}
-                    onCycleMode={() => {}}
-                  />
-                </div>
+                {/* True 3D-camera pan/zoom (stays crisp at any zoom — no CSS scale). */}
+                <EngStartPanel3D
+                  controlled panX={engView.x} panY={engView.y} zoom={engView.zoom}
+                  tune={engTune}
+                  fires={[fp3dFireDetected, false]}
+                  masters={[!isDone("eng1_master_off"), true]}
+                  mode={1}
+                  onToggleMaster={(i) => { if (i === 0) performStep("eng1_master_off"); }}
+                  onCycleMode={() => {}}
+                />
               </div>
             </DevMovable>
             {edit && (
@@ -2037,6 +2068,7 @@ function DslControlPanel({
                 border: "1px solid #2a313b", fontFamily: "monospace", fontSize: 11, color: "#cdd6e0" }}>
                 <div style={{ letterSpacing: 1, color: "#dfe6f0", fontWeight: 700 }}>ENG START · PARTS</div>
                 <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 4 }}>PANEL (blue base)</div>
+                {engColor("Colour", "panel", "color", engTune.panel.color ?? "#456a93")}
                 {engNum("Roughness", "panel", "roughness", 0, 1, 0.02)}
                 {engNum("Metalness", "panel", "metalness", 0, 3, 0.02)}
                 {engNum("Clearcoat", "panel", "clearcoat", 0, 1, 0.02)}
@@ -2057,7 +2089,7 @@ function DslControlPanel({
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                   <button type="button" onClick={() => { setEngTune(ENG_TUNE_DEFAULT); try { window.localStorage.setItem("engStartTune.v1", JSON.stringify(ENG_TUNE_DEFAULT)); } catch { /* ignore */ } }}
                     style={{ flex: 1, padding: "4px 6px", fontSize: 10, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>Reset look</button>
-                  <button type="button" onClick={() => { setEngView({ x: 0, y: 0, zoom: 1 }); try { window.localStorage.setItem("engStart3dView.v1", JSON.stringify({ x: 0, y: 0, zoom: 1 })); } catch { /* ignore */ } }}
+                  <button type="button" onClick={() => { setEngView({ x: 0, y: 0, zoom: 1 }); try { window.localStorage.setItem("engStart3dView.v2", JSON.stringify({ x: 0, y: 0, zoom: 1 })); } catch { /* ignore */ } }}
                     style={{ flex: 1, padding: "4px 6px", fontSize: 10, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>Reset view</button>
                 </div>
               </div>
@@ -2076,6 +2108,7 @@ function DslControlPanel({
             <DevMovable id="combo_outer" label="ACTION PANEL" fill container editMode={edit} popDelay={0} def={COMBO_OUTER}>
               {/* Shared container surface so the three items read as ONE panel/box. */}
               <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(180deg,#0c121b,#070b11)", border: "1px solid #283140", borderRadius: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 30px rgba(0,0,0,0.5)" }} />
+              {agent1Badge}
               {firePbCtrl && (
                 <DevMovable id="combo_panel3d" label="3D FIRE PANEL" fill relative editMode={edit}
                   onBodyDrag={onPanDrag} onBodyDragEnd={persistView} onWheel={onZoom} def={COMBO_INNER.panel3d}>
@@ -2095,9 +2128,10 @@ function DslControlPanel({
         }
 
         // INLINE: idle (action not yet started) and production — the panels stay in
-        // the action panel column. The ENG START panel renders alongside (starting layout).
+        // the action panel column. The ENG START panel is NOT shown here: like the
+        // action panel, it only pops out once the PF commands ECAM ACTIONS (see the
+        // `popped` branch above).
         return (
-          <>
           <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
             <div style={{ flex: "0 0 38%", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
               {sideControls.map((ctrl) => <div key={ctrl.stepId}>{renderCtrl(ctrl)}</div>)}
@@ -2108,8 +2142,6 @@ function DslControlPanel({
               </div>
             )}
           </div>
-          {engStartSection}
-          </>
         );
       })()}
 

@@ -15,12 +15,15 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import { useGLTF, useTexture, Environment, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { cockpitDpr } from "@/components/cockpit/cockpit-dpr";
 
 // ── ENG MASTER switch: the whole cylinder assembly (Cylinder/.001/.002 + cube
 // faces — the ENG-1/ENG-2 square) tilts forward/back about a horizontal hinge at
 // its base: ON = tilted forward (toward viewer), OFF = tilted back. (Per Blender.)
-const MASTER_ON_DEG = 24;
-const MASTER_OFF_DEG = -24;
+// ON = switch points UP toward the ON label (tilts forward/up); OFF = points DOWN
+// toward the OFF label. (Verified against the panel decal labels.)
+const MASTER_ON_DEG = -24;
+const MASTER_OFF_DEG = 24;
 // World-space bands of the two master assemblies (from the geometry dump). The
 // masters sit in the UPPER band (world Y≈0.33); the FIRE buttons (Y≈-0.03) are
 // below and must be excluded.
@@ -50,17 +53,20 @@ const FIRE_RED = "#ff2412";
 
 const MODEL_URL = "/models/eng_start_panel.glb";
 const HDRI_URL = "/hdri/braustuble_alley_2k.hdr";
-const FACE_TEX_URL = "/models/eng_start_face.png";
+// Sharpened decal: the panel labels (MASTER/ON/OFF/MODE/CRANK/IGN-START/ENG/1/2)
+// were thin & soft → dilated to bold solid white for legibility. (Original kept.)
+const FACE_TEX_URL = "/models/eng_start_face_sharp.png";
 
 export interface EngTune {
-  panel: { roughness: number; metalness: number; clearcoat: number; env: number };
+  panel: { color: string; roughness: number; metalness: number; clearcoat: number; env: number };
   knob: { color: string; roughness: number; metalness: number; env: number };
   buttonBlack: number; // 0 = base grey, 100 = black
   center: { color: string; roughness: number; metalness: number };
   decalColor: string;
 }
+const PANEL_BLUE = "#456a93"; // darker base so the white labels read clearly (was #7e9fc6)
 export const ENG_TUNE_DEFAULT: EngTune = {
-  panel: { roughness: 0.6, metalness: 1.5, clearcoat: 0.4, env: 1.0 },
+  panel: { color: PANEL_BLUE, roughness: 0.6, metalness: 1.5, clearcoat: 0.4, env: 1.0 },
   knob: { color: "#8b939d", roughness: 0.4, metalness: 1.0, env: 0.9 }, // defined chrome (not flushed white)
   buttonBlack: 100,
   center: { color: "#181d25", roughness: 0.5, metalness: 0.3 },
@@ -84,14 +90,16 @@ type Groups = {
   decal: THREE.MeshBasicMaterial[];    // air con decals
 };
 
-function EngStartScene({ tune, masters, mode, fires, onToggleMaster, onCycleMode }: {
-  tune: EngTune; masters: boolean[]; mode: number; fires: boolean[]; onToggleMaster: (i: number) => void; onCycleMode: () => void;
+function EngStartScene({ tune, masters, mode, fires, panX, panY, zoom, onToggleMaster, onCycleMode }: {
+  tune: EngTune; masters: boolean[]; mode: number; fires: boolean[];
+  panX: number; panY: number; zoom: number;
+  onToggleMaster: (i: number) => void; onCycleMode: () => void;
 }) {
   const { scene } = useGLTF(MODEL_URL);
   const faceTex = useTexture(FACE_TEX_URL);
   faceTex.flipY = false;
   faceTex.colorSpace = THREE.SRGBColorSpace;
-  faceTex.anisotropy = 8;
+  faceTex.anisotropy = 16;
 
   const { root, groups, masterPivots, modePivot, fireMats } = useMemo(() => {
     const clone = scene.clone(true);
@@ -104,7 +112,7 @@ function EngStartScene({ tune, masters, mode, fires, onToggleMaster, onCycleMode
           dec.name = "air con decals"; g.decal.push(dec); return dec;
         }
         if (m.name === "Blue base" || m.name === "Blue base.001") {
-          const base = new THREE.MeshPhysicalMaterial({ color: "#7e9fc6", clearcoatRoughness: 0.22 });
+          const base = new THREE.MeshPhysicalMaterial({ color: PANEL_BLUE, clearcoatRoughness: 0.22 });
           base.name = m.name; g.panel.push(base); return base;
         }
         if (m.name === "black button" || m.name === "black button.001") {
@@ -205,7 +213,7 @@ function EngStartScene({ tune, masters, mode, fires, onToggleMaster, onCycleMode
 
   // apply the tune to each part group (live)
   useEffect(() => {
-    groups.panel.forEach((m) => { m.roughness = tune.panel.roughness; m.metalness = tune.panel.metalness; m.clearcoat = tune.panel.clearcoat; m.envMapIntensity = tune.panel.env; m.needsUpdate = true; });
+    groups.panel.forEach((m) => { if (m.color) m.color.set(tune.panel.color ?? PANEL_BLUE); m.roughness = tune.panel.roughness; m.metalness = tune.panel.metalness; m.clearcoat = tune.panel.clearcoat; m.envMapIntensity = tune.panel.env; m.needsUpdate = true; });
     groups.knob.forEach((m) => { if (m.color) m.color.set(tune.knob.color); m.roughness = tune.knob.roughness; m.metalness = tune.knob.metalness; m.envMapIntensity = tune.knob.env; m.needsUpdate = true; });
     const bhex = blackHex(tune.buttonBlack);
     groups.button.forEach((m) => { if (m.color) m.color.set(bhex); m.roughness = 1.0; m.metalness = 0.0; m.envMapIntensity = 0.25; m.needsUpdate = true; });
@@ -235,15 +243,15 @@ function EngStartScene({ tune, masters, mode, fires, onToggleMaster, onCycleMode
       groups.button.forEach((m) => { m.envMap = fs.environment; m.needsUpdate = true; });
       bound.current = true;
     }
-    // ease each master assembly to its ON / OFF tilt (about the base hinge)
+    // Snap each master to its ON / OFF tilt — NO easing. The switch is simply in its
+    // state's position (ON = forward/up by default), so there is no glide/motion when
+    // the panel pops out; it only changes when the pilot actually moves it.
     masterPivots.forEach((pv, i) => {
-      const target = ((masters[i] ? MASTER_ON_DEG : MASTER_OFF_DEG) * Math.PI) / 180;
-      pv.rotation.x = THREE.MathUtils.lerp(pv.rotation.x, target, 0.18);
+      pv.rotation.x = ((masters[i] ? MASTER_ON_DEG : MASTER_OFF_DEG) * Math.PI) / 180;
     });
-    // ease the MODE knob to its selected position (spins in the screen plane)
+    // MODE knob: snap to its selected position (no glide either).
     if (modePivot) {
-      const target = ((MODE_DEG[mode] ?? 0) * Math.PI) / 180;
-      modePivot.rotation.y = THREE.MathUtils.lerp(modePivot.rotation.y, target, 0.18);
+      modePivot.rotation.y = ((MODE_DEG[mode] ?? 0) * Math.PI) / 180;
     }
   });
 
@@ -259,30 +267,42 @@ function EngStartScene({ tune, masters, mode, fires, onToggleMaster, onCycleMode
     const vFov = (cam.fov * Math.PI) / 180;
     const aspect = size.width / Math.max(1, size.height);
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-    const dist = Math.max(w / 2 / Math.tan(hFov / 2), h / 2 / Math.tan(vFov / 2)) * 1.1 + dim[normal];
+    // zoom DOLLIES the camera (true 3D zoom — stays crisp, unlike a CSS scale);
+    // pan offsets the look-at point by a fraction of the panel size.
+    const z = Math.max(0.2, zoom || 1);
+    const dist = (Math.max(w / 2 / Math.tan(hFov / 2), h / 2 / Math.tan(vFov / 2)) * 1.1) / z + dim[normal];
     const viewDir = new THREE.Vector3(normal === "x" ? 1 : 0, normal === "y" ? 1 : 0, normal === "z" ? 1 : 0);
     const heightAxis = dims[1].a;
-    cam.up.set(heightAxis === "x" ? 1 : 0, heightAxis === "y" ? 1 : 0, heightAxis === "z" ? 1 : 0);
-    cam.position.copy(center).addScaledVector(viewDir, dist);
+    const up = new THREE.Vector3(heightAxis === "x" ? 1 : 0, heightAxis === "y" ? 1 : 0, heightAxis === "z" ? 1 : 0);
+    cam.up.copy(up);
+    const right = new THREE.Vector3().crossVectors(viewDir, up).normalize();
+    const lookAt = center.clone()
+      .addScaledVector(right, (panX || 0) * (w / 2))
+      .addScaledVector(up, -(panY || 0) * (h / 2));
+    cam.position.copy(lookAt).addScaledVector(viewDir, dist);
     cam.near = Math.max(0.01, dist * 0.02); cam.far = dist * 6; cam.updateProjectionMatrix();
-    cam.lookAt(center);
+    cam.lookAt(lookAt);
     const orbit = controls as unknown as { target: THREE.Vector3; update: () => void } | null;
-    if (orbit?.target) { orbit.target.copy(center); orbit.update(); }
-  }, [camera, size.width, size.height, controls, root]);
+    if (orbit?.target) { orbit.target.copy(lookAt); orbit.update(); }
+  }, [camera, size.width, size.height, controls, root, panX, panY, zoom]);
 
   // rotation is baked onto `root` in useMemo, so render it directly.
   return <primitive object={root} onClick={handleClick} />;
 }
 
-export function EngStartPanel3D({ tune, masters, mode, fires, onToggleMaster, onCycleMode }: {
-  tune?: EngTune; masters?: boolean[]; mode?: number; fires?: boolean[]; onToggleMaster?: (i: number) => void; onCycleMode?: () => void;
+export function EngStartPanel3D({ tune, masters, mode, fires, controlled, panX, panY, zoom, onToggleMaster, onCycleMode }: {
+  tune?: EngTune; masters?: boolean[]; mode?: number; fires?: boolean[];
+  // controlled: camera is driven by panX/panY/zoom (true 3D zoom — stays crisp) and
+  // OrbitControls is disabled. Used in the scenario embed. Dev page leaves it off → free orbit.
+  controlled?: boolean; panX?: number; panY?: number; zoom?: number;
+  onToggleMaster?: (i: number) => void; onCycleMode?: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div style={{ width: "100%", height: "100%", background: "#070a0e" }} />;
   return (
     <Canvas
-      dpr={[1, 2]}
+      dpr={cockpitDpr()}
       camera={{ fov: 28, near: 0.01, far: 100, position: [0, 0, 4] }}
       gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
       style={{ width: "100%", height: "100%", background: "#05070a" }}
@@ -293,10 +313,10 @@ export function EngStartPanel3D({ tune, masters, mode, fires, onToggleMaster, on
       <Suspense fallback={null}>
         <Environment files={HDRI_URL} environmentIntensity={1.5} />
         <EngStartScene tune={tune ?? ENG_TUNE_DEFAULT} masters={masters ?? [false, false]} mode={mode ?? 1}
-          fires={fires ?? [false, false]}
+          fires={fires ?? [false, false]} panX={panX ?? 0} panY={panY ?? 0} zoom={zoom ?? 1}
           onToggleMaster={onToggleMaster ?? (() => {})} onCycleMode={onCycleMode ?? (() => {})} />
       </Suspense>
-      <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+      {!controlled && <OrbitControls makeDefault enableDamping dampingFactor={0.08} />}
     </Canvas>
   );
 }

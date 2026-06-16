@@ -49,6 +49,16 @@ case — copy `src/components/cockpit/fire-test-panel-3d.tsx` and adapt.
 8. **Keep the Blender source pristine.** Re-bake via a *script* that hides meshes,
    bakes, saves the PNG, and exits WITHOUT saving the .blend. Default answer to
    "save the .blend?" is DON'T SAVE.
+9. **TEXT MUST BE CRISP — supersample every cockpit Canvas.** This is a standing
+   product requirement (user: "they have to look crisp like this... I don't have to
+   tell you again"). Thin decal labels (ON/OFF/MASTER/CRANK…) and small geometry
+   text (FIRE/FAULT, SQUIB/DISCH) blur at the native pixel ratio while only big text
+   stays sharp. Fix: `dpr={cockpitDpr()}` (`src/components/cockpit/cockpit-dpr.ts`),
+   which supersamples to ~1.6× the device ratio (capped 3). NEVER use a `dpr={[1,2]}`
+   RANGE — R3F clamps the range to the display's own ratio, so it never supersamples.
+   Also set `faceTex.anisotropy = 16`. Applies to EVERY cockpit panel (fire + ENG
+   START + all future ones). CAVEAT: a CSS `scale()` zoom re-softens the canvas — use
+   true camera zoom or frame-resize, not CSS scale, when crispness must survive zoom.
 
 ---
 
@@ -104,7 +114,7 @@ const { scene } = useGLTF(MODEL_URL);
 const faceTex = useTexture(FACE_TEX_URL);
 faceTex.flipY = false;                       // glTF UVs
 faceTex.colorSpace = THREE.SRGBColorSpace;
-faceTex.anisotropy = 8;
+faceTex.anisotropy = 16;                     // max — keeps fine labels crisp (rule 9)
 ```
 - **Face** (material e.g. `DECALS`): replace with `new THREE.MeshBasicMaterial({
   map: faceTex, side: THREE.DoubleSide, toneMapped: false })`.
@@ -319,7 +329,7 @@ re-export GLB. Then make detection size-based (10f). Repro:
 `ambientLight 0.18 #9fb0c4` + `directionalLight [2.6,3.2,4.5] 2.8 #fff` +
 `directionalLight [-2.4,1.0,3.0] 1.1 #cfe0ff` + HDRI `braustuble_alley_2k.hdr`
 (`environmentIntensity 1.5`, fixed). Camera `fov 28`, framing fits the bbox of the
-FACE mesh; `dpr [1,2]`, `antialias`, `outputColorSpace sRGB`.
+FACE mesh; **`dpr={cockpitDpr()}`** (supersample — rule 9; NEVER `[1,2]`), `antialias`, `outputColorSpace sRGB`.
 
 ### 10i. Colours are RUNTIME, not baked in the GLB
 All tunable colours/finish are applied by the component at runtime (baked as code

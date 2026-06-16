@@ -10,7 +10,9 @@ const KEY = "engStartTune.v1";
 export default function EngStartPanel3DDevPage() {
   const [tune, setTune] = useState<EngTune>(ENG_TUNE_DEFAULT);
   // panel control state — driven by the buttons below AND by clicking the 3D parts
-  const [masters, setMasters] = useState<boolean[]>([false, false]);
+  // Engines running by default → masters ON. They only move OFF on a pilot click
+  // (button or clicking the 3D switch); nothing turns them off automatically.
+  const [masters, setMasters] = useState<boolean[]>([true, true]);
   const [mode, setMode] = useState(1); // 0 CRANK, 1 NORM, 2 IGN START
   // Simulated engine-fire state — in the real runner this comes from the scenario:
   //   fires[i] = !!state.triggersFired["fire_warn"] && !state.triggersFired["fire_extinguished"]
@@ -35,7 +37,7 @@ export default function EngStartPanel3DDevPage() {
 
   // numeric slider+box row bound to tune[grp][key]
   const num = (label: string, grp: keyof EngTune, key: string | null, min: number, max: number, step: number) => {
-    const cur = key ? (tune[grp] as Record<string, number>)[key] : (tune[grp] as unknown as number);
+    const cur = key ? (tune[grp] as unknown as Record<string, number>)[key] : (tune[grp] as unknown as number);
     return (
       <label key={`${grp}.${key ?? "v"}`} style={rowS}>
         <span style={{ width: 72 }}>{label}</span>
@@ -91,6 +93,7 @@ export default function EngStartPanel3DDevPage() {
         <div style={{ letterSpacing: 1, color: "#dfe6f0", fontWeight: 700 }}>ENG START · PARTS</div>
 
         <div style={hdr}>Panel (Blue base)</div>
+        {color("Colour", "panel", "color", tune.panel.color ?? "#456a93")}
         {num("Roughness", "panel", "roughness", 0, 1, 0.02)}
         {num("Metalness", "panel", "metalness", 0, 3, 0.02)}
         {num("Clearcoat", "panel", "clearcoat", 0, 1, 0.02)}
