@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { HydPanel3D, HYD_TUNE_DEFAULT, type HydTune, type HydPos } from "@/components/cockpit/hyd-panel-3d";
 
-const KEY = "hydTune.v22"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
+const KEY = "hydTune.v23"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
 
 export default function HydPanel3DDevPage() {
   const [tune, setTune] = useState<HydTune>(HYD_TUNE_DEFAULT);

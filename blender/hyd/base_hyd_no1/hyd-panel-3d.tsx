@@ -20,9 +20,9 @@ const MODEL_URL = "/models/hyd_panel.glb";
 const FACE_TEX_URL = "/models/hyd_face.png";
 const HDRI_URL = "/hdri/braustuble_alley_2k.hdr";
 
-// USER-DIALLED settings (2026-06-17): teal-blue #4a8c96, dialled live in the editor and confirmed
+// USER-DIALLED settings (2026-06-17): teal-blue #4a8296, dialled live in the editor and confirmed
 // on the real screen. Metalness 1.86 (three.js clamps to 1.0 = full mirror) + reflections 0.5.
-const PANEL_BASE = "#4a8c96";
+const PANEL_BASE = "#4a8296";
 const LEGEND_DIM = "#8b95a3";
 const LEGEND_AMBER = "#ff9f00";
 const LEGEND_WHITE = "#f3f6fa";
@@ -53,7 +53,7 @@ export interface HydTune {
 // contrast (all plates unlit so the hex shows exactly): border #333949, RAT #222734.
 // panel* defaults mirror eng-start's Blue base (rough 0.6 / metal 1.5 / clearcoat 0.4 / env 1.0)
 // so HYD starts parameter-identical to it; tune live to match the rendered look.
-export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#15171e", ratColor: "#222734", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8c96", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 };
+export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#15171e", ratColor: "#222734", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8296", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 };
 
 function matNames(o: THREE.Object3D): Set<string> {
   const s = new Set<string>();

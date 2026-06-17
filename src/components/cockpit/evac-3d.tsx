@@ -45,7 +45,7 @@ export type EvacBtnPos = "auto" | "neutral" | "in" | "stays"; // "auto" = driven
 // #456a93 — the white labels stay legible because they're rendered UNLIT on top and
 // the finish is masked off the lettering (see faceMask).
 // MASTER REFERENCE = base_hyd_no1 (HYD panel). Colour/finish/sheen matched to it 2026-06-17.
-const PANEL_BLUE = "#4a8c96";
+const PANEL_BLUE = "#4a8296";
 export const EVAC_TUNE_DEFAULT: EvacTune = {
   panel: { color: PANEL_BLUE, roughness: 0.72, metalness: 1.86, clearcoat: 0.6, env: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 },
   metal: { color: "#8b939d", roughness: 0.66, metalness: 1.0, env: 2.2 }, // user-tuned bezels

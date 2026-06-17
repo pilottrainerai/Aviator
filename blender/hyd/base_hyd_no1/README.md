@@ -11,7 +11,7 @@ Git tag: `base-hyd-no1`. Restore by copying these files back:
 
 ## Locked settings (HYD_TUNE_DEFAULT) — user-confirmed on real screen
 Panel front face:
-- Colour (panelColor) **`#4a8c96`** (teal-blue)
+- Colour (panelColor) **`#4a8296`** (teal-blue)
 - Roughness **0.72**
 - Metalness **1.86** (three.js clamps to 1.0 = full mirror). If it ever renders BLACK, drop to ≤0.8.
 - Clearcoat **0.6**

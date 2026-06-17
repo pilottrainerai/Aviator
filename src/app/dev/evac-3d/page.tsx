@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { EvacPanel3D, EVAC_TUNE_DEFAULT, type EvacTune, type EvacBtnPos } from "@/components/cockpit/evac-3d";
 
-const KEY = "evacTune.v2";
+const KEY = "evacTune.v3";
 
 export default function EvacPanel3DDevPage() {
   const [tune, setTune] = useState<EvacTune>(EVAC_TUNE_DEFAULT);
@@ -87,9 +87,9 @@ export default function EvacPanel3DDevPage() {
       </div>
 
       <div style={box}>
-        <div style={{ letterSpacing: 1, color: "#dfe6f0", fontWeight: 700 }}>EVAC · PARTS</div>
+        <div style={{ letterSpacing: 1, color: "#dfe6f0", fontWeight: 700 }}>EVAC · PANEL + BUTTON EDIT</div>
 
-        <div style={hdr}>Panel (Blue base)</div>
+        <div style={hdr}>PANEL (FACE) — matched to base_hyd_no1</div>
         {color("Colour", "panel", "color", tune.panel.color ?? "#456a93")}
         {num("Roughness", "panel", "roughness", 0, 1, 0.02)}
         {num("Metalness", "panel", "metalness", 0, 3, 0.02)}
@@ -99,6 +99,34 @@ export default function EvacPanel3DDevPage() {
         {num("Sheen bot", "panel", "sheenB", 0.1, 2.5, 0.05)}
         {num("Sheen left", "panel", "sheenL", 0.1, 2.5, 0.05)}
         {num("Sheen right", "panel", "sheenR", 0.1, 2.5, 0.05)}
+
+        <button type="button" onClick={playPress}
+          style={{ marginTop: 4, padding: "8px 8px", fontSize: 12, fontWeight: 700, letterSpacing: 1, color: "#05070a", background: "#8aabbb", border: "1px solid #3a434f", borderRadius: 6, cursor: "pointer", fontFamily: "monospace" }}>
+          ▶ PRESS  (neutral → in → stays)
+        </button>
+
+        <div style={hdr}>PREVIEW POSITION (auto = live)</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {(["auto", "neutral", "in", "stays"] as EvacBtnPos[]).map((p) => (
+            <button key={p} type="button" onClick={() => setBtnPos(p)}
+              style={{ flex: 1, padding: "6px 4px", fontSize: 10, fontWeight: 700, borderRadius: 5, cursor: "pointer", border: "1px solid #3a434f",
+                fontFamily: "monospace", color: btnPos === p ? "#05070a" : "#cdd6e0", background: btnPos === p ? "#8aabbb" : "#2a313b" }}>
+              {p === "stays" ? "STAYS" : p.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        <div style={hdr}>ABSOLUTE CAP POSITIONS (border stays fixed)</div>
+        {num("Neutral", "btn", "neutralY", -0.09, 0.09, 0.001)}
+        {num("In", "btn", "inY", -0.09, 0.09, 0.001)}
+        {num("Stays", "btn", "staysY", -0.09, 0.09, 0.001)}
+
+        <div style={hdr}>BUTTON COLOURS (matched to HYD: cap #05070a / border #15171e)</div>
+        {color("Cap", "btn", "capColor", tune.btn.capColor)}
+        {color("Border", "btn", "borderColor", tune.btn.borderColor)}
+        <div style={{ fontSize: 10, color: "#6b7480", lineHeight: 1.4, marginTop: 4 }}>
+          COMMAND latches to STAYS while active; HORN SHUT OFF dips to IN and returns to NEUTRAL.
+        </div>
 
         <div style={hdr}>Metal (bezels / rings)</div>
         {color("Color", "metal", "color", tune.metal.color)}
@@ -142,42 +170,6 @@ export default function EvacPanel3DDevPage() {
             style={{ flex: 1, padding: "5px 8px", fontSize: 11, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
             Reset all
           </button>
-        </div>
-      </div>
-
-      {/* BUTTON EDIT box (right) — HYD-style cap press positions + colours for COMMAND + HORN */}
-      <div style={{ position: "fixed", top: 16, right: 16, zIndex: 10, width: 272, display: "flex", flexDirection: "column", gap: 6,
-        padding: "12px 14px", borderRadius: 10, background: "rgba(10,14,20,0.95)", border: "1px solid #2a313b",
-        fontFamily: "monospace", fontSize: 12, color: "#cdd6e0" }}>
-        <div style={{ letterSpacing: 1, color: "#dfe6f0", fontWeight: 700 }}>EVAC · BUTTON EDIT</div>
-
-        <button type="button" onClick={playPress}
-          style={{ marginTop: 4, padding: "8px 8px", fontSize: 12, fontWeight: 700, letterSpacing: 1, color: "#05070a", background: "#8aabbb", border: "1px solid #3a434f", borderRadius: 6, cursor: "pointer", fontFamily: "monospace" }}>
-          ▶ PRESS  (neutral → in → stays)
-        </button>
-
-        <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 6 }}>PREVIEW POSITION (auto = live click/press)</div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {(["auto", "neutral", "in", "stays"] as EvacBtnPos[]).map((p) => (
-            <button key={p} type="button" onClick={() => setBtnPos(p)}
-              style={{ flex: 1, padding: "6px 4px", fontSize: 10, fontWeight: 700, borderRadius: 5, cursor: "pointer", border: "1px solid #3a434f",
-                fontFamily: "monospace", color: btnPos === p ? "#05070a" : "#cdd6e0", background: btnPos === p ? "#8aabbb" : "#2a313b" }}>
-              {p === "stays" ? "STAYS" : p.toUpperCase()}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 6 }}>ABSOLUTE CAP POSITIONS (border stays fixed)</div>
-        {num("Neutral", "btn", "neutralY", -0.09, 0.09, 0.001)}
-        {num("In", "btn", "inY", -0.09, 0.09, 0.001)}
-        {num("Stays", "btn", "staysY", -0.09, 0.09, 0.001)}
-
-        <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 6 }}>BUTTON COLOURS (live fire: cap #070a0e / border #222730)</div>
-        {color("Cap", "btn", "capColor", tune.btn.capColor)}
-        {color("Border", "btn", "borderColor", tune.btn.borderColor)}
-
-        <div style={{ fontSize: 10, color: "#6b7480", lineHeight: 1.4, marginTop: 6 }}>
-          COMMAND latches to STAYS while active; HORN SHUT OFF dips to IN and returns to NEUTRAL.
         </div>
       </div>
     </main>
