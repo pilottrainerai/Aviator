@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { EvacPanel3D, EVAC_TUNE_DEFAULT, type EvacTune, type EvacBtnPos } from "@/components/cockpit/evac-3d";
 
-const KEY = "evacTune.v4";
+const KEY = "evacTune.v5";
 
 export default function EvacPanel3DDevPage() {
   const [tune, setTune] = useState<EvacTune>(EVAC_TUNE_DEFAULT);
@@ -59,7 +59,7 @@ export default function EvacPanel3DDevPage() {
     );
   };
   const color = (label: string, grp: keyof EvacTune, key: string | null, val: string) => (
-    <label key={`${grp}.col`} style={rowS}>
+    <label key={`${grp}.${key ?? "col"}`} style={rowS}>
       <span style={{ width: 72 }}>{label}</span>
       <input type="color" value={val} onChange={(e) => set(grp, key, e.target.value)} style={{ flex: 1, height: 22, background: "transparent", border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0 }} />
     </label>

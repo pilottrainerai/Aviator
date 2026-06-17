@@ -47,7 +47,7 @@ export type EvacBtnPos = "auto" | "neutral" | "in" | "stays"; // "auto" = driven
 // MASTER REFERENCE = base_hyd_no1 (HYD panel). Colour/finish/sheen matched to it 2026-06-17.
 const PANEL_BLUE = "#4a8296";
 export const EVAC_TUNE_DEFAULT: EvacTune = {
-  panel: { color: PANEL_BLUE, roughness: 0.72, metalness: 1.86, clearcoat: 0.6, env: 0.5, sheenT: 1.0, sheenB: 1.0, sheenL: 1.0, sheenR: 1.0 }, // sheen flat: EVAC's face UV is oriented differently than HYD's, so HYD's L/R/T/B sheen lands on the wrong edges (blue blob bottom-left). Flat = clean uniform teal; remap axes if a directional gradient is wanted.
+  panel: { color: PANEL_BLUE, roughness: 0.72, metalness: 1.86, clearcoat: 0.6, env: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 }, // HYD sheen values; applied GEOMETRY-aligned (shader, world bbox) so they land on the panel's real edges regardless of UV — same appearance as the hydraulic panel on any shape/size.
   metal: { color: "#8b939d", roughness: 0.66, metalness: 1.0, env: 2.2 }, // user-tuned bezels
   buttonBlack: 100,
   shaft: { color: "#202632", roughness: 0.5, metalness: 1.0 },
@@ -140,9 +140,9 @@ function EvacScene({ tune, active, hornSignal, btnPos, onCommand, onHorn, onCapt
     if (!img || !w || !h) return null;
     try {
       const [pr, pg, pb] = hexRgb(tune.panel.color ?? PANEL_BLUE);
-      // 4-edge faked metallic sheen (matches base_hyd_no1): brightness = horiz lerp(L,R) × vert
-      // lerp(T,B), baked into the recoloured blue field. All 1.0 = flat.
-      const ST = tune.panel.sheenT, SB = tune.panel.sheenB, SL = tune.panel.sheenL, SR = tune.panel.sheenR;
+      // Recolour the blue field to the base panel colour ONLY (flat). The metallic SHEEN gradient is
+      // applied GEOMETRY-ALIGNED in the material shader (see applySheen) instead of baked here in UV
+      // space — so it lands on the panel's REAL edges regardless of this panel's UV / shape / size.
       const cnv = document.createElement("canvas");
       cnv.width = w; cnv.height = h;
       const ctx = cnv.getContext("2d");
@@ -152,7 +152,7 @@ function EvacScene({ tune, active, hornSignal, btnPos, onCommand, onHorn, onCapt
       const d = data.data;
       for (let p = 0; p < d.length; p += 4) {
         const r = d[p], b = d[p + 2];
-        if (b - r > 12 && b > 60) { const idx = p >> 2; const fx = (idx % w) / w, fy = ((idx / w) | 0) / h; const grad = (SL + (SR - SL) * fx) * (ST + (SB - ST) * fy); d[p] = Math.min(255, pr * grad); d[p + 1] = Math.min(255, pg * grad); d[p + 2] = Math.min(255, pb * grad); } // blue field → base colour + sheen
+        if (b - r > 12 && b > 60) { d[p] = pr; d[p + 1] = pg; d[p + 2] = pb; } // blue field → flat base colour
       }
       ctx.putImageData(data, 0, 0);
       const tex = new THREE.CanvasTexture(cnv);
@@ -162,7 +162,31 @@ function EvacScene({ tune, active, hornSignal, btnPos, onCommand, onHorn, onCapt
       tex.needsUpdate = true;
       return tex;
     } catch { return null; }
-  }, [faceTex, tune.panel.color, tune.panel.sheenT, tune.panel.sheenB, tune.panel.sheenL, tune.panel.sheenR]);
+  }, [faceTex, tune.panel.color]);
+
+  // Geometry-aligned SHEEN (universal across panel shapes/sizes): the gradient is driven by each
+  // fragment's WORLD position within the panel's bounding box — so Left/Right/Top/Bottom always map
+  // to the panel's REAL edges, independent of UV layout. Uniforms are live-updated from the sliders.
+  const sheenU = useRef({
+    uSL: { value: 1 }, uSR: { value: 1 }, uST: { value: 1 }, uSB: { value: 1 },
+    uBMin: { value: new THREE.Vector3() }, uBMax: { value: new THREE.Vector3() },
+  }).current;
+  const applySheen = (mat: THREE.MeshPhysicalMaterial) => {
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uSL = sheenU.uSL; shader.uniforms.uSR = sheenU.uSR;
+      shader.uniforms.uST = sheenU.uST; shader.uniforms.uSB = sheenU.uSB;
+      shader.uniforms.uBMin = sheenU.uBMin; shader.uniforms.uBMax = sheenU.uBMax;
+      shader.vertexShader = "varying vec3 vSheenW;\n" + shader.vertexShader.replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\n  vSheenW = (modelMatrix * vec4(transformed, 1.0)).xyz;"
+      );
+      shader.fragmentShader = "varying vec3 vSheenW;\nuniform float uSL,uSR,uST,uSB;\nuniform vec3 uBMin,uBMax;\n" + shader.fragmentShader.replace(
+        "#include <map_fragment>",
+        "#include <map_fragment>\n  float sfx = clamp((vSheenW.x-uBMin.x)/max(1e-4,uBMax.x-uBMin.x),0.0,1.0);\n  float sfy = clamp((vSheenW.y-uBMin.y)/max(1e-4,uBMax.y-uBMin.y),0.0,1.0);\n  diffuseColor.rgb *= (uSL + (uSR-uSL)*sfx) * (uSB + (uST-uSB)*sfy);"
+      );
+    };
+    mat.needsUpdate = true;
+  };
 
   const { root, groups, guardPivot, captPivot, pressParts, surroundMat, hornParts, hornSurroundMat, commandAnchor, hornAnchor, captAnchor, capMats, hornCapMats } = useMemo(() => {
     const clone = scene.clone(true);
@@ -182,12 +206,12 @@ function EvacScene({ tune, active, hornSignal, btnPos, onCommand, onHorn, onCapt
             metalnessMap: faceMask ?? undefined,
             clearcoatMap: faceMask ?? undefined,
           });
-          face.name = "hydraulic decals"; g.face.push(face); return face;
+          face.name = "hydraulic decals"; applySheen(face); g.face.push(face); return face;
         }
         if (m.name === "Blue base" || m.name === "Blue base.001") {
           // body / border — FIRE FINAL reduced-glare steel-blue finish
           const base = new THREE.MeshPhysicalMaterial({ color: PANEL_BLUE, metalness: 1.86, roughness: 0.72, clearcoat: 0.6, clearcoatRoughness: 0.22, envMapIntensity: 0.5 });
-          base.name = m.name; g.panel.push(base); return base;
+          base.name = m.name; applySheen(base); g.panel.push(base); return base;
         }
         if (m.name === "black button" || m.name === "black button.001") {
           const c = m.clone() as THREE.MeshStandardMaterial; c.name = m.name; g.button.push(c); return c;
@@ -340,8 +364,18 @@ function EvacScene({ tune, active, hornSignal, btnPos, onCommand, onHorn, onCapt
       });
     }
     const captAnchor = captMesh ? (captMesh as THREE.Mesh).getWorldPosition(new THREE.Vector3()) : null;
+    // world-space bounds of the whole panel → drives the geometry-aligned sheen (real L/R/T/B edges)
+    clone.updateWorldMatrix(true, true);
+    const pbox = new THREE.Box3().setFromObject(clone);
+    sheenU.uBMin.value.copy(pbox.min); sheenU.uBMax.value.copy(pbox.max);
     return { root: clone, groups: g, guardPivot, captPivot, pressParts, surroundMat, hornParts, hornSurroundMat, commandAnchor, hornAnchor, captAnchor, capMats, hornCapMats };
   }, [scene, faceTex, faceMask]);
+
+  // sheen uniforms follow the sliders live (uniform-value changes need no recompile)
+  useEffect(() => {
+    sheenU.uSL.value = tune.panel.sheenL; sheenU.uSR.value = tune.panel.sheenR;
+    sheenU.uST.value = tune.panel.sheenT; sheenU.uSB.value = tune.panel.sheenB;
+  }, [tune.panel.sheenL, tune.panel.sheenR, tune.panel.sheenT, tune.panel.sheenB, sheenU]);
 
   // apply the tune to each part group (live)
   useEffect(() => {
