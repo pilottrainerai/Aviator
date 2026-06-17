@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { HydPanel3D, HYD_TUNE_DEFAULT, type HydTune, type HydPos } from "@/components/cockpit/hyd-panel-3d";
 
-const KEY = "hydTune.v13"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
+const KEY = "hydTune.v20"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
 
 export default function HydPanel3DDevPage() {
   const [tune, setTune] = useState<HydTune>(HYD_TUNE_DEFAULT);
@@ -53,7 +53,7 @@ export default function HydPanel3DDevPage() {
         </button>
         {!collapsed && <>
 
-        <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 6 }}>PANEL (FACE) — match eng-start</div>
+        <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 6 }}>PANEL (FACE) — fire hue + faked sheen</div>
         <label style={rowS}>
           <span style={{ width: 86 }}>Colour</span>
           <input type="color" value={tune.panelColor} onChange={(e) => set("panelColor", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />
@@ -62,6 +62,11 @@ export default function HydPanel3DDevPage() {
         {num("Metalness", "panelMetal", 0, 3, 0.02)}
         {num("Clearcoat", "panelClear", 0, 1, 0.02)}
         {num("Reflections", "panelEnv", 0, 6, 0.05)}
+        <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 4 }}>SHEEN per edge (1.0 = neutral)</div>
+        {num("Sheen top", "sheenT", 0.1, 2.5, 0.05)}
+        {num("Sheen bot", "sheenB", 0.1, 2.5, 0.05)}
+        {num("Sheen left", "sheenL", 0.1, 2.5, 0.05)}
+        {num("Sheen right", "sheenR", 0.1, 2.5, 0.05)}
 
         <button type="button" onClick={press}
           style={{ marginTop: 4, padding: "8px 8px", fontSize: 12, fontWeight: 700, letterSpacing: 1, color: "#05070a", background: "#8aabbb", border: "1px solid #3a434f", borderRadius: 6, cursor: "pointer", fontFamily: "monospace" }}>

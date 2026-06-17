@@ -20,9 +20,9 @@ const MODEL_URL = "/models/hyd_panel.glb";
 const FACE_TEX_URL = "/models/hyd_face.png";
 const HDRI_URL = "/hdri/braustuble_alley_2k.hdr";
 
-// Target = the FIRE panel's ON-SCREEN tone (#344e68). Compensated for HYD's brighter reflections:
-// #3a5572 @ reflections 0.8 with fire's metal 1.5 / rough 0.6 / clear 0.4 finish.
-const PANEL_BASE = "#3a5572";
+// USER-DIALLED settings (2026-06-17): teal-blue #4a8c96, dialled live in the editor and confirmed
+// on the real screen. Metalness 1.86 (three.js clamps to 1.0 = full mirror) + reflections 0.5.
+const PANEL_BASE = "#4a8c96";
 const LEGEND_DIM = "#8b95a3";
 const LEGEND_AMBER = "#ff9f00";
 const LEGEND_WHITE = "#f3f6fa";
@@ -44,12 +44,16 @@ export interface HydTune {
   panelMetal: number;  // metalness (1.5 = near-mirror)
   panelClear: number;  // clearcoat (gloss layer — restores "life" without brightening the field)
   panelEnv: number;    // envMapIntensity (Reflections — drives the rendered blue)
+  sheenT: number;      // faked metallic sheen: brightness × at the TOP edge    (1.0 = neutral)
+  sheenB: number;      // faked metallic sheen: brightness × at the BOTTOM edge (1.0 = neutral)
+  sheenL: number;      // faked metallic sheen: brightness × at the LEFT edge   (1.0 = neutral)
+  sheenR: number;      // faked metallic sheen: brightness × at the RIGHT edge  (1.0 = neutral)
 }
 // capColor = canvas backdrop (unlit, DO NOT TOUCH). border frame + RAT switch lifted for
 // contrast (all plates unlit so the hex shows exactly): border #333949, RAT #222734.
 // panel* defaults mirror eng-start's Blue base (rough 0.6 / metal 1.5 / clearcoat 0.4 / env 1.0)
 // so HYD starts parameter-identical to it; tune live to match the rendered look.
-export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#333949", ratColor: "#222734", neutralY: 0.008, inY: -0.03, outY: -0.014, panelColor: "#3a5572", panelRough: 0.6, panelMetal: 1.5, panelClear: 0.4, panelEnv: 0.8 };
+export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#333949", ratColor: "#222734", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8c96", panelRough: 0.72, panelMetal: 0.8, panelClear: 0.6, panelEnv: 0.5, sheenT: 1.0, sheenB: 1.0, sheenL: 0.45, sheenR: 1.55 };
 
 function matNames(o: THREE.Object3D): Set<string> {
   const s = new Set<string>();
@@ -84,15 +88,16 @@ function HydScene({ lit, tune, pos }: { lit: HydLit; tune: HydTune; pos: HydPos 
       const m = md.data, c = cd.data, dmk = dd.data;
       const FIELD = tune.panelColor || PANEL_BASE; // live: Colour slider drives the FRONT face field too (not just the Blue base behind)
       const pr = parseInt(FIELD.slice(1, 3), 16), pg = parseInt(FIELD.slice(3, 5), 16), pb = parseInt(FIELD.slice(5, 7), 16);
-      // SHEEN FAKE (option 2): bake a vertical light→dark gradient into the recoloured field so the
-      // flat HYD plate mimics the fire panel's metallic top-bright/bottom-dark gradient — HYD's
-      // geometry can't produce that gloss on its own (measured: fire gloss 34 vs HYD 16). top×bot.
-      const GRAD_TOP = 1.5, GRAD_BOT = 0.5;
+      // SHEEN FAKE (option 2): bake a 2D brightness field into the recoloured field so the flat HYD
+      // plate mimics the fire panel's metallic gradient — HYD's geometry can't produce that gloss on
+      // its own. Four independent edge sliders (top/bottom/left/right): brightness = horizontal lerp
+      // (L→R) × vertical lerp (T→B). All 1.0 = flat. Live, so the editor matches the render.
+      const ST = tune.sheenT, SB = tune.sheenB, SL = tune.sheenL, SR = tune.sheenR;
       for (let p = 0; p < m.length; p += 4) {
         const r = m[p], g = m[p + 1], b = m[p + 2]; const lum = (r + g + b) / 3;
         const isPanel = lum < 110 && !(g > r + 24 && g > b + 24);
         m[p] = isPanel ? 255 : 0; m[p + 1] = 255; m[p + 2] = isPanel ? 255 : 0; m[p + 3] = 255;
-        if (isPanel) { const t = Math.floor((p >> 2) / w) / h; const grad = GRAD_TOP + (GRAD_BOT - GRAD_TOP) * t; c[p] = Math.min(255, pr * grad); c[p + 1] = Math.min(255, pg * grad); c[p + 2] = Math.min(255, pb * grad); } // recolour field + sheen gradient
+        if (isPanel) { const idx = p >> 2; const fx = (idx % w) / w, fy = ((idx / w) | 0) / h; const grad = (SL + (SR - SL) * fx) * (ST + (SB - ST) * fy); c[p] = Math.min(255, pr * grad); c[p + 1] = Math.min(255, pg * grad); c[p + 2] = Math.min(255, pb * grad); } // recolour field + 2D sheen (L→R × T→B edge sliders)
         if (isPanel) dmk[p + 3] = 0; // markings overlay: drop the field, keep only lettering
       }
       mctx.putImageData(md, 0, 0); cctx.putImageData(cd, 0, 0); dctx.putImageData(dd, 0, 0);
@@ -101,7 +106,7 @@ function HydScene({ lit, tune, pos }: { lit: HydLit; tune: HydTune; pos: HydPos 
       const marks = new THREE.CanvasTexture(dk); marks.flipY = false; marks.colorSpace = THREE.SRGBColorSpace; marks.anisotropy = 16; marks.needsUpdate = true;
       return { faceMask: mask, faceColored: colored, faceMarks: marks };
     } catch { return NUL; }
-  }, [faceTex, tune.panelColor]);
+  }, [faceTex, tune.panelColor, tune.sheenT, tune.sheenB, tune.sheenL, tune.sheenR]);
 
   const { root, legendMats, panelMats, btnClass, movable } = useMemo(() => {
     const clone = scene.clone(true);
@@ -121,11 +126,11 @@ function HydScene({ lit, tune, pos }: { lit: HydLit; tune: HydTune; pos: HydPos 
         if (!m) return m;
         const mn = m.name;
         if (mn === "hydraulic decals") {
-          const face = new THREE.MeshPhysicalMaterial({ map: faceColored ?? faceTex, side: THREE.DoubleSide, roughness: 0.6, metalness: 1.5, clearcoat: 0.4, clearcoatRoughness: 0.22, envMapIntensity: 1.0, metalnessMap: faceMask ?? undefined, clearcoatMap: faceMask ?? undefined });
+          const face = new THREE.MeshPhysicalMaterial({ map: faceColored ?? faceTex, side: THREE.DoubleSide, roughness: 0.72, metalness: 0.8, clearcoat: 0.6, clearcoatRoughness: 0.22, envMapIntensity: 0.5, metalnessMap: faceMask ?? undefined, clearcoatMap: faceMask ?? undefined });
           face.name = "face"; panelMats.push(face); return face;
         }
         if (mn === "Blue base") {
-          const base = new THREE.MeshPhysicalMaterial({ color: PANEL_BASE, metalness: 1.5, roughness: 0.6, clearcoat: 0.4, clearcoatRoughness: 0.22, envMapIntensity: 1.0 });
+          const base = new THREE.MeshPhysicalMaterial({ color: PANEL_BASE, metalness: 0.8, roughness: 0.72, clearcoat: 0.6, clearcoatRoughness: 0.22, envMapIntensity: 0.5 });
           base.name = "Blue base"; panelMats.push(base); return base;
         }
         if (mn === "black button") {
