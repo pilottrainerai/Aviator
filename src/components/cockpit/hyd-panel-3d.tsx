@@ -20,10 +20,9 @@ const MODEL_URL = "/models/hyd_panel.glb";
 const FACE_TEX_URL = "/models/hyd_face.png";
 const HDRI_URL = "/hdri/braustuble_alley_2k.hdr";
 
-// Metalness 0.8 (Blender source), NOT 1.5. A full mirror (1.5) showed only reflections and rendered
-// BLACK on real GPUs while looking blue in headless tests. At 0.8 the panel keeps ~20% of its own
-// solid colour, so it's stable on every GPU and never goes black. #4a6f95 = a fire-leaning steel blue.
-const PANEL_BASE = "#4a6f95";
+// USER-DIALLED settings (2026-06-17): teal-blue #4a8c96, dialled live in the editor and confirmed
+// on the real screen. Metalness 1.86 (three.js clamps to 1.0 = full mirror) + reflections 0.5.
+const PANEL_BASE = "#4a8c96";
 const LEGEND_DIM = "#8b95a3";
 const LEGEND_AMBER = "#ff9f00";
 const LEGEND_WHITE = "#f3f6fa";
@@ -52,7 +51,7 @@ export interface HydTune {
 // contrast (all plates unlit so the hex shows exactly): border #333949, RAT #222734.
 // panel* defaults mirror eng-start's Blue base (rough 0.6 / metal 1.5 / clearcoat 0.4 / env 1.0)
 // so HYD starts parameter-identical to it; tune live to match the rendered look.
-export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#333949", ratColor: "#222734", neutralY: 0.008, inY: -0.03, outY: -0.014, panelColor: "#4a6f95", panelRough: 0.4, panelMetal: 0.8, panelClear: 0.4, panelEnv: 1.0, sheenTop: 1.5, sheenBot: 0.45 };
+export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#333949", ratColor: "#222734", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8c96", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenTop: 1.55, sheenBot: 0.45 };
 
 function matNames(o: THREE.Object3D): Set<string> {
   const s = new Set<string>();
@@ -125,11 +124,11 @@ function HydScene({ lit, tune, pos }: { lit: HydLit; tune: HydTune; pos: HydPos 
         if (!m) return m;
         const mn = m.name;
         if (mn === "hydraulic decals") {
-          const face = new THREE.MeshPhysicalMaterial({ map: faceColored ?? faceTex, side: THREE.DoubleSide, roughness: 0.4, metalness: 0.8, clearcoat: 0.4, clearcoatRoughness: 0.22, envMapIntensity: 1.0, metalnessMap: faceMask ?? undefined, clearcoatMap: faceMask ?? undefined });
+          const face = new THREE.MeshPhysicalMaterial({ map: faceColored ?? faceTex, side: THREE.DoubleSide, roughness: 0.72, metalness: 1.86, clearcoat: 0.6, clearcoatRoughness: 0.22, envMapIntensity: 0.5, metalnessMap: faceMask ?? undefined, clearcoatMap: faceMask ?? undefined });
           face.name = "face"; panelMats.push(face); return face;
         }
         if (mn === "Blue base") {
-          const base = new THREE.MeshPhysicalMaterial({ color: PANEL_BASE, metalness: 0.8, roughness: 0.4, clearcoat: 0.4, clearcoatRoughness: 0.22, envMapIntensity: 1.0 });
+          const base = new THREE.MeshPhysicalMaterial({ color: PANEL_BASE, metalness: 1.86, roughness: 0.72, clearcoat: 0.6, clearcoatRoughness: 0.22, envMapIntensity: 0.5 });
           base.name = "Blue base"; panelMats.push(base); return base;
         }
         if (mn === "black button") {
