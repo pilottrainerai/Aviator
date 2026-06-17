@@ -6,19 +6,20 @@ Restore by copying these files back:
 - `page.tsx`         → `src/app/dev/hyd-panel-3d/page.tsx`
 - `hyd_panel.glb`, `hyd_face.png` → `public/models/`
 
-## FINAL settings (HYD_TUNE_DEFAULT)
+## FINAL settings (HYD_TUNE_DEFAULT) — user-confirmed on real screen 2026-06-17
 Panel front face:
 - Colour (panelColor) **`#4a8c96`** (teal-blue)
 - Roughness **0.72**
-- Metalness **0.8**  ← keep ≤1.0; above 1.0 = full mirror = goes black on real GPUs
+- Metalness **1.86** (three.js clamps to 1.0 = full mirror) — user's choice; renders teal on the
+  real screen with these gentle sheen values. If it ever goes black, drop Metalness to ≤0.8.
 - Clearcoat **0.6**
 - Reflections (envMapIntensity) **0.5**
 
 Sheen (faked metallic gradient, baked into the recoloured face field) — per-edge brightness ×, 1.0 = neutral:
-- Sheen top **1.0**
-- Sheen bot **1.0**
-- Sheen left **0.45**
-- Sheen right **1.55**
+- Sheen top **0.95**
+- Sheen bot **0.9**
+- Sheen left **0.95**
+- Sheen right **1.35**
 - (brightness = horizontal lerp(L,R) × vertical lerp(T,B))
 
 Buttons / cap positions (unchanged):
