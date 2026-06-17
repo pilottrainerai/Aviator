@@ -44,14 +44,15 @@ export interface HydTune {
   panelMetal: number;  // metalness (1.5 = near-mirror)
   panelClear: number;  // clearcoat (gloss layer — restores "life" without brightening the field)
   panelEnv: number;    // envMapIntensity (Reflections — drives the rendered blue)
-  sheenTop: number;    // faked metallic sheen: top-of-panel brightness × (mimics fire's gradient)
-  sheenBot: number;    // faked metallic sheen: bottom-of-panel brightness ×
+  sheenTop: number;    // faked metallic sheen: gradient START brightness × (top, or LEFT if horizontal)
+  sheenBot: number;    // faked metallic sheen: gradient END brightness × (bottom, or RIGHT if horizontal)
+  sheenDir: "v" | "h"; // sheen gradient axis: "v" = top→bottom, "h" = left→right (matches fire's run)
 }
 // capColor = canvas backdrop (unlit, DO NOT TOUCH). border frame + RAT switch lifted for
 // contrast (all plates unlit so the hex shows exactly): border #333949, RAT #222734.
 // panel* defaults mirror eng-start's Blue base (rough 0.6 / metal 1.5 / clearcoat 0.4 / env 1.0)
 // so HYD starts parameter-identical to it; tune live to match the rendered look.
-export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#333949", ratColor: "#222734", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8c96", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenTop: 1.55, sheenBot: 0.45 };
+export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#333949", ratColor: "#222734", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8c96", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenTop: 1.55, sheenBot: 0.45, sheenDir: "h" };
 
 function matNames(o: THREE.Object3D): Set<string> {
   const s = new Set<string>();
@@ -86,16 +87,16 @@ function HydScene({ lit, tune, pos }: { lit: HydLit; tune: HydTune; pos: HydPos 
       const m = md.data, c = cd.data, dmk = dd.data;
       const FIELD = tune.panelColor || PANEL_BASE; // live: Colour slider drives the FRONT face field too (not just the Blue base behind)
       const pr = parseInt(FIELD.slice(1, 3), 16), pg = parseInt(FIELD.slice(3, 5), 16), pb = parseInt(FIELD.slice(5, 7), 16);
-      // SHEEN FAKE (option 2): bake a vertical light→dark gradient into the recoloured field so the
-      // flat HYD plate mimics the fire panel's metallic top-bright/bottom-dark gradient — HYD's
-      // geometry can't produce that gloss on its own (measured: fire gloss 34 vs HYD 16). Live via
-      // the Sheen top/bottom sliders so the editor matches what's rendered.
-      const GRAD_TOP = tune.sheenTop, GRAD_BOT = tune.sheenBot;
+      // SHEEN FAKE (option 2): bake a light→dark gradient into the recoloured field so the flat HYD
+      // plate mimics the fire panel's metallic gradient — HYD's geometry can't produce that gloss on
+      // its own. Direction-switchable: "v" = top→bottom, "h" = left→right (fire's sheen runs along
+      // the long axis). Live via the Sheen sliders + V/H toggle so the editor matches the render.
+      const GRAD_A = tune.sheenTop, GRAD_B = tune.sheenBot, HORIZ = tune.sheenDir === "h";
       for (let p = 0; p < m.length; p += 4) {
         const r = m[p], g = m[p + 1], b = m[p + 2]; const lum = (r + g + b) / 3;
         const isPanel = lum < 110 && !(g > r + 24 && g > b + 24);
         m[p] = isPanel ? 255 : 0; m[p + 1] = 255; m[p + 2] = isPanel ? 255 : 0; m[p + 3] = 255;
-        if (isPanel) { const t = Math.floor((p >> 2) / w) / h; const grad = GRAD_TOP + (GRAD_BOT - GRAD_TOP) * t; c[p] = Math.min(255, pr * grad); c[p + 1] = Math.min(255, pg * grad); c[p + 2] = Math.min(255, pb * grad); } // recolour field + sheen gradient
+        if (isPanel) { const idx = p >> 2; const t = HORIZ ? 1 - (idx % w) / w : Math.floor(idx / w) / h; const grad = GRAD_A + (GRAD_B - GRAD_A) * t; c[p] = Math.min(255, pr * grad); c[p + 1] = Math.min(255, pg * grad); c[p + 2] = Math.min(255, pb * grad); } // recolour field + sheen gradient (V: top→bottom; H: bright RIGHT → dark LEFT)
         if (isPanel) dmk[p + 3] = 0; // markings overlay: drop the field, keep only lettering
       }
       mctx.putImageData(md, 0, 0); cctx.putImageData(cd, 0, 0); dctx.putImageData(dd, 0, 0);
@@ -104,7 +105,7 @@ function HydScene({ lit, tune, pos }: { lit: HydLit; tune: HydTune; pos: HydPos 
       const marks = new THREE.CanvasTexture(dk); marks.flipY = false; marks.colorSpace = THREE.SRGBColorSpace; marks.anisotropy = 16; marks.needsUpdate = true;
       return { faceMask: mask, faceColored: colored, faceMarks: marks };
     } catch { return NUL; }
-  }, [faceTex, tune.panelColor, tune.sheenTop, tune.sheenBot]);
+  }, [faceTex, tune.panelColor, tune.sheenTop, tune.sheenBot, tune.sheenDir]);
 
   const { root, legendMats, panelMats, btnClass, movable } = useMemo(() => {
     const clone = scene.clone(true);

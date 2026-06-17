@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { HydPanel3D, HYD_TUNE_DEFAULT, type HydTune, type HydPos } from "@/components/cockpit/hyd-panel-3d";
 
-const KEY = "hydTune.v16"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
+const KEY = "hydTune.v17"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
 
 export default function HydPanel3DDevPage() {
   const [tune, setTune] = useState<HydTune>(HYD_TUNE_DEFAULT);
@@ -64,6 +64,15 @@ export default function HydPanel3DDevPage() {
         {num("Reflections", "panelEnv", 0, 6, 0.05)}
         {num("Sheen top", "sheenTop", 0.5, 2.5, 0.05)}
         {num("Sheen bot", "sheenBot", 0.1, 1.5, 0.05)}
+        <label style={rowS}>
+          <span style={{ width: 86 }}>Sheen axis</span>
+          <div style={{ display: "flex", gap: 6, flex: 1 }}>
+            <button type="button" onClick={() => set("sheenDir", "v")}
+              style={{ flex: 1, padding: "3px 0", fontSize: 11, fontFamily: "monospace", cursor: "pointer", borderRadius: 4, border: "1px solid #3a434f", color: tune.sheenDir === "v" ? "#05070a" : "#cdd6e0", background: tune.sheenDir === "v" ? "#8aabbb" : "#2a313b" }}>↕ TOP-BOT</button>
+            <button type="button" onClick={() => set("sheenDir", "h")}
+              style={{ flex: 1, padding: "3px 0", fontSize: 11, fontFamily: "monospace", cursor: "pointer", borderRadius: 4, border: "1px solid #3a434f", color: tune.sheenDir === "h" ? "#05070a" : "#cdd6e0", background: tune.sheenDir === "h" ? "#8aabbb" : "#2a313b" }}>↔ LEFT-RIGHT</button>
+          </div>
+        </label>
 
         <button type="button" onClick={press}
           style={{ marginTop: 4, padding: "8px 8px", fontSize: 12, fontWeight: 700, letterSpacing: 1, color: "#05070a", background: "#8aabbb", border: "1px solid #3a434f", borderRadius: 6, cursor: "pointer", fontFamily: "monospace" }}>
