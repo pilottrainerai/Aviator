@@ -23,7 +23,7 @@ Sheen (faked metallic gradient, baked into the recoloured face field) — per-ed
 - (brightness = horizontal lerp(L,R) × vertical lerp(T,B))
 
 Buttons / cap positions (unchanged):
-- Cap `#05070a` · Border/frame `#333949` · RAT switch `#222734`
+- Cap `#05070a` · Border/frame `#15171e` (rgb 21,23,30) · RAT switch `#222734`
 - Neutral `0.008` · In `-0.041` · Stays `-0.009`
 
 ## Notes
