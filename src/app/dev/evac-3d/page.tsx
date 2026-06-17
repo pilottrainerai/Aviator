@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { EvacPanel3D, EVAC_TUNE_DEFAULT, type EvacTune, type EvacBtnPos } from "@/components/cockpit/evac-3d";
 
-const KEY = "evacTune.v5";
+const KEY = "evacTune.v6";
 
 export default function EvacPanel3DDevPage() {
   const [tune, setTune] = useState<EvacTune>(EVAC_TUNE_DEFAULT);

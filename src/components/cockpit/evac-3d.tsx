@@ -47,7 +47,7 @@ export type EvacBtnPos = "auto" | "neutral" | "in" | "stays"; // "auto" = driven
 // MASTER REFERENCE = base_hyd_no1 (HYD panel). Colour/finish/sheen matched to it 2026-06-17.
 const PANEL_BLUE = "#4a8296";
 export const EVAC_TUNE_DEFAULT: EvacTune = {
-  panel: { color: PANEL_BLUE, roughness: 0.72, metalness: 1.86, clearcoat: 0.6, env: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 }, // HYD sheen values; applied GEOMETRY-aligned (shader, world bbox) so they land on the panel's real edges regardless of UV — same appearance as the hydraulic panel on any shape/size.
+  panel: { color: PANEL_BLUE, roughness: 0.72, metalness: 1.86, clearcoat: 0.6, env: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 1.25, sheenR: 1.35 }, // GEOMETRY-aligned sheen (shader, world bbox) → lands on real edges on any shape/size. Left lifted 0.95→1.25 (vs HYD) to counter EVAC's darker left-edge metallic reflection so the dark-blue corner is gone — same APPEARANCE as HYD; the magnitude is this panel's one-slider dial.
   metal: { color: "#8b939d", roughness: 0.66, metalness: 1.0, env: 2.2 }, // user-tuned bezels
   buttonBlack: 100,
   shaft: { color: "#202632", roughness: 0.5, metalness: 1.0 },
