@@ -44,12 +44,14 @@ export interface HydTune {
   panelMetal: number;  // metalness (1.5 = near-mirror)
   panelClear: number;  // clearcoat (gloss layer — restores "life" without brightening the field)
   panelEnv: number;    // envMapIntensity (Reflections — drives the rendered blue)
+  sheenTop: number;    // faked metallic sheen: top-of-panel brightness × (mimics fire's gradient)
+  sheenBot: number;    // faked metallic sheen: bottom-of-panel brightness ×
 }
 // capColor = canvas backdrop (unlit, DO NOT TOUCH). border frame + RAT switch lifted for
 // contrast (all plates unlit so the hex shows exactly): border #333949, RAT #222734.
 // panel* defaults mirror eng-start's Blue base (rough 0.6 / metal 1.5 / clearcoat 0.4 / env 1.0)
 // so HYD starts parameter-identical to it; tune live to match the rendered look.
-export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#333949", ratColor: "#222734", neutralY: 0.008, inY: -0.03, outY: -0.014, panelColor: "#3a5572", panelRough: 0.6, panelMetal: 1.5, panelClear: 0.4, panelEnv: 0.8 };
+export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#333949", ratColor: "#222734", neutralY: 0.008, inY: -0.03, outY: -0.014, panelColor: "#3a5572", panelRough: 0.6, panelMetal: 1.5, panelClear: 0.4, panelEnv: 0.8, sheenTop: 1.7, sheenBot: 0.35 };
 
 function matNames(o: THREE.Object3D): Set<string> {
   const s = new Set<string>();
@@ -86,8 +88,9 @@ function HydScene({ lit, tune, pos }: { lit: HydLit; tune: HydTune; pos: HydPos 
       const pr = parseInt(FIELD.slice(1, 3), 16), pg = parseInt(FIELD.slice(3, 5), 16), pb = parseInt(FIELD.slice(5, 7), 16);
       // SHEEN FAKE (option 2): bake a vertical light→dark gradient into the recoloured field so the
       // flat HYD plate mimics the fire panel's metallic top-bright/bottom-dark gradient — HYD's
-      // geometry can't produce that gloss on its own (measured: fire gloss 34 vs HYD 16). top×bot.
-      const GRAD_TOP = 1.5, GRAD_BOT = 0.5;
+      // geometry can't produce that gloss on its own (measured: fire gloss 34 vs HYD 16). Live via
+      // the Sheen top/bottom sliders so the editor matches what's rendered.
+      const GRAD_TOP = tune.sheenTop, GRAD_BOT = tune.sheenBot;
       for (let p = 0; p < m.length; p += 4) {
         const r = m[p], g = m[p + 1], b = m[p + 2]; const lum = (r + g + b) / 3;
         const isPanel = lum < 110 && !(g > r + 24 && g > b + 24);
@@ -101,7 +104,7 @@ function HydScene({ lit, tune, pos }: { lit: HydLit; tune: HydTune; pos: HydPos 
       const marks = new THREE.CanvasTexture(dk); marks.flipY = false; marks.colorSpace = THREE.SRGBColorSpace; marks.anisotropy = 16; marks.needsUpdate = true;
       return { faceMask: mask, faceColored: colored, faceMarks: marks };
     } catch { return NUL; }
-  }, [faceTex, tune.panelColor]);
+  }, [faceTex, tune.panelColor, tune.sheenTop, tune.sheenBot]);
 
   const { root, legendMats, panelMats, btnClass, movable } = useMemo(() => {
     const clone = scene.clone(true);
