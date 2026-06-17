@@ -138,7 +138,7 @@ border (thickness/colour/depth/bevel), neutral position, travel limits; OFF + FA
 and **large-pushbutton text** styling. **Small-pushbutton text** instead follows the ENG FIRE
 AGENT pb. Goal = visual consistency with HYD, not a flat-colour approximation.
 
-Locked HYD values (user-confirmed): colour `#4a8c96`, roughness 0.72, metalness 1.86, clearcoat 0.6,
+Locked HYD values (user-confirmed): colour `#4a8296`, roughness 0.72, metalness 1.86, clearcoat 0.6,
 reflections(env) 0.5; sheen T0.95/B0.9/L0.95/R1.35 (brightness = horiz lerp(L,R) × vert lerp(T,B),
 baked into the recoloured face field); cap `#05070a`, border/frame `#15171e`, RAT `#222734`.
 **Gotcha:** metalness >1.0 = full mirror → renders BLACK on the real GPU though headless tests show
