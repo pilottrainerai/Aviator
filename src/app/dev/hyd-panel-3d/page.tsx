@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { HydPanel3D, HYD_TUNE_DEFAULT, type HydTune, type HydPos } from "@/components/cockpit/hyd-panel-3d";
 
-const KEY = "hydTune.v18"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
+const KEY = "hydTune.v19"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
 
 export default function HydPanel3DDevPage() {
   const [tune, setTune] = useState<HydTune>(HYD_TUNE_DEFAULT);
@@ -62,18 +62,11 @@ export default function HydPanel3DDevPage() {
         {num("Metalness", "panelMetal", 0, 3, 0.02)}
         {num("Clearcoat", "panelClear", 0, 1, 0.02)}
         {num("Reflections", "panelEnv", 0, 6, 0.05)}
-        {num("Sheen top", "sheenTop", 0.5, 2.5, 0.05)}
-        {num("Sheen bot", "sheenBot", 0.1, 1.5, 0.05)}
-        <label style={rowS}>
-          <span style={{ width: 86 }}>Sheen side</span>
-          <div style={{ display: "flex", gap: 4, flex: 1 }}>
-            {(["up", "down", "left", "right"] as const).map((d) => (
-              <button key={d} type="button" onClick={() => set("sheenDir", d)}
-                style={{ flex: 1, padding: "4px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", borderRadius: 4, border: "1px solid #3a434f", color: tune.sheenDir === d ? "#05070a" : "#cdd6e0", background: tune.sheenDir === d ? "#8aabbb" : "#2a313b" }}
-                title={`bright ${d}`}>{d === "up" ? "↑" : d === "down" ? "↓" : d === "left" ? "←" : "→"}</button>
-            ))}
-          </div>
-        </label>
+        <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 4 }}>SHEEN per edge (1.0 = neutral)</div>
+        {num("Sheen top", "sheenT", 0.1, 2.5, 0.05)}
+        {num("Sheen bot", "sheenB", 0.1, 2.5, 0.05)}
+        {num("Sheen left", "sheenL", 0.1, 2.5, 0.05)}
+        {num("Sheen right", "sheenR", 0.1, 2.5, 0.05)}
 
         <button type="button" onClick={press}
           style={{ marginTop: 4, padding: "8px 8px", fontSize: 12, fontWeight: 700, letterSpacing: 1, color: "#05070a", background: "#8aabbb", border: "1px solid #3a434f", borderRadius: 6, cursor: "pointer", fontFamily: "monospace" }}>
