@@ -47,6 +47,16 @@ Run headless:
 Pre-export checklist (per `PANEL_CONVERSION_RULES.md`): all objects included, collections exported,
 pivots preserved, materials preserved, text readable, lights functional, animated parts kept separate.
 
+## Applying this look to OTHER panels (the universal method)
+HYD's own sheen is baked into its face texture (locked, don't touch). For EVERY OTHER panel, apply
+the sheen **geometry-aligned** instead — `evac-3d.tsx` is the reference: multiply `diffuseColor` by
+`(uSL+(uSR-uSL)*fx)*(uSB+(uST-uSB)*fy)` in the panel material via `onBeforeCompile`, with `fx,fy`
+from each fragment's WORLD position normalised by the panel's world bounding box. Then Left/Right/
+Top/Bottom map to the panel's real edges on any shape/size (never bake the gradient into the UV
+texture — the bright edge lands wrong). Orientation is then automatic; the only per-panel step is a
+one-slider nudge of a sheen edge if a corner reads too dark (EVAC: Sheen left 1.25 vs HYD's 0.95).
+See the blender-panels-to-web skill §0.5.
+
 ## Notes
 - localStorage key `hydTune.v22` (bump on any default change so saved tunes don't shadow new defaults).
 - The HYD editor exposes everything live: Colour, Roughness, Metalness, Clearcoat, Reflections, and

@@ -139,8 +139,19 @@ and **large-pushbutton text** styling. **Small-pushbutton text** instead follows
 AGENT pb. Goal = visual consistency with HYD, not a flat-colour approximation.
 
 Locked HYD values (user-confirmed): colour `#4a8296`, roughness 0.72, metalness 1.86, clearcoat 0.6,
-reflections(env) 0.5; sheen T0.95/B0.9/L0.95/R1.35 (brightness = horiz lerp(L,R) × vert lerp(T,B),
-baked into the recoloured face field); cap `#05070a`, border/frame `#15171e`, RAT `#222734`.
+reflections(env) 0.5; sheen T0.95/B0.9/L0.95/R1.35; cap `#05070a`, border/frame `#15171e`, RAT `#222734`.
+
+**SHEEN must be GEOMETRY-ALIGNED, not UV-baked** (the universal method — `evac-3d.tsx` is the
+reference impl). The fake metallic sheen is a brightness gradient `(uSL+(uSR-uSL)*fx)*(uSB+(uST-uSB)*fy)`
+multiplied onto `diffuseColor` in the panel material via `onBeforeCompile`, where `fx,fy` come from
+each fragment's WORLD position normalised by the panel's world bounding box (`Box3.setFromObject`).
+This makes Left/Right/Top/Bottom map to the panel's REAL edges on ANY shape/size — do NOT bake the
+gradient into the face texture (UV space differs per panel, so the bright edge lands wrong, e.g. a
+blue blob in a corner). Uniforms are live-updated from the editor sheen sliders.
+Per-panel reality: orientation is now automatic, but the *magnitude* to counter each panel's own
+metallic reflection darkening is a one-slider nudge (EVAC needed Sheen left 1.25 vs HYD's 0.95 to
+clear a dark-blue left corner). Expect ~one sheen-edge tweak per new panel; that's normal, not a bug.
+
 **Gotcha:** metalness >1.0 = full mirror → renders BLACK on the real GPU though headless tests show
 colour; if a panel blacks out, drop metalness to ≤0.8.
 
