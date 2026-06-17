@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { HydPanel3D, HYD_TUNE_DEFAULT, type HydTune, type HydPos } from "@/components/cockpit/hyd-panel-3d";
 
-const KEY = "hydTune.v17"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
+const KEY = "hydTune.v18"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
 
 export default function HydPanel3DDevPage() {
   const [tune, setTune] = useState<HydTune>(HYD_TUNE_DEFAULT);
@@ -65,12 +65,13 @@ export default function HydPanel3DDevPage() {
         {num("Sheen top", "sheenTop", 0.5, 2.5, 0.05)}
         {num("Sheen bot", "sheenBot", 0.1, 1.5, 0.05)}
         <label style={rowS}>
-          <span style={{ width: 86 }}>Sheen axis</span>
-          <div style={{ display: "flex", gap: 6, flex: 1 }}>
-            <button type="button" onClick={() => set("sheenDir", "v")}
-              style={{ flex: 1, padding: "3px 0", fontSize: 11, fontFamily: "monospace", cursor: "pointer", borderRadius: 4, border: "1px solid #3a434f", color: tune.sheenDir === "v" ? "#05070a" : "#cdd6e0", background: tune.sheenDir === "v" ? "#8aabbb" : "#2a313b" }}>↕ TOP-BOT</button>
-            <button type="button" onClick={() => set("sheenDir", "h")}
-              style={{ flex: 1, padding: "3px 0", fontSize: 11, fontFamily: "monospace", cursor: "pointer", borderRadius: 4, border: "1px solid #3a434f", color: tune.sheenDir === "h" ? "#05070a" : "#cdd6e0", background: tune.sheenDir === "h" ? "#8aabbb" : "#2a313b" }}>↔ LEFT-RIGHT</button>
+          <span style={{ width: 86 }}>Sheen side</span>
+          <div style={{ display: "flex", gap: 4, flex: 1 }}>
+            {(["up", "down", "left", "right"] as const).map((d) => (
+              <button key={d} type="button" onClick={() => set("sheenDir", d)}
+                style={{ flex: 1, padding: "4px 0", fontSize: 13, fontFamily: "monospace", cursor: "pointer", borderRadius: 4, border: "1px solid #3a434f", color: tune.sheenDir === d ? "#05070a" : "#cdd6e0", background: tune.sheenDir === d ? "#8aabbb" : "#2a313b" }}
+                title={`bright ${d}`}>{d === "up" ? "↑" : d === "down" ? "↓" : d === "left" ? "←" : "→"}</button>
+            ))}
           </div>
         </label>
 
