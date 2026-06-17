@@ -47,7 +47,7 @@ export type EvacBtnPos = "auto" | "neutral" | "in" | "stays"; // "auto" = driven
 // MASTER REFERENCE = base_hyd_no1 (HYD panel). Colour/finish/sheen matched to it 2026-06-17.
 const PANEL_BLUE = "#4a8296";
 export const EVAC_TUNE_DEFAULT: EvacTune = {
-  panel: { color: PANEL_BLUE, roughness: 0.72, metalness: 1.86, clearcoat: 0.6, env: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 },
+  panel: { color: PANEL_BLUE, roughness: 0.72, metalness: 1.86, clearcoat: 0.6, env: 0.5, sheenT: 1.0, sheenB: 1.0, sheenL: 1.0, sheenR: 1.0 }, // sheen flat: EVAC's face UV is oriented differently than HYD's, so HYD's L/R/T/B sheen lands on the wrong edges (blue blob bottom-left). Flat = clean uniform teal; remap axes if a directional gradient is wanted.
   metal: { color: "#8b939d", roughness: 0.66, metalness: 1.0, env: 2.2 }, // user-tuned bezels
   buttonBlack: 100,
   shaft: { color: "#202632", roughness: 0.5, metalness: 1.0 },

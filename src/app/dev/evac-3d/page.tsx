@@ -6,13 +6,14 @@
 import { useEffect, useState } from "react";
 import { EvacPanel3D, EVAC_TUNE_DEFAULT, type EvacTune, type EvacBtnPos } from "@/components/cockpit/evac-3d";
 
-const KEY = "evacTune.v3";
+const KEY = "evacTune.v4";
 
 export default function EvacPanel3DDevPage() {
   const [tune, setTune] = useState<EvacTune>(EVAC_TUNE_DEFAULT);
   const [active, setActive] = useState(false); // EVAC COMMAND pressed → alert active (EVAC flashes red, ON white)
   const [hornSignal, setHornSignal] = useState(0); // increments per HORN SHUT OFF press → momentary dip
   const [btnPos, setBtnPos] = useState<EvacBtnPos>("auto"); // BUTTON EDIT preview ("auto" = live)
+  const [collapsed, setCollapsed] = useState(false); // edit panel collapse/close toggle
   // Play a preview press: dip to IN, then settle at STAYS (returns to AUTO/live after).
   const playPress = () => { setBtnPos("in"); setTimeout(() => setBtnPos("stays"), 190); };
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function EvacPanel3DDevPage() {
     border: "1px solid #2a313b", fontFamily: "monospace", fontSize: 12, color: "#cdd6e0" };
   const hdr: React.CSSProperties = { letterSpacing: 1, color: "#8aabbb", textTransform: "uppercase", marginTop: 8, fontSize: 11 };
   const rowS: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
-  const numS: React.CSSProperties = { width: 56, flex: "0 0 auto", background: "#161b22", color: "#eef6ff", border: "1px solid #3a434f", borderRadius: 4, padding: "2px 4px", fontFamily: "monospace", fontSize: 11, textAlign: "right" };
+  const numS: React.CSSProperties = { width: 70, flex: "0 0 auto", background: "#161b22", color: "#eef6ff", border: "1px solid #3a434f", borderRadius: 4, padding: "2px 4px", fontFamily: "monospace", fontSize: 11, textAlign: "right" };
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number.isFinite(v) ? v : lo));
 
   const num = (label: string, grp: keyof EvacTune, key: string | null, min: number, max: number, step: number) => {
@@ -87,7 +88,12 @@ export default function EvacPanel3DDevPage() {
       </div>
 
       <div style={box}>
-        <div style={{ letterSpacing: 1, color: "#dfe6f0", fontWeight: 700 }}>EVAC · PANEL + BUTTON EDIT</div>
+        <button type="button" onClick={() => setCollapsed((v) => !v)}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", letterSpacing: 1, color: "#dfe6f0", fontWeight: 700, background: "transparent", border: "none", cursor: "pointer", fontFamily: "monospace", fontSize: 12, padding: 0 }}>
+          <span>EVAC · PANEL + BUTTON EDIT</span>
+          <span style={{ color: "#8aabbb" }}>{collapsed ? "▸" : "▾"}</span>
+        </button>
+        {!collapsed && <>
 
         <div style={hdr}>PANEL (FACE) — matched to base_hyd_no1</div>
         {color("Colour", "panel", "color", tune.panel.color ?? "#456a93")}
@@ -171,6 +177,7 @@ export default function EvacPanel3DDevPage() {
             Reset all
           </button>
         </div>
+        </>}
       </div>
     </main>
   );
