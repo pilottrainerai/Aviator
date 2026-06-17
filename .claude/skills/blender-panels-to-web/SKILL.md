@@ -59,6 +59,90 @@ case — copy `src/components/cockpit/fire-test-panel-3d.tsx` and adapt.
    Also set `faceTex.anisotropy = 16`. Applies to EVERY cockpit panel (fire + ENG
    START + all future ones). CAVEAT: a CSS `scale()` zoom re-softens the canvas — use
    true camera zoom or frame-resize, not CSS scale, when crispness must survive zoom.
+10. **APPLY THE FULL §10 FINAL TREATMENT ON THE FIRST PASS — never a "basic" material
+   pass.** Standing requirement (user: "whenever you input we need to apply the same
+   logic same skills... I do have to tell you every time"). The MOMENT a panel is
+   brought to web it must load in the FINAL/shipped format — right texture, right
+   colour, right metallic finish — nothing missed. That means §10 in full, every time:
+   §10a LIT metallic face (MeshPhysical, legends stay unlit on top), §10b finish values
+   (roughness 0.6 / metalness 1.5 / clearcoat / envMapIntensity), §10c the text-
+   protection MASK (metalnessMap+clearcoatMap so finish lands only on the panel field,
+   text/lines stay matte), §10d reflections isolated (env-bind the PANEL materials
+   only), §10e part materials by name (matte-black buttons #0b0d10 rough 1 metal 0
+   env 0; guard housing metal 0.7 rough 0.32; legends visible-dim → glow), §10h lighting
+   rig + camera + `cockpitDpr()`. `evac-3d.tsx` is the canonical leaner example (shares
+   the same material names: hydraulic decals / Blue base / black button / Material /
+   emissive). Do NOT ship a quick MeshBasic/clone first pass and "polish later".
+11. **EVERY pushbutton gets the full PB treatment — colours (cap + border) AND the
+    NEUTRAL/IN/STAYS press logic — checked on EVERY new Blender panel.** Standing
+    requirement (user, HYD panel 2026-06-16: "for any push button check its border and
+    cap color as well neutral in and stays logic as rule and skill when we bring new
+    blender"). For each pushbutton-type control (see §11 below):
+    - **Cap = the CANVAS backdrop colour, rendered UNLIT** (`MeshBasicMaterial`,
+      `toneMapped:false`). A LIT matte material always reflects ~4% dielectric specular
+      → washes a dark cap to grey and never matches the canvas at the same hex. Unlit =
+      the cap shows its exact tone. HYD base: cap `#05070a` (canvas).
+    - **Border/bezel frame + any guarded-switch plates = lifted tones for CONTRAST**,
+      also UNLIT so the hex shows exactly (a lit plate never matches an unlit cap).
+      HYD base: border/frame `#333949`, RAT switch `#222734`. The cap–border gap is the
+      contrast that makes the button read; same tone everywhere = a flat black field.
+    - **Plates move NEUTRAL→IN→STAYS** along the panel normal (absolute offsets added to
+      baseY, NOT deltas): only the CAP + its legends move; the BORDER and any guarded
+      switch (e.g. RAT) stay at their imported Blender position. HYD base: neutral 0.008,
+      in −0.03, stays −0.014. Expose all of it in the dev edit bar (3 colour pickers +
+      3 position sliders + a readout; bump the `localStorage` key whenever you change a
+      baked default, or the user's stale saved value keeps overriding it).
+    - **Three gotchas that silently break this:** (a) classify parts from material names
+      *before* the §10 remap (remap renames `emissive→legend`, `decals→face`) or legends
+      get dropped from the moving set and the text won't travel with the cap; (b) the
+      press is along the panel NORMAL = the face-on camera's view axis, so it's invisible
+      face-on — verify from an OBLIQUE orbit; (c) a slider only moves the cap while its
+      own position is being previewed — auto-switch the preview to the slider's position.
+12. **Match the STANDARD panel blue `#456a93` on the FACE, not just the geometry.** The
+    baked face carries Blender's own blue (HYD was `#33607a`) which differs from every
+    other cockpit panel. Fixing only the `Blue base` geometry leaves the FACE wrong.
+    Recolour the field web-side in the same mask pass (§10c): where `isPanel`, overwrite
+    the pixel to `#456a93`; keep white/green lettering. Use the standard finish the other
+    panels use (`clearcoat 0.4`). **But the same hex does NOT guarantee the same look:**
+    metalness 1.5 makes the panel a near-mirror, so the rendered blue is mostly the HDRI
+    REFLECTION and depends on the camera angle vs the HDRI. VERIFY by sampling the rendered
+    blue (CDP/headless screenshot → PIL patch average) against a reference panel (eng-start
+    renders ≈`#2e5880`) and tune `envMapIntensity` until they match — a flatter/face-on dev
+    camera catches a brighter region, so HYD needed **0.62** vs the nominal 1.0 to match.
+    Don't trust "the hex is right" — sample both and match the rendered pixels.
+    **DECOUPLE COLOUR FROM SHEEN — `envMapIntensity` controls BOTH, so it is the wrong knob
+    for "life".** (HYD lesson, 2026-06-17.) If the env value that matches the colour leaves
+    the panel looking flat/dead, do NOT raise `envMapIntensity` to bring back the gloss — that
+    re-brightens the whole field and breaks the colour match (HYD at env 1.0 jumped to a washed
+    `#4574ad`, the brightest outlier of all panels). Instead keep env at the colour-matched
+    value and restore the gloss with the **clearcoat layer**, which adds a specular highlight
+    streak WITHOUT shifting the base colour: raise `clearcoat` (≈0.4 → **0.9**) and drop
+    `clearcoatRoughness` (≈0.22 → **0.1**). Proven: HYD env `0.62` + clearcoat `0.9` /
+    ccRough `0.1` samples `#426693` (≈ the `#456a93` target, in-family) AND has the glossy
+    gradient back (dark `#3e5f89` → bright `#476e9e`). Rule of thumb: **env = colour, clearcoat
+    = sheen.** Sample blue-field pixels with `B≥G and B−R≥14` — the standard blue has G>R, so
+    a naïve "exclude G>R green-line" filter wrongly drops the paint itself.
+
+---
+
+## 0.5 MASTER REFERENCE PANEL — BASE HYD No.1
+
+The **HYDRAULIC panel** (`base_hyd_no1`, git tag `base-hyd-no1`, snapshot in
+`Aviator/blender/hyd/base_hyd_no1/`) is the **master reference** for every other panel.
+Whenever uncertainty exists about a panel's look, **copy from HYD** — do not invent values or
+infer Airbus components from memory. Full rules: `blender/hyd/base_hyd_no1/PANEL_CONVERSION_RULES.md`.
+
+Match from HYD: base panel colour, roughness, metalness, clearcoat, reflection response, edge
+highlights, specular, and the **four-edge sheen** (top/bottom/left/right); pushbutton colour,
+border (thickness/colour/depth/bevel), neutral position, travel limits; OFF + FAULT light styling;
+and **large-pushbutton text** styling. **Small-pushbutton text** instead follows the ENG FIRE
+AGENT pb. Goal = visual consistency with HYD, not a flat-colour approximation.
+
+Locked HYD values (user-confirmed): colour `#4a8c96`, roughness 0.72, metalness 1.86, clearcoat 0.6,
+reflections(env) 0.5; sheen T0.95/B0.9/L0.95/R1.35 (brightness = horiz lerp(L,R) × vert lerp(T,B),
+baked into the recoloured face field); cap `#05070a`, border/frame `#15171e`, RAT `#222734`.
+**Gotcha:** metalness >1.0 = full mirror → renders BLACK on the real GPU though headless tests show
+colour; if a panel blacks out, drop metalness to ≤0.8.
 
 ---
 
