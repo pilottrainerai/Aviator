@@ -66,7 +66,7 @@ export interface EngTune {
 }
 const PANEL_BLUE = "#456a93"; // darker base so the white labels read clearly (was #7e9fc6)
 export const ENG_TUNE_DEFAULT: EngTune = {
-  panel: { color: PANEL_BLUE, roughness: 0.6, metalness: 1.5, clearcoat: 0.4, env: 1.0 },
+  panel: { color: PANEL_BLUE, roughness: 0.5, metalness: 1.5, clearcoat: 1.0, env: 1.0 }, // match live fire panel finish (glossy)
   knob: { color: "#8b939d", roughness: 0.4, metalness: 1.0, env: 0.9 }, // defined chrome (not flushed white)
   buttonBlack: 100,
   center: { color: "#181d25", roughness: 0.5, metalness: 0.3 },

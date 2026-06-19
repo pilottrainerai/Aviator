@@ -49,3 +49,4 @@ next-env.d.ts
 
 # Reference manuals (belong in ~/.claude/manuals/a320/, not the repo)
 *.pdf
+.npm-cache/

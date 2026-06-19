@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { EngStartPanel3D, ENG_TUNE_DEFAULT, MODE_LABELS, type EngTune } from "@/components/cockpit/eng-start-panel-3d";
 
-const KEY = "engStartTune.v1";
+const KEY = "engStartTune.v2";
 
 export default function EngStartPanel3DDevPage() {
   const [tune, setTune] = useState<EngTune>(ENG_TUNE_DEFAULT);
@@ -14,6 +14,7 @@ export default function EngStartPanel3DDevPage() {
   // (button or clicking the 3D switch); nothing turns them off automatically.
   const [masters, setMasters] = useState<boolean[]>([true, true]);
   const [mode, setMode] = useState(1); // 0 CRANK, 1 NORM, 2 IGN START
+  const [collapsed, setCollapsed] = useState(false); // dev edit bar collapse toggle
   // Simulated engine-fire state — in the real runner this comes from the scenario:
   //   fires[i] = !!state.triggersFired["fire_warn"] && !state.triggersFired["fire_extinguished"]
   const [fires, setFires] = useState<boolean[]>([false, false]);
@@ -27,12 +28,12 @@ export default function EngStartPanel3DDevPage() {
   const set = (grp: keyof EngTune, key: string | null, v: number | string) =>
     setTune((t) => save(key == null ? { ...t, [grp]: v } as EngTune : { ...t, [grp]: { ...(t[grp] as object), [key]: v } }));
 
-  const box: React.CSSProperties = { position: "fixed", top: 16, right: 16, zIndex: 10, width: 248, maxHeight: "92vh", overflowY: "auto",
+  const box: React.CSSProperties = { position: "fixed", top: 16, right: 16, zIndex: 10, width: 280, maxHeight: "92vh", overflowY: "auto",
     display: "flex", flexDirection: "column", gap: 4, padding: "12px 14px", borderRadius: 10, background: "rgba(10,14,20,0.94)",
     border: "1px solid #2a313b", fontFamily: "monospace", fontSize: 12, color: "#cdd6e0" };
   const hdr: React.CSSProperties = { letterSpacing: 1, color: "#8aabbb", textTransform: "uppercase", marginTop: 8, fontSize: 11 };
   const rowS: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
-  const numS: React.CSSProperties = { width: 48, background: "#161b22", color: "#eef6ff", border: "1px solid #3a434f", borderRadius: 4, padding: "2px 4px", fontFamily: "monospace", fontSize: 11, textAlign: "right" };
+  const numS: React.CSSProperties = { width: 64, background: "#161b22", color: "#eef6ff", border: "1px solid #3a434f", borderRadius: 4, padding: "2px 6px", fontFamily: "monospace", fontSize: 11, textAlign: "right" };
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number.isFinite(v) ? v : lo));
 
   // numeric slider+box row bound to tune[grp][key]
@@ -90,7 +91,12 @@ export default function EngStartPanel3DDevPage() {
       </div>
 
       <div style={box}>
-        <div style={{ letterSpacing: 1, color: "#dfe6f0", fontWeight: 700 }}>ENG START · PARTS</div>
+        <button type="button" onClick={() => setCollapsed((v) => !v)}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", letterSpacing: 1, color: "#dfe6f0", fontWeight: 700, background: "transparent", border: "none", cursor: "pointer", fontFamily: "monospace", fontSize: 12, padding: 0 }}>
+          <span>ENG START · PARTS</span>
+          <span style={{ color: "#8aabbb" }}>{collapsed ? "▸" : "▾"}</span>
+        </button>
+        {!collapsed && <>
 
         <div style={hdr}>Panel (Blue base)</div>
         {color("Colour", "panel", "color", tune.panel.color ?? "#456a93")}
@@ -120,6 +126,7 @@ export default function EngStartPanel3DDevPage() {
           style={{ marginTop: 10, padding: "5px 8px", fontSize: 11, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
           Reset all
         </button>
+        </>}
       </div>
     </main>
   );

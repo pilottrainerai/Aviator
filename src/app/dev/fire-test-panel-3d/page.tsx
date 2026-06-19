@@ -14,7 +14,7 @@ type AgentKey = "capBlack" | "aroundBlack" | "capBlackApu" | "aroundBlackApu";
 const AGENT_DEF = { capBlack: 100, aroundBlack: 80, capBlackApu: 100, aroundBlackApu: 85 }; // baked tuned values
 const CAP_BASE = [70, 80, 92];      // grey the cap darkens from
 const AROUND_BASE = [92, 104, 120]; // grey the surround darkens from
-const toneDef = (): PanelSet => ({ color: "#ffffff", roughness: 0.6, metalness: 1.5, clearcoat: 0.4, env: 1.0 }); // baked tuned finish (reduced glare)
+const toneDef = (): PanelSet => ({ color: "#ffffff", roughness: 0.5, metalness: 1.5, clearcoat: 1.0, env: 1.0 }); // canonical glossy finish — matches HYD + eng-start
 
 const rgbToHex = (a: number[]) => "#" + a.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
 const blackHex = (base: number[], b: number) => rgbToHex(base.map((v) => v * (1 - b / 100)));
@@ -26,6 +26,8 @@ export default function FireTestPanel3DDevPage() {
 
   const [agent, setAgent] = useState(AGENT_DEF);
   const [tone, setTone] = useState<Tone>("none");
+  const [colA, setColA] = useState(false); // collapse AGENTS edit panel
+  const [colP, setColP] = useState(false); // collapse PANEL edit panel
   const [byTone, setByTone] = useState<Record<Tone, PanelSet>>({ none: toneDef(), agx: toneDef(), aces: toneDef() });
   useEffect(() => {
     try { const a = localStorage.getItem("fireAgentBlack.v1"); if (a) setAgent({ ...AGENT_DEF, ...JSON.parse(a) }); } catch { /* ignore */ }
@@ -52,7 +54,7 @@ export default function FireTestPanel3DDevPage() {
   const rowS: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
   const btn: React.CSSProperties = { marginTop: 2, padding: "4px 8px", fontSize: 11, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" };
 
-  const numStyle: React.CSSProperties = { width: 46, background: "#161b22", color: "#eef6ff", border: "1px solid #3a434f", borderRadius: 4, padding: "2px 4px", fontFamily: "monospace", fontSize: 11, textAlign: "right" };
+  const numStyle: React.CSSProperties = { width: 64, background: "#161b22", color: "#eef6ff", border: "1px solid #3a434f", borderRadius: 4, padding: "2px 6px", fontFamily: "monospace", fontSize: 11, textAlign: "right" };
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number.isFinite(v) ? v : lo));
   // Called INLINE ({blackRow(...)}) — NOT as <Component/> — so the inputs aren't
   // remounted on every change (that remount was what made the slider jump/stick).
@@ -77,6 +79,7 @@ export default function FireTestPanel3DDevPage() {
       <FireTestPanel3D fireDetected={fireDetected} resetSignal={resetSignal}
         agentCapColor={capHex} agentAsmColor={aroundHex}
         agentCapColorApu={capHexApu} agentAsmColorApu={aroundHexApu}
+        panelColor={cur.color}
         panelRoughness={cur.roughness} panelMetalness={cur.metalness}
         panelClearcoat={cur.clearcoat} envIntensity={cur.env} toneMapping={tone} />
 
@@ -88,7 +91,10 @@ export default function FireTestPanel3DDevPage() {
 
       {/* AGENT darkness — separate controls for the ENG agents vs the APU agent */}
       <div style={{ ...box, left: 16 }}>
-        <div style={title}>agents — black amount</div>
+        <button type="button" onClick={() => setColA((v) => !v)} style={{ ...rowS, justifyContent: "space-between", ...title, background: "transparent", border: "none", cursor: "pointer", fontFamily: "monospace", fontSize: 12, padding: 0 }}>
+          <span>agents — black amount</span><span style={{ color: "#8aabbb" }}>{colA ? "▸" : "▾"}</span>
+        </button>
+        {!colA && <>
         <div style={{ color: "#7c8696", fontSize: 10, marginTop: 2 }}>ENGINE 1 &amp; 2 agents</div>
         {blackRow("Button (cap)", capHex, "capBlack")}
         {blackRow("Around it", aroundHex, "aroundBlack")}
@@ -96,23 +102,33 @@ export default function FireTestPanel3DDevPage() {
         {blackRow("Button (cap)", capHexApu, "capBlackApu")}
         {blackRow("Around it", aroundHexApu, "aroundBlackApu")}
         <button type="button" style={btn} onClick={() => { setAgent(AGENT_DEF); try { localStorage.setItem("fireAgentBlack.v1", JSON.stringify(AGENT_DEF)); } catch { /* ignore */ } }}>Reset agents</button>
+        </>}
       </div>
 
       {/* PANEL front-face material — per tone-map */}
       <div style={{ ...box, right: 16 }}>
         <div style={{ ...rowS, justifyContent: "space-between" }}>
-          <span style={title}>panel · front face</span>
+          <button type="button" onClick={() => setColP((v) => !v)} style={{ ...title, background: "transparent", border: "none", cursor: "pointer", fontFamily: "monospace", fontSize: 12, padding: 0 }}>
+            panel · front face {colP ? "▸" : "▾"}
+          </button>
           <select value={tone} onChange={(e) => { const t = e.target.value as Tone; setTone(t); savePanel(byTone, t); }}
             style={{ background: "#161b22", color: "#cdd6e0", border: "1px solid #3a434f", borderRadius: 4, padding: "2px 4px" }}>
             <option value="none">None</option><option value="agx">AgX</option><option value="aces">ACES</option>
           </select>
         </div>
+        {!colP && <>
+        <label style={rowS}>
+          <span style={{ width: 74 }}>Colour</span>
+          <input type="color" value={cur.color} onChange={(e) => setPanelVal("color", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />
+          <span style={{ ...numStyle, display: "inline-flex", alignItems: "center", justifyContent: "flex-end" }}>{cur.color}</span>
+        </label>
         {panelRow("Roughness", "roughness", 0, 1, 0.02)}
         {panelRow("Metalness", "metalness", 0, 3, 0.02)}
         {panelRow("Clearcoat", "clearcoat", 0, 1, 0.02)}
         {panelRow("Reflections", "env", 0, 6, 0.05)}
         <span style={{ color: "#7c8696", fontSize: 10 }}>saved per tone-map ({tone})</span>
         <button type="button" style={btn} onClick={() => { const n = { ...byTone, [tone]: toneDef() }; setByTone(n); savePanel(n, tone); }}>Reset {tone}</button>
+        </>}
       </div>
     </main>
   );
