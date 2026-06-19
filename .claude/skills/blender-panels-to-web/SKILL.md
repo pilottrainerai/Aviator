@@ -18,6 +18,32 @@ case — copy `src/components/cockpit/fire-test-panel-3d.tsx` and adapt.
 
 ---
 
+## THE WORKING LOOP — CONTEXT → PLAN → VERIFY → EVOLVE (run this EVERY panel/plan, no exceptions)
+
+Standing requirement (user, 2026-06-19). The failure mode to kill: improvising the conversion "from
+memory," applying the logic, shipping it, missing something, and the USER catching it later. Never
+work that way. Every time a panel or a plan is handed over:
+
+1. **CONTEXT first — read before you touch anything.** Load: THIS skill (esp. §0, §0.5, §10, §11),
+   the project memory (`project_aviator_base_hyd_no1` + related), and the master reference
+   `base_hyd_no1/` (README + PANEL_CONVERSION_RULES + the code + export scripts). You convert FROM
+   that context, not from memory. If you didn't read it, you're guessing.
+2. **PLAN against the context.** Write the explicit match-list up front so nothing is missed by
+   default: base colour, finish (rough/metal/clear/env), **geometry-aligned sheen**, pushbutton
+   cap/border, NEUTRAL/IN/STAYS movement, OFF/FAULT lights, large- vs small-pushbutton text, decals,
+   guards, indicators, editor format. Confirm the list with the user when the panel is non-trivial.
+3. **VERIFY every action — never assume an edit worked.** Render headless (puppeteer), sample the
+   pixels, and remember the **headless render can differ from the real GPU** (metalness>1 black trap)
+   — so confirm the important calls on the user's actual screen. Catch your own misses here, before
+   the user does.
+4. **EVOLVE — write the lesson back immediately.** The moment something was missed, learned, or
+   tuned, update THIS skill + the memory in the same session, so the next panel never repeats it.
+   The skill is meant to get strictly better every panel; if it didn't improve, the loop wasn't run.
+
+This loop is the system. Apply it to panels, plans, and any non-trivial task in this repo.
+
+---
+
 ## 0. Hard rules (the expensive lessons — never relearn them)
 
 1. **Never break working state.** A committed base model must exist before you
