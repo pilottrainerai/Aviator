@@ -2060,6 +2060,10 @@ function DslControlPanel({
                   onToggleMaster={(i) => { if (i === 0) performStep("eng1_master_off"); }}
                   onCycleMode={() => {}}
                 />
+                {/* Training-guide flash: the WHOLE ENG START box pulses when ENG 1 MASTER is the next action */}
+                {isDone("eng1_fire_pb") && !isDone("eng1_master_off") && (
+                  <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: 8, animation: "ccGuideFlash 1.15s ease-in-out infinite" }} />
+                )}
               </div>
             </DevMovable>
             {edit && (

@@ -537,6 +537,55 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
     );
   }, [runner.state.completedSteps, runner.state.triggersFired, runner.status, scenario.steps]);
 
+  // ── Training-mode guidance: flash the surface of the SINGLE primary next step ──
+  const [trainingGuide, setTrainingGuide] = useState(true);
+  const primaryNextStep = useMemo(() => {
+    if (runner.status !== "running") return null;
+    return (
+      scenario.steps.find(
+        (s) =>
+          !s.optional &&
+          !runner.state.completedSteps[s.id] &&
+          (!s.requiresTrigger || !!runner.state.triggersFired[s.requiresTrigger]) &&
+          (s.requires ?? []).every((r) => !!runner.state.completedSteps[r]),
+      ) ?? null
+    );
+  }, [runner.state.completedSteps, runner.state.triggersFired, runner.status, scenario.steps]);
+  // Which surface should flash (null = none). comms→ATC, hardware→action panel, glareshield→glareshield.
+  const pfActionSteps = useMemo(
+    () => new Set((scenario.phases ?? []).map((p) => p.pfAction?.stepId).filter((x): x is string => !!x)),
+    [scenario.phases],
+  );
+  // ATC/COMMS flashes the whole time a call is active — no auto-collapse (stays on until answered).
+  const commsCallFlash = trainingGuide && atcPhase.kind === "active";
+  // Each panel flashes distinctly: PFD / ECAM(+fire) / fire / glareshield / comms(ATC) / procedure.
+  const baseFlash =
+    !trainingGuide || !primaryNextStep
+      ? null
+      : pfActionSteps.has(primaryNextStep.id)
+        ? "pfd"
+        : primaryNextStep.group === "glareshield"
+          ? "glareshield"
+          : primaryNextStep.group === "comms"
+            ? "comms"
+            : primaryNextStep.hardware
+              ? "firepanel"
+              : "procedure";
+  // ATC has priority over the procedure: while a call is pending, DON'T flash the procedure
+  // section — it waits until the ATC is handled. (Hardware/agent actions still flash alongside ATC.)
+  const flashSurface = commsCallFlash && baseFlash === "procedure" ? null : baseFlash;
+  const guideFlash = (key: string) =>
+    flashSurface === key ? { animation: "ccGuideFlash 1.15s ease-in-out infinite", borderRadius: "4px" } : {};
+  // Overlay flash — sits ON TOP of opaque panel content (fire panel / ECAM), so it's visible.
+  const flashOverlay = (key: string) =>
+    flashSurface === key ? (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: "4px", animation: "ccGuideFlash 1.15s ease-in-out infinite" }} />
+    ) : null;
+  const flashOverlayIf = (on: boolean) =>
+    on ? (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: "4px", animation: "ccGuideFlash 1.15s ease-in-out infinite" }} />
+    ) : null;
+
   // Auto-open decision drawer when it first unlocks (agent1 completed)
   const agent1Done = !!runner.state.completedSteps["agent1"];
   useEffect(() => {
@@ -594,6 +643,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
       <AudioController active={runner.state.masterWarnActive} cautActive={runner.state.masterCautActive} />
       <ScenarioClock elapsedMs={runner.elapsedMs} state={runner.state} scenario={scenario} />
 
+      <style>{`@keyframes ccGuideFlash{0%,100%{box-shadow:inset 0 0 0 2px rgba(57,129,246,.25)}50%{box-shadow:inset 0 0 0 4px rgba(57,129,246,1),inset 0 0 28px rgba(57,129,246,.6)}}`}</style>
       <div className="flex flex-1 min-h-0">
 
         {/* ── LEFT PANEL — cockpit instruments ────────────────────────── */}
@@ -604,7 +654,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
           <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", padding: "10px 4px 8px 10px", overflow: "hidden" }}>
             {/* PFD + ND */}
             <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-              <div style={{ width: "380px", height: "380px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
+              <div style={{ width: "380px", height: "380px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden", ...guideFlash("pfd") }}>
                 <div style={{ position: "relative", width: "100%", height: "100%" }}>
                   <PfdMockup
                     state={runner.state}
@@ -637,17 +687,19 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
               </div>
             </div>
             {/* Glareshield — compact strip */}
-            <div style={{ flexShrink: 0, marginTop: "4px" }}>
+            <div style={{ flexShrink: 0, marginTop: "4px", position: "relative" }}>
               <GlareshieldPanel
                 scenario={scenario}
                 state={runner.state}
                 perform={runner.perform}
                 disabled={runner.status !== "running"}
               />
+              {flashOverlay("glareshield")}
             </div>
             {/* ECAM (E/WD) — fills remaining height */}
-            <div style={{ flex: "1 1 0", minHeight: 0, marginTop: "4px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ flex: "1 1 0", minHeight: 0, marginTop: "4px", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
               <EwdDisplay state={runner.state} scenario={scenario} />
+              {flashOverlay("firepanel")}
             </div>
             {/* STATUS page — below ECAM, same left sub-column */}
             <StatusPanel scenario={scenario} state={runner.state} />
@@ -655,12 +707,15 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
 
           {/* Right sub-column: Fire/Engine (top) + System Display (mid) */}
           <div style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: "6px", padding: "10px 10px 8px 4px" }}>
-            <FirePanelContainer
-              scenario={scenario}
-              state={runner.state}
-              perform={runner.perform}
-              disabled={runner.status !== "running"}
-            />
+            <div style={{ flexShrink: 0, position: "relative" }}>
+              <FirePanelContainer
+                scenario={scenario}
+                state={runner.state}
+                perform={runner.perform}
+                disabled={runner.status !== "running"}
+              />
+              {flashOverlay("firepanel")}
+            </div>
             <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <SystemDisplay state={runner.state} scenario={scenario} />
             </div>
@@ -681,6 +736,19 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
               <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
                 ◈ ACTION PANEL
               </span>
+              <button
+                onClick={() => setTrainingGuide((v) => !v)}
+                title="Training guidance — flash the next action's surface"
+                style={{
+                  fontFamily: "monospace", fontSize: "8px", letterSpacing: "0.12em",
+                  padding: "2px 6px", borderRadius: "3px", border: "1px solid var(--color-border)",
+                  color: trainingGuide ? "#3981f6" : "var(--color-text-muted)",
+                  background: trainingGuide ? "rgba(57,129,246,0.12)" : "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                ✦ GUIDE {trainingGuide ? "ON" : "OFF"}
+              </button>
               <button
                 onClick={() => (runner.paused ? runner.resume() : runner.pause())}
                 className="px-2 py-0.5 border border-[#1C2530] text-[9px] uppercase tracking-wider hover:border-[#3A4555]"
@@ -708,8 +776,9 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
           {/* ── COMMS SECTION — fixed reservation, content scrolls if overflow ── */}
           <div
             className="shrink-0 flex flex-col"
-            style={{ borderBottom: "1px solid var(--color-border)", height: "420px" }}
+            style={{ borderBottom: "1px solid var(--color-border)", height: "420px", position: "relative" }}
           >
+            {flashOverlayIf(flashSurface === "comms" || commsCallFlash)}
             <div
               className="px-4 py-1.5 shrink-0 flex items-center justify-between"
               style={{ borderBottom: "1px solid var(--color-border)" }}
@@ -760,7 +829,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
           </div>
 
           {/* ── PROCEDURE SECTION — stable reserved space, never shifts ── */}
-          <div className="flex-1 min-h-0 flex flex-col" style={{ minHeight: "180px" }}>
+          <div className="flex-1 min-h-0 flex flex-col" style={{ minHeight: "180px", ...guideFlash("procedure") }}>
             {/* Header */}
             <div
               className="px-4 py-1.5 shrink-0 flex items-center justify-between"

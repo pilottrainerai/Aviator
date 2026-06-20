@@ -981,7 +981,7 @@ export const eng1FireAfterV1: Scenario = {
     //   Correct choice completes pm_hold_req step, which gates the ATC holding clearance response.
     {
       id: "pm_hold_req_card",
-      atMs: 5_000,
+      atMs: 1_500,
       requiresStep: "mct_open_clb",
       kind: "crew",
       from: "PM → DELHI DEPARTURE",
