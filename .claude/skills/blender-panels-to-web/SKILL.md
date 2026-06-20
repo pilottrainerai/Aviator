@@ -148,6 +148,26 @@ This loop is the system. Apply it to panels, plans, and any non-trivial task in 
     gradient back (dark `#3e5f89` → bright `#476e9e`). Rule of thumb: **env = colour, clearcoat
     = sheen.** Sample blue-field pixels with `B≥G and B−R≥14` — the standard blue has G>R, so
     a naïve "exclude G>R green-line" filter wrongly drops the paint itself.
+13. **A legend UNDER a flip-up guard must DEPTH-TEST against the cover, or it bleeds through.**
+    (HYD ELEC pump lesson, 2026-06-20.) Pump legends render `depthTest:false` so the lit words
+    always sit over the baked face (rule #4) — but for a guarded control that makes the FAULT/OFF
+    text draw THROUGH the cover whenever the cover is in front of it (closed, or swung in front
+    mid-open). Fix: set `depthTest:true` on the GUARDED legend's mats ONLY (filter legend entries
+    by the control's `isElec`/`isRat` predicate); the opaque cover (depthWrite on) then occludes
+    it. **Do NOT add polygonOffset to "keep it over the face"** — the cover↔legend gap is tiny
+    (~0.02 world units), so a forward offset shoves the legend back through the cover and brings
+    the bleed-through straight back. The legend already sits ~0.025 forward of the face, so plain
+    `depthTest:true` won't z-fight. Plain (unguarded) pump legends KEEP `depthTest:false`.
+14. **Headless software-GL UNDER-SATURATES lit-material colour — verify button colours at the
+    DATA level, not by sampling the screenshot.** (HYD RAT split lesson, 2026-06-20.) Under
+    swiftshader/angle a lit `MeshStandardMaterial` set to a vivid `#2ecc40` green renders as a
+    near-neutral grey `(79,81,86)`; the colour is correct on the real GPU. So when you split a
+    control into parts that colour independently (e.g. RAT = raised round button vs recessed flat
+    plate — discriminate by FOOTPRINT, plate = largest), CONFIRM the split by dumping each mesh's
+    `material.color.getHexString()` to a temp `window.__dbg` and reading it over CDP — NOT by
+    looking for the colour in the rendered pixels (it isn't there even when the logic is right).
+    This is the inverse companion to the §0.5 metalness>1→black trap: headless lies about lit
+    colour in both directions, so trust material state + the user's real-GPU screen.
 
 ---
 
