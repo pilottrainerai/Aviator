@@ -51,10 +51,13 @@ export const eng1FireAfterV1: Scenario = {
         },
       ],
     },
-    // FCTM OP-020: ECAM actions begin at 400 ft AGL — PM announces, PF commands
+    // FCTM OP-020: ECAM actions begin at 400 ft AGL — PM announces, PF commands.
+    // SEQUENCE-gated (not pure wall-clock): fires once AVIATE is complete (engage_ap_fma)
+    // AND ≥18 s elapsed (realistic 400 ft floor) — so it tracks the pilot, not the clock.
     {
       id: "four_hundred_ft",
       atMs: 18_000,
+      requiresStep: "engage_ap_fma",
       description: "400 ft AGL — PM announces 'ECAM ACTIONS', procedure begins",
       effects: [
         {
@@ -257,10 +260,10 @@ export const eng1FireAfterV1: Scenario = {
       hardware: true,
       ecamRef: "ecam_agent1",
       afterEffect: {
-        // BOTH bottles required: AGENT 1 does NOT put the fire out — the warning
-        // persists, which unlocks the AGENT 2 branch. (The persistent-fire variant
-        // overrides this with a longer 30 s conditional gate.)
-        delayMs: 5_000,
+        // BOTH bottles required: AGENT 1 does NOT put the fire out — the FIRE WARNING
+        // persists the full FCOM 30 s, which unlocks the AGENT 2 branch (FCOM PRO-ABN-ENG:
+        // discharge AGENT 2 only if FIRE WARNING still active 30 s after AGENT 1).
+        delayMs: 30_000,
         triggerId: "fire_persists_30s",
         effects: [
           {
@@ -348,7 +351,7 @@ export const eng1FireAfterV1: Scenario = {
       id: "mayday_atc",
       label: "MAYDAY",
       action: "DECLARE",
-      hint: "PM on Tower 118.10: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one, heading 280, climbing [ALT] feet, STANDBY.' Nature + heading + altitude only. No destination, no runway, no POB. Tower acknowledges and hands over to Departure 124.85.",
+      hint: "PM on Tower 118.10: 'MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine one, maintaining runway track, climbing [ALT] feet, STANDBY.' Nature + track + altitude only. No destination, no runway, no POB. Transmit on CURRENT frequency (Tower if handoff not yet accepted). Tower acknowledges and hands over to Departure 124.85.",
       variant: "warning",
       crew: "PM",
       group: "comms",
@@ -856,18 +859,19 @@ export const eng1FireAfterV1: Scenario = {
   // MAYDAY is step-gated on engine_secured (via announce_land_asap → mayday_atc).
   // Declaring MAYDAY before engine secured is scored as fault (choice d below).
   distractions: [
-    // ① A1 (green — Tower initiates) — Tower calls for frequency change at rotation.
-    //   STANDBY is correct while ECAM is running — PM cannot switch freq mid-procedure.
-    //   Card resurfaces every 25 s. MAYDAY option is a training discriminator (wrong here
-    //   because engine is not yet secured; PM must stay on Tower until engine secured).
+    // ① A1 (green — Tower initiates) — Tower calls for frequency change AT 400 FT (start of
+    //   ECAM actions), not at rotation. STANDBY is correct while ECAM is running — PM cannot
+    //   switch freq mid-procedure. CONDITION-driven resurface: after STANDBY the card comes
+    //   back only once the FIRE P/B is pushed (eng1_fire_pb) — not on a 25 s timer. MAYDAY
+    //   option is a training discriminator (wrong here because engine is not yet secured).
     {
       id: "atc_handoff_to_departure",
       atMs: 5_000,
-      requiresStep: "continue_rotation",
+      requiresStep: "four_hundred_ft_cmd",
       kind: "atc",
       from: "DELHI TOWER",
       message: "IFLY101, contact Delhi Departure 124.85.",
-      standbyResurfaceMs: 25_000,
+      standbyResurfaceOnStep: "eng1_fire_pb",
       choices: [
         // Correct — hold on Tower while ECAM running
         { id: "a", label: "STANDBY, IFLY101",                                                                  correct: true  },

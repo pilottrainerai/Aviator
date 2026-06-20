@@ -96,6 +96,11 @@ export type ScenarioTrigger = {
   effects: TriggerEffect[];
   /** Description for the event log */
   description: string;
+  /** Optional step-gate (mirrors ScenarioDistraction.requiresStep). When set, the
+   *  trigger fires only once that step is complete AND elapsed >= atMs — so atMs
+   *  becomes a MINIMUM floor and the event is SEQUENCE-driven, not pure wall-clock.
+   *  e.g. "400 FT — ECAM ACTIONS" fires when AVIATE is done, not at a fixed time. */
+  requiresStep?: string;
 };
 
 export type ScenarioDecision = {

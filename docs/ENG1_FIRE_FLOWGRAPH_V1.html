@@ -36,7 +36,7 @@ body{background:#0a0e1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 <div id="topbar">
   <h1>ENG 1 FIRE — Flow Graph V1</h1>
   <span class="sep">|</span>
-  <span style="font-size:10px;color:#475569">87 nodes · all V3 content · click node = edit notes</span>
+  <span style="font-size:10px;color:#475569">86 nodes · all V3 content · click node = edit notes</span>
   <span class="sep">|</span>
   <span style="font-size:10px;color:#475569">FILTER:</span>
   <button class="tbtn active" onclick="setFilter('all',this)">ALL</button>
@@ -58,6 +58,40 @@ body{background:#0a0e1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   <span id="saveStatus" style="font-size:10px;color:#475569">auto-save on</span>
 </div>
 
+<div id="ccSeqWrap" style="position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:60;max-height:78vh;overflow:auto;display:none">
+<style>
+.cc-logseq{font-family:system-ui,sans-serif;background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+  box-shadow:0 2px 10px rgba(0,0,0,.10);padding:16px 18px;margin:14px 0;max-width:1000px}
+.cc-logseq h2{margin:0 0 6px;font-size:15px;color:#111827}
+.cc-logseq .rule{margin:0 0 12px;font-size:12px;color:#4b5563;line-height:1.5}
+.cc-logseq ol{margin:0;padding:0;list-style:none;counter-reset:s}
+.cc-logseq li{counter-increment:s;display:grid;grid-template-columns:26px 118px 1fr;gap:10px;align-items:start;
+  padding:8px 6px;border-top:1px solid #f1f5f9}
+.cc-logseq li::before{content:counter(s);background:#1f2937;color:#fff;width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.cc-logseq .tag{font-size:10px;font-weight:800;padding:3px 7px;border-radius:5px;text-align:center;white-space:nowrap;align-self:start}
+.cc-logseq .time{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+.cc-logseq .cond{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
+.cc-logseq .body{font-size:13px;color:#1f2937;line-height:1.45}
+.cc-logseq .body b{color:#0f172a}
+.cc-logseq .par{color:#7c3aed;font-weight:700}
+</style>
+<div class="cc-logseq">
+  <h2>ENG&nbsp;1&nbsp;FIRE — Logical Sequence <span style="font-weight:400;color:#6b7280">(how it really runs)</span></h2>
+  <p class="rule"><b>⏱ TIME</b> = runs on the clock (only the failure). <b>🔗 COND</b> = runs on a <b>trigger condition</b> (crew state) — not a timer.
+  <span class="par">∥</span> = parallel calls that fire <b>when their condition is met</b>, as in real life.</p>
+  <ol>
+    <li><span class="tag time">⏱ T+6s</span><span class="body"><b>after_v1</b> — committed to takeoff, rotation in progress.</span></li>
+    <li><span class="tag time">⏱ T+8s</span><span class="body"><b>FIRE WARNING</b> — MASTER WARN + CRC + the <b>whole ECAM checklist appears at once</b> (ENG&nbsp;1&nbsp;FIRE · THR&nbsp;IDLE · MASTER&nbsp;OFF · FIRE&nbsp;P/B · AGENT&nbsp;1 · ATC · LAND&nbsp;ASAP).</span></li>
+    <li><span class="tag cond">🔗 AVIATE <span class="par">∥</span></span><span class="body"><b>Fly first</b> — continue rotation → POSITIVE&nbsp;CLIMB/GEAR&nbsp;UP → engage&nbsp;AP+FMA · PM cancels MASTER&nbsp;WARN. <i>Runs throughout.</i></span></li>
+    <li><span class="tag cond">🔗 400&nbsp;FT</span><span class="body"><b>ECAM ACTIONS unlock</b> (AVIATE complete). <span class="par">∥</span> <b>1st ATC call:</b> TWR "contact Departure 124.85" → crew <b>"STANDBY"</b> (don't switch freq mid-drill).</span></li>
+    <li><span class="tag cond">🔗 DRILL</span><span class="body"><b>ECAM fire drill</b> (now you DO the lines, in order): THR&nbsp;IDLE → MASTER&nbsp;OFF → <b>FIRE&nbsp;P/B</b> (isolates + <b>arms bottles</b>) → <b>AGENT&nbsp;1&nbsp;DISCH</b> → <i>if fire after 30&nbsp;s</i> → <b>AGENT&nbsp;2&nbsp;DISCH</b>. <span class="par">∥</span> The TWR handoff call <b>repeats here</b> — the moment the <b>FIRE&nbsp;P/B is pushed</b> — → crew <b>"STANDBY"</b> again until secured.</span></li>
+    <li><span class="tag cond">🔗 SECURED</span><span class="body"><b>Engine secured</b> — announce <b>LAND&nbsp;ASAP</b>.</span></li>
+    <li><span class="tag cond">🔗 COMMS <span class="par">∥</span></span><span class="body"><b>Communicate</b> (after secured) — <b>MAYDAY</b> → ATC vectors → approach. <i>Comms track.</i></span></li>
+  </ol>
+</div>
+</div>
+<button id="ccSeqBtn" onclick="var w=document.getElementById('ccSeqWrap');w.style.display=w.style.display=='none'?'block':'none'" style="position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:61;padding:6px 12px;border:1px solid #0bd;border-radius:7px;background:#0bd;color:#012;font:700 12px system-ui;cursor:pointer">📋 Logical Sequence</button>
 <div id="canvasWrap">
   <svg id="mainSvg" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -73,10 +107,11 @@ body{background:#0a0e1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 <div id="noteOverlay">
   <div id="noteLabelRow">
     <span id="noteLabel">node_id</span>
+    <button id="noteDelete" onclick="deleteSelectedNode()" title="Delete this node" style="cursor:pointer;font-size:12px;color:#f87171;background:none;border:none;padding:0 4px">🗑</button>
     <button id="noteClose" onclick="closeNote()">✕</button>
   </div>
   <div id="connInfo" style="font-size:10px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.08);line-height:1.8;display:none"></div>
-  <textarea id="noteTA" rows="5" placeholder="Procedure notes · ATC script · Callouts · Hints…&#10;&#10;Saves automatically to localStorage."></textarea>
+  <textarea id="noteTA" rows="5" placeholder="Message shown to the pilot at this point… (edit freely — saves automatically)"></textarea>
 </div>
 
 <!-- Edge note overlay — right side, appears when ✎ EDIT LINES is active and an edge is clicked -->
@@ -137,7 +172,7 @@ const nodes = [
 
   // PHASE 2 — FLIGHTCHECK
   {id:'continue_rotation', type:'step',    x:COL.ctr,  y:268,  w:NW,h:NH, label:'CONTINUE ROTATION',         sub:'PF · AVIATE — V2+10 / FD bars / SRS', req:['after_v1']},
-  {id:'atc_handoff',       type:'atc',     x:COL.atc,  y:640,  w:SW,h:SH, label:'① TWR: CHANGEOVER — PM STANDBY', sub:'after V1 rotation · TWR calls for 124.85 · PM: "STANDBY, IFLY101" (resurfaces every 25s)', req:['four_hundred_ft']},
+  {id:'atc_handoff_to_departure',       type:'atc',     x:COL.atc,  y:640,  w:SW,h:SH, label:'① TWR: CHANGEOVER — PM STANDBY', sub:'after V1 rotation · TWR calls for 124.85 · PM: "STANDBY, IFLY101" (resurfaces every 25s)', req:['four_hundred_ft']},
   {id:'positive_rate_gear_up',type:'step', x:COL.ctr,  y:372,  w:NW,h:NH, label:'POSITIVE CLIMB — GEAR UP',  sub:'PM · AVIATE — CALL + select UP', req:['continue_rotation']},
   {id:'pfa_ap1',           type:'pfd',     x:COL.pf,   y:372,  w:NW,h:SH, label:'PFD: AP1 ENGAGE',           sub:'Green pulsing ring · phase 4', req:['positive_rate_gear_up']},
   {id:'engage_ap_fma',     type:'step',    x:COL.ctr,  y:476,  w:NW,h:NH, label:'AP1 ENGAGE — READ FMA',     sub:'PF · AVIATE — confirm A/THR armed', req:['positive_rate_gear_up']},
@@ -146,7 +181,7 @@ const nodes = [
   // PHASE 3 — 400 FT GATE + ECAM PROCEDURE
   {id:'four_hundred_ft',   type:'trigger', x:COL.ctr,  y:590,  w:NW,h:NH, label:'four_hundred_ft',           sub:'T+18 000 ms · 400 ft AGL · opens ECAM gate', req:['fire_warn']},
   {id:'fma_05',            type:'fma',     x:COL.fma,  y:590,  w:SW,h:SH, label:'FMA 05',                    sub:'MAN TOGA | SRS green | NAV | AP1 | A/THR', req:['four_hundred_ft']},
-  {id:'four_hundred_ft_cmd',type:'step',   x:COL.ctr,  y:700,  w:NW,h:NH, label:'400 FT — ECAM ACTIONS',    sub:'PM · AVIATE — ANNOUNCE [JOIN]', req:['engage_ap_fma','cancel_master_warn']},
+  {id:'four_hundred_ft_cmd',type:'step',   x:COL.ctr,  y:700,  w:NW,h:NH, label:'400 FT — ECAM ACTIONS',    sub:'PM · AVIATE — ANNOUNCE [JOIN]', req:['engage_ap_fma','cancel_master_warn','four_hundred_ft']},
   {id:'thr_lever_idle',    type:'step',    x:COL.ctr,  y:812,  w:NW,h:NH, label:'THR LEVER 1 → IDLE',        sub:'PF · ECAM — HW · confirm before retard', req:['four_hundred_ft_cmd']},
   {id:'fma_06',            type:'fma',     x:COL.fma,  y:812,  w:SW,h:SH, label:'FMA 06',                    sub:'ENG1 TL at IDLE · SRS green | NAV | AP1', req:['thr_lever_idle']},
   {id:'eng1_master_off',   type:'step',    x:COL.ctr,  y:924,  w:NW,h:NH, label:'ENG 1 MASTER → OFF',        sub:'PM · ECAM — HW · LP+HP SOVs close', req:['thr_lever_idle']},
@@ -171,8 +206,7 @@ const nodes = [
   {id:'atc_notified',      type:'trigger', x:COL.pf,   y:1374, w:NW,h:NH, label:'atc_notified',              sub:'ATC NOTIFY cleared · 1.5s after MAYDAY', req:['mayday_atc']},
 
   // ENGINE SECURED — JOIN
-  {id:'engine_secured',    type:'step',    x:COL.ctr,  y:1488, w:NW,h:NH, label:'ENGINE SECURED',            sub:'PM · ECAM — ANNOUNCE [JOIN: agent1+fire out]', req:['agent1','fire_extinguished']},
-  {id:'fma_10',            type:'fma',     x:COL.fma,  y:1488, w:SW,h:SH, label:'FMA 10',                    sub:'PF AVIATE + PM COMMS tracks open simultaneously', req:['engine_secured']},
+  {id:'engine_secured',    type:'step',    x:COL.ctr,  y:1488, w:NW,h:NH, label:'ENGINE SECURED',            sub:'PM · ECAM — ANNOUNCE [JOIN: agent2+fire out]', req:['agent2','fire_extinguished']},
   {id:'announce_land_asap',type:'step',    x:COL.ctr,  y:1598, w:NW,h:NH, label:'LAND ASAP',                 sub:'PF · AVIATE — announce (ECAM directive)', req:['engine_secured']},
   {id:'mayday_tower_declare',type:'atc',  x:COL.atc,  y:1598, w:SW,h:SH, label:'①b PM → TOWER: MAYDAY',       sub:'CREW card · PM selects MAYDAY phrasing · completes mayday_atc step · gates TWR ACK', req:['engine_secured']},
 
@@ -188,17 +222,17 @@ const nodes = [
   {id:'pfa_op_clb',        type:'pfd',     x:COL.fma,  y:1938, w:SW,h:SH, label:'PFD: OP CLB',               sub:'Green ring · phase 13 · THR MCT active', req:['mct_open_clb']},
   {id:'fma_13',            type:'fma',     x:COL.fma,  y:1988, w:SW,h:SH, label:'FMA 13',                    sub:'THR MCT green | OP CLB green | NAV | AP1 | A/THR active', req:['mct_open_clb']},
   {id:'pm_hold_req',        type:'step',    x:COL.pm,   y:1968, w:NW,h:NH, label:'HOLD REQUEST',               sub:'PM · ATC — proceeding hold 15 DME radial 060 DPN', req:['mct_open_clb']},
-  {id:'atc_hold_clr',      type:'atc',     x:COL.atc,  y:1968, w:SW,h:SH, label:'DEP: HOLD CLEARED',          sub:'DEP: cleared hold 15 DME radial 060 DPN · report established', req:['pm_hold_req']},
-  {id:'atc_endurance_ask', type:'atc',     x:COL.atc,  y:2018, w:SW,h:SH, label:'DEP: ENDURANCE + POB?',      sub:'DEP: say fuel endurance + POB → PM: "STANDBY" (STATUS running)', req:['atc_hold_clr']},
+  {id:'atc_hold_clearance',      type:'atc',     x:COL.atc,  y:1968, w:SW,h:SH, label:'DEP: HOLD CLEARED',          sub:'DEP: cleared hold 15 DME radial 060 DPN · report established', req:['pm_hold_req']},
+  {id:'atc_endurance_ask', type:'atc',     x:COL.atc,  y:2018, w:SW,h:SH, label:'DEP: ENDURANCE + POB?',      sub:'DEP: say fuel endurance + POB → PM: "STANDBY" (STATUS running)', req:['atc_hold_clearance']},
 
   // PM COMMS PARALLEL TRACK
   {id:'mayday_atc',        type:'step',    x:COL.pm,   y:1708, w:NW,h:NH, label:'PM INITIAL COMMS — MAYDAY',  sub:'PM · TOWER freq · ENGINE SECURED → MAYDAY×3 · nature + hdg + alt · STANDBY', req:['engine_secured']},
   {id:'atc_tower_mayday_ack',type:'atc',   x:COL.atc,  y:1708, w:SW,h:SH, label:'② TWR: MAYDAY ACK + HANDOVER', sub:'TWR: MAYDAY ack · "Contact Departure 124.85" · PM readback + freq change', req:['mayday_atc']},
-  {id:'pm_dep_initial_call',type:'step',   x:COL.pm,   y:1760, w:NW,h:NH, label:'PM CALLS DEPARTURE',        sub:'PM · 124.85 · "IFLY101 · hdg 280 · climbing [ALT] · STANDBY"', req:['atc_tower_mayday_ack']},
-  {id:'atc_vectors_clb',   type:'atc',     x:COL.atc,  y:1760, w:SW,h:SH, label:'③ DEP: MAYDAY CONFIRM',    sub:'DEP: radar contact · MAYDAY ack · continue track · climb 4000', req:['pm_dep_initial_call']},
-  {id:'atc_pob_fuel_services',type:'atc',  x:COL.atc,  y:1780, w:SW,h:SH, label:'[D2] DEP: POB + ENDURANCE?',    sub:'DEP: say POB and endurance → PM: "STANDBY, IFLY101" (ECAM still running)', req:['atc_vectors_clb']},
+  {id:'pm_dep_initial_call',type:'atc' ,   x:COL.pm,   y:1760, w:NW,h:NH, label:'PM CALLS DEPARTURE',        sub:'PM · 124.85 · "IFLY101 · hdg 280 · climbing [ALT] · STANDBY"', req:['atc_tower_mayday_ack']},
+  {id:'atc_vectors_climb',   type:'atc',     x:COL.atc,  y:1760, w:SW,h:SH, label:'③ DEP: MAYDAY CONFIRM',    sub:'DEP: radar contact · MAYDAY ack · continue track · climb 4000', req:['pm_dep_initial_call']},
+  {id:'atc_pob_fuel_services',type:'atc',  x:COL.atc,  y:1780, w:SW,h:SH, label:'[D2] DEP: POB + ENDURANCE?',    sub:'DEP: say POB and endurance → PM: "STANDBY, IFLY101" (ECAM still running)', req:['atc_vectors_climb']},
   {id:'announce_sec_failures',type:'step', x:COL.pm,   y:1818, w:NW,h:NH, label:'SECONDARY FAILURES',        sub:'PM · ECAM — read from SD (HYD/ELEC/AIR)', req:['mayday_atc']},
-  {id:'atc_vectors_rdy',   type:'atc',     x:COL.atc,  y:1818, w:SW,h:SH, label:'[D1] DEP: VECTORS AVAIL',  sub:'DEP: "vectors available when ready" → PM: "STANDBY, IFLY101"', req:['atc_vectors_clb']},
+  {id:'atc_vectors_when_ready',   type:'atc',     x:COL.atc,  y:1818, w:SW,h:SH, label:'[D1] DEP: VECTORS AVAIL',  sub:'DEP: "vectors available when ready" → PM: "STANDBY, IFLY101"', req:['atc_vectors_climb']},
   {id:'announce_status',   type:'step',    x:COL.pm,   y:1928, w:NW,h:NH, label:'STATUS — ANNOUNCE',         sub:'PM · STATUS — announce when page appears', req:['announce_sec_failures']},
   {id:'stop_ecam',         type:'step',    x:COL.pm,   y:2038, w:NW,h:NH, label:'STOP ECAM',                 sub:'PF · STATUS — order, then After T/O CL', req:['announce_status']},
   {id:'after_takeoff_cl',  type:'step',    x:COL.pm,   y:2148, w:NW,h:NH, label:'AFTER TAKEOFF CL',          sub:'PM · STATUS — COMPLETE (PACKS/BELTS/GEAR/ENG MODE/FLAPS)', req:['stop_ecam']},
@@ -210,8 +244,8 @@ const nodes = [
 
   // JOIN — both parallel tracks converge here
   {id:'wx_request',        type:'step',    x:COL.ctr,  y:2700, w:NW,h:NH, label:'WX + RWY + APPR TYPE',      sub:'PM · ATC — request latest WX · runway in use · approach type', req:['crew_crosscheck']},
-  {id:'atc_wx_brief',      type:'atc',     x:COL.atc,  y:2755, w:SW,h:SH, label:'⑥ WX BRIEF + RWY + APPR',  sub:'APP: wind 280/8 · QNH 1013 · RWY 28 in use · ILS RWY 28', req:['wx_request']},
-  {id:'pm_wx_readback',    type:'step',    x:COL.pm,   y:2810, w:NW,h:NH, label:'WX + RWY READBACK',         sub:'PM · ATC — reads back wind / runway / approach type', req:['atc_wx_brief']},
+  {id:'atc_provides_briefing_info',      type:'atc',     x:COL.atc,  y:2755, w:SW,h:SH, label:'⑥ WX BRIEF + RWY + APPR',  sub:'APP: wind 280/8 · QNH 1013 · RWY 28 in use · ILS RWY 28', req:['wx_request']},
+  {id:'pm_wx_readback',    type:'step',    x:COL.pm,   y:2810, w:NW,h:NH, label:'WX + RWY READBACK',         sub:'PM · ATC — reads back wind / runway / approach type', req:['atc_provides_briefing_info']},
   {id:'ldg_perf',          type:'step',    x:COL.ctr,  y:2810, w:NW,h:NH, label:'LDG PERF CHECK',            sub:'PF · PLAN — Vapp+5 kt, RWY 28 LDA 4430 m adequate', req:['wx_request']},
   {id:'fordec',            type:'step',    x:COL.ctr,  y:2920, w:NW,h:NH, label:'FORDEC',                    sub:'PF · PLAN — F·O·R·D·E·C decision', req:['ldg_perf']},
 
@@ -225,17 +259,23 @@ const nodes = [
   {id:'atc_rdy_appr',      type:'atc',     x:COL.atc,  y:3142, w:SW,h:SH, label:'⑨ READY APPROACH',         sub:'APP: advise when ready for approach', req:['approach_prep']},
 
   {id:'company_notify',    type:'step',    x:COL.pf,   y:3252, w:NW,h:NH, label:'OPS NOTIFY [OPT]',          sub:'PM · PLAN — ACARS/VHF MAYDAY + CFR request', req:['pax_pa']},
-  {id:'atc_emsvcs_ack',    type:'atc',     x:COL.atc,  y:3194, w:SW,h:SH, label:'⑧ EMSVCS ACK',             sub:'DEP: Cat 3 CFR + ambulance + emerg svcs confirmed RWY 28 · advise ready approach · PM reads back', req:['atc_emergency_services']},
+  {id:'atc_emerg_svcs_confirmed',    type:'atc',     x:COL.atc,  y:3194, w:SW,h:SH, label:'⑧ EMSVCS ACK',             sub:'DEP: Cat 3 CFR + ambulance + emerg svcs confirmed RWY 28 · advise ready approach · PM reads back', req:['atc_emergency_services']},
 
   // APPROACH SEQUENCE
   {id:'approach_brief',    type:'step',    x:COL.ctr,  y:3362, w:NW,h:NH, label:'APPROACH BRIEF',            sub:'PF · APPROACH — ILS RWY 28, OEI CAT 1, Vapp+5', req:['atc_emergency_services']},
   {id:'go_around_review',  type:'step',    x:COL.ctr,  y:3472, w:NW,h:NH, label:'GO-AROUND REVIEW',          sub:'PF · APPROACH — TOGA ENG2 only / SRS / V2+10', req:['approach_brief']},
   {id:'approach_cl',       type:'step',    x:COL.ctr,  y:3582, w:NW,h:NH, label:'APPROACH CL',               sub:'PM · APPROACH — BARO/DH/BELTS/AUTOBRK/SPOILERS', req:['go_around_review']},
   {id:'pm_req_vectors',    type:'step',    x:COL.pm,   y:3600, w:NW,h:NH, label:'REQUEST VECTORS',           sub:'PM · ATC — ready · request ILS vectors RWY 28', req:['approach_cl']},
-  {id:'atc_clrd_appr',     type:'atc',     x:COL.atc,  y:3640, w:SW,h:SH, label:'⑩ CLEARED APPROACH',       sub:'APP: hdg 240, descend 3000, cleared ILS RWY 28', req:['pm_req_vectors']},
-  {id:'atc_tower_cont',    type:'atc',     x:COL.atc,  y:3582, w:SW,h:SH, label:'⑪ TOWER CONTACT',          sub:'TWR: continue ILS RWY 28, report established', req:['atc_clrd_appr']},
+  {id:'atc_cleared_approach',     type:'atc',     x:COL.atc,  y:3640, w:SW,h:SH, label:'⑩ CLEARED APPROACH',       sub:'APP: hdg 240, descend 3000, cleared ILS RWY 28', req:['pm_req_vectors']},
+  {id:'atc_tower_contact',    type:'atc',     x:COL.atc,  y:3582, w:SW,h:SH, label:'⑪ TOWER CONTACT',          sub:'TWR: continue ILS RWY 28, report established', req:['atc_cleared_approach']},
   {id:'landing_cl',        type:'step',    x:COL.ctr,  y:3692, w:NW,h:NH, label:'LANDING CL',                sub:'PM · APPROACH — GEAR/FLAPS/SPOILERS/AUTOBRK/CABIN', req:['approach_cl']},
-  {id:'atc_cleared_land',  type:'atc',     x:COL.atc,  y:3692, w:SW,h:SH, label:'⑫ CLEARED TO LAND',        sub:'TWR: RWY 28 cleared to land, wind 280/8', req:['landing_cl']},
+  {id:'atc_cleared_to_land',  type:'atc',     x:COL.atc,  y:3692, w:SW,h:SH, label:'⑫ CLEARED TO LAND',        sub:'TWR: RWY 28 cleared to land, wind 280/8', req:['landing_cl']},
+  // ── added for live parity (Option B): the 3 PM→ATC calls live models that the flowgraph was missing ──
+  {id:'pm_wx_request',        type:'atc',     x:COL.pm,   y:2645, w:NW,h:NH, label:'PM → APP: WX REQUEST',       sub:'PM · ATC — request weather / RWY in use / approach details (completes wx_request)', req:['crew_crosscheck']},
+  {id:'pm_ready_for_approach',type:'atc',     x:COL.pm,   y:3090, w:NW,h:NH, label:'PM → APP: READY APPR',       sub:'PM · ATC — report ready for approach', req:['approach_prep']},
+  {id:'pm_report_established',type:'atc',     x:COL.pm,   y:3640, w:NW,h:NH, label:'PM → TWR 118.10: ESTABLISHED', sub:'PM · ATC — report established ILS RWY 28 (completes report_established)', req:['approach_cl']},
+  {id:'pm_hold_req_card',    type:'atc',     x:COL.pm,   y:1900, w:NW,h:NH, label:'PM -> DEP: HOLD REQUEST',    sub:'PM - ATC request holding pattern (completes pm_hold_req)', req:['mct_open_clb']},
+  {id:'pm_emerg_svcs_call',  type:'atc',     x:COL.pm,   y:3240, w:NW,h:NH, label:'PM -> APP: EMERG SVCS CALL',  sub:'PM - ATC request emergency services RWY 28 (completes emerg_svcs_confirmed)', req:['atc_emergency_services']},
 ];
 
 // ── DEFAULT NOTES (from V3 workbook) ──────────────────────────────────────
@@ -247,7 +287,7 @@ const DEFAULT_EDGE_NOTES = {
 // __NOTES_BLOCK_START__
 const DEFAULT_NOTES = {
 
-  atc_handoff:`① TWR CALLS FOR HANDOVER — PM RESPONDS: STANDBY
+  atc_handoff_to_departure:`① TWR CALLS FOR HANDOVER — PM RESPONDS: STANDBY
 ─────────────────────────────────────────
 WHEN: After V1 rotation (continue_rotation step) · fires at T+5s floor
       Tower calls as aircraft climbs out — routine handover to Departure
@@ -327,7 +367,7 @@ WRONG OPTIONS (training discriminators):
 After readback: PM selects 124.85 on VHF 1.
 PM calls Departure — position report only (see PM CALLS DEPARTURE node).`,
 
-  atc_vectors_clb:`③ DEPARTURE — MAYDAY CONFIRMED + CLIMB CLEARANCE
+  atc_vectors_climb:`③ DEPARTURE — MAYDAY CONFIRMED + CLIMB CLEARANCE
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
 
@@ -368,7 +408,7 @@ WHY STANDBY: ECAM checklist still running — workload too high.
              PM gives POB + fuel endurance after ECAM complete
              (see ENDURANCE + POB node — JOIN gate).`,
 
-  atc_vectors_rdy:`[D1] DEPARTURE — VECTORS AVAILABLE
+  atc_vectors_when_ready:`[D1] DEPARTURE — VECTORS AVAILABLE
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
 TIMING: After DEP confirms MAYDAY + climb 4000 ft
@@ -393,7 +433,7 @@ TRANSMISSION:
 
 Departure acknowledges + clears hold (see DEP: HOLD CLEARED).`,
 
-  atc_hold_clr:`DEP — HOLD CLEARED
+  atc_hold_clearance:`DEP — HOLD CLEARED
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
 
@@ -446,7 +486,7 @@ TRANSMISSION:
 
 Approach Control responds with WX brief (see ⑥ WX BRIEF node).`,
 
-  atc_wx_brief:`⑥ APPROACH — WX BRIEF + RUNWAY + APPROACH TYPE
+  atc_provides_briefing_info:`⑥ APPROACH — WX BRIEF + RUNWAY + APPROACH TYPE
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
 
@@ -508,7 +548,7 @@ NOTE: Intention (returning VIDP RWY 28) was the PREVIOUS call.
       This call is emergency services only — do not repeat intention.
       ATC responds with full confirmation (see ⑧ EMSVCS ACK).`,
 
-  atc_emsvcs_ack:`⑧ DEPARTURE — EMERGENCY SERVICES CONFIRMED
+  atc_emerg_svcs_confirmed:`⑧ DEPARTURE — EMERGENCY SERVICES CONFIRMED
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
 
@@ -548,7 +588,7 @@ TRANSMISSION:
 
 Approach clears for ILS (see ⑩ CLEARED APPROACH node).`,
 
-  atc_clrd_appr:`⑩ APP — CLEARED ILS APPROACH RUNWAY 28
+  atc_cleared_approach:`⑩ APP — CLEARED ILS APPROACH RUNWAY 28
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
 
@@ -562,7 +602,7 @@ PM READBACK:
    cleared ILS runway 28,
    Delhi Tower 118.10 established, IFLY101"`,
 
-  atc_tower_cont:`⑪ TOWER — CONTINUE ILS RUNWAY 28
+  atc_tower_contact:`⑪ TOWER — CONTINUE ILS RUNWAY 28
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
 
@@ -574,7 +614,7 @@ PM READBACK:
 
 → PM reports established on localizer when captured.`,
 
-  atc_cleared_land:`⑫ TOWER — CLEARED TO LAND RUNWAY 28
+  atc_cleared_to_land:`⑫ TOWER — CLEARED TO LAND RUNWAY 28
 ─────────────────────────────────────────
 [simulation-placeholder — ICAO Doc 9432 format]
 
@@ -685,12 +725,12 @@ let nodeNotes = {};
 try { nodeNotes = JSON.parse(localStorage.getItem(NOTES_KEY)||'{}'); } catch{}
 // Always apply latest defaults — overwrite nodes whose saved value equals old placeholder text
 const ATC_NODES = [
-  'atc_handoff','mayday_tower_declare','mayday_atc','atc_tower_mayday_ack','atc_vectors_clb',
-  'pm_dep_initial_call','atc_pob_fuel_services','atc_vectors_rdy',
-  'pm_hold_req','atc_hold_clr','atc_endurance_ask','pm_endurance_pob',
-  'wx_request','atc_wx_brief','pm_wx_readback',
-  'intention_to_atc','atc_emergency_services','atc_emsvcs_ack','atc_rdy_appr',
-  'pm_req_vectors','atc_clrd_appr','atc_tower_cont','atc_cleared_land',
+  'atc_handoff_to_departure','mayday_tower_declare','mayday_atc','atc_tower_mayday_ack','atc_vectors_climb',
+  'pm_dep_initial_call','atc_pob_fuel_services','atc_vectors_when_ready',
+  'pm_hold_req','atc_hold_clearance','atc_endurance_ask','pm_endurance_pob',
+  'wx_request','atc_provides_briefing_info','pm_wx_readback',
+  'intention_to_atc','atc_emergency_services','atc_emerg_svcs_confirmed','atc_rdy_appr',
+  'pm_req_vectors','atc_cleared_approach','atc_tower_contact','atc_cleared_to_land',
 ];
 nodes.forEach(n => {
   const forceRefresh = ATC_NODES.includes(n.id) && (!nodeNotes[n.id] || nodeNotes[n.id].length < 40);
@@ -729,7 +769,18 @@ const undoStack = [];
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
 const byId = {};
-nodes.forEach(n => byId[n.id]=n);
+// ── Drag/delete persistence (node positions + deletions) ──
+// __NODE_OV_START__
+const DEFAULT_NODE_POS = {};
+const DEFAULT_DELETED_NODES = [];
+// __NODE_OV_END__
+const NODE_POS_KEY='flowgraph_node_pos_v1', DELETED_KEY='flowgraph_deleted_v1';
+let nodePos=Object.assign({},DEFAULT_NODE_POS);
+let deletedNodes=new Set(DEFAULT_DELETED_NODES);
+try{ const _s=localStorage.getItem(NODE_POS_KEY); if(_s) Object.assign(nodePos,JSON.parse(_s)); }catch(e){}
+try{ const _s=localStorage.getItem(DELETED_KEY); if(_s) JSON.parse(_s).forEach(id=>deletedNodes.add(id)); }catch(e){}
+nodes.forEach(n=>{ if(nodePos[n.id]){ n.x=nodePos[n.id].x; n.y=nodePos[n.id].y; } });
+nodes.forEach(n => { if(!deletedNodes.has(n.id)) byId[n.id]=n; });
 
 function svgEl(tag, attrs, parent){
   const e = document.createElementNS(svgNS, tag);
@@ -745,6 +796,7 @@ function nBot(n){ return n.y+nH(n); }
 function buildEdges(){
   const edges=[];
   nodes.forEach(n => {
+    if(deletedNodes.has(n.id)) return;
     (n.req||[]).forEach(r => {
       if(r==='—') return;
       if(!byId[r]) return;
@@ -849,9 +901,21 @@ function render(){
   // Nodes
   const gN=svgEl('g',{'id':'gNodes'},gw);
   nodes.forEach(n=>{
+    if(deletedNodes.has(n.id)) return;
     const hide=nodeFilter!=='all'&&n.type!==nodeFilter;
-    const g=svgEl('g',{'data-id':n.id,opacity:hide?'0.1':'1',style:'cursor:pointer'},gN);
-    g.addEventListener('click', ev=>{ ev.stopPropagation(); selectNode(n.id); });
+    const g=svgEl('g',{'data-id':n.id,opacity:hide?'0.1':'1',style:'cursor:move'},gN);
+    g.addEventListener('mousedown', ev=>{
+      if(edgeEditMode) return;
+      ev.stopPropagation();
+      const sx=ev.clientX, sy=ev.clientY, ox=n.x, oy=n.y; let moved=false;
+      function mv(e){ const dx=(e.clientX-sx)/vp.scale, dy=(e.clientY-sy)/vp.scale;
+        if(Math.abs(dx)>3||Math.abs(dy)>3) moved=true; n.x=ox+dx; n.y=oy+dy; render(); applyVp(); }
+      function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+        if(moved){ n.x=Math.round(n.x); n.y=Math.round(n.y); nodePos[n.id]={x:n.x,y:n.y};
+          localStorage.setItem(NODE_POS_KEY,JSON.stringify(nodePos)); render(); applyVp(); }
+        else { selectNode(n.id); } }
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    });
     g.addEventListener('mouseenter', ()=>highlightNode(n.id));
     g.addEventListener('mouseleave', ()=>clearHighlight());
 
@@ -978,22 +1042,14 @@ function positionNote(){
   ov.style.width=ow+'px';
   ov.style.display='block';
   document.getElementById('noteLabel').textContent=selected;
-  document.getElementById('noteTA').value=nodeNotes[selected]||'';
-  // Connection info
+  // The editable box = the MESSAGE shown to the pilot at this node. Seeded from the
+  // node's own content (sub) when nothing's been edited yet; edits persist to localStorage.
   const n2=byId[selected];
+  document.getElementById('noteTA').value=nodeNotes[selected]||n2.sub||'';
   const ci=document.getElementById('connInfo');
-  const validReq=(n2.req||[]).filter(r=>r!=='—');
-  const feeds=requiredBy[selected]||[];
-  let ciHtml='';
-  if(validReq.length){
-    ciHtml+=`<span style="color:#fbbf24;font-weight:700">← REQUIRES:</span> `
-      +validReq.map(r=>`<span style="color:#fbbf24;font-family:monospace;opacity:.85">${r}</span>`).join(' + ')+'<br>';
-  }
-  if(feeds.length){
-    ciHtml+=`<span style="color:#34d399;font-weight:700">→ FEEDS INTO:</span> `
-      +feeds.map(f=>`<span style="color:#34d399;font-family:monospace;opacity:.85">${f}</span>`).join(' · ');
-  }
-  ci.innerHTML=ciHtml||'<span style="color:#475569">no connections</span>';
+  const typeLabel={fma:'FMA',trigger:'TRIGGER',step:'CREW STEP',ecam:'ECAM LINE',atc:'ATC CALL'}[n2.type]||(n2.type||'').toUpperCase();
+  ci.innerHTML=`<div style="color:#818cf8;font-size:9px;font-weight:800;letter-spacing:.5px">${typeLabel} · ${n2.label||''}</div>`
+    +`<div style="color:#475569;font-size:9px;margin-top:3px">MESSAGE SHOWN TO PILOT — edit below, saves automatically</div>`;
   ci.style.display='block';
 }
 
@@ -1007,6 +1063,14 @@ function closeNote(){
   selected=null;
   render(); applyVp();
   document.getElementById('noteOverlay').style.display='none';
+}
+
+function deleteSelectedNode(){
+  if(!selected) return;
+  if(!confirm('Delete node "'+selected+'" and its connections? (Undo: ↺ RESET notes won\'t restore — re-add manually)')) return;
+  deletedNodes.add(selected);
+  localStorage.setItem(DELETED_KEY, JSON.stringify([...deletedNodes]));
+  closeNote(); render(); applyVp();
 }
 
 // ── EDGE NOTE OVERLAY ────────────────────────────────────────────────────────
@@ -1279,6 +1343,10 @@ function saveHTML(){
     /let _savedVp = \/\*__VP__\*\/[\s\S]*?\/\*__VP_END__\*\/;/,
     newVp
   );
+
+  // Bake node positions + deletions between stable markers
+  const newNodeOv = '// __NODE_OV_START__\nconst DEFAULT_NODE_POS = '+JSON.stringify(nodePos)+';\nconst DEFAULT_DELETED_NODES = '+JSON.stringify([...deletedNodes])+';\n// __NODE_OV_END__';
+  if(html.includes('// __NODE_OV_START__')) html = html.replace(/\/\/ __NODE_OV_START__[\s\S]*?\/\/ __NODE_OV_END__/, newNodeOv);
 
   const blob = new Blob([html], {type:'text/html;charset=utf-8'});
   const a = document.createElement('a');

@@ -48,6 +48,10 @@ export function useScenarioRunner(scenario: Scenario): RunnerHandle {
   const pausedElapsedRef = useRef<number | null>(null);
   const firedTriggersRef = useRef<Set<string>>(new Set());
   const sideEffectTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  // Latest completedSteps, readable from the (otherwise stale) setInterval closure
+  // so step-gated triggers (ScenarioTrigger.requiresStep) can see current progress.
+  const completedStepsRef = useRef(state.completedSteps);
+  completedStepsRef.current = state.completedSteps;
 
   // Tick loop — fires scenario timed triggers as wall-clock crosses thresholds.
   // Stops when paused or ended.
@@ -61,7 +65,9 @@ export function useScenarioRunner(scenario: Scenario): RunnerHandle {
       for (const trig of scenario.triggers) {
         if (
           elapsed >= trig.atMs &&
-          !firedTriggersRef.current.has(trig.id)
+          !firedTriggersRef.current.has(trig.id) &&
+          // step-gate: if set, also wait for that step (atMs is then a min-delay floor)
+          (!trig.requiresStep || !!completedStepsRef.current[trig.requiresStep])
         ) {
           firedTriggersRef.current.add(trig.id);
           const evt: ScenarioEvent = {
