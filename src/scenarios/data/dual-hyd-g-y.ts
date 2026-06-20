@@ -939,12 +939,23 @@ export const dualHydGY: Scenario = {
       alertStates: [{ value: false }],
       sections: [
         {
-          title: "BOTH ENGINES",
+          title: "ENG 1",
           colorStates: [{ value: "green" }],
           rows: [
-            { label: "ENG 1 N1", unit: "%", states: [{ value: { v: "84.2",  c: "green" } }] },
-            { label: "ENG 2 N1", unit: "%", states: [{ value: { v: "84.2",  c: "green" } }] },
-            { label: "STATUS",              states: [{ value: { v: "NORM",   c: "green" } }] },
+            { label: "N1",     unit: "%",    states: [{ value: { v: "84.2",   c: "green" } }] },
+            { label: "EGT",    unit: "°C",   states: [{ value: { v: "620",    c: "green" } }] },
+            { label: "FF",     unit: "KG/H", states: [{ value: { v: "2400",   c: "green" } }] },
+            { label: "STATUS",               states: [{ value: { v: "NORMAL", c: "green" } }] },
+          ],
+        },
+        {
+          title: "ENG 2",
+          colorStates: [{ value: "green" }],
+          rows: [
+            { label: "N1",     unit: "%",    states: [{ value: { v: "84.2",   c: "green" } }] },
+            { label: "EGT",    unit: "°C",   states: [{ value: { v: "618",    c: "green" } }] },
+            { label: "FF",     unit: "KG/H", states: [{ value: { v: "2350",   c: "green" } }] },
+            { label: "STATUS",               states: [{ value: { v: "NORMAL", c: "green" } }] },
           ],
         },
       ],
@@ -1016,29 +1027,40 @@ export const dualHydGY: Scenario = {
           ],
         },
       ],
+      // ECAM ACTION PANEL — mirrors the FIRE scenario's "FIRE PANEL" tray: the
+      // HYD overhead pushbuttons the crew presses during the ECAM drill, each
+      // flipping as its step is completed. (Blue system + RAT status is shown in
+      // the BLUE SYS section above.) FCOM PRO-ABN-HYD: RAT does NOT deploy for a
+      // pure G+Y loss — blue stays on its ELEC pump.
       tray: {
-        title: "HYD PANEL",
-        note: "FCOM DSC-29: Both G+Y systems unrecoverable. Blue system on ELEC pump only. RAT deployed on windmill. Do NOT cycle pumps.",
+        title: "HYD PANEL — ECAM ACTIONS",
+        note: "FCOM PRO-ABN-HYD: PTU OFF → G ENG 1 PUMP OFF → Y ENG 2 PUMP OFF → Y ELEC PUMP ON (Y lost by ENG 2 PUMP LO PR — ELEC pump charges the accumulator, ~7 full brake applications).",
         switches: [
           {
-            label: "GRN", sub: "ENG1 PMP",
+            label: "PTU", sub: "OFF",
             states: [
-              { when: { trigger: "structural_fail" }, value: "fault" as const },
+              { when: { step: "ptu_off" }, value: "off" as const },
               { value: "norm" as const },
             ],
           },
           {
-            label: "YLW", sub: "ENG2 PMP",
+            label: "ENG 1", sub: "PUMP OFF",
             states: [
-              { when: { trigger: "structural_fail" }, value: "fault" as const },
+              { when: { step: "grn_eng1_pump_off" }, value: "off" as const },
               { value: "norm" as const },
             ],
           },
-          { label: "BLU", sub: "ELEC PMP", states: [{ value: "auto" as const }] },
           {
-            label: "RAT",
+            label: "ENG 2", sub: "PUMP OFF",
             states: [
-              { when: { trigger: "rat_deploy" }, value: "armed" as const },
+              { when: { step: "yel_eng2_pump_off" }, value: "off" as const },
+              { value: "norm" as const },
+            ],
+          },
+          {
+            label: "Y ELEC", sub: "PUMP ON",
+            states: [
+              { when: { step: "yel_elec_pump_on" }, value: "auto" as const },
               { value: "norm" as const },
             ],
           },

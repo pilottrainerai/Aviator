@@ -25,6 +25,11 @@ export interface AircraftState {
   windDir:       number;  // wind from °
   windSpd:       number;  // wind kt
   track:         number;  // track angle °
+  vmax?:         number;  // VMO/MMO red barber-pole limit (KCAS); falls back to 220
+  // Flight-control law. NORMAL = green "=" pitch-limit bars on PFD; ALTN/DIRECT =
+  // amber Xs replace them (FCOM DSC-27-20-20); DIRECT also shows "USE MAN PITCH
+  // TRIM" amber in the FMA 3rd line (FCOM DSC-22-30-100).
+  law?:          'NORMAL' | 'ALTN' | 'DIRECT';
 }
 
 export const defaultAircraftState: AircraftState = {
@@ -51,4 +56,6 @@ export const defaultAircraftState: AircraftState = {
   windDir:       260,   // Delhi prevailing wind (WSW)
   windSpd:       12,
   track:         281,
+  vmax:          220,   // takeoff / low-alt default; cruise scenarios raise it
+  law:           'NORMAL',
 };

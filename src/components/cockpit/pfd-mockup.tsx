@@ -32,6 +32,7 @@ type PfdData = {
   ils: { id: string; freq: string; dist: number };
   gsPos: number; locPos: number;
   ra: number;
+  law?: 'NORMAL' | 'ALTN' | 'DIRECT';   // F/CTL law — amber Xs + MAN PITCH TRIM
 };
 
 export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paused }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number; onPfAction?: (phaseId: string) => void; paused?: boolean } = {}) {
@@ -260,6 +261,12 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
           if (flashOn) txt(thrCue, 52, 44, 12, C_WHITE, "center", true, 3);
         }
       }
+
+      // FMA 3rd line, top priority (FCOM DSC-22_30-100): "USE MAN PITCH TRIM"
+      // in amber when F/CTL are in DIRECT LAW (e.g. after L/G DN on DUAL HYD G+Y).
+      if (live?.law === "DIRECT") {
+        txt("USE MAN PITCH TRIM", 156, 46, 11, "#ffbf00", "center", true, 1);
+      }
     };
 
     // ── ADI ────────────────────────────────────────────────────────────────
@@ -331,6 +338,26 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
           ctx.beginPath(); ctx.moveTo(-len / 2, py); ctx.lineTo(-len / 2, py + dir * 12); ctx.stroke();
           ctx.beginPath(); ctx.moveTo( len / 2, py); ctx.lineTo( len / 2, py + dir * 12); ctx.stroke();
         }
+      }
+
+      // ── F/CTL law indication (FCOM DSC-27-20-20 + DSC-22-30) ─────────────────
+      // In ALTERNATE or DIRECT law there is no pitch attitude protection, so amber
+      // Xs replace the green "=" symbols. FCOM DSC-27 places these ON THE PITCH
+      // SCALE at the pitch-attitude-protection limits: +30° nose-up and -15°
+      // nose-down. Drawn here INSIDE the pitch-ladder transform (centred on the
+      // scale, x=0) so they ride the scale and move with pitch/roll.
+      if (d.law && d.law !== "NORMAL") {
+        ctx.strokeStyle = "#ffbf00"; ctx.lineWidth = 3; ctx.lineCap = "round";
+        const S = 9;
+        const amberXAt = (py2: number) => {
+          ctx.beginPath();
+          ctx.moveTo(-S, py2 - S); ctx.lineTo(S, py2 + S);
+          ctx.moveTo(S, py2 - S); ctx.lineTo(-S, py2 + S);
+          ctx.stroke();
+        };
+        amberXAt(-30 * PPD);   // +30° nose-up protection limit
+        amberXAt( 15 * PPD);   // -15° nose-down protection limit
+        ctx.lineCap = "butt";
       }
       ctx.restore();
 
@@ -502,7 +529,9 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
       diamond(locX, locy, 8, 8, "#ff00ff");
 
       // RA — green numeric value with subtle glow
-      txt(d.ra, cx, cy + r - 28, 20, "#00ff00", "center", true, 5);
+      // Radio altimeter shows only below 2500 ft AGL (FCOM / baseline §4) — above
+      // that it is blank, not the capped "2500". (Formula at d.ra unchanged.)
+      if (d.ra < 2500) txt(d.ra, cx, cy + r - 28, 20, "#00ff00", "center", true, 5);
     };
 
     // ── SPEED TAPE ─────────────────────────────────────────────────────────
@@ -867,6 +896,8 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
         d.pitch  = live.pitch  + Math.sin(t) * 0.15;
         d.roll   = live.bank;
         d.speed  = Math.round(lerpSpd);
+        d.vmax   = live.vmax ?? d.vmax;   // scenario VMO/MMO barber-pole (cruise raises it)
+        d.law    = live.law ?? 'NORMAL';  // F/CTL law for amber-X / MAN PITCH TRIM
         d.selSpd = live.selectedSpeed;
         d.mgtSpd = live.selectedSpeed;
         d.alt    = Math.round(lerpAlt);

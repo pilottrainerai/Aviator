@@ -81,10 +81,88 @@ export function getActivePfActionPhase(scenario?: Scenario, state?: ScenarioStat
 }
 
 export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elapsedMs?: number): AircraftState {
-  void scenario; void elapsedMs; // PFD is step-driven only — no timing jumps
+  void elapsedMs; // PFD is step-driven only — no timing jumps
 
   const step  = (id: string) => !!(s?.completedSteps?.[id]);
   const fired = (id: string) => !!(s?.triggersFired?.[id]);
+
+  // ── DUAL HYD G+Y SYS LO PR — cruise hydraulic failure FMA model ───────────
+  // Cruise FL350 → ALTERNATE LAW + AP lost at failure → hand-flown ILS → DIRECT
+  // LAW at gear-down. FMA boxes per the DUAL HYD G+Y Workbook V3 control-law
+  // timeline (user-authorised spec). A/THR remains active throughout (FD avail,
+  // AP 1+2 INOP). Step-gated like the FIRE model; FIRE logic below is untouched.
+  if (scenario?.meta?.slug === "dual-hyd-g-y") {
+    const failed       = fired("structural_fail");
+    const ecamComplete = step("crew_crosscheck");      // ECAM + STATUS done → planning/hold
+    const onIls        = step("approach_brief_hyd");   // ILS intercept / established
+    const gearDown     = step("lgr_gravity");          // L/G gravity extended → DIRECT LAW
+
+    // CAS / TAS chosen so the PFD Mach readout (computed from TAS) is realistic:
+    // FL350 ≈ M.78, descending values fall off naturally. speed stays well clear
+    // of the VLS amber strip (SPD_VLS 147) — no red/amber on the tape at cruise.
+    let thrMode = "MACH", vertMode = "ALT CRZ", latMode = "NAV";
+    let apOn = true;
+    // vmax = VMO/MMO red barber pole. At cruise it must sit ABOVE the cruise
+    // speed (not on it) — the default 220 is a takeoff value and would falsely
+    // paint the 265-kt cruise as overspeed.
+    let speed = 265, altitude = 35_000, vs = 0, pitch = 2, tas = 450, vmax = 330; // FL350 cruise ≈ M.78
+    let law: AircraftState['law'] = 'NORMAL';  // F/CTL law — drives amber-X / MAN PITCH TRIM on PFD
+
+    if (gearDown) {
+      // Final, gear down — DIRECT LAW (FCOM: at L/G DN), VAPP = VREF+25 (~160 kt, STATUS)
+      thrMode = "SPEED"; vertMode = "G/S"; latMode = "LOC"; apOn = false;
+      speed = 160; altitude = 1_500; vs = -700; pitch = 1; tas = 165; vmax = 230; law = 'DIRECT';
+    } else if (onIls) {
+      // Hand-flown ILS RWY 27 — AP INOP, FD + A/THR (still ALTERNATE LAW until gear down)
+      thrMode = "SPEED"; vertMode = "G/S"; latMode = "LOC"; apOn = false;
+      speed = 180; altitude = 3_000; vs = -700; pitch = 1; tas = 189; vmax = 230; law = 'ALTN';
+    } else if (ecamComplete) {
+      // ECAM/STATUS complete — planning / hold, ALTERNATE LAW
+      thrMode = "SPEED"; vertMode = "ALT"; latMode = "HDG"; apOn = false;
+      speed = 250; altitude = 16_000; vs = 0; pitch = 2; tas = 315; vmax = 300; law = 'ALTN';
+    } else if (failed) {
+      // HYD G+Y SYS LO PR — F/CTL ALTERNATE LAW (PROT LOST), AP 1+2 drop out.
+      // Lateral HDG (crew flying the ATC 2-mile right offset); A/THR still MACH.
+      thrMode = "MACH"; vertMode = "ALT"; latMode = "HDG"; apOn = false;
+      speed = 265; altitude = 35_000; vs = 0; pitch = 2; tas = 450; vmax = 330; law = 'ALTN';
+    }
+    // else: cruise before the failure — MACH / ALT CRZ / NAV, AP1 + A/THR (NORMAL LAW)
+
+    const masterWarn = !!(s?.masterWarnActive && !step("cancel_master_warn"));
+    const masterCaut = !!(s?.masterCautActive && !step("cancel_master_caut"));
+
+    return {
+      ...defaultAircraftState,
+      apEngaged: apOn,
+      masterWarn,
+      masterCaut,
+      eng1Failed: false,
+      eng2Failed: false,
+      thrMode,
+      thrCue: undefined,
+      vertMode,
+      latMode,
+      athrActive: true,
+      athrArmed: false,
+      srsCyan: false,
+      speed,
+      altitude,
+      vs,
+      pitch,
+      bank: 0,
+      gs: Math.max(speed - 2, 0),
+      tas,
+      vmax,
+      law,
+      selectedSpeed: speed,
+      selectedAlt: altitude,
+      selectedHdg: 200,   // heading 200 — scenario MAYDAY call
+      heading: 200,
+      track: 201,
+      windDir: 270,       // wind 270/6 — scenario ATC weather
+      windSpd: 6,
+    };
+  }
 
   const fireActive  = fired("fire_warn");
   const eng1Failed  = fireActive;
