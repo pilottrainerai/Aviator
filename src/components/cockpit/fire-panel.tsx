@@ -8,9 +8,9 @@ import type { PilotAction } from "@/engine/events";
 import type { Scenario, SysSwState } from "@/scenarios/types";
 import { evalSysCase, SYS_COLORS } from "@/components/cockpit/system-display";
 import { EngineFireScenarioPanel } from "@/components/cockpit/engine-fire-panel-scenario";
-import { FirePanel3D } from "@/components/cockpit/fire-panel-3d";
 import { FireTestPanel3D } from "@/components/cockpit/fire-test-panel-3d";
 import { EngStartPanel3D, ENG_TUNE_DEFAULT, type EngTune } from "@/components/cockpit/eng-start-panel-3d";
+import { HydPanel3D, type HydPumpState, type HydPumpKey } from "@/components/cockpit/hyd-panel-3d";
 
 // ── New (3-section) FireTestPanel3D ──────────────────────────────────────────
 // PROMOTED 2026-06-15: the FINAL panel (tag fire-panel-FINAL-2026-06-15) now renders
@@ -205,6 +205,12 @@ const COMBO_INNER: Record<string, DevBox> = {
 // ENG START pedestal panel — its own floating frame (dev-movable). Default sits
 // below the action panel; the user readjusts size/position in dev mode.
 const ENG_START_BOX: DevBox = { x: 380, y: 540, w: 760, h: 380 };
+// HYD action panel — popped-out floating layout (mirror of COMBO_OUTER/INNER for the
+// HYD scenario). Defaults are starting positions; the user dials them in via dev edit.
+const HYD_COMBO_OUTER: DevBox = { x: 380, y: 150, w: 1120, h: 392 };
+const HYD_COMBO_INNER: Record<string, DevBox> = {
+  panel3d: { x: 300, y: 24, w: 812, h: 360 },
+};
 
 // ─── CSS keyframes (AGENT arming pulse, TEST pulse) ─────────────────────────
 // Injected once via <style> in the panel root.
@@ -2019,20 +2025,12 @@ function DslControlPanel({
           </div>
         ) : null;
 
-        const panel3d = USE_NEW_FIRE_PANEL ? (
+        // Legacy FirePanel3D removed 2026-06-21 — FireTestPanel3D is the sole live ENG1 fire panel.
+        const panel3d = (
           <FireTestPanel3D
             controlled framing="eng1" panX={view3d.x} panY={view3d.y} zoom={view3d.zoom}
             fireDetected={fp3dFireDetected} firePbDone={fp3dFirePbDone}
             agent1Disch={fp3dAgent1Disch} agent2Disch={fp3dAgent2Disch}
-            onPushFirePb={() => performStep(firePbCtrl?.stepId)}
-            onPushAgent1={() => { if (a1Armed) performStep(agent1Ctrl?.stepId); }}
-            onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
-          />
-        ) : (
-          <FirePanel3D
-            fireDetected={fp3dFireDetected} firePbDone={fp3dFirePbDone}
-            agent1Disch={fp3dAgent1Disch} agent2Disch={fp3dAgent2Disch}
-            agent2Available={agent2Available} activeStepId={fp3dActiveStepId}
             onPushFirePb={() => performStep(firePbCtrl?.stepId)}
             onPushAgent1={() => { if (a1Armed) performStep(agent1Ctrl?.stepId); }}
             onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
@@ -2169,6 +2167,161 @@ function DslControlPanel({
   );
 }
 
+// ─── HYD Action Panel (mirror of DslControlPanel, for panel3d:"hyd") ───────────
+// Same logic as the ENG-FIRE action panel — "ACTION PANEL" header, inline two-column
+// (side controls + 3D panel) by default, pops out into a floating DevMovable combo on
+// the ECAM-ACTIONS trigger (or dev edit), status memo — but with HydPanel3D as the 3D
+// panel and the pumps wired via ed.hydMap. DslControlPanel (fire) is left untouched.
+function HydControlPanel({
+  ed, scenario, state, perform, disabled, warningActive,
+}: {
+  ed: import("@/scenarios/types").EngineDisplayDef;
+  scenario: Scenario;
+  state: ScenarioState;
+  perform: (a: PilotAction) => void;
+  disabled?: boolean;
+  warningActive: boolean;
+}) {
+  const hydMap = ed.hydMap ?? {};
+  const isDone = (id?: string) => !!id && !!state.completedSteps[id];
+
+  // Pump light states (FCOM PRO-ABN-HYD G+Y; DSC-29-20). OFF/ON step-driven; FAULT amber
+  // on the engine-driven pumps while LO PR is active — FLAGGED FOR SME. Panel auto-clears
+  // FAULT once OFF is selected.
+  const pumps: HydPumpState = {};
+  if (hydMap.eng1)       pumps.eng1       = { fault: warningActive, off: isDone(hydMap.eng1) };
+  if (hydMap.eng2)       pumps.eng2       = { fault: warningActive, off: isDone(hydMap.eng2) };
+  if (hydMap.ptu)        pumps.ptu        = { off: isDone(hydMap.ptu) };
+  if (hydMap.yellowElec) pumps.yellowElec = { on: isDone(hydMap.yellowElec) };
+  if (hydMap.blueElec)   pumps.blueElec   = { off: isDone(hydMap.blueElec) };
+
+  const onPush = (key: HydPumpKey) => {
+    const stepId = hydMap[key];
+    if (!stepId || disabled || state.completedSteps[stepId]) return;
+    const step = scenario.steps.find((s) => s.id === stepId);
+    const reqsMet = (step?.requires ?? []).every((r) => !!state.completedSteps[r]);
+    if (!reqsMet) return;
+    perform({ kind: "STEP", stepId });
+  };
+
+  // Side controls = controlPanel steps NOT on the HYD overhead panel (FLAPS / GPWS / L-G).
+  const mapped = new Set(Object.values(hydMap).filter(Boolean) as string[]);
+  const sideControls = (ed.controlPanel ?? []).filter((c) => !mapped.has(c.stepId));
+  const allDone = (ed.controlPanel ?? []).every((c) => !!state.completedSteps[c.stepId]);
+  const renderCtrl = (ctrl: import("@/scenarios/types").EngControlDef) => {
+    const done      = !!state.completedSteps[ctrl.stepId];
+    const step      = scenario.steps.find((s) => s.id === ctrl.stepId);
+    const reqsMet   = (step?.requires ?? []).every((r) => !!state.completedSteps[r]);
+    const active    = !done && reqsMet && warningActive;
+    const clickable = active && !disabled;
+    const onClick   = () => { if (clickable) perform({ kind: "STEP", stepId: ctrl.stepId }); };
+    const common = { done, active, clickable, onClick };
+    switch (ctrl.kind) {
+      case "toggle_sw": return <DslToggleSwCtrl key={ctrl.stepId} {...common} label={ctrl.label} sub={ctrl.sub} />;
+      case "emer_pb":   return <DslEmerPbCtrl   key={ctrl.stepId} {...common} label={ctrl.label} sub={ctrl.sub} />;
+      default:          return <DslMonitorCtrl  key={ctrl.stepId} {...common} label={ctrl.label} sub={ctrl.sub} />;
+    }
+  };
+
+  // Pop-out lifecycle (mirror of DslControlPanel). Dev edit keeps it popped for layout.
+  // Real trigger: the PF commands ECAM ACTIONS (step `ecam_actions`, gated on
+  // AVIATE→NAVIGATE→COMMUNICATE) → the panel pops; it retracts once all pumps are done.
+  // Default OFF so a fresh load starts INLINE (real flow): the panel only pops on the
+  // real `ecam_actions` trigger. Dev can flip Edit ON (persisted) to arrange the layout.
+  const [editMode, setEditMode] = useState(false);
+  useEffect(() => { try { const v = window.localStorage.getItem("hydDevEdit"); if (v != null) setEditMode(v === "1"); } catch { /* ignore */ } }, []);
+  const toggleEdit = () => setEditMode((p) => { const n = !p; try { window.localStorage.setItem("hydDevEdit", n ? "1" : "0"); } catch { /* ignore */ } return n; });
+  const edit = SHOW_LAYOUT_EDITOR && editMode;
+  const ecamActionsStarted = !!state.completedSteps["ecam_actions"];
+  const allPumpsDone = (Object.values(hydMap).filter(Boolean) as string[]).every((id) => !!state.completedSteps[id]);
+  // Stay popped for 2 s AFTER the last pushbutton (YELLOW ELEC PUMP ON → all pumps done),
+  // then retract — so the crew sees the final pump state before the panel collapses.
+  const [hydRetracted, setHydRetracted] = useState(false);
+  useEffect(() => {
+    if (!allPumpsDone) { setHydRetracted(false); return; }
+    const t = setTimeout(() => setHydRetracted(true), 2000);
+    return () => clearTimeout(t);
+  }, [allPumpsDone]);
+  // SECOND pop window — FMC PREP action panel: pops again for the FLAPS-fault +
+  // GPWS-FLAP-MODE selections, then retracts 2 s after GPWS FLAP MODE is set.
+  const apprActionsStarted = !!state.completedSteps["qrh_review"];
+  const apprActionsDone = !!state.completedSteps["gpws_flap_mode"];
+  const [apprRetracted, setApprRetracted] = useState(false);
+  useEffect(() => {
+    if (!apprActionsDone) { setApprRetracted(false); return; }
+    const t = setTimeout(() => setApprRetracted(true), 2000);
+    return () => clearTimeout(t);
+  }, [apprActionsDone]);
+  const popped = edit
+    || (ecamActionsStarted && !hydRetracted)
+    || (apprActionsStarted && !apprRetracted);
+
+  const hyd3d = <HydPanel3D controlled pumps={pumps} onPush={onPush} disabled={disabled} />;
+
+  return (
+    <div style={{ borderTop: "1px solid #1C2130", backgroundColor: warningActive ? "#060A12" : "#050709", padding: "6px 10px 8px" }}>
+      {SHOW_LAYOUT_EDITOR && (
+        <div style={{ position: "fixed", bottom: 12, left: 12, zIndex: 60, display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(10,14,20,0.92)", border: "1px solid #2a313b", fontFamily: "monospace", color: "#cdd6e0", fontSize: 10 }}>
+          <span style={{ letterSpacing: 1, color: "#8aabbb", textTransform: "uppercase" }}>hyd layout · dev</span>
+          <button type="button" onClick={toggleEdit}
+            style={{ padding: "3px 9px", fontSize: 10, fontWeight: 700, color: editMode ? "#05070a" : "#cdd6e0", background: editMode ? "#8aabbb" : "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
+            Edit: {editMode ? "ON" : "OFF"}
+          </button>
+          <span style={{ color: "#7c8696" }}>drag body = move · edges/corners = resize</span>
+        </div>
+      )}
+      {/* Section header */}
+      <div className="flex items-center gap-2 mb-2">
+        <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
+        <span style={{ fontSize: "7px", fontFamily: "monospace", letterSpacing: "0.25em", color: warningActive ? C.amber : C.dim, textTransform: "uppercase" }}>ACTION PANEL</span>
+        <div style={{ flex: 1, height: "1px", backgroundColor: warningActive ? `${C.amber}30` : "#1C2130" }} />
+      </div>
+
+      {popped ? (
+        <DevMovable id="hyd_combo_outer" label="HYD ACTION PANEL" fill container editMode={edit} popDelay={0} def={HYD_COMBO_OUTER}>
+          <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(180deg,#0c121b,#070b11)", border: "1px solid #283140", borderRadius: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 30px rgba(0,0,0,0.5)" }} />
+          <DevMovable id="hyd_combo_panel3d" label="HYD 3D PANEL" fill relative editMode={edit} def={HYD_COMBO_INNER.panel3d}>
+            <div style={{ position: "absolute", inset: 0, background: "transparent" }}>{hyd3d}</div>
+          </DevMovable>
+          {sideControls.map((ctrl, i) => (
+            <DevMovable key={ctrl.stepId} id={`hyd_combo_${ctrl.stepId}`} label={(ctrl.label || ctrl.kind).toUpperCase()} relative editMode={edit}
+              def={HYD_COMBO_INNER[ctrl.stepId] ?? { x: 6 + i * 130, y: 24, w: 124, h: 360 }}>
+              <div style={{ padding: 8 }}>{renderCtrl(ctrl)}</div>
+            </DevMovable>
+          ))}
+        </DevMovable>
+      ) : (
+        // INLINE (default / production until ECAM ACTIONS): stays in the engine-display top half.
+        <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+          <div style={{ flex: "0 0 38%", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
+            {sideControls.map((ctrl) => <div key={ctrl.stepId}>{renderCtrl(ctrl)}</div>)}
+          </div>
+          <div style={{ flex: "1 1 0", height: "202px", position: "relative", background: "#080C12" }}>
+            <div style={{ position: "absolute", inset: 0 }}>{hyd3d}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Status memo line */}
+      <div style={{ marginTop: "6px", minHeight: "14px", textAlign: "center" }}>
+        {allDone ? (
+          <span style={{ color: C.green, fontSize: "9px", fontFamily: "monospace", letterSpacing: "0.1em" }}>✓ ACTIONS COMPLETE</span>
+        ) : warningActive ? (
+          <span style={{ color: C.amber, fontSize: "8px", fontFamily: "monospace", letterSpacing: "0.08em" }}>
+            {(() => {
+              const next = (ed.controlPanel ?? []).find(c => !state.completedSteps[c.stepId]);
+              const nextStep = scenario.steps.find(s => s.id === next?.stepId);
+              const reqsMet = (nextStep?.requires ?? []).every(r => !!state.completedSteps[r]);
+              if (!next) return null;
+              return reqsMet ? `▸ ${next.label}${next.sub ? " → " + next.sub : ""}` : "◈ COMPLETE PRIOR STEPS FIRST";
+            })()}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main FirePanel ───────────────────────────────────────────────────────────
 
 export function FirePanel({
@@ -2223,7 +2376,16 @@ export function FirePanel({
         </div>
 
         {/* Interactive ECAM control panel — only when controlPanel defined */}
-        {ed.controlPanel && (
+        {ed.controlPanel && (ed.panel3d === "hyd" ? (
+          <HydControlPanel
+            ed={ed}
+            scenario={scenario}
+            state={state}
+            perform={perform}
+            disabled={disabled}
+            warningActive={warningActive}
+          />
+        ) : (
           <DslControlPanel
             controls={ed.controlPanel}
             scenario={scenario}
@@ -2233,7 +2395,7 @@ export function FirePanel({
             warningActive={warningActive}
             fireLit={fireLit}
           />
-        )}
+        ))}
 
         {/* OHP indicator trays — full width, below controls */}
         {allTrays.map(tray => (

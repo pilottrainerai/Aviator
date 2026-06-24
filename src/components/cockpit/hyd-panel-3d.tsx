@@ -45,17 +45,33 @@ export interface HydPumpLights {
 export type HydPumpState = Partial<Record<HydPumpKey, HydPumpLights>>;
 // RAT MAN ON guarded switch — the red guard (material "orange housijng") flips open about its
 // top hinge like the EVAC COMMAND guard. Editable angle so the open pose can be dialled live.
-export interface HydGuard { open: boolean; angleDeg: number; hingeYOff: number; hingeZOff: number }
+// `coverColor` recolours the flip-up guard lid itself (RAT = red housing, ELEC = black cover).
+export interface HydGuard {
+  open: boolean;
+  angleDeg: number;   // OPEN pose — rotation (deg) about the rod when the guard is open
+  closedDeg: number;  // CLOSED/seated pose — rotation (deg) when the guard is shut (rest is rarely 0)
+  posXOff: number; posYOff: number; posZOff: number;  // move the LID only (rod compensated out)
+  pivotYOff: number; pivotZOff: number;               // move the ROD/hinge only (lid compensated out)
+  coverColor: string;
+}
 export type HydRatGuard = HydGuard; // back-compat alias
-export const HYD_RAT_GUARD_DEFAULT: HydGuard = { open: false, angleDeg: -115, hingeYOff: 0, hingeZOff: 0 };
-export const HYD_ELEC_GUARD_DEFAULT: HydGuard = { open: false, angleDeg: -115, hingeYOff: 0, hingeZOff: 0 };
+// coverColor #b1422b ≈ the GLB's linear #720d05 red housing → RAT lid keeps its original look.
+// RAT lid placement + angles dialled live (2026-06-21): closedDeg = the seated/closed pose, angleDeg =
+// the open pose; pos* move the lid, pivot* move the hinge rod (independently). ELEC stays at 0 (its
+// working state). Tune live in the LEFT "GUARD LID EDITOR" panel, then bake the values you settle on.
+export const HYD_RAT_GUARD_DEFAULT: HydGuard = { open: false, angleDeg: -59, closedDeg: 37, posXOff: 0, posYOff: 0.008, posZOff: -0.006, pivotYOff: 0.032, pivotZOff: 0.068, coverColor: "#b1422b" };
+export const HYD_ELEC_GUARD_DEFAULT: HydGuard = { open: false, angleDeg: -115, closedDeg: 0, posXOff: 0, posYOff: 0, posZOff: 0, pivotYOff: 0, pivotZOff: 0, coverColor: "#171717" };
 // A guarded pushbutton under a cover (RAT MAN ON, BLUE ELEC PUMP): cap colour + press offset
 // (absolute Y offset added to the cap's imported position; negative = pressed IN).
 // `color` = the raised CIRCULAR pushbutton; `plateColor` (RAT only) = the recessed flat
-// backing plate around it — the two RAT parts colour independently.
-export interface HydBtn { color: string; inOut: number; plateColor?: string }
-export const HYD_RAT_BTN_DEFAULT: HydBtn = { color: "#15171e", inOut: 0, plateColor: "#05070a" };
-export const HYD_ELEC_BTN_DEFAULT: HydBtn = { color: "#0b0d12", inOut: 0 };
+// backing plate around it — the two RAT parts colour independently. `env`/`plateEnv` =
+// envMapIntensity (reflectivity) of those LIT RAT parts: lower → the black reads truly black
+// instead of picking up the bright HDRI. 1.0 = original look. (ELEC parts render unlit, so
+// env has no effect there — exposed for the RAT control only.)
+export interface HydBtn { color: string; inOut: number; plateColor?: string; env?: number; plateEnv?: number }
+// color/plateColor = pure-black round button + flat plate; env/plateEnv = darkness (user-dialled 2026-06-21).
+export const HYD_RAT_BTN_DEFAULT: HydBtn = { color: "#000000", inOut: 0, plateColor: "#0a0000", env: 0.15, plateEnv: 0.32 };
+export const HYD_ELEC_BTN_DEFAULT: HydBtn = { color: "#000000", inOut: 0 };
 export interface HydTune {
   capColor: string;    // button CAP (inner plate) — live fire-panel = #070a0e
   borderColor: string; // SURROUND/border (outer plate, incl. ELEC PUMP frame) — live fire = #222730
@@ -76,11 +92,11 @@ export interface HydTune {
   sheenL: number;      // faked metallic sheen: brightness × at the LEFT edge   (1.0 = neutral)
   sheenR: number;      // faked metallic sheen: brightness × at the RIGHT edge  (1.0 = neutral)
 }
-// capColor = canvas backdrop (unlit, DO NOT TOUCH). border frame + RAT switch lifted for
-// contrast (all plates unlit so the hex shows exactly): border #333949, RAT #222734.
+// capColor = canvas backdrop (unlit, DO NOT TOUCH). border frame + RAT switch are pure black
+// #000000 (user-dialled 2026-06-21; all plates unlit so the hex shows exactly).
 // panel* defaults mirror eng-start's Blue base (rough 0.6 / metal 1.5 / clearcoat 0.4 / env 1.0)
 // so HYD starts parameter-identical to it; tune live to match the rendered look.
-export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#15171e", ratColor: "#222734", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8296", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 };
+export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#000000", ratColor: "#000000", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8296", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 };
 
 function matNames(o: THREE.Object3D): Set<string> {
   const s = new Set<string>();
@@ -88,7 +104,17 @@ function matNames(o: THREE.Object3D): Set<string> {
   return s;
 }
 
-function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { pumps: HydPumpState; tune: HydTune; pos: HydPos; ratGuard: HydGuard; elecGuard: HydGuard; ratBtn: HydBtn; elecBtn: HydBtn }) {
+// A bright unlit bar drawn AT the pivot, aligned to the hinge axis (glTF X), so the otherwise
+// invisible rotation centre — the "hinge rod" — is visible while it's being placed. Toggled by showPivot.
+function makeRodMarker(lengthX: number): THREE.Mesh {
+  const g = new THREE.CylinderGeometry(0.018, 0.018, Math.max(0.1, lengthX), 16);
+  g.rotateZ(Math.PI / 2); // cylinder's long axis is Y → align it to X (the hinge axis)
+  const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffd23f, toneMapped: false, depthTest: false }));
+  mesh.name = "pivot_rod"; mesh.renderOrder = 999; mesh.visible = false;
+  return mesh;
+}
+
+function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, showPivot, onPush, disabled }: { pumps: HydPumpState; tune: HydTune; pos: HydPos; ratGuard: HydGuard; elecGuard: HydGuard; ratBtn: HydBtn; elecBtn: HydBtn; showPivot: boolean; onPush?: (key: HydPumpKey) => void; disabled?: boolean }) {
   const { scene } = useGLTF(MODEL_URL);
   const faceTex = useTexture(FACE_TEX_URL);
   faceTex.flipY = false; faceTex.colorSpace = THREE.SRGBColorSpace; faceTex.anisotropy = 16;
@@ -135,7 +161,7 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { 
     } catch { return NUL; }
   }, [faceTex, tune.panelColor, tune.sheenT, tune.sheenB, tune.sheenL, tune.sheenR]);
 
-  const { root, pumpLegends, panelMats, btnClass, movable, ratParts, elecParts, guardPivot, guardMesh, guardBaseHinge, guardBaseLocal, elecPivot, elecCover, elecBaseHinge, elecBaseLocal } = useMemo(() => {
+  const { root, pumpLegends, pumpColX, panelMats, btnClass, movable, ratParts, elecParts, guardPivot, guardMesh, guardBaseHinge, guardBaseLocal, guardRod, elecPivot, elecCover, elecBaseHinge, elecBaseLocal, elecRod } = useMemo(() => {
     const clone = scene.clone(true);
     clone.updateWorldMatrix(true, true);
     // legend meshes captured WITH their mesh ref so they can be clustered by world-X into
@@ -205,6 +231,9 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { 
     // ELEC guard cover = the most FORWARD (max world Y = press/normal axis) black mesh that is NOT
     // a RAT part (the RAT round-button cylinders also stick out, so they must be excluded first).
     const elecCover = blackMeshes.filter((m) => !isRat(m)).reduce<THREE.Mesh | null>((best, m) => (!best || wp(m).y > wp(best).y ? m : best), null);
+    // ELEC guard lid → UNLIT (MeshBasic) so coverColor maps 1:1 and a black setting reaches the
+    // canvas black, instead of catching the directional-light sheen the lit cover always shows.
+    if (elecCover) { const u = new THREE.MeshBasicMaterial({ color: 0x15171e, toneMapped: false }); u.name = "elec_cover_unlit"; elecCover.material = u; }
     const elecX = elecCover ? wp(elecCover).x : Infinity;
     const elecRod = elecCover && materialMeshes.length
       ? materialMeshes.reduce<THREE.Mesh | null>((best, m) => (!best || Math.abs(wp(m).x - elecX) < Math.abs(wp(best).x - elecX) ? m : best), null)
@@ -245,13 +274,28 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { 
     const ratFoot = (m: THREE.Mesh) => { const s = new THREE.Vector3(); new THREE.Box3().setFromObject(m).getSize(s); return s.x * s.z; };
     const ratPlates = plates.filter((m) => isRat(m));
     const ratPlateMesh = ratPlates.length > 1 ? ratPlates.reduce((a, b) => (ratFoot(b) > ratFoot(a) ? b : a)) : null;
+    // The RAT round nests TWO parts: a larger EXTERIOR ring (static bezel) and a smaller CENTRE
+    // round that is the actual momentary pushbutton. Among the round (x≈z) RAT parts minus the
+    // plate, sort by footprint: [0] = ring, [1] = centre. Only the centre travels on press (user
+    // req); thinner detail pins fall to [2]+ and are ignored.
+    const ratRound = (m: THREE.Mesh) => { const s = new THREE.Vector3(); new THREE.Box3().setFromObject(m).getSize(s); return Math.abs(s.x - s.z) < Math.max(s.x, s.z) * 0.3; };
+    const ratRoundParts = ratPlates.filter((m) => m !== ratPlateMesh && ratRound(m)).sort((a, b) => ratFoot(b) - ratFoot(a));
+    const ratCenterMesh = ratRoundParts[1] ?? ratRoundParts[0] ?? null;
     const btnClass = plates.map((mesh) => ({ mesh, isBorder: borderSet.has(mesh), isRat: isRat(mesh), isRatPlate: mesh === ratPlateMesh, isElec: isElec(mesh) }));
 
     // Flat pump caps render UNLIT (MeshBasic) so they show their exact tune colour. BUT the RAT
     // MAN ON button is a RAISED round pushbutton — an unlit material flattens it (no shading on the
     // cylinder), so render the RAT parts LIT (matte-plastic black) so the 3D geometry reads.
     plates.forEach((mesh) => {
-      if (isRat(mesh)) { const lit = new THREE.MeshStandardMaterial({ color: 0x15171e, roughness: 0.5, metalness: 0.15 }); lit.name = "rat_btn"; mesh.material = lit; return; }
+      if (isRat(mesh)) {
+        // RAT parts cache BOTH a lit (3D shading) and an unlit (exact-colour, canvas-black) material.
+        // The darkness knob fades the LIT one continuously toward black (albedo + specular + reflection
+        // all scale with the slider) and only snaps to the unlit material at the very bottom — so the
+        // approach to pure black is seamless instead of jumping. MeshPhysical → specularIntensity knob.
+        const lit = new THREE.MeshPhysicalMaterial({ color: 0x15171e, roughness: 0.5, metalness: 0.15 }); lit.name = "rat_btn";
+        const unlit = new THREE.MeshBasicMaterial({ color: 0x05070a, toneMapped: false }); unlit.name = "rat_btn_unlit";
+        mesh.userData.ratLit = lit; mesh.userData.ratUnlit = unlit; mesh.material = lit; return;
+      }
       const flat = new THREE.MeshBasicMaterial({ color: 0x05070a, toneMapped: false }); flat.name = "plate"; mesh.material = flat;
     });
 
@@ -261,12 +305,12 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { 
     const ratParts: { mesh: THREE.Mesh; baseY: number }[] = [];
     const elecParts: { mesh: THREE.Mesh; baseY: number }[] = [];
     plates.forEach((mesh) => {
-      if (isRat(mesh)) ratParts.push({ mesh, baseY: mesh.position.y });
+      if (isRat(mesh)) { if (mesh === ratCenterMesh) ratParts.push({ mesh, baseY: mesh.position.y }); } // ONLY the centre round presses; exterior ring + plate stay fixed
       else if (isElec(mesh)) elecParts.push({ mesh, baseY: mesh.position.y });
       else if (!borderSet.has(mesh)) movable.push({ mesh, baseY: mesh.position.y });
     });
     emissiveMeshes.forEach((mesh) => {
-      if (isRat(mesh)) ratParts.push({ mesh, baseY: mesh.position.y });
+      if (isRat(mesh)) { /* RAT has no moving legend — leave any in place */ }
       else if (isElec(mesh)) elecParts.push({ mesh, baseY: mesh.position.y });
       else movable.push({ mesh, baseY: mesh.position.y });
     });
@@ -283,30 +327,40 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { 
     legWithX.forEach((e) => { if (lc.length && Math.abs(e.x - lx) > 0.4) { legCols.push(lc); lc = []; } if (!lc.length) lx = e.x; lc.push(e); });
     if (lc.length) legCols.push(lc);
     const pumpLegends = {} as Record<HydPumpKey, { fault: THREE.MeshBasicMaterial[]; off: THREE.MeshBasicMaterial[] }>;
+    // World-X centre of each pump column — used to resolve a click to its pump key.
+    const pumpColX = {} as Partial<Record<HydPumpKey, number>>;
     legCols.forEach((col, i) => {
       const key = HYD_PUMP_ORDER[i]; if (!key) return;
       pumpLegends[key] = {
         fault: col.filter((e) => e.mesh.name.startsWith("FAULT")).map((e) => e.mat),
         off: col.filter((e) => !e.mesh.name.startsWith("FAULT")).map((e) => e.mat),
       };
+      pumpColX[key] = col.reduce((s, e) => s + e.x, 0) / col.length;
     });
 
     // RAT MAN ON guard — flip-open hinge (like EVAC). The red cover is the "orange housijng"
     // mesh; it hinges at its TOP edge (vertical axis = glTF Z, up = min z; normal = glTF Y).
     // Build a pivot at that edge and attach the cover so a rotation about X lifts it open.
     let guardPivot: THREE.Group | null = null;
+    let guardRod: THREE.Mesh | null = null;
     const oranges: THREE.Mesh[] = [];
     clone.traverse((o) => { if (o instanceof THREE.Mesh && matNames(o).has("orange housijng")) oranges.push(o); });
     const guardMesh: THREE.Mesh | null = oranges[0] ?? null;
     let guardBaseHinge: THREE.Vector3 | null = null, guardBaseLocal: THREE.Vector3 | null = null;
     if (guardMesh) {
       clone.updateWorldMatrix(true, true);
-      const box = new THREE.Box3().setFromObject(guardMesh);
-      const c = box.getCenter(new THREE.Vector3());
-      const hinge = new THREE.Vector3(c.x, box.min.y, box.min.z); // top-rear edge of the cover
+      // Hinge = the guard lid's TOP edge, dropped onto the flat plate's FRONT surface, so the lid
+      // pivots about a line physically on the plate (user req) and flips up like a real cover —
+      // not a slide. cover bbox gives the top edge (min z) + x-centre; the plate bbox gives the
+      // surface height (max y). Geometry (GLB): cover z -1.48‥-0.98, plate front y ≈ 0.14.
+      const cbox = new THREE.Box3().setFromObject(guardMesh);
+      const pbox = new THREE.Box3().setFromObject((ratPlateMesh as THREE.Mesh | null) ?? guardMesh);
+      const hinge = new THREE.Vector3(cbox.getCenter(new THREE.Vector3()).x, pbox.max.y, cbox.min.z);
       guardPivot = new THREE.Group(); guardPivot.name = "rat_guard_pivot"; clone.add(guardPivot);
       guardPivot.position.copy(clone.worldToLocal(hinge.clone()));
       guardPivot.attach(guardMesh);
+      const rl = new THREE.Vector3(); new THREE.Box3().setFromObject(guardMesh).getSize(rl);
+      guardRod = makeRodMarker(rl.x * 1.25); guardPivot.add(guardRod); // child at pivot origin = sits on the rod line, rotates with it
       guardBaseHinge = guardPivot.position.clone();
       guardBaseLocal = (guardMesh as THREE.Mesh).position.clone();
     }
@@ -314,6 +368,7 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { 
     // BLUE ELEC PUMP guard — same flip-open, but hinged on its "Material" ROD (like EVAC), so the
     // cover swings about the rod line through the cover's x. Falls back to the cover's top edge.
     let elecPivot: THREE.Group | null = null;
+    let elecRodMarker: THREE.Mesh | null = null;
     let elecBaseHinge: THREE.Vector3 | null = null, elecBaseLocal: THREE.Vector3 | null = null;
     if (elecCover) {
       clone.updateWorldMatrix(true, true);
@@ -324,30 +379,67 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { 
       elecPivot = new THREE.Group(); elecPivot.name = "elec_guard_pivot"; clone.add(elecPivot);
       elecPivot.position.copy(clone.worldToLocal(hinge.clone()));
       elecPivot.attach(elecCover);
+      const erl = new THREE.Vector3(); new THREE.Box3().setFromObject(elecCover).getSize(erl);
+      elecRodMarker = makeRodMarker(erl.x * 1.25); elecPivot.add(elecRodMarker);
       elecBaseHinge = elecPivot.position.clone();
       elecBaseLocal = elecCover.position.clone();
     }
 
-    return { root: clone, pumpLegends, panelMats, btnClass, movable, ratParts, elecParts, guardPivot, guardMesh, guardBaseHinge, guardBaseLocal, elecPivot, elecCover, elecBaseHinge, elecBaseLocal };
+    return { root: clone, pumpLegends, pumpColX, panelMats, btnClass, movable, ratParts, elecParts, guardPivot, guardMesh, guardBaseHinge, guardBaseLocal, guardRod, elecPivot, elecCover, elecBaseHinge, elecBaseLocal, elecRod: elecRodMarker };
   }, [scene, faceTex, faceMask, faceColored, faceMarks]);
 
   // Colour the plates: RAT button (ratBtn.color) / ELEC button (elecBtn.color) / bezel border
   // (borderColor) / pump cap (capColor).
   useEffect(() => {
     btnClass.forEach(({ mesh, isBorder, isRat: rat, isRatPlate: ratPlate, isElec: elec }) => {
+      // RAT round button + flat plate: the darkness knob fades the LIT material CONTINUOUSLY to
+      // near-black (albedo × slider kills the lit diffuse floor; specularIntensity × slider kills the
+      // dielectric sheen that otherwise stays grey-black; reflection scales too). Only at the very
+      // bottom (≤0.001) does it snap to the UNLIT material for the EXACT canvas black of the caps —
+      // and because the lit floor is already ~black, that snap is invisible (no 0.20→0 jump).
+      if (rat) {
+        const e = ratPlate ? (ratBtn.plateEnv ?? 1) : (ratBtn.env ?? 1);
+        const col = ratPlate ? (ratBtn.plateColor ?? ratBtn.color) : ratBtn.color;
+        const lit = mesh.userData.ratLit as THREE.MeshPhysicalMaterial | undefined;
+        const unlit = mesh.userData.ratUnlit as THREE.MeshBasicMaterial | undefined;
+        if (e <= 0.001 && unlit) { unlit.color.set(col); unlit.needsUpdate = true; mesh.material = unlit; }
+        else if (lit) {
+          const t = Math.min(1, e);              // 0 → fully dark, 1 → original lit look
+          lit.color.set(col).multiplyScalar(t);  // fade albedo to black (removes the lit diffuse floor)
+          lit.specularIntensity = t;             // fade the dielectric sheen that kept it grey-black
+          lit.envMapIntensity = e;               // HDRI reflection still scales past 1.0
+          lit.roughness = THREE.MathUtils.lerp(1.0, 0.5, t);
+          lit.metalness = THREE.MathUtils.lerp(0.0, 0.15, t);
+          lit.needsUpdate = true; mesh.material = lit;
+        }
+        return;
+      }
       const mm = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
       const sm = mm as THREE.MeshStandardMaterial;
       if (sm && sm.color) {
-        sm.color.set(
-          ratPlate ? (ratBtn.plateColor ?? ratBtn.color) // RAT recessed flat plate
-          : rat ? ratBtn.color                            // RAT raised round button
-          : elec ? elecBtn.color
-          : isBorder ? tune.borderColor : tune.capColor,
-        );
+        sm.color.set(elec ? elecBtn.color : isBorder ? tune.borderColor : tune.capColor);
         sm.needsUpdate = true;
       }
     });
-  }, [btnClass, tune.capColor, tune.borderColor, ratBtn.color, ratBtn.plateColor, elecBtn.color]);
+  }, [btnClass, tune.capColor, tune.borderColor, ratBtn.color, ratBtn.plateColor, ratBtn.env, ratBtn.plateEnv, elecBtn.color]);
+
+  // Guard LID colour — recolour the flip-up cover meshes themselves: RAT = red "orange housijng",
+  // ELEC = the black cover mesh (which shipped pure-black, so it now gets a real, pickable colour).
+  useEffect(() => {
+    const setCover = (mesh: THREE.Mesh | null, hex?: string) => {
+      if (!mesh || !hex) return;
+      const mm = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+      const sm = mm as THREE.MeshStandardMaterial;
+      if (sm?.color) { sm.color.set(hex); sm.needsUpdate = true; }
+    };
+    setCover(guardMesh, ratGuard.coverColor);
+    setCover(elecCover, elecGuard.coverColor);
+  }, [guardMesh, elecCover, ratGuard.coverColor, elecGuard.coverColor]);
+  // Hinge-rod markers (dev aid): show the otherwise-invisible pivot line so it can be placed.
+  useEffect(() => {
+    if (guardRod) guardRod.visible = showPivot;
+    if (elecRod) elecRod.visible = showPivot;
+  }, [showPivot, guardRod, elecRod]);
   // ── HYD pump legend lights — FCOM DSC-29-20 "Controls and Indicators" ──────────────────
   // OFF legend lights WHITE when the pump is selected OFF (inverted Airbus convention,
   // cockpit-control-mapping). FAULT legend lights AMBER when a fault condition exists and
@@ -392,26 +484,39 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { 
     elecParts.forEach(({ mesh, baseY }) => { mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, baseY + elecBtn.inOut, 0.2); });
   });
 
-  // RAT MAN ON guard flip. Live hinge tuning: nudging the pivot is compensated on the cover so it
-  // stays put at angle 0 — only the rotation centre moves. Rotation lerps for a real flip feel.
+  // RAT MAN ON guard flip. LID (pos*) and ROD (pivot*) move INDEPENDENTLY: the ROD follows only the
+  // rod offset; the LID follows only the lid offset, with the rod offset compensated out — so moving
+  // the rod leaves the lid where it is, and moving the lid leaves the rod where it is.
   useFrame(() => {
     if (!guardPivot || !guardBaseHinge || !guardMesh || !guardBaseLocal) return;
-    guardPivot.position.y = guardBaseHinge.y + ratGuard.hingeYOff;
-    guardPivot.position.z = guardBaseHinge.z + ratGuard.hingeZOff;
-    guardMesh.position.y = guardBaseLocal.y - ratGuard.hingeYOff;
-    guardMesh.position.z = guardBaseLocal.z - ratGuard.hingeZOff;
-    const target = ratGuard.open ? THREE.MathUtils.degToRad(ratGuard.angleDeg) : 0;
+    guardPivot.position.set(
+      guardBaseHinge.x,
+      guardBaseHinge.y + ratGuard.pivotYOff,
+      guardBaseHinge.z + ratGuard.pivotZOff,
+    );
+    guardMesh.position.set(
+      guardBaseLocal.x + ratGuard.posXOff,
+      guardBaseLocal.y + ratGuard.posYOff - ratGuard.pivotYOff,
+      guardBaseLocal.z + ratGuard.posZOff - ratGuard.pivotZOff,
+    );
+    const target = THREE.MathUtils.degToRad(ratGuard.open ? ratGuard.angleDeg : ratGuard.closedDeg);
     guardPivot.rotation.x = THREE.MathUtils.lerp(guardPivot.rotation.x, target, 0.15);
   });
 
-  // BLUE ELEC PUMP guard flip — same model, hinged on its rod.
+  // BLUE ELEC PUMP guard flip — same pos/pivot model, hinged on its rod.
   useFrame(() => {
     if (!elecPivot || !elecBaseHinge || !elecCover || !elecBaseLocal) return;
-    elecPivot.position.y = elecBaseHinge.y + elecGuard.hingeYOff;
-    elecPivot.position.z = elecBaseHinge.z + elecGuard.hingeZOff;
-    elecCover.position.y = elecBaseLocal.y - elecGuard.hingeYOff;
-    elecCover.position.z = elecBaseLocal.z - elecGuard.hingeZOff;
-    const target = elecGuard.open ? THREE.MathUtils.degToRad(elecGuard.angleDeg) : 0;
+    elecPivot.position.set(
+      elecBaseHinge.x,
+      elecBaseHinge.y + elecGuard.pivotYOff,
+      elecBaseHinge.z + elecGuard.pivotZOff,
+    );
+    elecCover.position.set(
+      elecBaseLocal.x + elecGuard.posXOff,
+      elecBaseLocal.y + elecGuard.posYOff - elecGuard.pivotYOff,
+      elecBaseLocal.z + elecGuard.posZOff - elecGuard.pivotZOff,
+    );
+    const target = THREE.MathUtils.degToRad(elecGuard.open ? elecGuard.angleDeg : elecGuard.closedDeg);
     elecPivot.rotation.x = THREE.MathUtils.lerp(elecPivot.rotation.x, target, 0.15);
   });
 
@@ -444,10 +549,35 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn }: { 
     if (orbit?.target) { orbit.target.copy(center); orbit.update(); }
   }, [camera, size.width, size.height, controls, root]);
 
-  return <primitive object={root} />;
+  // Click → resolve the intersection's world-X to the nearest pump column → onPush(key).
+  // Display-only when no onPush (dev page is unaffected).
+  const handleClick = onPush
+    ? (e: { stopPropagation: () => void; point: THREE.Vector3 }) => {
+        e.stopPropagation();
+        if (disabled) return;
+        let best: HydPumpKey | null = null, bd = Infinity;
+        for (const k of HYD_PUMP_ORDER) {
+          const cx = pumpColX[k];
+          if (cx == null) continue;
+          const d = Math.abs(e.point.x - cx);
+          if (d < bd) { bd = d; best = k; }
+        }
+        if (best && bd < 0.6) onPush(best);
+      }
+    : undefined;
+  const setCursor = (c: string) => { if (onPush && !disabled && typeof document !== "undefined") document.body.style.cursor = c; };
+
+  return (
+    <primitive
+      object={root}
+      onClick={handleClick}
+      onPointerOver={onPush ? () => setCursor("pointer") : undefined}
+      onPointerOut={onPush ? () => setCursor("auto") : undefined}
+    />
+  );
 }
 
-export function HydPanel3D({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, controlled }: { pumps?: HydPumpState; tune?: HydTune; pos?: HydPos; ratGuard?: HydGuard; elecGuard?: HydGuard; ratBtn?: HydBtn; elecBtn?: HydBtn; controlled?: boolean }) {
+export function HydPanel3D({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, controlled, showPivot, onPush, disabled }: { pumps?: HydPumpState; tune?: HydTune; pos?: HydPos; ratGuard?: HydGuard; elecGuard?: HydGuard; ratBtn?: HydBtn; elecBtn?: HydBtn; controlled?: boolean; showPivot?: boolean; onPush?: (key: HydPumpKey) => void; disabled?: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div style={{ width: "100%", height: "100%", background: "#070a0e" }} />;
@@ -463,7 +593,7 @@ export function HydPanel3D({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elec
       <directionalLight position={[-2.4, 1.0, 3.0]} intensity={1.1} color="#cfe0ff" />
       <Suspense fallback={null}>
         <Environment files={HDRI_URL} environmentIntensity={1.5} />
-        <HydScene pumps={pumps ?? {}} tune={tune ?? HYD_TUNE_DEFAULT} pos={pos ?? "neutral"} ratGuard={ratGuard ?? HYD_RAT_GUARD_DEFAULT} elecGuard={elecGuard ?? HYD_ELEC_GUARD_DEFAULT} ratBtn={ratBtn ?? HYD_RAT_BTN_DEFAULT} elecBtn={elecBtn ?? HYD_ELEC_BTN_DEFAULT} />
+        <HydScene pumps={pumps ?? {}} tune={tune ?? HYD_TUNE_DEFAULT} pos={pos ?? "neutral"} ratGuard={ratGuard ?? HYD_RAT_GUARD_DEFAULT} elecGuard={elecGuard ?? HYD_ELEC_GUARD_DEFAULT} ratBtn={ratBtn ?? HYD_RAT_BTN_DEFAULT} elecBtn={elecBtn ?? HYD_ELEC_BTN_DEFAULT} showPivot={showPivot ?? false} onPush={onPush} disabled={disabled} />
       </Suspense>
       {!controlled && <OrbitControls makeDefault enableDamping dampingFactor={0.08} />}
     </Canvas>

@@ -18,10 +18,12 @@ import { AudioController } from "@/components/cockpit/audio-controller";
 import { NdCanvas, buildAircraftState, getActivePfActionPhase } from "@/components/cockpit/pfd-nd";
 import PfdMockup from "@/components/cockpit/pfd-mockup";
 import { DistractionModal } from "@/components/cockpit/distraction-modal";
+import { ScenarioInspector } from "@/components/dev/scenario-inspector";
 import { GlareshieldPanel } from "@/components/cockpit/glareshield-panel";
 import { FlightCheckPopup } from "@/components/cockpit/flight-check-popup";
 import { FirePanel } from "@/components/cockpit/fire-panel";
 import { SystemDisplay } from "@/components/cockpit/system-display";
+import { ContextDisplay } from "@/components/cockpit/context-display";
 import { StatusPanel } from "@/components/cockpit/status-panel";
 import { getApplicableRequiredSteps, isStepApplicable } from "@/lib/scenarios/step-applicability";
 import { track } from "@/lib/analytics";
@@ -357,6 +359,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
   // Dev/admin mode — toggle via ?dev=1 (on) or ?dev=0 (off); persisted in
   // localStorage so the flag follows the user across scenarios + reloads.
   const [isDevMode, setIsDevMode] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   useEffect(() => {
     const urlVal = new URLSearchParams(window.location.search).get("dev");
     if (urlVal === "1") {
@@ -376,6 +379,9 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
   const firedDistractionsRef = useRef<Set<string>>(new Set());
   const standbyCountRef = useRef<Map<string, number>>(new Map());
   const atcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Live (animated) aircraft altitude, reported by the PFD each frame — used for
+  // altitude-gated distractions (e.g. "passing 22 000 ft → descend 10 000").
+  const liveAltRef = useRef<number>(35_000);
 
   // Fire distractions at their scheduled atMs.  If `requiresStep` is set,
   // the distraction also waits for that step to be marked complete — atMs
@@ -386,6 +392,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
       if (firedDistractionsRef.current.has(d.id)) continue;
       if (runner.elapsedMs < d.atMs) continue;
       if (d.requiresStep && !runner.state.completedSteps[d.requiresStep]) continue;
+      if (d.atAltitudeBelowFt != null && liveAltRef.current > d.atAltitudeBelowFt) continue;
       firedDistractionsRef.current.add(d.id);
       setDistractionQueue((prev) => [...prev, d]);
     }
@@ -397,6 +404,16 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
   // Promote from queue only when idle AND past the post-answer cooldown
   useEffect(() => {
     if (atcPhase.kind !== "idle" || distractionQueue.length === 0) return;
+    // Suppress ATC cards while the HYD action panel is popped (ECAM drill in
+    // progress): nothing surfaces from ECAM ACTIONS until all pumps are done.
+    const ed = scenario.engineDisplay;
+    if (ed?.panel3d === "hyd" && ed.hydMap) {
+      const pumpIds = Object.values(ed.hydMap).filter(Boolean) as string[];
+      const ecamPanelActive =
+        !!runner.state.completedSteps["ecam_actions"] &&
+        !pumpIds.every((id) => !!runner.state.completedSteps[id]);
+      if (ecamPanelActive) return;
+    }
     const now = Date.now();
     if (now < atcNextAllowedAt) {
       const delay = atcNextAllowedAt - now;
@@ -414,7 +431,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
     setDistractionQueue(rest);
     setAtcPhase({ kind: "active", d: next });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [atcPhase.kind, distractionQueue.length, atcNextAllowedAt]);
+  }, [atcPhase.kind, distractionQueue.length, atcNextAllowedAt, runner.state.completedSteps]);
 
   // Cleanup ATC timer when scenario ends
   useEffect(() => {
@@ -429,10 +446,11 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
       void choiceId;
       const d = atcPhase.d;
       if (correct) {
-        // Correct → permanently dismiss, then 9 s gap before next call
+        // Correct → permanently dismiss. Gap before next call is per-card:
+        // 1 s for the opening MAYDAY exchange, 15 s default for the rest.
         standbyCountRef.current.delete(d.id);
         setAtcPhase({ kind: "idle" });
-        setAtcNextAllowedAt(Date.now() + 9_000);
+        setAtcNextAllowedAt(Date.now() + (d.gapAfterMs ?? 15_000));
         // If the distraction declares a step (e.g. PM MAYDAY card completing
         // mayday_atc), complete it now so downstream gates fire correctly.
         if (d.completesStep) {
@@ -558,33 +576,67 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
   );
   // ATC/COMMS flashes the whole time a call is active — no auto-collapse (stays on until answered).
   const commsCallFlash = trainingGuide && atcPhase.kind === "active";
-  // Each panel flashes distinctly: PFD / ECAM(+fire) / fire / glareshield / comms(ATC) / procedure.
+  // Each panel flashes distinctly: PFD / ND / ECAM(+fire) / fire / glareshield / comms(ATC) / procedure.
+  // An explicit step.flashSurface wins (drives the AVIATE→NAVIGATE→COMMUNICATE→ACTIONS sequence);
+  // otherwise fall back to pfAction/group/hardware.
   const baseFlash =
     !trainingGuide || !primaryNextStep
       ? null
-      : pfActionSteps.has(primaryNextStep.id)
-        ? "pfd"
-        : primaryNextStep.group === "glareshield"
-          ? "glareshield"
-          : primaryNextStep.group === "comms"
-            ? "comms"
-            : primaryNextStep.hardware
-              ? "firepanel"
-              : "procedure";
-  // ATC has priority over the procedure: while a call is pending, DON'T flash the procedure
-  // section — it waits until the ATC is handled. (Hardware/agent actions still flash alongside ATC.)
-  const flashSurface = commsCallFlash && baseFlash === "procedure" ? null : baseFlash;
+      : primaryNextStep.flashSurface
+        ? primaryNextStep.flashSurface
+        : pfActionSteps.has(primaryNextStep.id)
+          ? "pfd"
+          : primaryNextStep.group === "glareshield"
+            ? "glareshield"
+            : primaryNextStep.group === "comms"
+              ? "comms"
+              : primaryNextStep.hardware
+                ? "firepanel"
+                : "procedure";
+  // Once ECAM ACTIONS is commanded (the action panel pops), STOP all guidance flashing —
+  // including comms — so the trainee just works the panel (B2).
+  const ecamCommanded = !!runner.state.completedSteps["ecam_actions"];
+  // SET of surfaces that pulse for the current step. Special case: COMMUNICATE
+  // (declare_mayday) pulses PFD + ND + procedure together (B1).
+  let activeFlashes: string[] =
+    ecamCommanded || !trainingGuide || !primaryNextStep
+      ? []
+      : primaryNextStep.id === "start_descent"
+        ? ["pfd", "nd"]                          // descent card (after MAYDAY): PFD + ND both pulse
+        : baseFlash
+          ? [baseFlash]
+          : [];
+  // ATC priority: while a call is pending, DON'T flash the procedure section.
+  if (commsCallFlash) activeFlashes = activeFlashes.filter((s) => s !== "procedure");
+  const commsFlashOn = commsCallFlash && !ecamCommanded;
+  const flashes = new Set(activeFlashes);
+  const FLASH_ANIM = "ccGuideFlash 1.25s ease-out infinite";
   const guideFlash = (key: string) =>
-    flashSurface === key ? { animation: "ccGuideFlash 1.15s ease-in-out infinite", borderRadius: "4px" } : {};
+    flashes.has(key) ? { animation: FLASH_ANIM, borderRadius: "4px" } : {};
   // Overlay flash — sits ON TOP of opaque panel content (fire panel / ECAM), so it's visible.
   const flashOverlay = (key: string) =>
-    flashSurface === key ? (
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: "4px", animation: "ccGuideFlash 1.15s ease-in-out infinite" }} />
+    flashes.has(key) ? (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: "4px", animation: FLASH_ANIM }} />
     ) : null;
   const flashOverlayIf = (on: boolean) =>
     on ? (
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: "4px", animation: "ccGuideFlash 1.15s ease-in-out infinite" }} />
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: "4px", animation: FLASH_ANIM }} />
     ) : null;
+  // On-screen guidance word (AVIATE / NAVIGATE / DESCENT) over the flashing PFD/ND.
+  // Per-surface guidance word. DESCENT card splits: PFD = "DESCENT", ND = "OFFSET 2 NM R".
+  const flashMsgFor = (key: string): string | undefined => {
+    if (!trainingGuide || !primaryNextStep || ecamCommanded) return undefined;
+    if (primaryNextStep.id === "start_descent") return key === "nd" ? "OFFSET 2 NM R" : "DESCENT";
+    return primaryNextStep.flashMsg;
+  };
+  const flashLabel = (key: string) => {
+    const msg = flashMsgFor(key);
+    return flashes.has(key) && msg ? (
+      <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", zIndex: 51, pointerEvents: "none", background: "rgba(57,129,246,0.92)", color: "#fff", fontFamily: "monospace", fontWeight: 700, fontSize: "12px", letterSpacing: "0.16em", padding: "3px 12px", borderRadius: "4px", whiteSpace: "nowrap", animation: "ccGuideMsg 1.25s ease-in-out infinite" }}>
+        {msg}
+      </div>
+    ) : null;
+  };
 
   // Auto-open decision drawer when it first unlocks (agent1 completed)
   const agent1Done = !!runner.state.completedSteps["agent1"];
@@ -637,13 +689,35 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
   return (
     <main className="flex flex-col">
 
+      {/* ── DEV — Scenario Inspector overlay (?dev=1 → 🔍 Inspector button). Opens
+             on the current live step; browse all steps + the full structure at each. ── */}
+      {isDevMode && inspectorOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(4,7,11,0.6)" }}>
+          <div style={{ position: "absolute", inset: "3vh 3vw", border: "1px solid #1C2530", borderRadius: 10, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
+            <ScenarioInspector
+              scenario={scenario}
+              initialStepId={primaryNextStep?.id ?? nextHardwareStep?.id ?? nextSoftwareStep?.id}
+              onClose={() => setInspectorOpen(false)}
+              onSeek={(stepIds) => {
+                const set = new Set(stepIds);
+                const triggers = ["structural_fail", ...scenario.steps
+                  .filter((s) => set.has(s.id) && s.afterEffect?.triggerId)
+                  .map((s) => s.afterEffect!.triggerId)];
+                runner.seekToCheckpoint(stepIds, triggers);
+                setInspectorOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── ABOVE FOLD — fills one full viewport; no scroll needed ── */}
       <div className="flex flex-col" style={{ height: "100vh", overflow: "hidden" }}>
       <FireBanner state={runner.state} />
       <AudioController active={runner.state.masterWarnActive} cautActive={runner.state.masterCautActive} />
       <ScenarioClock elapsedMs={runner.elapsedMs} state={runner.state} scenario={scenario} />
 
-      <style>{`@keyframes ccGuideFlash{0%,100%{box-shadow:inset 0 0 0 2px rgba(57,129,246,.25)}50%{box-shadow:inset 0 0 0 4px rgba(57,129,246,1),inset 0 0 28px rgba(57,129,246,.6)}}`}</style>
+      <style>{`@keyframes ccGuideFlash{0%{box-shadow:inset 0 0 0 2px rgba(57,129,246,1),0 0 0 0 rgba(57,129,246,.6)}70%{box-shadow:inset 0 0 0 2px rgba(57,129,246,.5),0 0 0 9px rgba(57,129,246,.18)}100%{box-shadow:inset 0 0 0 2px rgba(57,129,246,0),0 0 0 16px rgba(57,129,246,0)}}@keyframes ccGuideMsg{0%,100%{opacity:.6}50%{opacity:1}}`}</style>
       <div className="flex flex-1 min-h-0">
 
         {/* ── LEFT PANEL — cockpit instruments ────────────────────────── */}
@@ -654,13 +728,16 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
           <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", padding: "10px 4px 8px 10px", overflow: "hidden" }}>
             {/* PFD + ND */}
             <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-              <div style={{ width: "380px", height: "380px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden", ...guideFlash("pfd") }}>
+              <div style={{ width: "380px", height: "380px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
                 <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                  {flashOverlay("pfd")}
+                  {flashLabel("pfd")}
                   <PfdMockup
                     state={runner.state}
                     scenario={scenario}
                     elapsedMs={runner.elapsedMs}
                     paused={runner.paused}
+                    onAltitude={(ft) => { liveAltRef.current = ft; }}
                     onPfAction={(phaseId) => {
                       const phase = scenario.phases?.find(p => p.id === phaseId);
                       if (phase?.pfAction?.stepId) {
@@ -682,8 +759,10 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                   )}
                 </div>
               </div>
-              <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
+              <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden", position: "relative" }}>
                 <NdCanvas state={runner.state} scenario={scenario} elapsedMs={runner.elapsedMs} paused={runner.paused} />
+                {flashOverlay("nd")}
+                {flashLabel("nd")}
               </div>
             </div>
             {/* Glareshield — compact strip */}
@@ -700,6 +779,15 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
             <div style={{ flex: "1 1 0", minHeight: 0, marginTop: "4px", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
               <EwdDisplay state={runner.state} scenario={scenario} />
               {flashOverlay("firepanel")}
+              {/* Press the ECAM to command ECAM ACTIONS (pops the HYD action panel). */}
+              {trainingGuide && primaryNextStep?.id === "ecam_actions" && !ecamCommanded && (
+                <button
+                  type="button"
+                  onClick={() => runner.perform({ kind: "STEP", stepId: "ecam_actions" })}
+                  title="Press ECAM — command ECAM ACTIONS"
+                  style={{ position: "absolute", inset: 0, zIndex: 52, cursor: "pointer", background: "transparent", border: "none", borderRadius: "4px" }}
+                />
+              )}
             </div>
             {/* STATUS page — below ECAM, same left sub-column */}
             <StatusPanel scenario={scenario} state={runner.state} />
@@ -707,7 +795,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
 
           {/* Right sub-column: Fire/Engine (top) + System Display (mid) */}
           <div style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: "6px", padding: "10px 10px 8px 4px" }}>
-            <div style={{ flexShrink: 0, position: "relative" }}>
+            <div style={{ flex: "1 1 0", minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
               <FirePanelContainer
                 scenario={scenario}
                 state={runner.state}
@@ -716,8 +804,24 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
               />
               {flashOverlay("firepanel")}
             </div>
-            <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <SystemDisplay state={runner.state} scenario={scenario} />
+            <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}>
+              {/* Dev-gated (?dev=1): SD region becomes the tabbed Context Display
+                  (SYSTEM / QRH / GRAPHIC, SYSTEM default). Live flow renders the
+                  plain SystemDisplay so behaviour is unchanged. */}
+              {isDevMode ? (
+                <ContextDisplay state={runner.state} scenario={scenario} />
+              ) : (
+                <SystemDisplay state={runner.state} scenario={scenario} />
+              )}
+              {/* ECAM ACTIONS: pressing the ECAM/SD IS the action (no confirm). Pulses while it's next. */}
+              {trainingGuide && primaryNextStep?.id === "ecam_actions" && !ecamCommanded && (
+                <button
+                  type="button"
+                  onClick={() => runner.perform({ kind: "STEP", stepId: "ecam_actions" })}
+                  title="Press ECAM — command ECAM ACTIONS"
+                  style={{ position: "absolute", inset: 0, zIndex: 52, cursor: "pointer", background: "transparent", border: "none", borderRadius: "4px", animation: FLASH_ANIM }}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -756,6 +860,15 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
               >
                 {runner.paused ? "Resume" : "Pause"}
               </button>
+              {isDevMode && (
+                <button
+                  onClick={() => setInspectorOpen(true)}
+                  className="px-2 py-0.5 border border-[#1C2530] text-[9px] uppercase tracking-wider hover:border-[#50FA7B]"
+                  style={{ color: "#50FA7B" }}
+                >
+                  🔍 Inspector
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {runner.paused && <span className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: "#FFD700" }}>PAUSED</span>}
@@ -767,18 +880,14 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
             </div>
           </div>
 
-          <DeveloperOverlay
-            scenario={scenario}
-            currentStepId={nextSoftwareStep?.id ?? nextHardwareStep?.id}
-            activeAtcId={atcPhase.kind === "active" || atcPhase.kind === "standby" ? atcPhase.d.id : undefined}
-          />
+          {/* Developer Directions box removed — see the fixed Scenario Inspector dev page (/dev/scenario/[slug]). */}
 
           {/* ── COMMS SECTION — fixed reservation, content scrolls if overflow ── */}
           <div
             className="shrink-0 flex flex-col"
             style={{ borderBottom: "1px solid var(--color-border)", height: "420px", position: "relative" }}
           >
-            {flashOverlayIf(flashSurface === "comms" || commsCallFlash)}
+            {flashOverlayIf(flashes.has("comms") || commsFlashOn)}
             <div
               className="px-4 py-1.5 shrink-0 flex items-center justify-between"
               style={{ borderBottom: "1px solid var(--color-border)" }}
@@ -814,6 +923,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                   onRespond={handleAtcRespond}
                   onStandby={handleAtcStandby}
                   liveAltFt={buildAircraftState(runner.state, scenario, runner.elapsedMs).altitude}
+                  noAutoDismiss={scenario.meta.slug === "dual-hyd-g-y"}
                   inline
                 />
               ) : atcPhase.kind === "standby" ? (
@@ -859,7 +969,12 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
             </div>
             {/* Body — single active step card; scrolls internally if card is tall */}
             <div className="flex-1 min-h-0 overflow-y-auto">
-              {runner.status === "running" && !popupReady ? (
+              {atcPhase.kind === "active" ? (
+                // No procedure card while a radio call is in progress (ATC-comms rule).
+                <div className="flex items-center justify-center text-center px-4" style={{ minHeight: "120px" }}>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-faint)]">— radio in progress · procedure paused —</span>
+                </div>
+              ) : runner.status === "running" && !popupReady ? (
                 <ActionGapCard />
               ) : runner.status === "running" && nextSoftwareStep ? (
                 <FlightCheckPopup
@@ -1480,7 +1595,10 @@ function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenar
             );
           })()}
 
-          {/* Phase checkpoints — seek to a specific flight phase by bulk-completing steps */}
+          {/* Phase checkpoints (ENG1-FIRE only) — these buttons are hardcoded fire phases
+              (>100ft / 400ft / green dot / MCT). Hidden for other scenarios; dual-hyd etc.
+              use the Inspector's per-step "Seek scenario to here". */}
+          {scenario.meta?.slug?.startsWith("eng1-fire") && (
           <div>
             <div style={{ color: "#3A4858", fontSize: "7px", letterSpacing: "0.2em", marginBottom: "4px" }}>
               SEEK TO PHASE
@@ -1551,6 +1669,7 @@ function DevPanel({ runner, scenario }: { runner: RunnerHandle; scenario: Scenar
               ))}
             </div>
           </div>
+          )}
 
           {/* Triggers */}
           {unFiredTriggers.length > 0 && (

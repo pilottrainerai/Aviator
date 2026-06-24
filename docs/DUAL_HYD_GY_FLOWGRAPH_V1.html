@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DUAL HYD G+Y — Flow Graph V1</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0e1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+#topbar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(10,14,26,.96);backdrop-filter:blur(8px);display:flex;align-items:center;gap:8px;padding:5px 12px;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap}
+#topbar h1{font-size:12px;font-weight:700;color:#e2e8f0;letter-spacing:.5px;white-space:nowrap}
+.sep{color:rgba(255,255,255,.15)}
+.tbtn{padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#94a3b8;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap}
+.tbtn:hover{background:rgba(255,255,255,.1);color:#e2e8f0}
+.tbtn.active{background:rgba(99,102,241,.25);border-color:rgba(99,102,241,.5);color:#a5b4fc}
+.tbtn.day{background:rgba(251,191,36,.15);border-color:rgba(251,191,36,.4);color:#fbbf24}
+#canvasWrap{position:fixed;top:32px;left:0;right:0;bottom:0;overflow:hidden}
+#mainSvg{width:100%;height:100%;display:block;cursor:default}
+#noteOverlay{position:absolute;display:none;z-index:60;pointer-events:auto;background:rgba(10,14,26,.97);border:1px solid rgba(99,102,241,.5);border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,.7);padding:8px;min-width:200px}
+#noteLabelRow{display:flex;align-items:center;gap:6px;margin-bottom:5px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,.08)}
+#noteLabel{font-size:10px;font-weight:700;color:#64748b;flex:1;font-family:monospace}
+#noteClose{cursor:pointer;font-size:13px;color:#475569;background:none;border:none;padding:0 2px;line-height:1}
+#noteClose:hover{color:#e2e8f0}
+#noteTA{width:100%;min-height:90px;background:transparent;border:none;color:#e2e8f0;font-size:11px;font-family:inherit;resize:vertical;outline:none;line-height:1.6}
+#legend{position:fixed;bottom:10px;left:10px;z-index:50;background:rgba(10,14,26,.92);border:1px solid rgba(255,255,255,.07);border-radius:6px;padding:7px 9px;font-size:10px;color:#64748b;line-height:1.9}
+.lrow{display:flex;align-items:center;gap:5px}
+.lbar{width:3px;height:11px;border-radius:2px;flex-shrink:0}
+#hint{position:fixed;bottom:10px;right:10px;z-index:50;font-size:10px;color:#334155;text-align:right;line-height:1.8;pointer-events:none}
+#edgeNoteOverlay{position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:60;pointer-events:auto;background:rgba(10,14,26,.97);border:1px solid rgba(99,102,241,.4);border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,.7);padding:8px;width:240px;display:none}
+#edgeNoteLabel{font-size:9px;font-weight:700;color:#64748b;font-family:monospace;word-break:break-all;margin-bottom:4px}
+#edgeNoteTA{width:100%;min-height:80px;background:transparent;border:none;color:#e2e8f0;font-size:11px;font-family:inherit;resize:vertical;outline:none;line-height:1.6}
+.line-edit-cursor path{cursor:crosshair!important}
+.tbtn.lines{background:rgba(99,102,241,.15);border-color:rgba(99,102,241,.4);color:#a5b4fc}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <h1>DUAL HYD G+Y — Flow Graph V1</h1>
+  <span class="sep">|</span>
+  <span style="font-size:10px;color:#475569">49 nodes · dual-hyd G+Y · click node = edit notes</span>
+  <span class="sep">|</span>
+  <span style="font-size:10px;color:#475569">FILTER:</span>
+  <button class="tbtn active" onclick="setFilter('all',this)">ALL</button>
+  <button class="tbtn" onclick="setFilter('trigger',this)">TRIGGER</button>
+  <button class="tbtn" onclick="setFilter('step',this)">STEP</button>
+  <button class="tbtn" onclick="setFilter('ecam',this)">ECAM</button>
+  <button class="tbtn" onclick="setFilter('fma',this)">FMA</button>
+  <button class="tbtn" onclick="setFilter('atc',this)">ATC</button>
+  <button class="tbtn" onclick="setFilter('pfd',this)">PFD</button>
+  <span class="sep">|</span>
+  <button class="tbtn" id="dayBtn" onclick="toggleDay()">☀ DAY</button>
+  <button class="tbtn" onclick="resetView()">⌖ RESET</button>
+  <button class="tbtn lines" id="lineEditBtn" onclick="toggleLineEdit()" title="Click any flow line to add notes">✎ EDIT LINES</button>
+  <button class="tbtn" onclick="saveHTML()" title="Save notes baked into this HTML file">💾 SAVE HTML</button>
+  <button class="tbtn" onclick="undoLast()" title="Undo last note change (Ctrl+Z)">↩ UNDO</button>
+  <button class="tbtn" onclick="exportJSON()" title="Export notes as JSON">↓ JSON</button>
+  <button class="tbtn" id="resetNotesBtn" onclick="resetNotes()" title="Reset all notes to the defaults baked into this HTML file (clears localStorage overrides)" style="color:#f87171;border-color:rgba(248,113,113,.35)">↺ RESET</button>
+  <span class="sep">|</span>
+  <span id="saveStatus" style="font-size:10px;color:#475569">auto-save on</span>
+</div>
+
+<div id="ccSeqWrap" style="position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:60;max-height:78vh;overflow:auto;display:none">
+<style>
+.cc-logseq{font-family:system-ui,sans-serif;background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+  box-shadow:0 2px 10px rgba(0,0,0,.10);padding:16px 18px;margin:14px 0;max-width:1000px}
+.cc-logseq h2{margin:0 0 6px;font-size:15px;color:#111827}
+.cc-logseq .rule{margin:0 0 12px;font-size:12px;color:#4b5563;line-height:1.5}
+.cc-logseq ol{margin:0;padding:0;list-style:none;counter-reset:s}
+.cc-logseq li{counter-increment:s;display:grid;grid-template-columns:26px 118px 1fr;gap:10px;align-items:start;
+  padding:8px 6px;border-top:1px solid #f1f5f9}
+.cc-logseq li::before{content:counter(s);background:#1f2937;color:#fff;width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.cc-logseq .tag{font-size:10px;font-weight:800;padding:3px 7px;border-radius:5px;text-align:center;white-space:nowrap;align-self:start}
+.cc-logseq .time{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+.cc-logseq .cond{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
+.cc-logseq .body{font-size:13px;color:#1f2937;line-height:1.45}
+.cc-logseq .body b{color:#0f172a}
+.cc-logseq .par{color:#7c3aed;font-weight:700}
+</style>
+<div class="cc-logseq">
+  <h2>ENG&nbsp;1&nbsp;FIRE — Logical Sequence <span style="font-weight:400;color:#6b7280">(how it really runs)</span></h2>
+  <p class="rule"><b>⏱ TIME</b> = runs on the clock (only the failure). <b>🔗 COND</b> = runs on a <b>trigger condition</b> (crew state) — not a timer.
+  <span class="par">∥</span> = parallel calls that fire <b>when their condition is met</b>, as in real life.</p>
+  <ol>
+    <li><span class="tag time">⏱ T+6s</span><span class="body"><b>after_v1</b> — committed to takeoff, rotation in progress.</span></li>
+    <li><span class="tag time">⏱ T+8s</span><span class="body"><b>FIRE WARNING</b> — MASTER WARN + CRC + the <b>whole ECAM checklist appears at once</b> (ENG&nbsp;1&nbsp;FIRE · THR&nbsp;IDLE · MASTER&nbsp;OFF · FIRE&nbsp;P/B · AGENT&nbsp;1 · ATC · LAND&nbsp;ASAP).</span></li>
+    <li><span class="tag cond">🔗 AVIATE <span class="par">∥</span></span><span class="body"><b>Fly first</b> — continue rotation → POSITIVE&nbsp;CLIMB/GEAR&nbsp;UP → engage&nbsp;AP+FMA · PM cancels MASTER&nbsp;WARN. <i>Runs throughout.</i></span></li>
+    <li><span class="tag cond">🔗 400&nbsp;FT</span><span class="body"><b>ECAM ACTIONS unlock</b> (AVIATE complete). <span class="par">∥</span> <b>1st ATC call:</b> TWR "contact Departure 124.85" → crew <b>"STANDBY"</b> (don't switch freq mid-drill).</span></li>
+    <li><span class="tag cond">🔗 DRILL</span><span class="body"><b>ECAM fire drill</b> (now you DO the lines, in order): THR&nbsp;IDLE → MASTER&nbsp;OFF → <b>FIRE&nbsp;P/B</b> (isolates + <b>arms bottles</b>) → <b>AGENT&nbsp;1&nbsp;DISCH</b> → <i>if fire after 30&nbsp;s</i> → <b>AGENT&nbsp;2&nbsp;DISCH</b>. <span class="par">∥</span> The TWR handoff call <b>repeats here</b> — the moment the <b>FIRE&nbsp;P/B is pushed</b> — → crew <b>"STANDBY"</b> again until secured.</span></li>
+    <li><span class="tag cond">🔗 SECURED</span><span class="body"><b>Engine secured</b> — announce <b>LAND&nbsp;ASAP</b>.</span></li>
+    <li><span class="tag cond">🔗 COMMS <span class="par">∥</span></span><span class="body"><b>Communicate</b> (after secured) — <b>MAYDAY</b> → ATC vectors → approach. <i>Comms track.</i></span></li>
+  </ol>
+</div>
+</div>
+<button id="ccSeqBtn" onclick="var w=document.getElementById('ccSeqWrap');w.style.display=w.style.display=='none'?'block':'none'" style="position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:61;padding:6px 12px;border:1px solid #0bd;border-radius:7px;background:#0bd;color:#012;font:700 12px system-ui;cursor:pointer">📋 Logical Sequence</button>
+<div id="canvasWrap">
+  <svg id="mainSvg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="rgba(255,255,255,.22)"/>
+      </marker>
+    </defs>
+    <g id="gWorld"></g>
+    <g id="gDrag"></g>
+  </svg>
+</div>
+
+<div id="noteOverlay">
+  <div id="noteLabelRow">
+    <span id="noteLabel">node_id</span>
+    <button id="noteDelete" onclick="deleteSelectedNode()" title="Delete this node" style="cursor:pointer;font-size:12px;color:#f87171;background:none;border:none;padding:0 4px">🗑</button>
+    <button id="noteClose" onclick="closeNote()">✕</button>
+  </div>
+  <div id="connInfo" style="font-size:10px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.08);line-height:1.8;display:none"></div>
+  <textarea id="noteTA" rows="5" placeholder="Message shown to the pilot at this point… (edit freely — saves automatically)"></textarea>
+</div>
+
+<!-- Edge note overlay — right side, appears when ✎ EDIT LINES is active and an edge is clicked -->
+<div id="edgeNoteOverlay">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,.08)">
+    <span style="font-size:9px;font-weight:700;color:#a5b4fc;letter-spacing:.15em">FLOW LINE</span>
+    <button onclick="closeEdgeNote()" style="cursor:pointer;font-size:13px;color:#475569;background:none;border:none;padding:0 2px;line-height:1;margin-left:auto">✕</button>
+  </div>
+  <div id="edgeNoteLabel"></div>
+  <textarea id="edgeNoteTA" rows="5" placeholder="Notes for this flow line…&#10;(timing, condition, rationale)"></textarea>
+</div>
+
+<!-- Edge tooltip -->
+<div id="edgeTip" style="position:fixed;display:none;z-index:80;background:rgba(10,14,26,.95);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:3px 8px;font-size:10px;color:#94a3b8;pointer-events:none;font-family:monospace;white-space:nowrap"></div>
+
+<div id="legend">
+  <div class="lrow"><div class="lbar" style="background:#f87171"></div>TRIGGER</div>
+  <div class="lrow"><div class="lbar" style="background:#a78bfa"></div>STEP</div>
+  <div class="lrow"><div class="lbar" style="background:#fb923c"></div>ECAM</div>
+  <div class="lrow"><div class="lbar" style="background:#34d399"></div>FMA</div>
+  <div class="lrow"><div class="lbar" style="background:#22d3ee"></div>ATC</div>
+  <div class="lrow"><div class="lbar" style="background:#818cf8"></div>PFD</div>
+  <div style="margin-top:5px;border-top:1px solid rgba(255,255,255,.06);padding-top:5px">
+  <div class="lrow"><div class="lbar" style="background:#fbbf24"></div>← requires (hover)</div>
+  <div class="lrow"><div class="lbar" style="background:#34d399"></div>→ feeds into (hover)</div>
+  <div style="margin-top:3px;font-size:9px;color:#334155">● = has notes · hover node = trace</div>
+  </div>
+</div>
+<div id="hint">Scroll=pan · Ctrl+Scroll=zoom · Click=notes · Esc=close · Ctrl+Z=undo</div>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────────────
+const NOTES_KEY      = 'flowgraph_notes_v1';
+const EDGE_NOTES_KEY = 'flowgraph_edge_notes_v1';
+const VP_KEY         = 'flowgraph_vp_v1';
+const NW=168, NH=52, SW=142, SH=40;
+const COL = { fma:10, pf:182, ctr:374, pm:566, atc:758, ecam:920 };
+const TC = { trigger:'#f87171', step:'#a78bfa', ecam:'#fb923c', fma:'#34d399', atc:'#22d3ee', pfd:'#818cf8' };
+
+// ── ALL 87 NODES ──────────────────────────────────────────────────────────
+const nodes = [
+  {id:'structural_fail', type:'trigger', x:COL.fma, y:40, w:NW,h:NH, label:'structural_fail', sub:'HYD G+Y SYS LO PR — green AND yellow pressure ', req:['—']},
+  {id:'maintain_control', type:'step', x:COL.ctr, y:40, w:NW,h:NH, label:'FLY THE AIRCRAFT', sub:'PF · flightcheck · MAINTAIN CONTROL', req:['structural_fail']},
+  {id:'cancel_master_warn', type:'step', x:COL.pm, y:96, w:NW,h:NH, label:'MASTER WARN', sub:'PM · glareshield · CANCEL', req:['maintain_control']},
+  {id:'ptu_off', type:'step', x:COL.ctr, y:152, w:NW,h:NH, label:'PTU', sub:'PM · proc · OFF', req:['cancel_master_warn']},
+  {id:'grn_eng1_pump_off', type:'step', x:COL.ctr, y:208, w:NW,h:NH, label:'ENG 1 PUMP', sub:'PM · proc · OFF', req:['ptu_off']},
+  {id:'yel_eng2_pump_off', type:'step', x:COL.ctr, y:264, w:NW,h:NH, label:'ENG 2 PUMP', sub:'PM · proc · OFF', req:['grn_eng1_pump_off']},
+  {id:'yel_elec_pump_on', type:'step', x:COL.ctr, y:320, w:NW,h:NH, label:'YELLOW ELEC PUMP', sub:'PM · proc · ON', req:['yel_eng2_pump_off']},
+  {id:'announce_sec_failures', type:'step', x:COL.pf, y:376, w:NW,h:NH, label:'ECAM — SECONDARY FAILURES', sub:'PM · chclm · READ', req:['yel_elec_pump_on']},
+  {id:'fctl_check', type:'step', x:COL.ctr, y:432, w:NW,h:NH, label:'FCTL PAGE CHECK', sub:'PM · proc · CONFIRM', req:['announce_sec_failures']},
+  {id:'cancel_master_caut', type:'step', x:COL.pm, y:488, w:NW,h:NH, label:'MASTER CAUT', sub:'PM · glareshield · CANCEL', req:['announce_sec_failures']},
+  {id:'speed_set', type:'step', x:COL.ctr, y:544, w:NW,h:NH, label:'MANEUVER WITH CARE', sub:'PF · proc · MAX 320/M.77', req:['cancel_master_caut']},
+  {id:'announce_status', type:'step', x:COL.pf, y:600, w:NW,h:NH, label:'ECAM — STATUS', sub:'PM · chclm · ANNOUNCE', req:['speed_set']},
+  {id:'stop_ecam', type:'step', x:COL.pf, y:656, w:NW,h:NH, label:'STOP ECAM', sub:'PF · chclm · CALL', req:['announce_status']},
+  {id:'oeb_check', type:'step', x:COL.pf, y:712, w:NW,h:NH, label:'OEB / COMPUTER RESETS', sub:'PF · chclm · CHECK', req:['stop_ecam']},
+  {id:'read_status', type:'step', x:COL.pf, y:768, w:NW,h:NH, label:'READ STATUS', sub:'PF · chclm · CALL', req:['oeb_check']},
+  {id:'status_read_aloud', type:'step', x:COL.pf, y:824, w:NW,h:NH, label:'STATUS — PM READS', sub:'PM · chclm · REVIEW', req:['read_status']},
+  {id:'crew_crosscheck', type:'step', x:COL.pf, y:880, w:NW,h:NH, label:'ECAM ACTIONS COMPLETED', sub:'PM · chclm · ANNOUNCE', req:['status_read_aloud']},
+  {id:'ldg_perf', type:'step', x:COL.atc, y:936, w:NW,h:NH, label:'LANDING PERFORMANCE', sub:'PM · comms · COMPUTE', req:['crew_crosscheck']},
+  {id:'fordec_hyd', type:'step', x:COL.atc, y:992, w:NW,h:NH, label:'FORDEC', sub:'PF · comms · COMPLETE', req:['ldg_perf']},
+  {id:'inform_atc_intentions', type:'step', x:COL.atc, y:1048, w:NW,h:NH, label:'INFORM ATC — INTENTIONS + BRIE', sub:'PM · comms · CALL', req:['fordec_hyd']},
+  {id:'fmgc_prep', type:'step', x:COL.atc, y:1104, w:NW,h:NH, label:'FMGC PREP', sub:'PM · comms · COMPLETE', req:['fordec_hyd']},
+  {id:'nis_brief_hyd', type:'step', x:COL.atc, y:1160, w:NW,h:NH, label:'NITS BRIEF (SCCM)', sub:'PF · comms · CONFIRM', req:['fordec_hyd']},
+  {id:'pax_pa', type:'step', x:COL.atc, y:1216, w:NW,h:NH, label:'PASSENGER PA', sub:'PF · comms · ANNOUNCE', req:['nis_brief_hyd']},
+  {id:'inform_company', type:'step', x:COL.atc, y:1272, w:NW,h:NH, label:'INFORM COMPANY', sub:'PM · comms · CALL', req:['pax_pa']},
+  {id:'go_around_review', type:'step', x:COL.atc, y:1328, w:NW,h:NH, label:'GO-AROUND REVIEW', sub:'PF · comms · CONFIRM', req:['inform_company']},
+  {id:'atc_emergency_svcs', type:'step', x:COL.atc, y:1384, w:NW,h:NH, label:'ATC — EMERGENCY SERVICES', sub:'PM · comms · ADVISE', req:['go_around_review']},
+  {id:'approach_brief_hyd', type:'step', x:COL.atc, y:1440, w:NW,h:NH, label:'APPROACH BRIEF', sub:'PF · comms · COMPLETE', req:['atc_emergency_svcs']},
+  {id:'approach_prep_hyd', type:'step', x:COL.atc, y:1496, w:NW,h:NH, label:'APPROACH PREP', sub:'PM · comms · COMPLETE', req:['approach_brief_hyd']},
+  {id:'gpws_flap_mode', type:'step', x:COL.ctr, y:1552, w:NW,h:NH, label:'GPWS FLAP MODE', sub:'PM · proc · OFF', req:['approach_prep_hyd']},
+  {id:'approach_cl_hyd', type:'step', x:COL.pf, y:1608, w:NW,h:NH, label:'APPROACH CL', sub:'PM · chclm · COMPLETE', req:['gpws_flap_mode']},
+  {id:'lgr_gravity', type:'step', x:COL.ctr, y:1664, w:NW,h:NH, label:'GEAR — GRAVITY EXTN', sub:'PM · proc · DEPLOY AT VAPP', req:['approach_cl_hyd']},
+  {id:'landing_cl_hyd', type:'step', x:COL.pf, y:1720, w:NW,h:NH, label:'LANDING CL', sub:'PM · chclm · COMPLETE', req:['approach_cl_hyd']},
+  {id:'request_taxi_to_stand', type:'step', x:COL.atc, y:1776, w:NW,h:NH, label:'REQUEST TAXI TO STAND', sub:'PM · comms · CALL', req:['landing_cl_hyd']},
+  {id:'atc_handoff_checkin', type:'atc', x:COL.atc, y:40, w:SW,h:SH, label:'MUMBAI CONTROL', sub:'ATC distraction', req:['—']},
+  {id:'atc_mayday_ack', type:'atc', x:COL.atc, y:40, w:SW,h:SH, label:'MUMBAI CONTROL', sub:'ATC distraction', req:['—']},
+  {id:'atc_assistance_req', type:'atc', x:COL.atc, y:40, w:SW,h:SH, label:'MUMBAI CONTROL', sub:'ATC distraction', req:['—']},
+  {id:'atc_vectors_when_ready', type:'atc', x:COL.atc, y:40, w:SW,h:SH, label:'MUMBAI CONTROL', sub:'ATC distraction', req:['—']},
+  {id:'atc_weather_request', type:'atc', x:COL.atc, y:904, w:SW,h:SH, label:'PM → MUMBAI APPROACH', sub:'ATC distraction', req:['crew_crosscheck']},
+  {id:'atc_weather_delivery', type:'atc', x:COL.atc, y:904, w:SW,h:SH, label:'MUMBAI APPROACH', sub:'ATC distraction', req:['crew_crosscheck']},
+  {id:'pm_hold_req', type:'atc', x:COL.atc, y:904, w:SW,h:SH, label:'PM → MUMBAI APPROACH', sub:'ATC distraction', req:['crew_crosscheck']},
+  {id:'atc_hold_clr', type:'atc', x:COL.atc, y:904, w:SW,h:SH, label:'MUMBAI APPROACH', sub:'ATC distraction', req:['crew_crosscheck']},
+  {id:'atc_pob_fuel_services', type:'atc', x:COL.atc, y:40, w:SW,h:SH, label:'MUMBAI APPROACH', sub:'ATC distraction', req:['—']},
+  {id:'atc_intentions_advise', type:'atc', x:COL.atc, y:1016, w:SW,h:SH, label:'PM → MUMBAI APPROACH', sub:'ATC distraction', req:['fordec_hyd']},
+  {id:'atc_emg_services_req', type:'atc', x:COL.atc, y:1016, w:SW,h:SH, label:'PM → MUMBAI APPROACH', sub:'ATC distraction', req:['fordec_hyd']},
+  {id:'atc_ready_for_approach', type:'atc', x:COL.atc, y:1016, w:SW,h:SH, label:'MUMBAI APPROACH', sub:'ATC distraction', req:['fordec_hyd']},
+  {id:'atc_cleared_approach', type:'atc', x:COL.atc, y:40, w:SW,h:SH, label:'MUMBAI APPROACH', sub:'ATC distraction', req:['—']},
+  {id:'atc_tower_contact', type:'atc', x:COL.atc, y:40, w:SW,h:SH, label:'MUMBAI TOWER', sub:'ATC distraction', req:['—']},
+  {id:'atc_cleared_to_land', type:'atc', x:COL.atc, y:40, w:SW,h:SH, label:'MUMBAI TOWER', sub:'ATC distraction', req:['—']},
+  {id:'atc_taxi_to_stand', type:'atc', x:COL.atc, y:1800, w:SW,h:SH, label:'MUMBAI TOWER', sub:'ATC distraction', req:['request_taxi_to_stand']}
+];
+
+// ── DEFAULT NOTES (from V3 workbook) ──────────────────────────────────────
+// __EDGE_NOTES_START__
+const DEFAULT_EDGE_NOTES = {
+};
+// __EDGE_NOTES_END__
+
+// __NOTES_BLOCK_START__
+const DEFAULT_NOTES = {
+};
+// __NOTES_BLOCK_END__
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let nodeNotes = {};
+try { nodeNotes = JSON.parse(localStorage.getItem(NOTES_KEY)||'{}'); } catch{}
+// Always apply latest defaults — overwrite nodes whose saved value equals old placeholder text
+const ATC_NODES = [
+  'atc_handoff_checkin','atc_mayday_ack','atc_assistance_req','atc_vectors_when_ready','atc_weather_request','atc_weather_delivery','pm_hold_req','atc_hold_clr','atc_pob_fuel_services','atc_intentions_advise','atc_emg_services_req','atc_ready_for_approach','atc_cleared_approach','atc_tower_contact','atc_cleared_to_land','atc_taxi_to_stand'
+];
+nodes.forEach(n => {
+  const forceRefresh = ATC_NODES.includes(n.id) && (!nodeNotes[n.id] || nodeNotes[n.id].length < 40);
+  if ((nodeNotes[n.id] === undefined || forceRefresh) && DEFAULT_NOTES[n.id]) {
+    nodeNotes[n.id] = DEFAULT_NOTES[n.id];
+  }
+});
+localStorage.setItem(NOTES_KEY, JSON.stringify(nodeNotes));
+
+let _savedVp = /*__VP__*/{x:60, y:50, scale:1}/*__VP_END__*/;
+try { const s=localStorage.getItem(VP_KEY); if(s){ _savedVp=JSON.parse(s); } } catch{}
+const vp = {x:_savedVp.x, y:_savedVp.y, scale:_savedVp.scale};
+let selected = null;
+let panStart = null;
+let nodeFilter = 'all';
+let dayMode = false;
+
+// Edge notes — seed from baked-in DEFAULT_EDGE_NOTES, then overlay with localStorage
+let edgeNotes = Object.assign({}, DEFAULT_EDGE_NOTES);
+try { const s=localStorage.getItem(EDGE_NOTES_KEY); if(s){ Object.assign(edgeNotes,JSON.parse(s)); } } catch{}
+let edgeEditMode = false;
+
+// __EDGE_OVERRIDES_START__
+const DEFAULT_EDGE_OVERRIDES = {
+};
+// __EDGE_OVERRIDES_END__
+const EDGE_OVERRIDES_KEY = 'flowgraph_edge_overrides_v1';
+let edgeOverrides = Object.assign({}, DEFAULT_EDGE_OVERRIDES);
+try { const s=localStorage.getItem(EDGE_OVERRIDES_KEY); if(s){ Object.assign(edgeOverrides,JSON.parse(s)); } } catch{}
+let dragEdge = null; // { origKey, end:'from'|'to', fixedId } — active drag state
+let dragHoverId = null; // node id currently under cursor during drag
+let selEdge = null; // { key:'from→to', from, to }
+const svgNS = 'http://www.w3.org/2000/svg';
+// undo stack — each entry: {nodeId, before, after}
+const undoStack = [];
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+const byId = {};
+// ── Drag/delete persistence (node positions + deletions) ──
+// __NODE_OV_START__
+const DEFAULT_NODE_POS = {};
+const DEFAULT_DELETED_NODES = [];
+// __NODE_OV_END__
+const NODE_POS_KEY='flowgraph_node_pos_v1', DELETED_KEY='flowgraph_deleted_v1';
+let nodePos=Object.assign({},DEFAULT_NODE_POS);
+let deletedNodes=new Set(DEFAULT_DELETED_NODES);
+try{ const _s=localStorage.getItem(NODE_POS_KEY); if(_s) Object.assign(nodePos,JSON.parse(_s)); }catch(e){}
+try{ const _s=localStorage.getItem(DELETED_KEY); if(_s) JSON.parse(_s).forEach(id=>deletedNodes.add(id)); }catch(e){}
+nodes.forEach(n=>{ if(nodePos[n.id]){ n.x=nodePos[n.id].x; n.y=nodePos[n.id].y; } });
+nodes.forEach(n => { if(!deletedNodes.has(n.id)) byId[n.id]=n; });
+
+function svgEl(tag, attrs, parent){
+  const e = document.createElementNS(svgNS, tag);
+  for(const [k,v] of Object.entries(attrs||{})) e.setAttribute(k,v);
+  if(parent) parent.appendChild(e);
+  return e;
+}
+function nW(n){ return n.w||NW; }
+function nH(n){ return n.h||NH; }
+function nCX(n){ return n.x+nW(n)/2; }
+function nBot(n){ return n.y+nH(n); }
+
+function buildEdges(){
+  const edges=[];
+  nodes.forEach(n => {
+    if(deletedNodes.has(n.id)) return;
+    (n.req||[]).forEach(r => {
+      if(r==='—') return;
+      if(!byId[r]) return;
+      const origKey = r+'→'+n.id;
+      const ov = edgeOverrides[origKey];
+      const from = (ov&&ov.from) ? ov.from : r;
+      const to   = (ov&&ov.to)   ? ov.to   : n.id;
+      if(byId[from] && byId[to]) edges.push({from, to, origKey});
+    });
+  });
+  return edges;
+}
+
+function screenToWorld(cx, cy){
+  const r = document.getElementById('mainSvg').getBoundingClientRect();
+  return { x:(cx-r.left-vp.x)/vp.scale, y:(cy-r.top-vp.y)/vp.scale };
+}
+function nodeAtWorld(wx, wy){
+  for(const n of nodes){
+    if(wx>=n.x && wx<=n.x+nW(n) && wy>=n.y && wy<=n.y+nH(n)) return n;
+  }
+  return null;
+}
+
+const joinSet = new Set();
+nodes.forEach(n => {
+  const vr = (n.req||[]).filter(r=>r!=='—');
+  if(vr.length>1) joinSet.add(n.id);
+});
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+function render(){
+  const gw = document.getElementById('gWorld');
+  gw.innerHTML = '';
+
+  const bg      = dayMode ? 'rgba(248,250,252,.96)' : 'rgba(16,20,36,.95)';
+  const border  = dayMode ? 'rgba(0,0,0,.12)'       : 'rgba(255,255,255,.08)';
+  const textCol = dayMode ? '#1e293b'                : '#e2e8f0';
+  const subCol  = dayMode ? '#64748b'                : '#64748b';
+  const edgeCol = dayMode ? 'rgba(0,0,0,.15)'        : 'rgba(255,255,255,.18)';
+  const joinCol = dayMode ? 'rgba(234,179,8,.8)'     : 'rgba(251,191,36,.75)';
+
+  // Lane backgrounds
+  const gL=svgEl('g',{},gw);
+  [
+    {x:COL.pf-6, y:1690, w:NW+12, h:1928+NH-1690+24, c:'rgba(96,165,250,.04)',   s:'rgba(96,165,250,.14)',  lbl:'PF AVIATE'},
+    {x:COL.pm-6, y:1690, w:NW+12, h:2588+NH-1690+24, c:'rgba(192,132,252,.04)', s:'rgba(192,132,252,.14)', lbl:'PM COMMS'},
+    {x:COL.pf-6, y:3010, w:COL.pm+NW-COL.pf+12, h:3252+NH-3010+24, c:'rgba(251,191,36,.03)', s:'rgba(251,191,36,.12)', lbl:'POST-FORDEC ∥'},
+    {x:COL.ctr-6,y:3340, w:NW+12, h:3692+NH-3340+24, c:'rgba(52,211,153,.03)',  s:'rgba(52,211,153,.12)',  lbl:'APPROACH'},
+  ].forEach(ld=>{
+    svgEl('rect',{x:ld.x,y:ld.y,width:ld.w,height:ld.h,fill:ld.c,stroke:ld.s,'stroke-width':'1','stroke-dasharray':'6,4',rx:'8'},gL);
+    const t=svgEl('text',{x:ld.x+7,y:ld.y+13,fill:ld.s,'font-size':'9','font-weight':'700','font-family':'monospace','letter-spacing':'1'},gL);
+    t.textContent=ld.lbl;
+  });
+
+  // Edges
+  const gE=svgEl('g',{'id':'gEdges'},gw);
+  const edges=buildEdges();
+  edges.forEach(e=>{
+    const s=byId[e.from], d=byId[e.to];
+    if(!s||!d) return;
+    const sHide=nodeFilter!=='all'&&s.type!==nodeFilter;
+    const dHide=nodeFilter!=='all'&&d.type!==nodeFilter;
+    if(sHide&&dHide) return;
+    const sx=nCX(s), sy=nBot(s), dx=nCX(d), dy=d.y;
+    const mY=(sy+dy)/2;
+    const isJ=joinSet.has(e.to);
+    const p=svgEl('path',{
+      d:`M${sx},${sy} C${sx},${mY} ${dx},${mY} ${dx},${dy}`,
+      fill:'none', stroke:isJ?joinCol:edgeCol, 'stroke-width':isJ?'1.5':'1',
+      'stroke-dasharray':isJ?'4,3':'none',
+      'marker-end':'url(#arr)',
+      'data-from':e.from, 'data-to':e.to,
+      style:'pointer-events:stroke',
+    },gE);
+    // Thicker stroke + note-dot indicator when edge has notes
+    const ek=e.from+'→'+e.to;
+    if(edgeNotes[ek]){ p.setAttribute('stroke-width','2'); p.setAttribute('stroke-dasharray','3,2'); }
+    if(edgeEditMode){ p.style.cursor='crosshair'; p.setAttribute('stroke-width','3'); p.setAttribute('stroke', edgeNotes[ek] ? '#f59e0b' : '#38bdf8'); }
+    // Edge click — open note panel when line-edit mode active
+    p.addEventListener('click', ev=>{
+      if(!edgeEditMode) return;
+      ev.stopPropagation();
+      selectEdge(e.origKey||ek, e.from, e.to);
+    });
+    // Edge hover tooltip
+    p.addEventListener('mouseenter', ev=>{
+      const tip=document.getElementById('edgeTip');
+      tip.textContent=edgeEditMode
+        ? `✎  ${e.from}  →  ${e.to}${edgeNotes[ek]?' ●':''}`
+        : `${e.from}  →  ${e.to}`;
+      tip.style.display='block';
+      tip.style.left=(ev.clientX+12)+'px'; tip.style.top=(ev.clientY-6)+'px';
+    });
+    p.addEventListener('mousemove', ev=>{
+      const tip=document.getElementById('edgeTip');
+      tip.style.left=(ev.clientX+12)+'px'; tip.style.top=(ev.clientY-6)+'px';
+    });
+    p.addEventListener('mouseleave',()=>{ document.getElementById('edgeTip').style.display='none'; });
+  });
+
+  // Nodes
+  const gN=svgEl('g',{'id':'gNodes'},gw);
+  nodes.forEach(n=>{
+    if(deletedNodes.has(n.id)) return;
+    const hide=nodeFilter!=='all'&&n.type!==nodeFilter;
+    const g=svgEl('g',{'data-id':n.id,opacity:hide?'0.1':'1',style:'cursor:move'},gN);
+    g.addEventListener('mousedown', ev=>{
+      if(edgeEditMode) return;
+      ev.stopPropagation();
+      const sx=ev.clientX, sy=ev.clientY, ox=n.x, oy=n.y; let moved=false;
+      function mv(e){ const dx=(e.clientX-sx)/vp.scale, dy=(e.clientY-sy)/vp.scale;
+        if(Math.abs(dx)>3||Math.abs(dy)>3) moved=true; n.x=ox+dx; n.y=oy+dy; render(); applyVp(); }
+      function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+        if(moved){ n.x=Math.round(n.x); n.y=Math.round(n.y); nodePos[n.id]={x:n.x,y:n.y};
+          localStorage.setItem(NODE_POS_KEY,JSON.stringify(nodePos)); render(); applyVp(); }
+        else { selectNode(n.id); } }
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    });
+    g.addEventListener('mouseenter', ()=>highlightNode(n.id));
+    g.addEventListener('mouseleave', ()=>clearHighlight());
+
+    const color=TC[n.type]||'#94a3b8';
+    const w=nW(n), h=nH(n), x=n.x, y=n.y;
+    const isSel=n.id===selected;
+    const hasNote=!!nodeNotes[n.id];
+
+    // Shadow for selected
+    if(isSel){
+      svgEl('rect',{x:x-2,y:y-2,width:w+4,height:h+4,rx:'7',fill:'none',
+        stroke:color,'stroke-width':'2',opacity:'0.7'},g);
+    }
+    // Card background
+    svgEl('rect',{x,y,width:w,height:h,rx:'5',fill:bg,stroke:border,'stroke-width':'1'},g);
+    // Left accent bar
+    svgEl('rect',{x,y:y+3,width:3,height:h-6,rx:'1.5',fill:color},g);
+    // Notes dot (top-right)
+    if(hasNote){
+      svgEl('circle',{cx:x+w-5,cy:y+5,r:'3',fill:color,opacity:'0.75'},g);
+    }
+    // JOIN badge
+    if(joinSet.has(n.id)){
+      svgEl('rect',{x:x+w-26,y:y+h-14,width:24,height:12,rx:'3',fill:'rgba(251,191,36,.15)',stroke:'rgba(251,191,36,.4)','stroke-width':'1'},g);
+      const jt=svgEl('text',{x:x+w-14,y:y+h-5,'font-size':'7','font-weight':'800',fill:'#fbbf24','text-anchor':'middle'},g);
+      jt.textContent='JOIN';
+    }
+    // ID label
+    const idT=svgEl('text',{x:x+10,y:y+13,'font-size':'9','font-weight':'700','font-family':'monospace',fill:color,'letter-spacing':'0.2'},g);
+    idT.textContent=n.id.length>22?n.id.slice(0,22):n.id;
+    // Main label
+    const mlT=svgEl('text',{x:x+10,y:y+26,'font-size':'10','font-weight':'600',fill:textCol},g);
+    mlT.textContent=n.label.length>24?n.label.slice(0,24):n.label;
+    // Sub label (only for taller nodes)
+    if(h>=NH && n.sub){
+      const maxC=Math.floor((w-18)/5.4);
+      const slT=svgEl('text',{x:x+10,y:y+39,'font-size':'9',fill:subCol},g);
+      slT.textContent=n.sub.length>maxC?n.sub.slice(0,maxC)+'…':n.sub;
+    }
+  });
+
+  // Edge endpoint handles — shown when an edge is selected in edit mode
+  if(edgeEditMode && selEdge){
+    const activeEdges=buildEdges();
+    const ae=activeEdges.find(e=>(e.origKey||e.from+'→'+e.to)===selEdge.key);
+    if(ae){
+      const sn=byId[ae.from], tn=byId[ae.to];
+      const gH=svgEl('g',{id:'gHandles'},gw);
+      if(sn){
+        const sh=svgEl('circle',{cx:nCX(sn),cy:nBot(sn)-6,r:'8',fill:'#38bdf8',stroke:'#fff','stroke-width':'2',cursor:'grab'},gH);
+        sh.addEventListener('mousedown',ev=>{ev.stopPropagation();ev.preventDefault();dragEdge={origKey:selEdge.key,end:'from',fixedId:ae.to};});
+        const sl=svgEl('text',{x:nCX(sn),y:nBot(sn)-17,'font-size':'8','font-weight':'700',fill:'#38bdf8','text-anchor':'middle'},gH);
+        sl.textContent='SOURCE';
+      }
+      if(tn){
+        const th=svgEl('circle',{cx:nCX(tn),cy:tn.y+6,r:'8',fill:'#f59e0b',stroke:'#fff','stroke-width':'2',cursor:'grab'},gH);
+        th.addEventListener('mousedown',ev=>{ev.stopPropagation();ev.preventDefault();dragEdge={origKey:selEdge.key,end:'to',fixedId:ae.from};});
+        const tl=svgEl('text',{x:nCX(tn),y:tn.y-4,'font-size':'8','font-weight':'700',fill:'#f59e0b','text-anchor':'middle'},gH);
+        tl.textContent='TARGET';
+      }
+    }
+  }
+}
+
+// ── VIEW ──────────────────────────────────────────────────────────────────
+function applyVp(){
+  const t=`translate(${vp.x},${vp.y}) scale(${vp.scale})`;
+  document.getElementById('gWorld').setAttribute('transform',t);
+  document.getElementById('gDrag').setAttribute('transform',t);
+  localStorage.setItem(VP_KEY, JSON.stringify({x:vp.x,y:vp.y,scale:vp.scale}));
+  positionNote();
+}
+
+function resetView(){ vp.x=60; vp.y=50; vp.scale=1; applyVp(); }
+
+// ── HOVER HIGHLIGHT ────────────────────────────────────────────────────────
+function highlightNode(hoverId){
+  const upstream=new Set(), downstream=new Set(), upEdges=[], downEdges=[];
+  document.querySelectorAll('#gEdges > path').forEach(p=>{
+    const f=p.dataset.from, t=p.dataset.to;
+    if(t===hoverId){ upstream.add(f); upEdges.push(p); }
+    if(f===hoverId){ downstream.add(t); downEdges.push(p); }
+  });
+  // Dim all nodes and edges
+  document.querySelectorAll('#gNodes > g').forEach(g=>{
+    const id=g.dataset.id;
+    g.style.opacity=(id===hoverId||upstream.has(id)||downstream.has(id))?'1':'0.08';
+  });
+  document.querySelectorAll('#gEdges > path').forEach(p=>{ p.style.opacity='0.04'; p.style.stroke=''; p.style.strokeWidth=''; });
+  // Highlight upstream (amber) and downstream (green)
+  upEdges.forEach(p=>{ p.style.opacity='1'; p.style.stroke='#fbbf24'; p.style.strokeWidth='2'; });
+  downEdges.forEach(p=>{ p.style.opacity='1'; p.style.stroke='#34d399'; p.style.strokeWidth='2'; });
+}
+
+function clearHighlight(){
+  document.querySelectorAll('#gNodes > g').forEach(g=>{ g.style.opacity=''; });
+  document.querySelectorAll('#gEdges > path').forEach(p=>{ p.style.opacity=''; p.style.stroke=''; p.style.strokeWidth=''; });
+}
+
+// Build a reverse-lookup map: which nodes require THIS node
+const requiredBy = {};
+nodes.forEach(n=>{
+  (n.req||[]).forEach(r=>{
+    if(r==='—') return;
+    if(!requiredBy[r]) requiredBy[r]=[];
+    requiredBy[r].push(n.id);
+  });
+});
+
+// ── NOTE OVERLAY ──────────────────────────────────────────────────────────
+function positionNote(){
+  const ov=document.getElementById('noteOverlay');
+  if(!selected){ ov.style.display='none'; return; }
+  const n=byId[selected];
+  if(!n){ ov.style.display='none'; return; }
+  const svgEl2=document.getElementById('mainSvg');
+  const svgR=svgEl2.getBoundingClientRect();
+  const wrapR=document.getElementById('canvasWrap').getBoundingClientRect();
+  const sx=(svgR.left-wrapR.left)+vp.x+n.x*vp.scale;
+  const sy=(svgR.top-wrapR.top)+vp.y+(n.y+nH(n))*vp.scale+4;
+  const ow=Math.max(nW(n)*vp.scale, 220);
+  ov.style.left=Math.max(4,Math.min(sx,wrapR.width-ow-8))+'px';
+  ov.style.top=Math.min(sy,wrapR.height-200)+'px';
+  ov.style.width=ow+'px';
+  ov.style.display='block';
+  document.getElementById('noteLabel').textContent=selected;
+  // The editable box = the MESSAGE shown to the pilot at this node. Seeded from the
+  // node's own content (sub) when nothing's been edited yet; edits persist to localStorage.
+  const n2=byId[selected];
+  document.getElementById('noteTA').value=nodeNotes[selected]||n2.sub||'';
+  const ci=document.getElementById('connInfo');
+  const typeLabel={fma:'FMA',trigger:'TRIGGER',step:'CREW STEP',ecam:'ECAM LINE',atc:'ATC CALL'}[n2.type]||(n2.type||'').toUpperCase();
+  ci.innerHTML=`<div style="color:#818cf8;font-size:9px;font-weight:800;letter-spacing:.5px">${typeLabel} · ${n2.label||''}</div>`
+    +`<div style="color:#475569;font-size:9px;margin-top:3px">MESSAGE SHOWN TO PILOT — edit below, saves automatically</div>`;
+  ci.style.display='block';
+}
+
+function selectNode(id){
+  if(selected===id){ closeNote(); return; }
+  selected=id;
+  render(); applyVp();
+}
+
+function closeNote(){
+  selected=null;
+  render(); applyVp();
+  document.getElementById('noteOverlay').style.display='none';
+}
+
+function deleteSelectedNode(){
+  if(!selected) return;
+  if(!confirm('Delete node "'+selected+'" and its connections? (Undo: ↺ RESET notes won\'t restore — re-add manually)')) return;
+  deletedNodes.add(selected);
+  localStorage.setItem(DELETED_KEY, JSON.stringify([...deletedNodes]));
+  closeNote(); render(); applyVp();
+}
+
+// ── EDGE NOTE OVERLAY ────────────────────────────────────────────────────────
+function toggleLineEdit(){
+  edgeEditMode=!edgeEditMode;
+  document.getElementById('lineEditBtn').classList.toggle('active', edgeEditMode);
+  if(!edgeEditMode){ closeEdgeNote(); }
+  render(); applyVp();
+  document.getElementById('hint').textContent = edgeEditMode
+    ? 'LINE EDIT — click any arrow to add notes  ·  Esc=exit'
+    : 'Scroll=pan · Ctrl+Scroll=zoom · Click=notes · Esc=close · Ctrl+Z=undo';
+}
+
+function selectEdge(origKey, from, to){
+  const k=origKey||from+'→'+to;
+  selEdge = (selEdge&&selEdge.key===k) ? null : {key:k, from, to};
+  render(); applyVp();
+  positionEdgeNote();
+}
+
+// ── EDGE DRAG — reroute endpoint to a different node ──────────────────────
+document.addEventListener('mousemove', ev=>{
+  if(!dragEdge) return;
+  const wp=screenToWorld(ev.clientX, ev.clientY);
+  const gd=document.getElementById('gDrag');
+  gd.innerHTML='';
+  const fixedN=byId[dragEdge.fixedId];
+  if(fixedN){
+    let fx,fy,tx,ty;
+    if(dragEdge.end==='to'){
+      fx=nCX(fixedN); fy=nBot(fixedN); tx=wp.x; ty=wp.y;
+    } else {
+      fx=wp.x; fy=wp.y; tx=nCX(fixedN); ty=fixedN.y;
+    }
+    const mY=(fy+ty)/2;
+    svgEl('path',{d:`M${fx},${fy} C${fx},${mY} ${tx},${mY} ${tx},${ty}`,
+      fill:'none',stroke:'#38bdf8','stroke-width':'2','stroke-dasharray':'8,5',
+      opacity:'0.85','marker-end':'url(#arr)'},gd);
+  }
+  // Highlight node under cursor
+  const hn=nodeAtWorld(wp.x,wp.y);
+  const newId=hn?hn.id:null;
+  if(newId!==dragHoverId){
+    dragHoverId=newId;
+    document.querySelectorAll('#gNodes > g').forEach(g=>{
+      g.style.filter = g.getAttribute('data-id')===dragHoverId ? 'brightness(2) drop-shadow(0 0 6px #38bdf8)' : '';
+    });
+  }
+});
+
+document.addEventListener('mouseup', ev=>{
+  if(!dragEdge) return;
+  const wp=screenToWorld(ev.clientX, ev.clientY);
+  const dropN=nodeAtWorld(wp.x,wp.y);
+  if(dropN && dropN.id!==dragEdge.fixedId){
+    const ov=Object.assign({},edgeOverrides[dragEdge.origKey]||{});
+    ov[dragEdge.end]=dropN.id;
+    // If result matches original, remove override
+    const parts=dragEdge.origKey.split('→');
+    if((ov.from||parts[0])===parts[0] && (ov.to||parts[1])===parts[1]) delete edgeOverrides[dragEdge.origKey];
+    else edgeOverrides[dragEdge.origKey]=ov;
+    localStorage.setItem(EDGE_OVERRIDES_KEY,JSON.stringify(edgeOverrides));
+  }
+  document.getElementById('gDrag').innerHTML='';
+  document.querySelectorAll('#gNodes > g').forEach(g=>{ g.style.filter=''; });
+  dragHoverId=null; dragEdge=null;
+  render(); applyVp();
+  document.getElementById('hint').textContent='LINE EDIT — click any arrow to add notes  ·  Esc=exit';
+});
+
+function positionEdgeNote(){
+  const ov=document.getElementById('edgeNoteOverlay');
+  if(!selEdge){ ov.style.display='none'; return; }
+  ov.style.display='block';
+  document.getElementById('edgeNoteLabel').textContent=selEdge.from+'  →  '+selEdge.to;
+  document.getElementById('edgeNoteTA').value=edgeNotes[selEdge.key]||'';
+  document.getElementById('edgeNoteTA').focus();
+}
+
+function closeEdgeNote(){
+  selEdge=null;
+  document.getElementById('edgeNoteOverlay').style.display='none';
+}
+
+document.getElementById('edgeNoteTA').addEventListener('input',()=>{
+  if(!selEdge) return;
+  edgeNotes[selEdge.key]=document.getElementById('edgeNoteTA').value;
+  localStorage.setItem(EDGE_NOTES_KEY,JSON.stringify(edgeNotes));
+  const s=document.getElementById('saveStatus');
+  s.textContent='line note saved'; s.style.color='#34d399';
+  setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; },1800);
+});
+
+let _noteBeforeEdit = null;
+document.getElementById('noteTA').addEventListener('focus',()=>{
+  _noteBeforeEdit = document.getElementById('noteTA').value;
+});
+document.getElementById('noteTA').addEventListener('blur',()=>{
+  if(!selected) return;
+  const after = document.getElementById('noteTA').value;
+  if(_noteBeforeEdit !== after){
+    undoStack.push({nodeId:selected, before:_noteBeforeEdit, after});
+    if(undoStack.length > 50) undoStack.shift();
+  }
+  _noteBeforeEdit = null;
+});
+let _saveTimer;
+document.getElementById('noteTA').addEventListener('input',()=>{
+  if(!selected) return;
+  nodeNotes[selected]=document.getElementById('noteTA').value;
+  localStorage.setItem(NOTES_KEY,JSON.stringify(nodeNotes));
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(()=>{
+    const s=document.getElementById('saveStatus');
+    s.textContent='saved '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    s.style.color='#34d399';
+    setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; }, 2200);
+  }, 600);
+});
+
+// ── PAN / ZOOM ────────────────────────────────────────────────────────────
+const mainSvg=document.getElementById('mainSvg');
+
+mainSvg.addEventListener('wheel',e=>{
+  e.preventDefault();
+  if(e.ctrlKey||e.metaKey){
+    const r=mainSvg.getBoundingClientRect();
+    const cx=e.clientX-r.left, cy=e.clientY-r.top;
+    const f=e.deltaY<0?1.10:0.91;
+    const ns=Math.max(0.07,Math.min(5,vp.scale*f));
+    vp.x=cx-(cx-vp.x)*ns/vp.scale;
+    vp.y=cy-(cy-vp.y)*ns/vp.scale;
+    vp.scale=ns;
+  } else {
+    vp.x-=e.deltaX;
+    vp.y-=e.deltaY;
+  }
+  applyVp();
+},{passive:false});
+
+mainSvg.addEventListener('pointerdown',e=>{
+  if(e.target===mainSvg||e.target.tagName==='svg'){
+    panStart={x:e.clientX-vp.x, y:e.clientY-vp.y};
+    mainSvg.setPointerCapture(e.pointerId);
+  }
+});
+mainSvg.addEventListener('pointermove',e=>{
+  if(!panStart) return;
+  vp.x=e.clientX-panStart.x;
+  vp.y=e.clientY-panStart.y;
+  applyVp();
+});
+mainSvg.addEventListener('pointerup',()=>{ panStart=null; });
+mainSvg.addEventListener('click',e=>{
+  if(e.target===mainSvg) closeNote();
+});
+
+// Touch pinch-to-zoom
+let _tt={}, _pd=0;
+mainSvg.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  Array.from(e.changedTouches).forEach(t=>{ _tt[t.identifier]={x:t.clientX,y:t.clientY}; });
+  const ids=Object.keys(_tt);
+  if(ids.length===2){ const a=_tt[ids[0]],b=_tt[ids[1]]; _pd=Math.hypot(b.x-a.x,b.y-a.y); }
+},{passive:false});
+mainSvg.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    const t=e.touches[0], prev=_tt[t.identifier];
+    if(prev){ vp.x+=t.clientX-prev.x; vp.y+=t.clientY-prev.y; applyVp(); }
+    _tt[t.identifier]={x:t.clientX,y:t.clientY};
+  } else if(e.touches.length===2){
+    const t0=e.touches[0],t1=e.touches[1];
+    const nd=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);
+    if(_pd>0){
+      const cx=(t0.clientX+t1.clientX)/2, cy=(t0.clientY+t1.clientY)/2;
+      const r=mainSvg.getBoundingClientRect();
+      const lx=cx-r.left, ly=cy-r.top;
+      const f=nd/_pd;
+      const ns=Math.max(0.07,Math.min(5,vp.scale*f));
+      vp.x=lx-(lx-vp.x)*ns/vp.scale;
+      vp.y=ly-(ly-vp.y)*ns/vp.scale;
+      vp.scale=ns; applyVp();
+    }
+    _pd=nd;
+    _tt[t0.identifier]={x:t0.clientX,y:t0.clientY};
+    _tt[t1.identifier]={x:t1.clientX,y:t1.clientY};
+  }
+},{passive:false});
+mainSvg.addEventListener('touchend',e=>{
+  Array.from(e.changedTouches).forEach(t=>delete _tt[t.identifier]);
+  if(Object.keys(_tt).length<2) _pd=0;
+},{passive:false});
+
+// ── FILTER ────────────────────────────────────────────────────────────────
+function setFilter(f,btn){
+  nodeFilter=f;
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render(); applyVp();
+}
+
+// ── DAY MODE ──────────────────────────────────────────────────────────────
+function toggleDay(){
+  dayMode=!dayMode;
+  document.getElementById('dayBtn').classList.toggle('day',dayMode);
+  document.body.style.background=dayMode?'#f1f5f9':'#0a0e1a';
+  document.getElementById('legend').style.background=dayMode?'rgba(248,250,252,.95)':'rgba(10,14,26,.92)';
+  document.getElementById('legend').style.color=dayMode?'#475569':'#64748b';
+  document.getElementById('hint').style.color=dayMode?'#94a3b8':'#334155';
+  // Update arrow marker color
+  document.querySelector('#arr path').setAttribute('fill', dayMode?'rgba(0,0,0,.2)':'rgba(255,255,255,.22)');
+  document.getElementById('noteOverlay').style.background=dayMode?'rgba(248,250,252,.97)':'rgba(10,14,26,.97)';
+  document.getElementById('noteTA').style.color=dayMode?'#1e293b':'#e2e8f0';
+  render(); applyVp();
+}
+
+// ── SAVE HTML — bakes current notes into the file itself ──────────────────
+function saveHTML(){
+  const entries = Object.entries(nodeNotes)
+    .map(([k,v]) => `  ${JSON.stringify(k)}:${JSON.stringify(v)}`)
+    .join(',\n');
+  const newNotesBlock =
+    `// __NOTES_BLOCK_START__\nconst DEFAULT_NOTES = {\n${entries}\n};\n// __NOTES_BLOCK_END__`;
+
+  // Bake edge overrides into a stable block
+  const ovEntries = Object.entries(edgeOverrides)
+    .map(([k,v]) => `  ${JSON.stringify(k)}:${JSON.stringify(v)}`)
+    .join(',\n');
+  const newOvBlock =
+    `// __EDGE_OVERRIDES_START__\nconst DEFAULT_EDGE_OVERRIDES = {\n${ovEntries}\n};\n// __EDGE_OVERRIDES_END__`;
+
+  // Bake edge notes into a stable block
+  const edgeEntries = Object.entries(edgeNotes)
+    .map(([k,v]) => `  ${JSON.stringify(k)}:${JSON.stringify(v)}`)
+    .join(',\n');
+  const newEdgeBlock =
+    `// __EDGE_NOTES_START__\nconst DEFAULT_EDGE_NOTES = {\n${edgeEntries}\n};\n// __EDGE_NOTES_END__`;
+  const newVp =
+    `let _savedVp = /*__VP__*/${JSON.stringify({x:Math.round(vp.x),y:Math.round(vp.y),scale:Math.round(vp.scale*1000)/1000})}/*__VP_END__*/;`;
+
+  // Always prepend DOCTYPE — outerHTML drops it
+  let html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
+  // Replace notes block between stable markers — works on any saved version
+  html = html.replace(
+    /\/\/ __NOTES_BLOCK_START__[\s\S]*?\/\/ __NOTES_BLOCK_END__/,
+    newNotesBlock
+  );
+  // Replace edge notes block
+  if(html.includes('// __EDGE_NOTES_START__')){
+    html = html.replace(
+      /\/\/ __EDGE_NOTES_START__[\s\S]*?\/\/ __EDGE_NOTES_END__/,
+      newEdgeBlock
+    );
+  } else {
+    html = html.replace(newNotesBlock, newNotesBlock+'\n'+newEdgeBlock);
+  }
+  // Replace edge overrides block
+  if(html.includes('// __EDGE_OVERRIDES_START__')){
+    html = html.replace(
+      /\/\/ __EDGE_OVERRIDES_START__[\s\S]*?\/\/ __EDGE_OVERRIDES_END__/,
+      newOvBlock
+    );
+  } else {
+    html = html.replace(newEdgeBlock, newEdgeBlock+'\n'+newOvBlock);
+  }
+  // Replace VP between stable markers — works on any saved version
+  html = html.replace(
+    /let _savedVp = \/\*__VP__\*\/[\s\S]*?\/\*__VP_END__\*\/;/,
+    newVp
+  );
+
+  // Bake node positions + deletions between stable markers
+  const newNodeOv = '// __NODE_OV_START__\nconst DEFAULT_NODE_POS = '+JSON.stringify(nodePos)+';\nconst DEFAULT_DELETED_NODES = '+JSON.stringify([...deletedNodes])+';\n// __NODE_OV_END__';
+  if(html.includes('// __NODE_OV_START__')) html = html.replace(/\/\/ __NODE_OV_START__[\s\S]*?\/\/ __NODE_OV_END__/, newNodeOv);
+
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ENG1_FIRE_FLOWGRAPH_V1_SAVED.html';
+  a.click();
+  const s = document.getElementById('saveStatus');
+  s.textContent = 'HTML saved ✓'; s.style.color = '#34d399';
+  setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; }, 2500);
+}
+
+// ── UNDO — revert last note change ────────────────────────────────────────
+function undoLast(){
+  const entry=undoStack.pop();
+  if(!entry){
+    const s=document.getElementById('saveStatus');
+    s.textContent='nothing to undo'; s.style.color='#f87171';
+    setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; }, 1800);
+    return;
+  }
+  nodeNotes[entry.nodeId]=entry.before;
+  localStorage.setItem(NOTES_KEY,JSON.stringify(nodeNotes));
+  if(selected===entry.nodeId) document.getElementById('noteTA').value=entry.before||'';
+  render(); applyVp();
+  const s=document.getElementById('saveStatus');
+  s.textContent=`undid: ${entry.nodeId}`; s.style.color='#fbbf24';
+  setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; }, 2000);
+}
+
+// ── EXPORT JSON ───────────────────────────────────────────────────────────
+function exportJSON(){
+  const out={scenario:'ENG1_FIRE_AFTER_V1',exported:new Date().toISOString(),notes:{},edgeNotes:{}};
+  nodes.forEach(n=>{ if(nodeNotes[n.id]) out.notes[n.id]=nodeNotes[n.id]; });
+  Object.entries(edgeNotes).forEach(([k,v])=>{ if(v) out.edgeNotes[k]=v; });
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='ENG1_FIRE_FLOWGRAPH_NOTES.json'; a.click();
+}
+
+// ── RESET NOTES — clears localStorage, restores baked-in defaults ─────────
+function resetNotes(){
+  const msg =
+    'Reset all notes to the defaults baked into this HTML file?\n\n' +
+    '• Node notes → back to DEFAULT_NOTES\n' +
+    '• Edge notes → back to DEFAULT_EDGE_NOTES\n' +
+    '• View position is NOT changed\n\n' +
+    'Any notes added since the last 💾 SAVE HTML will be lost.';
+  if(!confirm(msg)) return;
+
+  // Clear localStorage overrides
+  localStorage.removeItem(NOTES_KEY);
+  localStorage.removeItem(EDGE_NOTES_KEY);
+  localStorage.removeItem(EDGE_OVERRIDES_KEY);
+
+  // Restore from baked-in defaults
+  nodeNotes     = Object.assign({}, DEFAULT_NOTES);
+  edgeNotes     = Object.assign({}, DEFAULT_EDGE_NOTES);
+  edgeOverrides = Object.assign({}, DEFAULT_EDGE_OVERRIDES);
+
+  // Close any open overlays
+  closeNote();
+  closeEdgeNote();
+  render(); applyVp();
+
+  const s=document.getElementById('saveStatus');
+  s.textContent='reset to defaults ✓'; s.style.color='#f87171';
+  setTimeout(()=>{ s.textContent='auto-save on'; s.style.color='#475569'; }, 2500);
+}
+
+// ── KEYBOARD ──────────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(edgeEditMode){ edgeEditMode=false; document.getElementById('lineEditBtn').classList.remove('active'); closeEdgeNote(); render(); applyVp(); document.getElementById('hint').textContent='Scroll=pan · Ctrl+Scroll=zoom · Click=notes · Esc=close · Ctrl+Z=undo'; }
+    else { closeNote(); closeEdgeNote(); }
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='0'){ e.preventDefault(); resetView(); }
+  // Ctrl+Z when textarea not focused = undo last note change
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&document.activeElement!==document.getElementById('noteTA')){
+    e.preventDefault(); undoLast();
+  }
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+render();
+applyVp();
+</script>
+</body>
+</html>

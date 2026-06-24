@@ -57,6 +57,13 @@ export type ScenarioStep = {
    */
   /** "flightcheck" = timed PF/PM coordination popup, gates ECAM actions */
   group?: "procedure" | "comms" | "glareshield" | "chclm" | "flightcheck";
+  /** Training-guidance flash override: which cockpit surface pulses while this is the
+   *  next action. Drives the AVIATE→NAVIGATE→COMMUNICATE→ACTIONS sequence
+   *  (pfd / nd / comms / firepanel). Falls back to group/hardware/pfAction when unset. */
+  flashSurface?: "pfd" | "nd" | "comms" | "glareshield" | "firepanel" | "procedure";
+  /** Optional on-screen guidance word rendered over the flashing PFD/ND while this
+   *  step is the next action (e.g. "AVIATE", "NAVIGATE", "DESCENT"). */
+  flashMsg?: string;
   /** Optional structured bullet points shown in CommChecklist when the card is active */
   notes?: readonly string[];
   /**
@@ -131,6 +138,15 @@ export type ScenarioDistraction = {
    *  set, this becomes a *minimum* delay — the distraction only fires once
    *  the step is complete AND the elapsed time has reached atMs. */
   atMs: number;
+  /** Cooldown (ms) AFTER this card is answered correctly, before the next ATC
+   *  card may surface. Defaults to 15 000 (10–30 s feel). Set to 1 000 only on
+   *  the opening MAYDAY exchange so those first calls come back-to-back. */
+  gapAfterMs?: number;
+  /** Altitude gate (ft). When set, the distraction only fires once the live
+   *  (animated) aircraft altitude has DESCENDED to/through this value — e.g.
+   *  3500 means "passing 3 500 ft on the way down". Combines with atMs /
+   *  requiresStep (all conditions must hold). */
+  atAltitudeBelowFt?: number;
   kind: DistractionKind;
   /** Display name of the caller — "ATC LONDON", "PURSER", "F/O", etc. */
   from: string;
@@ -192,6 +208,28 @@ export type Scenario = {
   phases?: readonly ScenarioPhase[];
   /** If present, a pre-start airport picker is shown in the briefing screen. */
   airports?: readonly AirportOption[];
+  /** QRH summary document (CRUISE/APPROACH/LANDING/GO-AROUND) for the Context
+   *  Display "QRH" tab. Rendered in the real black-on-white QRH format with a
+   *  severity-coloured title cap. DRAFT — procedure content needs SME review. */
+  qrhSummary?: QrhSummary;
+};
+
+// ─── QRH summary (Context Display "QRH" tab) ─────────────────────────────────
+// Pure data describing a QRH SUMMARY page the way it prints in the handbook:
+// a severity-capped title, grey phase-header bars, and black-on-white body
+// lines (label/value rows with dot leaders, ○ headings, rich paragraphs).
+export type QrhSeverity = "warning" | "caution" | "advisory";
+export type QrhSpan = { text: string; b?: boolean; i?: boolean };
+export type QrhLine =
+  | { row: { label: string; value?: string }; indent?: 0 | 1 | 2 }
+  | { head: string; indent?: 0 | 1 | 2 }
+  | { para: QrhSpan[]; indent?: 0 | 1 | 2 };
+export type QrhSection = { title: string; lines: QrhLine[] };
+export type QrhSummary = {
+  title: string;
+  /** drives the title end-cap colour: warning = red, caution = amber */
+  severity: QrhSeverity;
+  sections: QrhSection[];
 };
 
 // ─── System / Engine display DSL ─────────────────────────────────────────────
@@ -235,6 +273,12 @@ export type EngineDisplayDef = {
   warningTrigger?: string;
   /** Interactive ECAM procedure controls rendered below engine gauges */
   controlPanel?: EngControlDef[];
+  /** Render a real 3D cockpit panel as the Action Panel instead of the ENG-FIRE rig.
+   *  "hyd" = the HYD overhead pushbutton panel (HydPanel3D), via HydControlPanel. */
+  panel3d?: "hyd";
+  /** For panel3d:"hyd" — maps each HYD pump pushbutton to the scenario step it performs.
+   *  controlPanel steps NOT mapped here render as side controls (FLAPS/GPWS/L-G). */
+  hydMap?: { eng1?: string; blueElec?: string; ptu?: string; eng2?: string; yellowElec?: string };
 };
 
 // ─── Scenario Channels (phase-based cockpit state) ────────────────────────────

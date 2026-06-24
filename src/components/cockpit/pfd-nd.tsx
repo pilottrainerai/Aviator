@@ -92,10 +92,11 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
   // timeline (user-authorised spec). A/THR remains active throughout (FD avail,
   // AP 1+2 INOP). Step-gated like the FIRE model; FIRE logic below is untouched.
   if (scenario?.meta?.slug === "dual-hyd-g-y") {
-    const failed       = fired("structural_fail");
-    const ecamComplete = step("crew_crosscheck");      // ECAM + STATUS done → planning/hold
-    const onIls        = step("approach_brief_hyd");   // ILS intercept / established
-    const gearDown     = step("lgr_gravity");          // L/G gravity extended → DIRECT LAW
+    const failed          = fired("structural_fail");
+    const startDescent    = step("start_descent");          // DESCENT card → descending to FL200 @ 3000 fpm
+    const cleared10000    = step("cleared_10000");          // ATC "descend 10000" ack (passing FL220) → continue to 10 000
+    const onIls           = step("configure_for_approach"); // established on ILS → SPEED · LOC · G/S
+    const gearDown        = step("lgr_gravity");            // L/G gravity extended → DIRECT LAW
 
     // CAS / TAS chosen so the PFD Mach readout (computed from TAS) is realistic:
     // FL350 ≈ M.78, descending values fall off naturally. speed stays well clear
@@ -116,14 +117,21 @@ export function buildAircraftState(s?: ScenarioState, scenario?: Scenario, elaps
       // Hand-flown ILS RWY 27 — AP INOP, FD + A/THR (still ALTERNATE LAW until gear down)
       thrMode = "SPEED"; vertMode = "G/S"; latMode = "LOC"; apOn = false;
       speed = 180; altitude = 3_000; vs = -700; pitch = 1; tas = 189; vmax = 230; law = 'ALTN';
-    } else if (ecamComplete) {
-      // ECAM/STATUS complete — planning / hold, ALTERNATE LAW
-      thrMode = "SPEED"; vertMode = "ALT"; latMode = "HDG"; apOn = false;
-      speed = 250; altitude = 16_000; vs = 0; pitch = 2; tas = 315; vmax = 300; law = 'ALTN';
+    } else if (cleared10000) {
+      // Passing FL220 ATC cleared continued descent to 10 000 ft → the aircraft
+      // continues down (FCU selected alt = 10 000). From 10 000 ft the FMA is
+      // OPEN DES · NAV (rejoining the approach track), ALTERNATE LAW.
+      thrMode = "SPEED"; vertMode = "OP DES"; latMode = "NAV"; apOn = false;
+      speed = 290; altitude = 10_000; vs = -3_000; pitch = -3; tas = 320; vmax = 330; law = 'ALTN';
+    } else if (startDescent) {
+      // DESCENT card (after MAYDAY) → descending to FL200 @ 3000 fpm on the 2 NM right
+      // offset; holds FL200 through ECAM / STATUS / planning. FMA: A/THR SPEED · OP DES · HDG.
+      thrMode = "SPEED"; vertMode = "OP DES"; latMode = "HDG"; apOn = false;
+      speed = 290; altitude = 20_000; vs = -3_000; pitch = -3; tas = 360; vmax = 330; law = 'ALTN';
     } else if (failed) {
-      // HYD G+Y SYS LO PR — F/CTL ALTERNATE LAW (PROT LOST), AP 1+2 drop out.
-      // Lateral HDG (crew flying the ATC 2-mile right offset); A/THR still MACH.
-      thrMode = "MACH"; vertMode = "ALT"; latMode = "HDG"; apOn = false;
+      // Just after failure (CANCEL → AVIATE → NAVIGATE) — level FL350, ALTERNATE LAW.
+      // SAME FMA as cruise except AP 1+2 dropped out: MACH · ALT CRZ · NAV, no AP.
+      thrMode = "MACH"; vertMode = "ALT CRZ"; latMode = "NAV"; apOn = false;
       speed = 265; altitude = 35_000; vs = 0; pitch = 2; tas = 450; vmax = 330; law = 'ALTN';
     }
     // else: cruise before the failure — MACH / ALT CRZ / NAV, AP1 + A/THR (NORMAL LAW)

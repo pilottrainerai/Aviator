@@ -16,17 +16,18 @@ export default function HydPanel3DDevPage() {
   const toggleOn = (k: HydPumpKey) => setPumps((p) => ({ ...p, [k]: { ...p[k], on: !p[k]?.on } }));
   const toggleFault = (k: HydPumpKey) => setPumps((p) => ({ ...p, [k]: { ...p[k], fault: !p[k]?.fault } }));
   // RAT MAN ON + BLUE ELEC PUMP — guard flip + pushbutton (colour + IN/OUT), persisted.
-  const CKEY = "hydCtl.v1";
+  const CKEY = "hydCtl.v4"; // bump: HydGuard reshaped (pos X/Y/Z + pivot Y/Z); discard old hinge-only state
   const [ratGuard, setRatGuard] = useState<HydGuard>(HYD_RAT_GUARD_DEFAULT);
   const [elecGuard, setElecGuard] = useState<HydGuard>(HYD_ELEC_GUARD_DEFAULT);
   const [ratBtn, setRatBtn] = useState<HydBtn>(HYD_RAT_BTN_DEFAULT);
   const [elecBtn, setElecBtn] = useState<HydBtn>(HYD_ELEC_BTN_DEFAULT);
   useEffect(() => { try { const v = localStorage.getItem(CKEY); if (v) { const o = JSON.parse(v); if (o.ratGuard) setRatGuard({ ...HYD_RAT_GUARD_DEFAULT, ...o.ratGuard }); if (o.elecGuard) setElecGuard({ ...HYD_ELEC_GUARD_DEFAULT, ...o.elecGuard }); if (o.ratBtn) setRatBtn({ ...HYD_RAT_BTN_DEFAULT, ...o.ratBtn }); if (o.elecBtn) setElecBtn({ ...HYD_ELEC_BTN_DEFAULT, ...o.elecBtn }); } } catch { /* ignore */ } }, []);
   const saveCtl = (rg: HydGuard, eg: HydGuard, rb: HydBtn, eb: HydBtn) => { try { localStorage.setItem(CKEY, JSON.stringify({ ratGuard: rg, elecGuard: eg, ratBtn: rb, elecBtn: eb })); } catch { /* ignore */ } };
-  const setG = (k: keyof HydGuard, v: number | boolean) => setRatGuard((g) => { const n = { ...g, [k]: v }; saveCtl(n, elecGuard, ratBtn, elecBtn); return n; });
-  const setEG = (k: keyof HydGuard, v: number | boolean) => setElecGuard((g) => { const n = { ...g, [k]: v }; saveCtl(ratGuard, n, ratBtn, elecBtn); return n; });
+  const setG = (k: keyof HydGuard, v: number | boolean | string) => setRatGuard((g) => { const n = { ...g, [k]: v }; saveCtl(n, elecGuard, ratBtn, elecBtn); return n; });
+  const setEG = (k: keyof HydGuard, v: number | boolean | string) => setElecGuard((g) => { const n = { ...g, [k]: v }; saveCtl(ratGuard, n, ratBtn, elecBtn); return n; });
   const setRB = (k: keyof HydBtn, v: number | string) => setRatBtn((b) => { const n = { ...b, [k]: v }; saveCtl(ratGuard, elecGuard, n, elecBtn); return n; });
   const setEB = (k: keyof HydBtn, v: number | string) => setElecBtn((b) => { const n = { ...b, [k]: v }; saveCtl(ratGuard, elecGuard, ratBtn, n); return n; });
+  const [showPivot, setShowPivot] = useState(true); // dev aid: draw the hinge-rod marker at each guard pivot
   const [latched, setLatched] = useState(false); // false = rests at neutral, true = rests at out
   // Play the real press: dip to IN momentarily, then settle at the toggled resting state.
   const press = () => {
@@ -57,7 +58,55 @@ export default function HydPanel3DDevPage() {
 
   return (
     <main style={{ position: "fixed", inset: 0, background: "#05070a", overflow: "hidden" }}>
-      <HydPanel3D tune={tune} pos={pos} pumps={pumps} ratGuard={ratGuard} elecGuard={elecGuard} ratBtn={ratBtn} elecBtn={elecBtn} />
+      <HydPanel3D tune={tune} pos={pos} pumps={pumps} ratGuard={ratGuard} elecGuard={elecGuard} ratBtn={ratBtn} elecBtn={elecBtn} showPivot={showPivot} />
+
+      {/* GUARD LID EDITOR — isolated on the LEFT so the lid can be placed without the busy right panel.
+          pos = move the whole lid (X left/right, Y in/out depth, Z up/down); pivot = move only the
+          rotation centre; Open angle flips it about that pivot. */}
+      <div style={{ position: "fixed", top: 16, left: 16, zIndex: 10, width: 262, maxHeight: "92vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
+        padding: "12px 14px", borderRadius: 10, background: "rgba(10,14,20,0.95)", border: "1px solid #2a313b",
+        fontFamily: "monospace", fontSize: 12, color: "#cdd6e0" }}>
+        <div style={{ letterSpacing: 1, color: "#dfe6f0", fontWeight: 700 }}>GUARD LID EDITOR</div>
+        <div style={{ color: "#7d8794", fontSize: 9, lineHeight: 1.35 }}>
+          Lid = the cover, Rod = the hinge — moved INDEPENDENTLY. up/dn + L/R = along the face; in/out = depth (usually 0).
+        </div>
+        <label style={{ ...rowS, cursor: "pointer", color: "#ffd23f" }}>
+          <input type="checkbox" checked={showPivot} onChange={(e) => setShowPivot(e.target.checked)} />
+          <span>Show hinge rod (yellow bar = the pivot line)</span>
+        </label>
+        {([
+          ["RAT MAN ON", ratGuard, setG, "#e08a2b"],
+          ["BLUE ELEC PUMP", elecGuard, setEG, "#3f6fb0"],
+        ] as [string, HydGuard, (k: keyof HydGuard, v: number | boolean | string) => void, string][]).map(([title, g, sg, accent]) => (
+          <div key={title} style={{ borderTop: "1px solid #222a35", paddingTop: 6, marginTop: 2 }}>
+            <div style={{ color: "#8aabbb", fontSize: 10 }}>{title}</div>
+            <button type="button" onClick={() => sg("open", !g.open)}
+              style={{ width: "100%", marginTop: 4, padding: "6px 8px", fontSize: 11, fontWeight: 700, fontFamily: "monospace",
+                color: g.open ? "#05070a" : "#cdd6e0", background: g.open ? accent : "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
+              {g.open ? "GUARD OPEN ▲" : "GUARD CLOSED ▼"}
+            </button>
+            <label style={rowS}>
+              <span style={{ width: 92 }}>Lid colour</span>
+              <input type="color" value={g.coverColor} onChange={(e) => sg("coverColor", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />
+            </label>
+            {([
+              ["Open angle", "angleDeg", -270, 270, 1, "open"],
+              ["Close angle", "closedDeg", -270, 270, 1, "close"],
+              ["Lid L/R", "posXOff", -0.9, 0.9, 0.002, ""],
+              ["Lid up/dn", "posZOff", -0.9, 0.9, 0.002, ""],
+              ["Lid in/out", "posYOff", -0.9, 0.9, 0.002, ""],
+              ["Rod up/dn", "pivotZOff", -0.9, 0.9, 0.002, ""],
+              ["Rod in/out", "pivotYOff", -0.9, 0.9, 0.002, ""],
+            ] as [string, keyof HydGuard, number, number, number, string][]).map(([label, k, min, max, step, mode]) => (
+              <label key={k} style={rowS}>
+                <span style={{ width: 92 }}>{label}</span>
+                <input type="range" min={min} max={max} step={step} value={g[k] as number} onChange={(e) => { if (mode === "open" && !g.open) sg("open", true); if (mode === "close" && g.open) sg("open", false); sg(k, Number(e.target.value)); }} style={{ flex: 1 }} />
+                <input type="number" min={min} max={max} step={step} value={g[k] as number} onChange={(e) => sg(k, Number(e.target.value))} style={numS} />
+              </label>
+            ))}
+          </div>
+        ))}
+      </div>
 
       <div style={{ position: "fixed", top: 16, right: 16, zIndex: 10, width: 270, maxHeight: "92vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
         padding: "12px 14px", borderRadius: 10, background: "rgba(10,14,20,0.95)", border: "1px solid #2a313b",
@@ -145,28 +194,13 @@ export default function HydPanel3DDevPage() {
           );
         })}
 
+        {/* PUSHBUTTONS only — guard-lid controls live in the LEFT panel. */}
         {([
-          ["RAT MAN ON", ratGuard, setG, ratBtn, setRB, "#e08a2b"],
-          ["BLUE ELEC PUMP", elecGuard, setEG, elecBtn, setEB, "#3f6fb0"],
-        ] as [string, HydGuard, (k: keyof HydGuard, v: number | boolean) => void, HydBtn, (k: keyof HydBtn, v: number | string) => void, string][]).map(([title, g, sg, b, sb, accent]) => (
+          ["RAT MAN ON", ratBtn, setRB],
+          ["BLUE ELEC PUMP", elecBtn, setEB],
+        ] as [string, HydBtn, (k: keyof HydBtn, v: number | string) => void][]).map(([title, b, sb]) => (
           <div key={title}>
-            <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 8 }}>{title} — GUARD + PUSHBUTTON</div>
-            <button type="button" onClick={() => sg("open", !g.open)}
-              style={{ width: "100%", padding: "6px 8px", fontSize: 11, fontWeight: 700, fontFamily: "monospace",
-                color: g.open ? "#05070a" : "#cdd6e0", background: g.open ? accent : "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
-              {g.open ? "GUARD OPEN ▲" : "GUARD CLOSED ▼"}
-            </button>
-            {([
-              ["Open angle", "angleDeg", -180, 0, 1],
-              ["Hinge Y", "hingeYOff", -0.4, 0.4, 0.005],
-              ["Hinge Z", "hingeZOff", -0.4, 0.4, 0.005],
-            ] as [string, keyof HydGuard, number, number, number][]).map(([label, k, min, max, step]) => (
-              <label key={k} style={rowS}>
-                <span style={{ width: 86 }}>{label}</span>
-                <input type="range" min={min} max={max} step={step} value={g[k] as number} onChange={(e) => { if (!g.open) sg("open", true); sg(k, Number(e.target.value)); }} style={{ flex: 1 }} />
-                <input type="number" min={min} max={max} step={step} value={g[k] as number} onChange={(e) => sg(k, Number(e.target.value))} style={numS} />
-              </label>
-            ))}
+            <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 8 }}>{title} — PUSHBUTTON</div>
             <label style={rowS}>
               <span style={{ width: 86 }}>{b.plateColor !== undefined ? "Round btn" : "Btn colour"}</span>
               <input type="color" value={b.color} onChange={(e) => sb("color", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />
@@ -177,16 +211,45 @@ export default function HydPanel3DDevPage() {
                 <input type="color" value={b.plateColor} onChange={(e) => sb("plateColor", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />
               </label>
             )}
+            {b.plateColor !== undefined && (<>
+              <label style={rowS}>
+                <span style={{ width: 86 }}>Round darkness</span>
+                <input type="range" min={0} max={1.5} step={0.01} value={b.env ?? 1} onChange={(e) => sb("env", Number(e.target.value))} style={{ flex: 1 }} />
+                <input type="number" min={0} max={1.5} step={0.01} value={b.env ?? 1} onChange={(e) => sb("env", Number(e.target.value))} style={numS} />
+              </label>
+              <label style={rowS}>
+                <span style={{ width: 86 }}>Plate darkness</span>
+                <input type="range" min={0} max={1.5} step={0.01} value={b.plateEnv ?? 1} onChange={(e) => sb("plateEnv", Number(e.target.value))} style={{ flex: 1 }} />
+                <input type="number" min={0} max={1.5} step={0.01} value={b.plateEnv ?? 1} onChange={(e) => sb("plateEnv", Number(e.target.value))} style={numS} />
+              </label>
+              <div style={{ color: "#7d8794", fontSize: 9, lineHeight: 1.3 }}>lower = blacker (less HDRI reflection); 1.0 = original</div>
+            </>)}
             <label style={rowS}>
               <span style={{ width: 86 }}>Btn in/out</span>
               <input type="range" min={-0.06} max={0.04} step={0.002} value={b.inOut} onChange={(e) => sb("inOut", Number(e.target.value))} style={{ flex: 1 }} />
               <input type="number" min={-0.06} max={0.04} step={0.002} value={b.inOut} onChange={(e) => sb("inOut", Number(e.target.value))} style={numS} />
             </label>
+            {b.plateColor !== undefined && (
+              // Momentary press of the CENTRE round: dip in, then return to the rest offset.
+              <button type="button" onClick={() => { const rest = b.inOut; sb("inOut", rest - 0.03); setTimeout(() => sb("inOut", rest), 200); }}
+                style={{ marginTop: 4, width: "100%", padding: "7px 8px", fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: "#05070a", background: "#8aabbb", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
+                ▶ PRESS CENTRE  (in → out)
+              </button>
+            )}
           </div>
         ))}
 
+        {/* Dump every live-dialled value (tune + guards + buttons) so it can be baked as a code
+            default. Copies JSON to clipboard AND logs it — paste it back to lock the settings. */}
+        <button type="button" onClick={() => {
+          const dump = JSON.stringify({ tune, ratGuard, elecGuard, ratBtn, elecBtn }, null, 2);
+          console.log("[HYD settings dump]\n" + dump);
+          navigator.clipboard?.writeText(dump).catch(() => {});
+        }}
+          style={{ marginTop: 10, padding: "6px 8px", fontSize: 11, fontWeight: 700, color: "#05070a", background: "#8aabbb", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer", fontFamily: "monospace" }}>⧉ COPY SETTINGS JSON</button>
+
         <button type="button" onClick={() => { setTune(HYD_TUNE_DEFAULT); try { localStorage.setItem(KEY, JSON.stringify(HYD_TUNE_DEFAULT)); } catch { /* ignore */ } }}
-          style={{ marginTop: 10, padding: "5px 8px", fontSize: 11, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>Reset</button>
+          style={{ marginTop: 6, padding: "5px 8px", fontSize: 11, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>Reset</button>
         </>}
       </div>
     </main>

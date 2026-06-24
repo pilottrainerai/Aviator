@@ -35,12 +35,14 @@ type PfdData = {
   law?: 'NORMAL' | 'ALTN' | 'DIRECT';   // F/CTL law — amber Xs + MAN PITCH TRIM
 };
 
-export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paused }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number; onPfAction?: (phaseId: string) => void; paused?: boolean } = {}) {
+export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paused, onAltitude }: { state?: ScenarioState; scenario?: Scenario; elapsedMs?: number; onPfAction?: (phaseId: string) => void; paused?: boolean; onAltitude?: (ft: number) => void } = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef  = useRef(state);
   const scenarioRef = useRef(scenario);
   const elapsedMsRef = useRef(elapsedMs);
   const pausedRef = useRef(paused);
+  const onAltitudeRef = useRef(onAltitude);
+  useEffect(() => { onAltitudeRef.current = onAltitude; }, [onAltitude]);
   const pendingPhaseRef = useRef<ScenarioPhase | null>(null);
 
   // PF action overlay — pulsing green ring on PFD at key phases.
@@ -901,6 +903,7 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
         d.selSpd = live.selectedSpeed;
         d.mgtSpd = live.selectedSpeed;
         d.alt    = Math.round(lerpAlt);
+        onAltitudeRef.current?.(lerpAlt);
         d.selAlt = live.selectedAlt;
         d.vs     = Math.round(lerpVs / 10) * 10;
         d.hdg    = live.heading;

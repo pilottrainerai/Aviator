@@ -26,6 +26,7 @@ export function DistractionModal({
   onStandby,
   liveAltFt,
   inline = false,
+  noAutoDismiss = false,
 }: {
   distraction: ScenarioDistraction;
   onRespond: (choiceId: string, correct: boolean) => void;
@@ -34,6 +35,8 @@ export function DistractionModal({
   liveAltFt?: number;
   /** true = render as a block inside the right panel (no fixed position, no backdrop) */
   inline?: boolean;
+  /** true = card NEVER auto-collapses; it stays until answered (no countdown to standby) */
+  noAutoDismiss?: boolean;
 }) {
   const altStr = liveAltFt != null ? String(Math.round(liveAltFt / 100) * 100) : "[ALT]";
   const subAlt = (text: string) => text.replace("[ALT]", altStr);
@@ -48,6 +51,7 @@ export function DistractionModal({
   }, [distraction.id, autoDismissMs]);
 
   useEffect(() => {
+    if (noAutoDismiss) return;   // comm card stays until answered — no auto-collapse
     const id = setInterval(() => {
       const elapsed = performance.now() - startedAt.current;
       const left = autoDismissMs - elapsed;
@@ -59,7 +63,7 @@ export function DistractionModal({
       }
     }, 100);
     return () => clearInterval(id);
-  }, [autoDismissMs, onStandby, distraction.id]);
+  }, [autoDismissMs, onStandby, distraction.id, noAutoDismiss]);
 
   const style = KIND_STYLE[distraction.kind];
   const pct = Math.max(0, (remainingMs / autoDismissMs) * 100);

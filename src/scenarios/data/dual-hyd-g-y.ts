@@ -43,6 +43,11 @@ export const dualHydGY: Scenario = {
             { id: "ecam_y_pump",   line: "Y ENG 2 PUMP...OFF",       level: "advisory" },
             { id: "ecam_y_elec",   line: "Y ELEC PUMP.....ON",       level: "advisory" },
             { id: "ecam_manuv",    line: "MANEUVER WITH CARE",       level: "remark"   },
+            // FCOM PRO-ABN-HYD lists these two as procedure lines directly
+            // after MANEUVER WITH CARE — they belong on the EWD during the
+            // drill, not only in STATUS.
+            { id: "ecam_fuel",     line: "FUEL CONSUMPT INCRSD",     level: "remark"   },
+            { id: "ecam_fms",      line: "FMS PRED UNRELIABLE",      level: "remark"   },
             // Right column — LAND ASAP (SECONDARY FAILURES appear later,
             // after main ECAM actions are complete — see afterEffect on
             // yel_elec_pump_on below)
@@ -58,6 +63,24 @@ export const dualHydGY: Scenario = {
     //    aircraft … The PF will maneuver with care to avoid high hydraulic
     //    demand on the remaining systems.")  MAYDAY comes later — it is a
     //    PM call (see atc_mayday below), and ECAM actions begin first.
+    // ── ① CANCEL the ECAM warning FIRST (off the HYD G+Y SYS LO PR red warning),
+    //    then ② AVIATE → ③ NAVIGATE → ④ COMMUNICATE → ⑤ ECAM ACTIONS. ──
+    {
+      id: "cancel_master_warn",
+      label: "MASTER WARN",
+      action: "CANCEL",
+      hint: "PM: cancel MASTER WARNING — silences CRC. HYD G+Y SYS LO PR is Level 3 RED WARNING.",
+      variant: "warning",
+      crew: "PM",
+      group: "glareshield",
+      hardware: true,
+      requiresTrigger: "structural_fail",
+      afterEffect: {
+        delayMs: 400,
+        triggerId: "mw_hyd_cancelled",
+        effects: [{ type: "SET_MASTER_WARN", active: false }],
+      },
+    },
     {
       id: "maintain_control",
       label: "FLY THE AIRCRAFT",
@@ -66,23 +89,88 @@ export const dualHydGY: Scenario = {
       variant: "warning",
       crew: "PF",
       group: "flightcheck",
-      requiresTrigger: "structural_fail",
+      flashSurface: "pfd",
+      flashMsg: "AVIATE",
+      requires: ["cancel_master_warn"],
+    },
+    // ── NAVIGATE → COMMUNICATE → ECAM ACTIONS (FCTM airmanship order, before pumps).
+    //    Content FCOM/FCTM-sourced — FLAGGED FOR SME REVIEW. ──
+    {
+      id: "request_routing",
+      label: "NAVIGATE",
+      action: "DIVERT / ROUTING",
+      hint: "PM: NAVIGATE — plan to track 2 NM right of the airway in coordination with ATC, and prepare to divert to the nearest suitable airport with adequate runway.",
+      variant: "advisory",
+      crew: "PM",
+      group: "flightcheck",
+      flashSurface: "nd",
+      flashMsg: "NAVIGATE",
+      requires: ["maintain_control"],
     },
     {
-      id: "cancel_master_warn",
-      label: "MASTER WARN",
-      action: "CANCEL",
-      hint: "PM: cancel MASTER WARNING — silences CRC. HYD G+Y SYS LO PR is Level 3 RED WARNING. ECAM procedure remains displayed.",
+      id: "declare_mayday",
+      label: "COMMUNICATE",
+      action: "MAYDAY",
+      hint: "PM: COMMUNICATE — declare MAYDAY to ATC (callsign, DUAL HYD failure). State intentions: descent, 2 NM right offset from the airway, and descend to FL200.",
       variant: "warning",
       crew: "PM",
-      group: "glareshield",
-      hardware: true,
-      requires: ["maintain_control"],
-      afterEffect: {
-        delayMs: 400,
-        triggerId: "mw_hyd_cancelled",
-        effects: [{ type: "SET_MASTER_WARN", active: false }],
-      },
+      group: "comms",
+      flashSurface: "comms",
+      requires: ["request_routing"],
+    },
+    {
+      // Internal gate (optional → never shown as a next action): completed when the crew
+      // reads back the ATC MAYDAY acknowledgement (atc_mayday_ack). Unlocks the DESCENT card,
+      // so the descent only begins AFTER the declaration → ATC ack → read-back exchange.
+      id: "mayday_ack",
+      label: "MAYDAY ACK",
+      action: "READBACK",
+      hint: "ATC acknowledged the MAYDAY and cleared the 2 NM right offset + descent to FL200; crew reads it back.",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      optional: true,
+      requires: ["declare_mayday"],
+    },
+    {
+      id: "start_descent",
+      label: "DESCENT",
+      action: "FL200 · 2 NM R OFFSET",
+      hint: "PF: ATC cleared — begin descent to FL200 @ 3000 fpm on the 2 NM right offset. Monitor PFD + ND.",
+      variant: "advisory",
+      crew: "PF",
+      group: "flightcheck",
+      flashSurface: "pfd",
+      flashMsg: "DESCENT",
+      requires: ["mayday_ack"],
+    },
+    {
+      // Hidden gate — completed by the ATC "descend 10000" call (atc_descend_10000)
+      // when passing FL220.  Once set, the PFD continues the descent to 10 000 ft
+      // (FCU selected alt → 10 000) and the PFD flashes the new clearance.
+      id: "cleared_10000",
+      label: "CLEARED 10 000 FT",
+      action: "CONTINUE DESCENT",
+      hint: "ATC cleared continued descent to 10 000 ft (passing FL220). PF continues the descent; FMA OPEN DES · NAV.",
+      variant: "advisory",
+      crew: "PF",
+      group: "flightcheck",
+      flashSurface: "pfd",
+      flashMsg: "DESCENT 10 000",
+      optional: true,
+      requires: ["start_descent"],
+    },
+    {
+      id: "ecam_actions",
+      label: "ECAM ACTIONS",
+      action: "COMMAND",
+      hint: "PF: aircraft under control, navigated, MAYDAY declared → command ECAM ACTIONS by pressing the ECAM.",
+      variant: "advisory",
+      crew: "PF",
+      group: "flightcheck",
+      flashSurface: "firepanel",
+      hardware: true,   // completed by pressing the ECAM (no procedure CONFIRM card)
+      requires: ["start_descent"],
     },
     {
       id: "ptu_off",
@@ -93,7 +181,7 @@ export const dualHydGY: Scenario = {
       crew: "PM",
       hardware: true,
       ecamRef: "ecam_ptu_off",
-      requires: ["cancel_master_warn"],
+      requires: ["ecam_actions"],
     },
     {
       id: "grn_eng1_pump_off",
@@ -149,31 +237,55 @@ export const dualHydGY: Scenario = {
         ],
       },
     },
-    // ── SECONDARY FAILURES — PM reads, PF cross-checks ────────────────────────
-    // FCOM PRO-ABN-HYD lists * F/CTL and * WHEEL as secondary failures.
-    // PM reads each one and the associated consequences; PF acknowledges.
+    // ── MANEUVER WITH CARE — part of the MAIN ECAM, reviewed BEFORE the
+    //    secondary failures (design note: it belongs to the ECAM drill).
     {
-      id: "announce_sec_failures",
-      label: "ECAM — SECONDARY FAILURES",
-      action: "READ",
-      hint: "PM reads each secondary failure from the SD/EWD after main ECAM is complete. PF cross-checks and acknowledges each line.",
-      variant: "advisory",
+      id: "speed_set",
+      label: "MANEUVER WITH CARE",
+      action: "MAX 320/0.77",
+      hint: "PF: announces 'MANEUVER WITH CARE.' Apply MAX SPEED 320 KT / 0.77. F/CTL in ALTERNATE LAW (PROT LOST) — smooth, modest sidestick inputs only. Ailerons + elevator available on BLUE; spoilers limited to 1/wing. Slats slow. Loss of high-speed protection is the reason for the speed limit.",
+      variant: "switch",
+      crew: "PF",
+      requires: ["yel_elec_pump_on"],
+    },
+    // ── SECONDARY FAILURES — reviewed ON the SD PAGE-CHECK cards (the secondary
+    //    failure is read off the SD page during the check).  LAND ASAP (red
+    //    directive) → FLIGHT CONTROL PAGE CHECK (carries * F/CTL) → WHEEL PAGE
+    //    CHECK (carries * WHEEL).  FCOM PRO-ABN-HYD lists * F/CTL and * WHEEL as
+    //    secondary failures.  FLAGGED FOR SME REVIEW.
+    {
+      id: "land_asap_card",
+      label: "LAND ASAP",
+      action: "ACKNOWLEDGE",
+      hint: "PM/PF: LAND ASAP (red) — land at the nearest airport where a safe landing can be made. MAYDAY has already been declared.",
+      variant: "warning",
       crew: "PM",
       group: "chclm",
-      requires: ["yel_elec_pump_on"],
-      notes: [
-        "* F/CTL — Flight controls degraded.  ALTN LAW (PROT LOST): only load factor limitation + hi/lo speed stability remain.  STABILIZER, YAW DAMPER, AP 1+2 all INOP.  Ailerons + Elevator AVAIL (Blue).  Spoilers: 1 per wing only.  Slats slow only; FLAPS INOP.  DIRECT LAW when L/G DN.  MAX SPEED 320 KT / M.77.  MANEUVER WITH CARE.",
-        "* WHEEL — Braking & steering degraded.  NORMAL brakes INOP, ANTI SKID INOP, NW STEERING INOP, AUTO BRAKE INOP, L/G RETRACTION INOP.  Gear extension by GRAVITY only.  Yellow accumulator brakes: ~7 full applications available, MAX BRK PR 1 000 PSI.  Plan long, straight rollout.",
-      ],
+      requires: ["speed_set"],
     },
     {
       id: "fctl_check",
-      label: "FCTL PAGE CHECK",
+      label: "FLIGHT CONTROL PAGE CHECK",
       action: "CONFIRM",
-      hint: "PM: verify FCTL page on the SD — ailerons + elevator available (Blue); STABILIZER + YAW DAMPER + FLAPS INOP; spoilers 1/wing. F/CTL ALTN LAW (PROT LOST); DIRECT LAW after L/G DN. MAN PITCH TRIM NOT used in G+Y SYS LO PR (stabilizer inop).",
+      hint: "PM: review the F/CTL page on the SD — this is where the * F/CTL secondary failure is read.  Ailerons + elevator available (Blue); STABILIZER + YAW DAMPER + FLAPS INOP; spoilers 1/wing.  F/CTL ALTN LAW (PROT LOST); DIRECT LAW after L/G DN.  MAN PITCH TRIM NOT used in G+Y SYS LO PR (stabilizer inop).  PF cross-checks.",
       variant: "switch",
       crew: "PM",
-      requires: ["announce_sec_failures"],
+      requires: ["land_asap_card"],
+      notes: [
+        "* F/CTL (secondary) — Flight controls degraded.  ALTN LAW (PROT LOST): only load factor limitation + hi/lo speed stability remain.  STABILIZER, YAW DAMPER, AP 1+2 all INOP.  Ailerons + Elevator AVAIL (Blue).  Spoilers: 1 per wing only.  Slats slow only; FLAPS INOP.  DIRECT LAW when L/G DN.  MAX SPEED 320 KT / 0.77.  MANEUVER WITH CARE.",
+      ],
+    },
+    {
+      id: "wheel_check",
+      label: "WHEEL PAGE CHECK",
+      action: "CONFIRM",
+      hint: "PM: review the WHEEL page on the SD — this is where the * WHEEL secondary failure is read.  Braking & steering degraded.  PF cross-checks.",
+      variant: "switch",
+      crew: "PM",
+      requires: ["fctl_check"],
+      notes: [
+        "* WHEEL (secondary) — Braking & steering degraded.  NORMAL brakes INOP, ANTI SKID INOP, NW STEERING INOP, AUTO BRAKE INOP, L/G RETRACTION INOP.  Gear extension by GRAVITY only.  Yellow accumulator brakes: ~7 full applications available, MAX BRK PR 1 000 PSI.",
+      ],
     },
     {
       id: "cancel_master_caut",
@@ -184,23 +296,12 @@ export const dualHydGY: Scenario = {
       crew: "PM",
       group: "glareshield",
       hardware: true,
-      requires: ["announce_sec_failures"],
+      requires: ["wheel_check"],
       afterEffect: {
         delayMs: 300,
         triggerId: "mc_cancelled",
         effects: [{ type: "SET_MASTER_CAUT", active: false }],
       },
-    },
-
-    // ── MANEUVER DISCIPLINE — explicit PF reminder per FCOM action line
-    {
-      id: "speed_set",
-      label: "MANEUVER WITH CARE",
-      action: "MAX 320/M.77",
-      hint: "PF: announces 'MANEUVER WITH CARE.' Apply MAX SPEED 320 KT / M.77 per FCOM PRO-ABN-HYD. F/CTL in ALTERNATE LAW (PROT LOST) — smooth, modest sidestick inputs only. Ailerons + elevator are available on BLUE; spoilers limited to 1/wing. Slats slow. Loss of high-speed protection is the reason for the speed limit.",
-      variant: "switch",
-      crew: "PF",
-      requires: ["cancel_master_caut"],
     },
 
     // ── STATUS PHASE ─────────────────────────────────────────────────────────
@@ -216,7 +317,7 @@ export const dualHydGY: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["speed_set"],
+      requires: ["cancel_master_caut"],
     },
     {
       id: "stop_ecam",
@@ -247,16 +348,12 @@ export const dualHydGY: Scenario = {
       crew: "PF",
       group: "chclm",
       requires: ["oeb_check"],
-      notes: [
-        "Reference: FCOM PRO-ABN-HYD STATUS page (PRO-ABN-HYD P 43/48).",
-        "Reference: QRH ABNORMAL — DUAL HYD G+Y LO PR summary (AOP-30-60 Use of Summaries).",
-      ],
     },
     {
       id: "status_read_aloud",
       label: "STATUS — PM READS",
       action: "REVIEW",
-      hint: "PM reads each STATUS line aloud; PF: 'CHECKED' after each. Covers limits, approach procedure, INOP SYS list.",
+      hint: "PM reads each STATUS limitation/memo line aloud; PF: 'CHECKED' after each. (INOP SYS list is on its own card next.)",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
@@ -273,7 +370,23 @@ export const dualHydGY: Scenario = {
         "LDG DIST PROC ...... APPLY",
         "ALTN LAW: PROT LOST.  WHEN L/G DN: DIRECT LAW.",
         "BRK Y ACCU PR ONLY (≈ 7 full applications)",
-        "INOP SYS: G+Y HYD, F/CTL PROT, STABILIZER, REVERSER 1+2, SPLR 1+2+4+5, FLAPS, LAF, YAW DAMPER, AP 1+2, ANTI SKID, N/W STRG, NORM BRK, AUTO BRK, L/G RETRACT, CAT 2, GLS AUTOLAND, STEEP APPR.",
+        "FUEL CONSUMPT INCRSD",
+        "FMS PRED UNRELIABLE",
+        "SLATS SLOW",
+      ],
+    },
+    // INOP SYS — its own card, separate from the STATUS limitations read.
+    {
+      id: "inop_sys_card",
+      label: "STATUS — INOP SYS",
+      action: "REVIEW",
+      hint: "PM reads the INOP SYS list from the STATUS page; PF cross-checks.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["status_read_aloud"],
+      notes: [
+        "G+Y HYD · F/CTL PROT · STABILIZER · REVERSER 1+2 · SPLR 1+2+4+5 · FLAPS · LAF · YAW DAMPER · AP 1+2 · ANTI SKID · N/W STRG · NORM BRK · AUTO BRK · L/G RETRACT · CARGO DOOR (if Y RSVR LO LVL) · CAT 2 · GLS AUTOLAND · STEEP APPR",
       ],
     },
     {
@@ -284,7 +397,39 @@ export const dualHydGY: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["status_read_aloud"],
+      requires: ["inop_sys_card"],
+    },
+
+    // ── QRH SUMMARY — first thing after ECAM ACTIONS COMPLETE ─────────────────
+    // A320 QRH HYD G+Y SYS LO PR SUMMARY (Rev 25 MAY 22, p.29.03A), read verbatim
+    // before performance/decision.  FLAGGED FOR SME REVIEW.
+    {
+      id: "qrh_summary_gy",
+      label: "QRH SUMMARY — CRUISE",
+      action: "READ",
+      hint: "PM reads the CRUISE part of the QRH HYD G+Y SYS LO PR summary aloud; PF cross-checks.",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["crew_crosscheck"],
+      notes: [
+        "SPD BRK: DO NOT USE.  MAX SPD 320 / 0.77.  MANEUVER WITH CARE.  NO STABILIZER.  ALTN LAW: PROT LOST.  FUEL: increased consumption.  Landing performance: use the EFB LDG PERF application.",
+      ],
+    },
+
+    // Hidden gate — completed by the ATC weather delivery card (completesStep).
+    // Keeps the procedure paused (no card) through the whole weather exchange:
+    // QRH cruise summary → request wx → ATC wx → readback → THEN landing perf.
+    {
+      id: "weather_obtained",
+      label: "WEATHER OBTAINED",
+      action: "CONFIRM",
+      hint: "Weather, runway in use and approach type obtained and read back to ATC.",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      optional: true,
+      requires: ["qrh_summary_gy"],
     },
 
     // ── PERFORMANCE & DECISION ───────────────────────────────────────────────
@@ -296,7 +441,7 @@ export const dualHydGY: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["crew_crosscheck"],
+      requires: ["weather_obtained"],
     },
     {
       id: "fordec_hyd",
@@ -322,7 +467,7 @@ export const dualHydGY: Scenario = {
       id: "inform_atc_intentions",
       label: "INFORM ATC — INTENTIONS + BRIEFING",
       action: "CALL",
-      hint: "Pilot-initiated call to ATC. PM: 'Mumbai Control, IFLY101 — dual hydraulic failure GREEN and YELLOW, MAYDAY emergency confirmed, request immediate vectors VABB runway 27 ILS. Request latest weather, runway in use, NOTAMs, expected approach type. 186 souls on board.' Combines intentions + briefing request in one call.",
+      hint: "Pilot-initiated call to ATC, made AFTER the landing distance is computed (ldg_perf). PM: 'Mumbai Control, IFLY101 — request immediate vectors VABB runway 27.' States the diversion intention only — weather / runway in use / approach type were already obtained in the earlier weather exchange that follows the QRH summary read.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
@@ -333,6 +478,7 @@ export const dualHydGY: Scenario = {
         "ATC reply (wx / RWY / NOTAMs / approach type) appears as an ATC distraction once this step is checked off — read back the full set.",
       ],
     },
+    // ── FMC PREP — 3 cards: (1) FMC  (2) QRH review  (3) action-panel flaps+GPWS ──
     {
       id: "fmgc_prep",
       label: "FMGC PREP",
@@ -341,7 +487,43 @@ export const dualHydGY: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["fordec_hyd"],
+      requires: ["inform_atc_intentions"],
+    },
+    {
+      id: "qrh_review",
+      label: "QRH REVIEW — APPR / LDG / GO-AROUND",
+      action: "REVIEW",
+      hint: "PM/PF REVIEW (not read aloud) the APPROACH / LANDING / GO-AROUND parts of the QRH HYD G+Y SYS LO PR summary during FMC prep. (CRUISE part was read earlier.)",
+      variant: "advisory",
+      crew: "PM",
+      group: "chclm",
+      requires: ["fmgc_prep"],
+      notes: [
+        "APPROACH — CAT 2 INOP.  SLATS SLOW / FLAPS JAMMED.  FOR LDG: USE FLAP 3.  GPWS FLAP MODE: OFF.  Flaps ext SPD SEL: VFE NEXT − 5 kt.  CONF 3: decelerate to calculated VAPP.  CONF 3 + VAPP: stabilize at VAPP before L/G down (trim reference).",
+        "L/G GRAVITY EXTN — handcrank PULL AND TURN (rotate clockwise 3 turns to mechanical stop).  L/G LEVER: DOWN.  GEAR DOWN: CHECK.  Disregard 'USE MAN PITCH TRIM' (MAN TRIM unusable).",
+        "LANDING — pitch authority reduced (no stabilizer).  Only 1 spoiler per wing (Direct law).  NO REVERSER.  BRK Y ACCU PR ONLY (7 applications), MAX BRK PR 1 000 PSI.  NO NOSEWHEEL STEERING.",
+        "GO-AROUND — NO GEAR RETRACTION.  FUEL: increased consumption.  Circuit: maintain slats/flaps, speed close to VAPP.  Diversion (flaps jammed 0): clean config, maintain ≥ higher of VAPP or VLS.",
+      ],
+    },
+    {
+      id: "flap_check",
+      label: "FLAPS",
+      action: "CHECK — FAULT",
+      hint: "Action panel: check the FLAPS pb — FAULT (flaps jammed / slow for G+Y).  The HYD action panel pops out again for this selection.",
+      variant: "switch",
+      crew: "PM",
+      hardware: true,
+      requires: ["qrh_review"],
+    },
+    {
+      id: "gpws_flap_mode",
+      label: "GPWS FLAP MODE",
+      action: "OFF",
+      hint: "Action panel: GPWS FLAP MODE pb → OFF — prevents a spurious GPWS 'TOO LOW FLAP' warning during the FLAP 3 landing.  Panel retracts 2 s after this selection.",
+      variant: "switch",
+      crew: "PM",
+      hardware: true,
+      requires: ["flap_check"],
     },
     {
       id: "nis_brief_hyd",
@@ -351,7 +533,7 @@ export const dualHydGY: Scenario = {
       variant: "advisory",
       crew: "PF",
       group: "comms",
-      requires: ["fordec_hyd"],
+      requires: ["gpws_flap_mode"],
       notes: [
         "N — NATURE: 'We have a technical issue with the hydraulic system. The aircraft is fully controllable.'",
         "I — INTENTIONS: 'We are diverting to Mumbai and will be landing on runway 27. Full emergency services will meet the aircraft as a precaution.'",
@@ -394,73 +576,83 @@ export const dualHydGY: Scenario = {
       ],
     },
     {
-      id: "go_around_review",
-      label: "GO-AROUND REVIEW",
-      action: "CONFIRM",
-      hint: "PF briefs go-around plan with dual-hyd constraints.  L/G RETRACTION INOP (gear stays down).  FLAPS INOP — already at maximum lift.  HAND-FLOWN GA (AP 1+2 INOP).  Maneuver with care in alternate law.",
-      variant: "advisory",
-      crew: "PF",
-      group: "comms",
-      requires: ["inform_company"],
-      notes: [
-        "GO-AROUND CALL: 'GO AROUND — FLAPS' is non-standard here (no flap change available).  Use 'GO AROUND, MAX REVERSE N/A, FOLLOW SRS.'",
-        "TOGA: both engines healthy — TOGA + SRS will give positive climb.  Limit pitch — alternate law, no Alpha Floor.",
-        "GEAR: STAYS DOWN (retraction INOP).  Expect additional drag — anticipate trimming for positive climb.",
-        "SPEED: maintain VAPP, build to green dot only once positive climb established.",
-        "TURN: minimum bank turns only (≤15°) — alternate law, reduced lateral control authority.",
-      ],
-    },
-    {
       id: "atc_emergency_svcs",
       label: "ATC — EMERGENCY SERVICES",
       action: "ADVISE",
-      hint: "PM: 'Mumbai Approach, IFLY101 — confirm full emergency services on runway 27.  Flapless approach, VAPP plus 25, accumulator brakes only, no anti-skid, no nose-wheel steering, long high-speed rollout expected, possible runway excursion.  Request foam runway and CFR vehicles in position.'  Per ICAO phraseology §10.8 SQUAWK MAYDAY [7700] if not already.",
+      hint: "PM reads this, then makes the radio call (next ATC card): request FULL EMERGENCY SERVICES for runway 27, and advise the aircraft will be UNABLE TO VACATE the runway (nose-wheel steering INOP). SQUAWK MAYDAY 7700 if not already. Keep it concise — ATC does not need the full technical aircraft status.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["go_around_review"],
+      requires: ["inform_company"],
     },
 
-    // ── APPROACH PHASE ───────────────────────────────────────────────────────
-    {
-      id: "approach_brief_hyd",
-      label: "APPROACH BRIEF",
-      action: "COMPLETE",
-      hint: "PF leads the approach brief.  Cover: ILS RWY 27, MDA/DH, VAPP = VREF+25 kt, FLAP 3 (final config), AP INOP (hand-flown), stabilize at VAPP BEFORE gravity gear (FCOM: ensures trim reference set before DIRECT LAW activates at gear extension), accumulator brakes only (~7 applications), anti-skid INOP, NW steering INOP, GPWS FLAP MODE OFF, GO-AROUND per brief.",
-      variant: "advisory",
-      crew: "PF",
-      group: "comms",
-      requires: ["atc_emergency_svcs"],
-      notes: [
-        "Approach type: ILS RWY 27.",
-        "Configuration: FLAP 3 (not FULL — flaps INOP for G+Y).",
-        "Speed: VAPP = VREF + 25 kt (FCOM STATUS).",
-        "Hand-flown: AP 1+2 INOP — FD + A/THR available.",
-        "Trim reference: stabilize at VAPP first, THEN gravity gear (DIRECT LAW activates at L/G DN).",
-        "Braking: Y accumulator brakes (~7 applications); ANTI SKID + AUTO BRK + N/W STRG INOP.",
-        "Reverse: INOP (REVERSER 1+2 INOP).",
-        "GPWS: FLAP MODE OFF (FCOM STATUS — prevents spurious GPWS warning for FLAP 3 landing).",
-      ],
-    },
+    // ── APPROACH PHASE ── (PREP before BRIEF) ─────────────────────────────────
     {
       id: "approach_prep_hyd",
-      label: "APPROACH PREP",
+      label: "APPROACH PREPARATION",
       action: "COMPLETE",
       hint: "PM: set ILS 27 manually on RMP 1 (auto-tune may not match selected RWY in FMGC).  Set BARO QNH.  Set MDA/DH per chart.  Verify auto-brake selector → OFF (auto-brake INOP).  Spoilers ARM (still arms, but G+Y lost — only 1 SPLR/wing).  Landing lights ON.",
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["approach_brief_hyd"],
+      requires: ["atc_emergency_svcs"],
+    },
+    // APPROACH BRIEFING — split into 3 cards (THE APPROACH / THE LANDING / THE GO-AROUND),
+    // mirroring the FCTM/QRH phase structure (vault §5.3/5.4/5.5).
+    // NOTE: id "approach_brief_hyd" is preserved — the PFD buildAircraftState() gates its
+    // "On ILS" state (SPEED·G/S·LOC, VMAX 230, RA shown) on this exact id. Do not rename.
+    {
+      id: "approach_brief_hyd",
+      label: "APPROACH BRIEFING · THE APPROACH (1/3)",
+      action: "COMPLETE",
+      hint: "PF leads the approach briefing — PART 1: how the approach will be flown.  ILS RWY 27, MDA/DH, VAPP = VREF+25 kt, hand-flown (AP 1+2 INOP; FD + A/THR available, A/THR stays ON).  Request a LONG FINAL to give time to stabilize at VAPP before the late gravity-gear extension.  Plan to be stabilized by a platform ~2500 ft AAL so the trim reference is set before gear.  GPWS FLAP MODE OFF (already done).",
+      variant: "advisory",
+      crew: "PF",
+      group: "comms",
+      requires: ["approach_prep_hyd"],
+      notes: [
+        "Approach type: ILS RWY 27 — hand-flown (AP 1+2 INOP; FD + A/THR available).",
+        "Speed: VAPP = VREF + 25 kt (increased — flaps INOP; FLAP 3 is the final config).",
+        "A/THR: keep ON (for G+Y it is NOT set to OFF, unlike the G+B case). Helps hold VAPP for the trim-reference-before-gear technique.",
+        "Trim reference: stabilize at VAPP FIRST, THEN gravity gear (DIRECT LAW activates at L/G DN).",
+        "DRAFT (SME review): request a LONG FINAL / extended track miles — gives time to fully stabilize at VAPP before the late gravity-gear extension.",
+        "DRAFT (SME review): plan a PLATFORM / level segment ~2500 ft AAL, stabilized at VAPP / CONF 3 before gear — airmanship to guarantee the trim reference is set.",
+      ],
     },
     {
-      id: "gpws_flap_mode",
-      label: "GPWS FLAP MODE",
-      action: "OFF",
-      hint: "PM: GPWS FLAP MODE pb → OFF.  FCOM STATUS item — prevents spurious GPWS 'TOO LOW FLAP' warning during the FLAP 3 landing.",
-      variant: "switch",
-      crew: "PM",
-      hardware: true,
-      requires: ["approach_prep_hyd"],
+      id: "approach_brief_landing",
+      label: "APPROACH BRIEFING · THE LANDING (2/3)",
+      action: "COMPLETE",
+      hint: "PF leads the approach briefing — PART 2: how the landing will be flown.  FLAP 3 final config (flaps INOP).  Gravity gear ONLY after stabilized at VAPP, CONF 3 — DIRECT LAW activates at L/G DN; disregard 'USE MAN PITCH TRIM'.  Yellow accumulator brakes only (~7 applications, MAX BRK PR 1000 PSI); no reverse, no anti-skid, no autobrake, no N/W steering.  Plan a long straight rollout; unable to vacate.",
+      variant: "advisory",
+      crew: "PF",
+      group: "comms",
+      requires: ["approach_brief_hyd"],
+      notes: [
+        "Configuration: FLAP 3 (not FULL — flaps INOP for G+Y).",
+        "Gear: gravity extension only, AFTER stabilized at VAPP / CONF 3 (preserves the trim reference).",
+        "Control law: DIRECT LAW at L/G DN — DISREGARD the 'USE MAN PITCH TRIM' PFD message (FCTM: stabilizer lost, ref already memorized at VAPP).",
+        "Braking: Yellow accumulator only (~7 applications, MAX BRK PR 1000 PSI); ANTI SKID + AUTO BRK + N/W STRG INOP.",
+        "Reverse: INOP (REVERSER 1+2 INOP) — plan a long straight rollout; unable to vacate (request tow).",
+        "DRAFT (SME review): TAIL-STRIKE / HIGH-NOSE awareness — a FLAP 3 landing flares at a higher pitch attitude; guard against over-rotation / tail strike.",
+      ],
+    },
+    {
+      id: "approach_brief_ga",
+      label: "APPROACH BRIEFING · THE GO-AROUND (3/3)",
+      action: "CONFIRM",
+      hint: "PF leads the approach briefing — PART 3: the go-around plan.  Call 'GO AROUND, MAX REVERSE N/A, FOLLOW SRS'.  TOGA + SRS (both engines healthy).  LIMIT PITCH (no Alpha Floor); manage the pitch/power couple manually (no stabilizer / auto-trim).  Gear STAYS DOWN (retraction INOP) — extra drag, trim for positive climb.  Maintain VAPP, build to green dot only after positive climb.  Minimum bank ≤15°.  Stays in DIRECT LAW.",
+      variant: "advisory",
+      crew: "PF",
+      group: "comms",
+      requires: ["approach_brief_landing"],
+      notes: [
+        "Call: 'GO AROUND, MAX REVERSE N/A, FOLLOW SRS' — 'GO AROUND FLAPS' is non-standard (already at max lift).",
+        "TOGA: both engines healthy → TOGA + SRS gives positive climb. LIMIT PITCH — no Alpha Floor.",
+        "DRAFT (SME review): PITCH/POWER COUPLE — with the stabilizer lost (no auto-trim), anticipate and manually counter the nose-up pitching moment from thrust application; trim continuously through the maneuver.",
+        "Gear: STAYS DOWN (L/G RETRACTION INOP) — expect extra drag; trim for positive climb.",
+        "Speed / turn: maintain VAPP → green dot only after positive climb; minimum bank ≤15° (degraded law).",
+      ],
     },
     {
       id: "approach_cl_hyd",
@@ -470,7 +662,7 @@ export const dualHydGY: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["gpws_flap_mode"],
+      requires: ["approach_brief_ga"],
       notes: [
         "BARO .............. QNH SET",
         "MDA / DH .......... SET",
@@ -479,36 +671,68 @@ export const dualHydGY: Scenario = {
         "SEAT BELTS ........ ON",
         "AUTOBRAKE ......... OFF  (INOP — accumulator brakes only)",
         "SPOILERS .......... ARM  (1 SPLR/wing, but arm anyway)",
-        "GPWS FLAP MODE .... OFF  (already done)",
+        "GPWS FLAP MODE .... OFF  (done at FMC prep)",
         "LANDING LIGHTS .... ON",
         "CABIN ............. ADVISED — BRACE BRIEF complete",
+      ],
+    },
+    // CONFIGURE FOR APPROACH + GEAR GRAVITY — both AFTER ATC clears the ILS.
+    {
+      id: "configure_for_approach",
+      label: "CONFIGURE FOR APPROACH",
+      action: "FLAP 3 · VAPP",
+      hint: "After ATC clears the ILS approach: PF configures — FLAP 3, decelerate to VAPP (VREF+25). Stabilize at VAPP BEFORE the gravity gear extension (sets the trim reference before DIRECT LAW).  Once established on the ILS the FMA reads SPEED · LOC · G/S (FD + A/THR).",
+      variant: "advisory",
+      crew: "PF",
+      group: "flightcheck",
+      requires: ["approach_cl_hyd"],
+      notes: [
+        "Established on ILS RWY 27 — FMA: SPEED · LOC · G/S, with FD + A/THR (AP INOP, hand-flown).",
+        "Check VABB field elevation (≈ 39 ft AMSL) and the G/S intercept altitude for RWY 27.",
+        "DRAFT (SME review): be fully stabilized at VAPP / CONF 3 by a platform ~2500 ft AAL before calling for the gravity gear (sets the trim reference before DIRECT LAW).",
       ],
     },
     {
       id: "lgr_gravity",
       label: "GEAR — GRAVITY EXTN",
       action: "DEPLOY AT VAPP",
-      hint: "PM: ONLY after PF confirms STABILIZED AT VAPP, CONF 3.  Pull the L/G GRAVITY EXTN handle; rotate one click at a time, 30 s settling between clicks.  Confirm 3 GREENS.  Reason for VAPP-first sequence (FCOM): at L/G DN the F/CTL reverts to DIRECT LAW — the mean elevator position at that moment becomes the centered-stick reference, so being trimmed at VAPP before gear ensures the correct reference.",
+      hint: "PM: ONLY after PF confirms STABILIZED AT VAPP, CONF 3.  GRVTY GEAR EXTN handcrank — PULL AND TURN: rotate the handle clockwise 3 turns until the mechanical stop.  L/G LEVER — DOWN.  GEAR DOWN — CHECK 3 GREENS.  At L/G DN the F/CTL reverts to DIRECT LAW — the mean elevator position at that moment becomes the centered-stick reference, so being trimmed at VAPP before gear ensures the correct reference.  Disregard 'USE MAN PITCH TRIM' (MAN TRIM unusable).",
       variant: "switch",
       crew: "PM",
       hardware: true,
-      requires: ["approach_cl_hyd"],
+      requires: ["configure_for_approach"],
     },
     {
       id: "landing_cl_hyd",
       label: "LANDING CL",
       action: "COMPLETE",
-      hint: "PM runs landing checklist at 1000 ft on final. Gear to extend at Vapp only when stabilized.",
+      hint: "PM runs the landing checklist once STABILISED and GEAR DOWN (gravity-extended).",
       variant: "advisory",
       crew: "PM",
       group: "chclm",
-      requires: ["approach_cl_hyd"],
+      requires: ["lgr_gravity"],
       notes: [
-        "GEAR: GRAVITY EXTN — AT VAPP CONF 3 (NOT BEFORE)",
+        "GEAR: GRAVITY EXTN — DOWN, 3 GREENS",
         "FLAPS: CONF 3 (VREF+25 kt)",
-        "EXPECT: direct law after gear down, accumulator brakes, long rollout, max reverse",
-        "USE MAN PITCH TRIM warning after L/G DN — DISREGARD (FCOM note)",
+        "EXPECT: direct law after gear down, accumulator brakes, long rollout, max reverse N/A",
+        "USE MAN PITCH TRIM warning after L/G DN — DISREGARD",
       ],
+    },
+
+    // Hidden gate — completed by the ATC "cleared to land" card (completesStep).
+    // Holds REQUEST TAXI TO STAND until ALL after-landing ATC calls (established
+    // report → tower contact → cleared to land) are complete, so the taxi
+    // request is genuinely the LAST action in the scenario.
+    {
+      id: "ldg_clearance_done",
+      label: "LANDING CLEARANCE",
+      action: "CONFIRM",
+      hint: "Landing clearance received from Tower and read back — all approach/landing ATC calls complete.",
+      variant: "advisory",
+      crew: "PM",
+      group: "comms",
+      optional: true,
+      requires: ["landing_cl_hyd"],
     },
 
     // ── AFTER LANDING — request taxi to stand ─────────────────────────────────
@@ -523,9 +747,10 @@ export const dualHydGY: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "comms",
-      requires: ["landing_cl_hyd"],
+      requires: ["ldg_clearance_done"],
       notes: [
         "Call: 'Mumbai Tower, IFLY101 — landed and stopped on runway 27. Confirm parking brake set, no immediate evacuation. Nose-wheel steering inoperative — request tow or follow-me to clear runway and proceed to remote stand.'",
+        "PARK BRK may be INOP (FCOM note — yellow accumulator low pressure after a Y failure). If park brake does not hold, keep pedal brakes applied (accumulator pressure, limited applications) and chock as soon as ground crew arrives.",
         "Wait for ATC instructions before any manoeuvre.",
         "If conditions deteriorate (fire / smoke / fuel leak detected by ARFF), be prepared for evacuation order.",
       ],
@@ -567,10 +792,104 @@ export const dualHydGY: Scenario = {
     { id: "st_inop_nbrk", line: "NORM BRK",            severity: "caution",  inopSys: true },
     { id: "st_inop_abrk", line: "AUTO BRK",            severity: "caution",  inopSys: true },
     { id: "st_inop_lgr",  line: "L/G RETRACT",         severity: "caution",  inopSys: true },
+    { id: "st_inop_cargo",line: "CARGO DOOR",          severity: "caution",  inopSys: true },
     { id: "st_inop_cat2", line: "CAT 2",               severity: "caution",  inopSys: true },
     { id: "st_inop_gls",  line: "GLS AUTOLAND",        severity: "caution",  inopSys: true },
     { id: "st_inop_steep",line: "STEEP APPR",          severity: "caution",  inopSys: true },
   ],
+
+  // ── QRH SUMMARY (Context Display "QRH" tab) ──────────────────────────────────
+  // A320 QRH "HYD G + Y SYS LO PR SUMMARY" — transcribed from the handbook page
+  // (CRUISE / APPROACH / LANDING / GO-AROUND). Severity = warning (Level 3, LAND
+  // ASAP) → red title end-caps. DRAFT — FLAGGED FOR SME REVIEW.
+  // NOTE: "SPD BRK: DO NOT USE" is deliberately NOT included here — the G+Y
+  // summary does not list it (it is a G+B item). The legacy step note still
+  // carries it pending the user's SME call.
+  qrhSummary: {
+    title: "HYD G + Y SYS LO PR SUMMARY",
+    severity: "warning",
+    sections: [
+      {
+        title: "CRUISE",
+        lines: [
+          { row: { label: "MAX SPD", value: "320 / 0.77" } },
+          { para: [{ text: "MANEUVER WITH CARE" }] },
+          { para: [{ text: "NO STABILIZER" }] },
+          { para: [{ text: "ALTN LAW :   PROT LOST" }] },
+          { para: [
+            { text: "FUEL:", b: true },
+            { text: "  Increased fuel consumption " },
+            { text: "(Refer to QRH PER-B)", i: true },
+          ] },
+          { para: [
+            { text: "For " },
+            { text: "Landing Performance", b: true },
+            { text: " assessment, " },
+            { text: "Refer to QRH PER-C", i: true },
+            { text: ", or use the LDG PERF application of FlySmart with Airbus." },
+          ] },
+        ],
+      },
+      {
+        title: "APPROACH",
+        lines: [
+          { para: [{ text: "CAT 2 INOP" }] },
+          { para: [{ text: "SLATS SLOW / FLAPS JAMMED" }] },
+          { row: { label: "FOR LANDING", value: "USE FLAP 3" } },
+          { row: { label: "GPWS FLAP MODE", value: "OFF" } },
+          { head: "For Flaps extension:" },
+          { row: { label: "SPD SEL", value: "VFE NEXT − 5 kt" }, indent: 1 },
+          { head: "When in CONF 3:" },
+          { para: [{ text: "DECELERATE TO CALCULATED VAPP" }], indent: 1 },
+          { head: "When in CONF 3 and VAPP:" },
+          { para: [{ text: "Stabilize at VAPP before L/G down, to be trimmed for approach" }], indent: 1 },
+          { head: "L/G gravity extension:" },
+          { row: { label: "GRVTY GEAR EXTN handcrank", value: "PULL AND TURN" }, indent: 1 },
+          { para: [{ text: "(Rotate the handle clockwise 3 turns until mechanical stop)", i: true }], indent: 1 },
+          { row: { label: "L/G LEVER", value: "DOWN" }, indent: 1 },
+          { row: { label: "GEAR DOWN", value: "CHECK" }, indent: 1 },
+          { para: [{ text: "Disregard “USE MANUAL PITCH TRIM”. MAN TRIM Unusable." }], indent: 1 },
+        ],
+      },
+      {
+        title: "LANDING",
+        lines: [
+          { para: [
+            { text: "FLARE:", b: true },
+            { text: " PITCH AUTHORITY REDUCED (No stabilizer). MAN TRIM Unusable." },
+          ] },
+          { para: [{ text: "When Flaps jammed close to zero, consider tailstrike clearance." }] },
+          { para: [{ text: "Only 1 spoiler per wing – Direct law" }] },
+          { row: { label: "SPOILERS", value: "Only 1 per wing" } },
+          { para: [{ text: "NO REVERSER" }] },
+          { row: { label: "BRAKING", value: "BRK Y ACCU PR ONLY (7 appl)" } },
+          { row: { label: "MAX BRK PR", value: "1 000 PSI" } },
+          { para: [{ text: "NO NOSEWHEEL STEERING" }] },
+        ],
+      },
+      {
+        title: "GO-AROUND",
+        lines: [
+          { para: [{ text: "NO GEAR RETRACTION" }] },
+          { para: [
+            { text: "FUEL:", b: true },
+            { text: " Increased fuel consumption " },
+            { text: "(Refer to QRH PER-B)", i: true },
+          ] },
+          { head: "For circuit:" },
+          { para: [{ text: "MAINTAIN SLATS/FLAPS CONFIGURATION" }], indent: 1 },
+          { para: [{ text: "Maintain speed close to VAPP (due to pitch trim unusable)" }], indent: 1 },
+          { head: "For diversion:" },
+          { para: [{ text: "If Flaps jammed at zero:", b: true }], indent: 1 },
+          { para: [{ text: "SELECT CLEAN CONFIGURATION" }], indent: 2 },
+          { para: [{ text: "Maintain at least the higher of VAPP or VLS (due to pitch trim unusable)" }], indent: 2 },
+          { para: [{ text: "If Flaps jammed above zero:", b: true }], indent: 1 },
+          { para: [{ text: "MAINTAIN SLATS/FLAPS CONFIGURATION" }], indent: 2 },
+          { para: [{ text: "Maintain speed close to VAPP (due to pitch trim unusable)" }], indent: 2 },
+        ],
+      },
+    ],
+  },
 
   // ── ATC sequence — cruise phase rule: first ATC contact IS the MAYDAY ────────
   // Phase rule (cruise): no prior Tower handoff/STANDBY sequence; the routine
@@ -583,20 +902,22 @@ export const dualHydGY: Scenario = {
     // Correct MAYDAY: nature + unable RVSM + request descent + standby.
     // No airport / vectors in the initial call — intentions come after FORDEC.
     {
-      id: "atc_handoff_checkin",
-      atMs: 10_000,
-      kind: "atc",
-      from: "MUMBAI CONTROL",
-      message: "IFLY101, Mumbai Control, checking in, maintain FL350.",
-      standbyResurfaceMs: 20_000,
+      // CRUISE start — the PILOT initiates the emergency with the MAYDAY call (no ATC
+      // check-in / handoff first). kind:"crew" → crew-initiated; NO standby option (atc-comms §0.9).
+      id: "pm_mayday_declare",
+      atMs: 0,
+      gapAfterMs: 5_000,
+      requiresStep: "request_routing",
+      completesStep: "declare_mayday",
+      kind: "crew",
+      from: "PM → MUMBAI CONTROL",
+      message: "Aircraft under control — PM initiates the emergency call to ATC.",
       choices: [
         // Correct — nature + heading + offset request + unable RVSM + descent request + standby
         // Heading states current navigation; offset gives lateral separation; descent exits RVSM block
-        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, dual hydraulic failure, heading 200, unable RVSM, request 2 miles right offset and descent flight level two five zero, standby",  correct: true  },
+        { id: "a", label: "MAYDAY MAYDAY MAYDAY, IFLY101, dual hydraulic failure, heading 200, unable RVSM, request 2 miles right offset and descent flight level two zero zero, standby",  correct: true  },
         // Wrong — missing heading and offset; ATC cannot plan separation without navigation info
-        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, dual hydraulic failure, unable RVSM, request descent flight level two five zero, standby",                                          correct: false },
-        // Wrong — standby only; MAYDAY must be declared immediately
-        { id: "c", label: "Standby IFLY101",                                                                                                                                                   correct: false },
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, dual hydraulic failure, unable RVSM, request descent flight level two zero zero, standby",                                          correct: false },
         // Wrong — airports and vectors in initial MAYDAY; intentions come after FORDEC
         { id: "d", label: "MAYDAY MAYDAY MAYDAY, IFLY101, dual hydraulic failure, maintaining FL350, request immediate vectors nearest suitable airport with 3 000 m runway, standby",        correct: false },
       ],
@@ -605,62 +926,86 @@ export const dualHydGY: Scenario = {
     // ② ATC acknowledges MAYDAY — crew reads back BOTH offset and descent level
     {
       id: "atc_mayday_ack",
-      atMs: 25_000,
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "declare_mayday",
+      completesStep: "mayday_ack",
       kind: "atc",
       from: "MUMBAI CONTROL",
-      message: "IFLY101, roger MAYDAY, radar contact. Maintain 2 miles right offset, descend flight level two four zero.",
+      message: "IFLY101, roger MAYDAY, radar contact. Maintain 2 miles right offset, descend flight level two zero zero.",
       standbyResurfaceMs: 25_000,
       choices: [
         // Correct — both items read back (offset is a safety separation instruction)
-        { id: "a", label: "2 miles right offset, descending flight level two four zero, IFLY101",  correct: true  },
+        { id: "a", label: "2 miles right offset, descending flight level two zero zero, IFLY101",  correct: true  },
         // Wrong — offset dropped (protects against conflicting traffic in RVSM block)
-        { id: "b", label: "Descending flight level two four zero, IFLY101",                         correct: false },
+        { id: "b", label: "Descending flight level two zero zero, IFLY101",                         correct: false },
         // Wrong — bare acknowledgement
         { id: "c", label: "Roger IFLY101",                                                          correct: false },
       ],
     },
 
-    // ③ ATC asks if assistance required — STANDBY while ECAM not yet started
+    // Passing FL220 on the descent (altitude-gated) — ATC extends the clearance
+    // from FL200 down to 10 000 ft.  Fires when the live altitude descends ≤ 22 000.
+    {
+      id: "atc_descend_10000",
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "start_descent",
+      atAltitudeBelowFt: 22_000,
+      completesStep: "cleared_10000",
+      kind: "atc",
+      from: "MUMBAI CONTROL",
+      message: "IFLY101, descend and maintain 10000 feet, QNH 1013.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Descend and maintain 10000 feet, QNH 1013, IFLY101",  correct: true  },
+        { id: "b", label: "Descending 10000 feet, IFLY101",                       correct: false },
+        { id: "c", label: "Roger IFLY101",                                        correct: false },
+      ],
+    },
+
+    // ③ After the HYD panel COLLAPSES (pumps done → speed_set) — ATC asks if
+    //    assistance is required.  Crew is still busy → STANDBY.
     {
       id: "atc_assistance_req",
-      atMs: 70_000,
+      atMs: 1_000,
+      gapAfterMs: 45_000,
+      requiresStep: "speed_set",
       kind: "atc",
       from: "MUMBAI CONTROL",
       message: "IFLY101, assistance required?",
       standbyResurfaceMs: 30_000,
       choices: [
-        // Correct — ECAM not yet running; focus on aircraft; advise when ready
         { id: "a", label: "Standby IFLY101",                                               correct: true  },
-        // Wrong — requests routing before ECAM started (too early to commit)
         { id: "b", label: "Request vectors nearest suitable airport, IFLY101",             correct: false },
-        // Wrong — "negative" implies no assistance needed; serious emergency is active
         { id: "c", label: "Negative IFLY101",                                              correct: false },
       ],
     },
 
-    // ④ ATC offers vectors — crew defers while checklist running
+    // ④ ATC offers vectors — crew defers while still working the drill/status.
     {
       id: "atc_vectors_when_ready",
-      atMs: 120_000,
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "speed_set",
       kind: "atc",
       from: "MUMBAI CONTROL",
       message: "IFLY101, vectors available when ready, descend at your discretion.",
       standbyResurfaceMs: 30_000,
       choices: [
-        // Correct — acknowledge without committing; ECAM in progress
         { id: "a", label: "Continuing checklist, will advise when ready, IFLY101", correct: true  },
         { id: "b", label: "Standby IFLY101",                                        correct: true  },
-        // Wrong — premature routing commitment before ECAM and FORDEC done
         { id: "c", label: "IFLY101, turn left direct Mumbai, descend FL100",        correct: false },
       ],
     },
 
-    // ⑤ ECAM complete — crew requests Mumbai weather before FORDEC
+    // ⑤ ECAM complete + QRH cruise summary read — crew requests Mumbai weather
     // Kind:"crew" — deliberate crew-initiated call; no standby option.
     {
       id: "atc_weather_request",
-      atMs: 250_000,
-      requiresStep: "crew_crosscheck",
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "qrh_summary_gy",
       kind: "crew",
       from: "PM → MUMBAI APPROACH",
       message: "ECAM complete. Select the correct weather request.",
@@ -678,8 +1023,9 @@ export const dualHydGY: Scenario = {
     // ⑥ ATC delivers weather — full readback required (QNH critical for landing distance)
     {
       id: "atc_weather_delivery",
-      atMs: 260_000,
-      requiresStep: "crew_crosscheck",
+      atMs: 1_000,
+      requiresStep: "qrh_summary_gy",
+      completesStep: "weather_obtained",
       kind: "atc",
       from: "MUMBAI APPROACH",
       pilotSays: "Mumbai Approach, IFLY101, request latest weather Mumbai, runway in use, QNH.",
@@ -695,68 +1041,12 @@ export const dualHydGY: Scenario = {
       ],
     },
 
-    // ⑦ Hold request — crew needs time for FORDEC + approach brief
-    // Kind:"crew" — deliberate crew-initiated call; no standby option.
-    {
-      id: "pm_hold_req",
-      atMs: 300_000,
-      requiresStep: "crew_crosscheck",
-      kind: "crew",
-      from: "PM → MUMBAI APPROACH",
-      message: "Request holding from Mumbai Approach.",
-      standbyResurfaceMs: 25_000,
-      choices: [
-        // Correct — states reason; gives ATC expectation of further delay
-        { id: "a", label: "Mumbai Approach, IFLY101, request holding, require time for crew coordination and approach preparation",  correct: true  },
-        // Wrong — commits to descent/approach before FORDEC and approach brief done
-        { id: "b", label: "Mumbai Approach, IFLY101, request descent 3 000 feet, vectors ILS runway 27",                            correct: false },
-        // Wrong — vague; no hold requested; ATC cannot plan separation
-        { id: "c", label: "Mumbai Approach, IFLY101, not ready, continuing on track",                                                correct: false },
-      ],
-    },
-
-    // ⑧ ATC issues hold clearance — full readback: fix + altitude + direction
-    {
-      id: "atc_hold_clr",
-      atMs: 310_000,
-      requiresStep: "crew_crosscheck",
-      kind: "atc",
-      from: "MUMBAI APPROACH",
-      message: "IFLY101, hold SAPAV, maintain 7 000 feet, left-hand pattern, expect further clearance time 25.",
-      standbyResurfaceMs: 30_000,
-      choices: [
-        // Correct — fix + altitude + direction all read back
-        { id: "a", label: "Hold SAPAV, 7 000 feet, left-hand, IFLY101",  correct: true  },
-        // Wrong — altitude dropped
-        { id: "b", label: "Hold SAPAV, left-hand, IFLY101",               correct: false },
-        // Wrong — bare acknowledgement
-        { id: "c", label: "Roger IFLY101",                                 correct: false },
-      ],
-    },
-
-    // ⑨ ATC asks POB + endurance — respond with facts; no technical aircraft status
-    {
-      id: "atc_pob_fuel_services",
-      atMs: 330_000,
-      kind: "atc",
-      from: "MUMBAI APPROACH",
-      message: "IFLY101, say persons on board, fuel endurance, and assistance required.",
-      standbyResurfaceMs: 30_000,
-      choices: [
-        // Correct — POB + fuel + endurance; no technical aircraft status (ATC does not need it)
-        { id: "a", label: "186 persons on board, 12 tonnes fuel, endurance 2 hours 30, IFLY101",                                                                                              correct: true  },
-        // Wrong — standby not acceptable once ECAM complete and holding
-        { id: "b", label: "Standby IFLY101",                                                                                                                                                  correct: false },
-        // Wrong — under-informative; no fuel or endurance stated
-        { id: "c", label: "IFLY101, 186 POB, standard approach",                                                                                                                              correct: false },
-      ],
-    },
-
-    // ⑩ Advise intentions — FORDEC complete; commit to VABB (training test: VAAH too short)
-    // Kind:"crew" — deliberate crew-initiated call; no standby option.
+    // ⑦ Advise intentions — FORDEC complete; commit to VABB (training test: VAAH too short)
+    // Kind:"crew" — deliberate crew-initiated call. gapAfterMs 30 s → HOLD request next.
     {
       id: "atc_intentions_advise",
-      atMs: 380_000,
+      atMs: 1_000,
+      gapAfterMs: 30_000,
       requiresStep: "fordec_hyd",
       kind: "crew",
       from: "PM → MUMBAI APPROACH",
@@ -764,7 +1054,7 @@ export const dualHydGY: Scenario = {
       standbyResurfaceMs: 25_000,
       choices: [
         // Correct — VABB RWY 27 (3 445 m): adequate for flapless + accumulator-brake landing
-        { id: "a", label: "Mumbai Approach, IFLY101, diverting Mumbai, request vectors ILS runway 27, flap 3 approach",  correct: true  },
+        { id: "a", label: "Mumbai Approach, IFLY101, diverting Mumbai, request vectors ILS runway 27",  correct: true  },
         // Wrong — VAAH RWY 23 (2 743 m): insufficient for flapless with accumulator brakes only
         { id: "b", label: "Mumbai Approach, IFLY101, diverting Ahmedabad, request vectors runway 23",                   correct: false },
         // Wrong — no clear divert decision communicated to ATC
@@ -772,65 +1062,159 @@ export const dualHydGY: Scenario = {
       ],
     },
 
-    // ⑪ Emergency services — concise; no technical aircraft status
-    // Kind:"crew" — deliberate crew-initiated call; no standby option.
+    // ⑧ Request hold — ~30 s after intentions; crew needs time for prep.
     {
-      id: "atc_emg_services_req",
-      atMs: 390_000,
-      requiresStep: "fordec_hyd",
+      id: "atc_hold_req",
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "inform_atc_intentions",
       kind: "crew",
       from: "PM → MUMBAI APPROACH",
-      message: "Request emergency services for runway 27.",
+      message: "Request holding from Mumbai Approach.",
       standbyResurfaceMs: 25_000,
       choices: [
-        // Correct — "full emergency services" only; ATC does not need technical aircraft details
-        { id: "a", label: "Mumbai Approach, IFLY101, request full emergency services runway 27",                                                                                                              correct: true  },
-        // Wrong — overloads frequency with technical status ATC cannot act on
-        { id: "b", label: "Mumbai Approach, IFLY101, request full emergency services runway 27, flapless approach, accumulator brakes only, no anti-skid, no nose-wheel steering, long rollout expected",  correct: false },
-        // Wrong — piecemeal; "fire trucks only" is not "full emergency services"
-        { id: "c", label: "Mumbai Approach, IFLY101, request fire trucks and foam runway 27",                                                                                                                correct: false },
+        { id: "a", label: "Mumbai Approach, IFLY101, request holding, two-minute legs, require time for crew coordination and approach preparation",  correct: true  },
+        { id: "b", label: "Mumbai Approach, IFLY101, request descent 3 000 feet, vectors ILS runway 27",                            correct: false },
+        { id: "c", label: "Mumbai Approach, IFLY101, not ready, continuing on track",                                                correct: false },
       ],
     },
 
-    // ⑫ ATC asks ready for approach
+    // ⑨ ATC issues hold clearance — full readback. gapAfterMs 30 s → POB next.
+    {
+      id: "atc_hold_clr",
+      atMs: 1_000,
+      gapAfterMs: 30_000,
+      requiresStep: "inform_atc_intentions",
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, hold SAPAV, maintain 7 000 feet, left-hand pattern, two-minute legs, expect further clearance time 25.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        { id: "a", label: "Hold SAPAV, 7 000 feet, left-hand, two-minute legs, IFLY101",  correct: true  },
+        { id: "b", label: "Hold SAPAV, left-hand, IFLY101",               correct: false },
+        { id: "c", label: "Roger IFLY101",                                 correct: false },
+      ],
+    },
+
+    // ⑩ ATC asks POB + endurance — ~30 s after hold clearance; facts only.
+    {
+      id: "atc_pob_fuel_services",
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "inform_atc_intentions",
+      kind: "atc",
+      from: "MUMBAI APPROACH",
+      message: "IFLY101, say persons on board, fuel endurance, and assistance required.",
+      standbyResurfaceMs: 30_000,
+      choices: [
+        // Correct — POB + fuel + endurance; no technical aircraft status (ATC does not need it)
+        { id: "a", label: "186 persons on board, 12 tonnes fuel, endurance 2 hours 30, IFLY101",                                                                                              correct: true  },
+        { id: "b", label: "Standby IFLY101",                                                                                                                                                  correct: false },
+        { id: "c", label: "IFLY101, 186 POB, standard approach",                                                                                                                              correct: false },
+      ],
+    },
+
+    // ⑪ Emergency services — fires off the ATC-EMERGENCY-SERVICES procedure card.
+    //    Crew requests full emergency services AND advises they will be unable to
+    //    vacate the runway (nose-wheel steering INOP).
+    {
+      id: "atc_emg_services_req",
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "atc_emergency_svcs",
+      kind: "crew",
+      from: "PM → MUMBAI APPROACH",
+      message: "Request emergency services for runway 27, and advise the runway-vacate situation.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        // Correct — full emergency services + the operationally-relevant fact that
+        // the runway cannot be vacated (no nose-wheel steering).
+        { id: "a", label: "Mumbai Approach, IFLY101, request full emergency services runway 27, and advise we will be unable to vacate the runway — nose-wheel steering inoperative",  correct: true  },
+        // Wrong — omits the unable-to-vacate advice ATC needs to plan the runway closure
+        { id: "b", label: "Mumbai Approach, IFLY101, request full emergency services runway 27",                                                                                       correct: false },
+        // Wrong — piecemeal; "fire trucks only" is not "full emergency services"
+        { id: "c", label: "Mumbai Approach, IFLY101, request fire trucks and foam runway 27",                                                                                          correct: false },
+      ],
+    },
+
+    // ⑫ Ready for approach — only AFTER the approach checklist is complete.
     {
       id: "atc_ready_for_approach",
-      atMs: 450_000,
-      requiresStep: "fordec_hyd",
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "approach_cl_hyd",
       kind: "atc",
       from: "MUMBAI APPROACH",
       message: "IFLY101, advise when ready for approach.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "IFLY101 ready, request vectors ILS runway 27, flap 3 approach, Vapp plus 25 knots",  correct: true  },
+        { id: "a", label: "IFLY101 ready, request vectors ILS runway 27, and request a long final",  correct: true  },
         { id: "b", label: "Ready, IFLY101",                                                                       correct: false },
         { id: "c", label: "Standby IFLY101",                                                                      correct: false },
       ],
     },
 
-    // ⑬ ILS clearance — full readback including frequency change
+    // ⑬ ILS clearance + "advise when stabilised" — full readback.
     {
       id: "atc_cleared_approach",
-      atMs: 480_000,
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "approach_cl_hyd",
       kind: "atc",
       from: "MUMBAI APPROACH",
       pilotSays: "Mumbai Approach, IFLY101, ready for the approach, request vectors for ILS runway 27.",
-      message: "IFLY101, roger, turn left heading 240, descend 3 000 feet, cleared ILS runway 27 approach, contact Mumbai Tower 118.10 when established.",
+      message: "IFLY101, roger, turn left heading 240, descend 3 000 feet, cleared ILS runway 27 approach, advise when stabilised, contact Mumbai Tower 118.10 when established.",
       standbyResurfaceMs: 30_000,
       choices: [
-        { id: "a", label: "Left heading 240, descend 3 000, cleared ILS runway 27, contact Tower 118.10 when established, IFLY101",  correct: true  },
-        { id: "b", label: "Roger IFLY101",                                                                                             correct: false },
-        { id: "c", label: "Cleared ILS runway 27, IFLY101",                                                                           correct: false },
+        { id: "a", label: "Left heading 240, descend 3 000, cleared ILS runway 27, will advise when stabilised, contact Tower 118.10, IFLY101",  correct: true  },
+        { id: "b", label: "Roger IFLY101",                                                                                                          correct: false },
+        { id: "c", label: "Cleared ILS runway 27, IFLY101",                                                                                        correct: false },
       ],
     },
 
-    // ⑭ Tower contact
+    // ⑭ Crew reports STABILISED ON ILS — after GEAR GRAVITY EXTENSION. Crew-initiated.
+    {
+      id: "atc_stabilised_report",
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "lgr_gravity",
+      kind: "crew",
+      from: "PM → MUMBAI APPROACH",
+      message: "Stabilised on the ILS — advise ATC.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Mumbai Approach, IFLY101, stabilised on the ILS runway 27",  correct: true  },
+        { id: "b", label: "Stabilised, IFLY101",                                                           correct: false },
+        { id: "c", label: "Continuing approach, IFLY101",                                                  correct: false },
+      ],
+    },
+
+    // ⑮ Crew reports ESTABLISHED ON ILS — after the LANDING CHECKLIST. Crew-initiated.
+    {
+      id: "atc_established_report",
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "landing_cl_hyd",
+      kind: "crew",
+      from: "PM → MUMBAI APPROACH",
+      message: "Landing checklist complete — report established on the ILS.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Mumbai Approach, IFLY101, established on the ILS runway 27, landing checklist complete",  correct: true  },
+        { id: "b", label: "Established, IFLY101",                                                                      correct: false },
+        { id: "c", label: "Roger IFLY101",                                                                            correct: false },
+      ],
+    },
+
+    // ⑯ Tower changeover — after ESTABLISHED report. Tower takes over.
     {
       id: "atc_tower_contact",
-      atMs: 510_000,
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "landing_cl_hyd",
       kind: "atc",
       from: "MUMBAI TOWER",
-      pilotSays: "Mumbai Tower, IFLY101, established ILS runway 27, MAYDAY confirmed.",
+      pilotSays: "Mumbai Tower, IFLY101, established and stabilised ILS runway 27.",
       message: "IFLY101, Mumbai Tower, roger, continue ILS approach runway 27, report established, emergency services on standby.",
       standbyResurfaceMs: 30_000,
       choices: [
@@ -839,13 +1223,16 @@ export const dualHydGY: Scenario = {
       ],
     },
 
-    // ⑮ Cleared to land
+    // ⑯ Cleared to land — Tower, after the changeover.
     {
       id: "atc_cleared_to_land",
-      atMs: 540_000,
+      atMs: 1_000,
+      gapAfterMs: 5_000,
+      requiresStep: "landing_cl_hyd",
+      completesStep: "ldg_clearance_done",
       kind: "atc",
       from: "MUMBAI TOWER",
-      pilotSays: "Mumbai Tower, IFLY101, established ILS runway 27, gear gravity, FLAP 3.",
+      pilotSays: "Mumbai Tower, IFLY101, stabilised, runway 27.",
       message: "IFLY101, runway 27 cleared to land, wind 270 at 6, ARFF in position, long rollout acknowledged.",
       standbyResurfaceMs: 30_000,
       choices: [
@@ -856,23 +1243,24 @@ export const dualHydGY: Scenario = {
       ],
     },
 
-    // ⑯ After landing — aircraft stopped, NW steering INOP; request tow
+    // ⑰ After full stop — HOLD ON RUNWAY for ARFF to check tyres/brakes for fire.
+    // (No taxi to stand yet — only after the emergency-services inspection.)
     {
       id: "atc_taxi_to_stand",
-      atMs: 600_000,
+      atMs: 1_000,
+      gapAfterMs: 5_000,
       requiresStep: "request_taxi_to_stand",
-      kind: "atc",
-      from: "MUMBAI TOWER",
-      pilotSays: "Mumbai Tower, IFLY101 — landed and fully stopped on runway 27, parking brake set. No immediate evacuation. Nose-wheel steering inoperative — request tow or follow-me vehicle to clear the runway and proceed to a remote stand.",
-      message: "IFLY101, roger, hold position, parking brake on. Tug and follow-me dispatched, ETA two minutes. Contact Mumbai Ground 121.9 when tug connected.",
+      kind: "crew",
+      from: "PM → MUMBAI TOWER",
+      message: "After full stop, all actions/procedures complete — advise ATC, hold position for ARFF inspection.",
       standbyResurfaceMs: 30_000,
       choices: [
-        // Correct — full readback: position + brake + frequency
-        { id: "a", label: "Holding position, parking brake on, will contact Ground 121.9 when tug connected, IFLY101",  correct: true  },
-        // Wrong — bare ack drops the tug/frequency instructions
-        { id: "b", label: "Roger IFLY101",                                                                               correct: false },
-        // Wrong — offers to taxi without a tug (NW steering INOP)
-        { id: "c", label: "Vacating runway 27 to the left, IFLY101",                                                    correct: false },
+        // Correct — hold on runway, request ARFF to check tyres/brakes for fire BEFORE any taxi
+        { id: "a", label: "Mumbai Tower, IFLY101, holding position runway 27, request emergency services inspect tyres and brakes for fire before we taxi",  correct: true  },
+        // Wrong — requesting taxi before the ARFF fire check
+        { id: "b", label: "Mumbai Tower, IFLY101, request taxi to stand",                                                                                       correct: false },
+        // Wrong — moving with no NW steering and no ARFF check
+        { id: "c", label: "Vacating runway 27 to the left, IFLY101",                                                                                            correct: false },
       ],
     },
   ],
@@ -906,6 +1294,15 @@ export const dualHydGY: Scenario = {
 
   engineDisplay: {
     warningTrigger: "structural_fail",
+    // Render the real HYD overhead 3D panel as the Action Panel (mirrors the ENG-FIRE
+    // panel logic), pumps wired to the PRO-ABN-HYD G+Y procedure steps.
+    panel3d: "hyd",
+    hydMap: {
+      ptu:        "ptu_off",
+      eng1:       "grn_eng1_pump_off",
+      eng2:       "yel_eng2_pump_off",
+      yellowElec: "yel_elec_pump_on",
+    },
     controlPanel: [
       { stepId: "ptu_off",           kind: "toggle_sw" as const, label: "PTU",       sub: "OFF"      },
       { stepId: "grn_eng1_pump_off", kind: "toggle_sw" as const, label: "ENG 1",     sub: "PUMP OFF" },
