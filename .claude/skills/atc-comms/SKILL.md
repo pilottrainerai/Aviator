@@ -17,8 +17,9 @@ the verified ENG1 FIRE reference implementation count.**
 
 ## 0. Hard rules (non-negotiable)
 
-1. **Six inputs before any card work.** No distraction JSON, no step change,
-   no choice label until all six inputs from §1 are collected.
+1. **STARTING PHASE first, then the inputs.** Determine the scenario's starting
+   phase (§0a) before anything; then collect all §1 inputs. No distraction JSON,
+   no step change, no choice label until both are done.
 2. **MAYDAY vs PAN PAN must be determined from FCOM, not judgment.**
    Check `abnormal-procs.txt` LAND ASAP color for the procedure.
    RED LAND ASAP → MAYDAY. AMBER LAND ASAP → PAN PAN.
@@ -39,14 +40,146 @@ the verified ENG1 FIRE reference implementation count.**
    correct and wrong versions of that call. Never offer "standby" as an option
    on a crew card. Standby options belong only on kind:"atc" cards where the
    crew may correctly defer an ATC query while the checklist is running.
+10. **Never read the aircraft configuration or technique to ATC** [user-input
+    2026-06-23 — the "Mumbai rule"]. Crew→ATC calls carry intentions (divert +
+    runway), a concise emergency-services request, and stabilised/established/
+    cleared read-backs ONLY. Never recite the approach/landing config or method
+    on frequency ("establish ILS", "gear gravity", "FLAP 3", "VAPP+25", brake /
+    anti-skid / NWS status). The configuration lives in the crew's internal
+    briefing, not on the ATC frequency.
+11. **Comms is gated on the procedure milestone before it (§0b).** Every exchange
+    fires only after the step/trigger that logically precedes it — it is a
+    *fallout* of reaching that point. Use `requiresStep`; never time-gate a call
+    that depends on a crew action.
+12. **To sequence a step AFTER a whole ATC chain, use a last-call gate.** Add a
+    hidden `optional` step that the FINAL ATC card completes (`completesStep`),
+    then have the downstream procedure step `requires` it (e.g. REQUEST TAXI
+    gated on `ldg_clearance_done`, completed by the cleared-to-land call)
+    [user-input 2026-06-23].
 
 ---
 
-## 1. Six mandatory inputs
+## 0a. Starting phase determines the opening (determine FIRST)
 
-Before any work, Claude must have ALL of the following.
+Identify the scenario's **starting phase** before building any card — it sets the
+entire opening sequence:
+
+- **TAKEOFF** (ENG 1(2) FIRE / FAILURE — after V1): Tower→Departure handoff,
+  STANDBY while ECAM runs, declaration gated at **400 ft / engine-secured**.
+- **CRUISE** (DUAL HYD G+Y and similar enroute failures): **no check-in / handoff.**
+  The **PILOT INITIATES** the declaration (`kind:"crew"`) as the FIRST contact —
+  MAYDAY/PAN PAN call → **ATC acknowledges** (`kind:"atc"`) → **crew reads back**.
+  **No procedure card is shown while the call is live.** Descent unlocks only
+  after the read-back.
+- **DESCENT / APPROACH (failure discovered already descending — e.g. tomorrow's
+  scenario):** SAME opener as cruise — the **PILOT INITIATES** the MAYDAY/PAN PAN
+  declaration as the FIRST contact, from the current descent/approach frequency.
+  A crew-discovered emergency ALWAYS opens with the pilot's declaration, never
+  with an ATC call — only the frequency differs from the cruise case. After the
+  declaration → ATC ack → read-back, reuse the shared descent/approach templates
+  (descend-lower → weather → hold → approach → tower → landing).
+
+---
+
+## 0b. The model — ATC comms is a phase-gated to-and-fro
+
+ATC communication is a sequence of **sets**, each tagged to a **phase** and gated
+on the procedure milestone before it (the comms are a *fallout* of reaching that
+step — use `requiresStep`, never time-gate a call that depends on a crew action).
+
+### The set — two shapes, decided by who opens it
+
+WHO OPENS THE SET IS DETERMINED BY THE PHASE (§0a). Identify the phase first.
+
+- **Pilot-initiated set — 3 parts.** crew request/declare (carries altitude +
+  navigation) → **ATC approves / instructs** → **crew reads back.** The read-back
+  closes the set. Opener is `kind:"crew"` (no standby option, §0 rule 9).
+- **ATC-initiated set — 2 parts.** ATC instructs or asks → **crew reads back.**
+  That is the end of it — no third part. Opener is `kind:"atc"` (may allow a
+  correct STANDBY while the checklist runs).
+
+A crew-discovered failure (cruise OR already descending) → the crew opens with the
+declaration. A frequency handoff or an ATC query → ATC opens.
+
+### Two hard gates on the crew→ATC *information* sets
+
+1. **Nothing but a lower level until the ECAM actions are complete.** During the
+   immediate-action phase the only crew request is "descend lower." NO weather, NO
+   intentions, NO diversion talk while actions are still running.
+2. **Major / dual failures (G+Y, G+B, EMER ELEC): read the CRUISE part of the
+   summary FIRST.** The crew reads the cruise portion of the QRH/ECAM summary
+   (`qrh_summary_gy` or equivalent) BEFORE the weather request. Weather is the
+   crew's FIRST call once actions are complete and that summary is read.
+3. **Never read the configuration to ATC (§0 rule 10).** Intentions, ready-calls,
+   and position reports carry divert + runway + a concise services request ONLY —
+   never FLAP 3 / gear gravity / VAPP+25 / brake / anti-skid / NWS method.
+
+### The phases run in sequence; each phase owns its sets
+
+Build the phase map FIRST, then write cards onto it. Generalized progression
+(enroute/descent failure; takeoff/climb opening differs per §0a):
+
+| Phase | Enters when | Sets, in order | Opener |
+|---|---|---|---|
+| CRUISE / DESCENT (start) | the failure | MAYDAY/PAN PAN: nature + altitude + nav request → ATC approves descent/offset → read back | crew (3) |
+|  |  | assistance offered → STANDBY · vectors offered → "continuing checklist" | ATC (2) |
+| DESCENT | control regained | request clearance to descend lower → ATC clears → read back — nothing else here | crew (3) |
+| ACTIONS COMPLETE / CRUISE SUMMARY READ | ECAM done & cruise summary read (`qrh_summary_gy`) | weather request → ATC delivers → read back | crew (3) |
+| DECISION | landing perf + FORDEC (`fordec_hyd`) | inform intentions (divert + runway, NO config) → ATC | crew |
+| HOLD | intentions passed, before FMC prep | request hold → ATC clears (fix / alt / two-minute legs) → read back | crew (3) |
+| FMC PREP | holding | POB + endurance query → answer | ATC (2) |
+| APPROACH | FMC prep done | ready for approach → ATC clears approach → read back · emergency services request | crew (3) |
+| ESTABLISHED | gear down / stabilised | stabilised & established reports (NO config) · radar → TOWER changeover | crew report + ATC handoff |
+| LANDING | on Tower | cleared to land → read back · (last) request taxi / tow | ATC then crew |
+
+Holding marks the entry to the approach phase. The descent set is ONLY
+"request to descend lower"; never collapse weather/intentions into it.
+
+### Takeoff / initial-climb opening (engine-fire family — different from enroute)
+
+On takeoff the crew is ALREADY on Tower and must **AVIATE FIRST**. The *opening*
+differs from the cruise/descent case; after it, the flow **MERGES into the
+generalized progression above** — from CLIMB onward the crew, "when ready," asks
+for holding, weather, POB, approach, etc. — the SAME sets as the enroute case.
+
+| Step | Set | Opener | Gate |
+|---|---|---|---|
+| V1 cut → rotate, positive climb, gear up | **no radio** — fly the aircraft first | — | — |
+| Tower hands off / queries while ECAM runs | ATC **2-part** → crew answers **STANDBY** (defer; ECAM not done) | ATC | `atc_handoff_to_departure` |
+| MAYDAY on Tower (current freq) | crew **3-part**: MAYDAY (nature + heading + climbing alt + STANDBY) → Tower ACK + handover → read back freq | crew | **`four_hundred_ft_cmd` / `engine_secured`** |
+| Switch to Departure, position report | crew: heading + climbing + STANDBY → Departure confirms + vectors | crew | after declaration |
+
+Two things unique to takeoff: (1) the declaration is **gated at 400 ft / engine
+secured** — STANDBY is the *correct* answer to anything ATC says before that;
+(2) there is a **Tower → Departure handoff** before the return sequence (in cruise
+the crew is already with the enroute controller). Full 9-card sequence in §4;
+reference implementation `eng1-fire-after-v1.ts` (§9 [2026-06-09]).
+
+### Gated = fallout. Worked example — DUAL HYD G+Y:
+
+| Procedure milestone (gate) | ATC set it unlocks |
+|---|---|
+| aircraft under control (cruise) | MAYDAY declaration + offset/descent read-back |
+| cruise summary read (`qrh_summary_gy`) | weather request/delivery |
+| ECAM complete (`crew_crosscheck`) | hold request + clearance |
+| landing performance → **FORDEC** (`fordec_hyd`) | inform intentions · request emergency services |
+| approach checklist (`approach_cl_hyd`) | ready for approach · cleared approach |
+| gear down / landing CL | stabilised · established · Tower · cleared to land |
+| full stop + all ATC done (last-call gate) | request tow / taxi (after ARFF) |
+
+---
+
+## 1. Mandatory inputs
+
+Determine STARTING PHASE (§0a) first, then collect ALL of the following.
 
 ```
+0. STARTING PHASE     — Takeoff / Cruise / Descent / Approach (see §0a).
+                        Sets the opening: takeoff = handoff + 400 ft gate;
+                        cruise = pilot-initiated MAYDAY first, no check-in;
+                        descent (failure found already descending) = same
+                        pilot-initiated MAYDAY first, on the current freq.
+
 1. PROCEDURE NAME     — Exact FCOM title.
                         Example: "ENG 1(2) FAILURE — AFTER V1"
                         Example: "RAPID DEPRESS"
@@ -89,13 +222,14 @@ Before any work, Claude must have ALL of the following.
 
 **Checklist before proceeding:**
 ```
+[ ] STARTING PHASE determined (§0a) — takeoff / cruise / descent / approach
 [ ] PROCEDURE NAME received
 [ ] CALL TYPE determined (MAYDAY / PAN PAN) and source confirmed
 [ ] GATE STEP confirmed — id exists in .ts file
 [ ] SCENARIO DETAILS received (callsign / airport / freqs / runway / hdg)
 [ ] PROCEDURE-SPECIFIC items confirmed or "standard"
 [ ] USER RULES received or "none"
-→ All six: proceed to §2 intake summary
+→ All: proceed to §2 intake summary
 → Any missing: stop and ask
 ```
 
@@ -567,6 +701,12 @@ Any card change WITHOUT one of these → return the plan, list triggers, ask whi
 - File: `src/scenarios/data/eng1-fire-after-v1.ts`
 
 ### [2026-06-09] DUAL HYD G+Y SYS LO PR — cruise
+> **SUPERSEDED by [2026-06-24] below** — the card ids and gates here are the
+> ORIGINAL build and were replaced by the 06-23 redesign. `atc_handoff_checkin`
+> → `pm_mayday_declare`; `pm_hold_req` → `atc_hold_req`; `atc_descend_10000`
+> added; the `crew_crosscheck` gates were re-sequenced (weather→`qrh_summary_gy`,
+> hold/POB→`inform_atc_intentions`). Kept for history; for the CURRENT card list
+> read the [2026-06-24] entry.
 - Call type: MAYDAY — RED LAND ASAP [abnormal-procs / skill §3 known classification]
 - Phase rule: cruise — first ATC contact IS the MAYDAY (no prior Tower handoff/STANDBY sequence)
 - Gate steps: weather/hold = `crew_crosscheck` · intentions/emg services = `fordec_hyd`
@@ -617,3 +757,79 @@ Any card change WITHOUT one of these → return the plan, list triggers, ask whi
   - CRUISE/CLIMB: first ATC contact IS the emergency declaration (no prior handoff)
   - LAND ASAP amber on STATUS → PAN PAN. Red → MAYDAY.
 - File: `src/scenarios/data/eng-failure-after-v1.ts`
+
+### [2026-06-23] DUAL HYD G+Y SYS LO PR — refinements (live-tuned on localhost)
+Built on the 2026-06-09 entry; refined card-by-card against the running scenario.
+- **No config read to ATC (§0 rule 10).** Stripped "gear gravity, FLAP 3" / "gear
+  down FLAP 3" from the crew→ATC calls (`atc_stabilised_report`, `atc_tower_contact`,
+  `atc_cleared_to_land`). The reports keep the navigation phase only — "stabilised
+  / established **on the ILS** runway 27", "cleared to land runway 27" — never the
+  landing configuration or method.
+- **Holding leg detail.** Non-standard hold for the degraded jet states **two-minute
+  legs** in BOTH the PM request (`atc_hold_req`) and the clearance + read-back
+  (`atc_hold_clr`).
+- **Last-call gate (§0 rule 12).** REQUEST TAXI must be the final action → added a
+  hidden `optional` step `ldg_clearance_done`, `completesStep`-ed by `atc_cleared_to_land`;
+  `request_taxi_to_stand.requires = ["ldg_clearance_done"]`. Engine only writes a
+  step to `completedSteps` via `completesStep` — ATC card ids are NOT auto-recorded.
+- **Squawk** stays a crew transponder action on the emergency-services card (§0 rule:
+  never spoken verbally) — kept, not ATC-requested [user confirmed 2026-06-23].
+- **Sync:** the data-driven workbook `atcCalls` array + vault §5 were regenerated
+  from the `.ts` after these edits.
+- File: `src/scenarios/data/dual-hyd-g-y.ts`
+
+### [2026-06-24] Comms MODEL refinement (§0a + §0b rewritten) [user-input]
+Captured the developer's verbal model of ATC comms as a phase-gated to-and-fro.
+No scenario change — skill §0a/§0b only.
+- **The "set" is the atomic unit, and its shape is set by who opens it:**
+  pilot-initiated = **3 parts** (request/declare → ATC approves → crew read-back);
+  ATC-initiated = **2 parts** (ATC instructs/asks → crew read-back, "end of it").
+- **Phase decides the opener.** A crew-discovered failure — cruise OR already
+  descending — ALWAYS opens with the pilot's MAYDAY/PAN PAN declaration, never an
+  ATC call (§0a generalized to the descent-start case for the next scenario).
+- **Two hard gates on the crew→ATC info sets** (§0b): (1) nothing but "descend
+  lower" until ECAM actions complete — no weather / intentions / diversion while
+  actions run; (2) **major/dual failures (G+Y, G+B, EMER ELEC) read the CRUISE
+  part of the summary FIRST**, then weather is the crew's first call; (3) never
+  read the config (FLAP 3 / gravity gear / VAPP+25) to ATC (reinforces §0 rule 10).
+- **Generalized phase-progression table** added (CRUISE/DESCENT → DESCENT →
+  ACTIONS COMPLETE/CRUISE SUMMARY → DECISION → HOLD → FMC PREP → APPROACH →
+  ESTABLISHED → LANDING), each row naming its sets + opener — scenario-agnostic,
+  replacing the dual-hyd-only gate map (kept as the worked example).
+- **Completeness audit of DUAL HYD G+Y (this session):** all 19 ATC cards map to
+  the phases; fire/emergency services (`atc_emg_services_req` + `atc_taxi_to_stand`
+  inspection) and special requests (unable-to-vacate / NWS inop, long final) all
+  present — nothing missing. One OPTIONAL item left to the developer: no explicit
+  MUMBAI CONTROL → MUMBAI APPROACH frequency-handoff set (cards jump Control→Appr).
+- **Takeoff / initial-climb opening folded into §0b** — a 4-row mini-table for the
+  engine-fire family: aviate first (no radio) → Tower handoff/STANDBY while ECAM
+  runs → MAYDAY on Tower gated at **400 ft / engine secured** → Tower→Departure
+  handoff + position report. After CLIMB it MERGES into the generalized progression
+  (the crew, "when ready," asks for holding/weather/POB/approach — same sets as
+  enroute). All three starting phases (takeoff · cruise · descent) now in one model.
+  Reference impl `eng1-fire-after-v1.ts` (declaration gated `four_hundred_ft_cmd`/
+  `engine_secured`, `atc_handoff_to_departure` present).
+- **AUTHORITATIVE current DUAL HYD G+Y card list (19, replaces the 06-09 list)** —
+  id · kind · gate (`completesStep` noted), in scenario order:
+  1. `pm_mayday_declare` · crew · `request_routing` → completes `declare_mayday`
+  2. `atc_mayday_ack` · atc · `declare_mayday` → completes `mayday_ack`
+  3. `atc_descend_10000` · atc · `start_descent` → completes `cleared_10000`
+  4. `atc_assistance_req` · atc · `speed_set`
+  5. `atc_vectors_when_ready` · atc · `speed_set`
+  6. `atc_weather_request` · crew · `qrh_summary_gy`
+  7. `atc_weather_delivery` · atc · `qrh_summary_gy` → completes `weather_obtained`
+  8. `atc_intentions_advise` · crew · `fordec_hyd`
+  9. `atc_hold_req` · crew · `inform_atc_intentions`
+  10. `atc_hold_clr` · atc · `inform_atc_intentions`
+  11. `atc_pob_fuel_services` · atc · `inform_atc_intentions`
+  12. `atc_emg_services_req` · crew · `atc_emergency_svcs`  (full emerg svcs + unable to vacate / NWS inop)
+  13. `atc_ready_for_approach` · atc · `approach_cl_hyd`  (request vectors + long final)
+  14. `atc_cleared_approach` · atc · `approach_cl_hyd`  (cleared ILS + Tower handoff)
+  15. `atc_stabilised_report` · crew · `lgr_gravity`
+  16. `atc_established_report` · crew · `landing_cl_hyd`
+  17. `atc_tower_contact` · atc · `landing_cl_hyd`
+  18. `atc_cleared_to_land` · atc · `landing_cl_hyd` → completes `ldg_clearance_done`
+  19. `atc_taxi_to_stand` · crew · `request_taxi_to_stand`  (hold position, request tyre/brake inspection)
+  Verified against the live `.ts` this session (47 steps · 19 cards · `status: DRAFT`).
+  OPTIONAL gap left to the developer: no explicit MUMBAI CONTROL → MUMBAI APPROACH
+  frequency-handoff set (cards 1–5 Control, 6+ Approach).

@@ -326,6 +326,48 @@ Any request to change code WITHOUT one of these → return an assessment, list t
 
 ---
 
+## 8a. Scenario-engine authoring (steps, triggers, gating)
+
+Scenarios are **data** (`src/scenarios/data/<slug>.ts`), not code. The engine runs
+them off three coupled things — understand the coupling before changing any sequence:
+
+- **`triggers`** — fire effects (ECAM lines, MASTER WARN, secondary failures) at a
+  time or after a step. A step's `afterEffect` can fire a trigger (e.g. Y ELEC PUMP
+  ON → +3 s → secondary failures appear on the SD/EWD).
+- **`steps[].requires: [id…]`** — a step unlocks only when ALL listed ids are in
+  `completedSteps`. This is the procedure spine — *what comes after what*.
+- **ATC cards (`distractions[]`)** gate on a step via `requiresStep`, and can
+  complete a step via `completesStep`. This is how comms couple to the spine — see
+  `atc-comms` §0b (comms is a phase-gated *fallout* of the procedure milestone
+  before it). The engine records a step in `completedSteps` ONLY via a real step
+  action or a card's `completesStep` — ATC card ids are not auto-recorded. To hold
+  a step until a whole ATC chain finishes, add a hidden `optional` gate step that
+  the LAST ATC card completes, then `requires` it (e.g. `ldg_clearance_done`).
+
+**Authoring rules (confirmed [user-input 2026-06-23], DUAL HYD G+Y):**
+1. **Preserve gating ids.** Some ids are referenced OUTSIDE the scenario — e.g. the
+   PFD `buildAircraftState()` gates its "On ILS" state on `approach_brief_hyd`.
+   `grep -rn "<id>" src/` BEFORE renaming; rename only with every ref updated.
+2. **Phase-split overloaded cards.** One giant brief → phase cards mirroring the
+   FCTM/QRH structure (THE APPROACH / THE LANDING / THE GO-AROUND), chained via
+   `requires`. One card = one phase.
+3. **Fold review onto the page-check.** A card that only re-reads what the SD already
+   shows belongs ON the SD page-check, not as a standalone "READ" card (FLIGHT
+   CONTROL PAGE CHECK carries `*F/CTL`; WHEEL PAGE CHECK carries `*WHEEL`).
+4. **Flag non-FCOM airmanship inline.** Technique not verbatim in FCOM gets a
+   `DRAFT (SME review): …` note; the scenario stays `status: DRAFT`.
+5. **Sequence IS the procedure.** Re-wire `requires` when inserting/removing a card
+   so the chain stays unbroken; after editing run `npx tsc --noEmit` and grep the
+   removed id to confirm no dangling `requires`.
+
+**Sync discipline (after any localhost `.ts` change):** localhost `.ts` FIRST →
+regenerate the data-driven workbook arrays (`steps`, `atcCalls`) from the `.ts` and
+`node --check` → mirror the canonical vault `scenarios/<slug>/*.md` §5 +
+`change-log.md`. Restart the run (steps load at run start) or the dev server (stale
+HMR) to see step changes.
+
+---
+
 ## 9. Reference files
 
 All in `references/` next to this `SKILL.md`:
@@ -358,6 +400,10 @@ All in `references/` next to this `SKILL.md`:
 - ❌ Accepting "fix all procedures" — ask which one, do one at a time.
 - ❌ Making a decision when stuck — always stop and discuss with the developer.
 - ❌ Asking the user to re-state §0 hard rules — they are always in effect.
+- ❌ Renaming a step id without `grep -rn`-ing `src/` for external refs (PFD/runner gating).
+- ❌ Time-gating an ATC call that depends on a crew action — gate on the step (§8a).
+- ❌ Leaving a standalone "READ" card for what the SD page-check already shows (§8a rule 3).
+- ❌ Editing the live `.ts` without mirroring the workbook arrays + vault §5 (§8a sync).
 
 ---
 
@@ -428,3 +474,23 @@ FCTM technique notes from real work. Add a new entry each time intake is confirm
 - Scenario IDs: `mayday_tower_declare` (crew, blue) → `atc_tower_mayday_ack` (atc, green) → `pm_dep_initial_call` (crew, blue) → `atc_vectors_climb` (atc, green).
 - If a distraction is initiated by PM/PF it is ALWAYS `kind: "crew"`. Never mark a PM-initiated call as `kind: "atc"`.
 - File: `src/scenarios/data/eng1-fire-after-v1.ts` · distractions block.
+
+### [2026-06-23] DUAL HYD G+Y SYS LO PR — scenario-engine authoring (live-tuned)
+First worked application of §8a. Procedure refined card-by-card on localhost, then
+mirrored to workbook + vault.
+- **Phase-split brief.** One APPROACH BRIEF → three cards (1/3 THE APPROACH · 2/3 THE
+  LANDING · 3/3 THE GO-AROUND), chained via `requires`, mirroring the FCTM/QRH phases.
+  Kept the id `approach_brief_hyd` on card 1/3 because the **PFD gates "On ILS" on it**.
+- **Fold review onto page-checks.** Removed standalone `fctl_card` / `wheel_card`
+  ("SECONDARY — READ") → `*F/CTL` now lives on **FLIGHT CONTROL PAGE CHECK**, `*WHEEL`
+  on a new **WHEEL PAGE CHECK**; re-wired `cancel_master_caut.requires`.
+- **Last-call gate.** REQUEST TAXI made the final step via hidden `optional`
+  `ldg_clearance_done` (`completesStep` on the cleared-to-land ATC card).
+- **DRAFT/SME items added inline:** long final, platform ~2500 ft AAL, tail-strike /
+  high-nose, pitch/power couple — all `DRAFT (SME review)`, scenario `status: DRAFT`.
+- **Removed** the standalone early GO-AROUND REVIEW (go-around now briefed in 3/3);
+  re-wired `atc_emergency_svcs.requires` → `inform_company`. LANDING CL no longer
+  fixes "1000 ft".
+- **Verify done:** `npx tsc --noEmit` clean; grep confirmed no dangling `requires`;
+  workbook `node --check` clean; vault §5 + change-log synced.
+- File: `src/scenarios/data/dual-hyd-g-y.ts`
