@@ -11,6 +11,7 @@ import { EngineFireScenarioPanel } from "@/components/cockpit/engine-fire-panel-
 import { FireTestPanel3D } from "@/components/cockpit/fire-test-panel-3d";
 import { EngStartPanel3D, ENG_TUNE_DEFAULT, type EngTune } from "@/components/cockpit/eng-start-panel-3d";
 import { HydPanel3D, type HydPumpState, type HydPumpKey } from "@/components/cockpit/hyd-panel-3d";
+import { GpwsPanel3D, type GpwsLights, type GpwsBtnKey } from "@/components/cockpit/gpws-3d";
 
 // ── New (3-section) FireTestPanel3D ──────────────────────────────────────────
 // PROMOTED 2026-06-15: the FINAL panel (tag fire-panel-FINAL-2026-06-15) now renders
@@ -70,6 +71,18 @@ function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd,
   const [box, setBox] = useState<DevBox>(def);
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
   const measureRef = useRef<HTMLDivElement>(null);
+  // [user 2026-06-30] The popped (position:fixed) outer frame must travel WITH the page on
+  // scroll — like the other cockpit panels — not stay pinned to the viewport. Offset `top` by
+  // the live scroll (rAF-throttled). Nested (relative) items ride along inside the frame.
+  const [scrollY, setScrollY] = useState(0);
+  useEffect(() => {
+    if (relative) return;
+    let raf = 0;
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { setScrollY(window.scrollY); raf = 0; }); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    setScrollY(window.scrollY);
+    return () => { window.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [relative]);
   useEffect(() => { setBox(readDevBox(id, def)); /* hydrate once */ // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
   const measuring = !fill && !nat;
@@ -137,7 +150,7 @@ function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd,
   const handle = (on: React.PointerEventHandler, style: React.CSSProperties) =>
     (<div onPointerDown={on} style={{ position: "absolute", touchAction: "none", zIndex: 4, ...style }} />);
   return (
-    <div style={{ position: relative ? "absolute" : "fixed", left: box.x, top: box.y, width: measuring ? "auto" : box.w, height: measuring ? "auto" : box.h, zIndex: 45,
+    <div style={{ position: relative ? "absolute" : "fixed", left: box.x, top: relative ? box.y : box.y - scrollY, width: measuring ? "auto" : box.w, height: measuring ? "auto" : box.h, zIndex: 45,
       animation: relative ? undefined : `fire-pop-in 0.5s cubic-bezier(.2,.85,.3,1) ${popDelay ?? 0}ms both` }}>
       <div style={{ position: "relative", width: measuring ? "auto" : box.w, height: measuring ? "auto" : box.h, overflow: measuring ? "visible" : "hidden", border: editMode ? `1px dashed ${A}66` : "none" }}>
         {fill ? (
@@ -209,7 +222,8 @@ const ENG_START_BOX: DevBox = { x: 380, y: 540, w: 760, h: 380 };
 // HYD scenario). Defaults are starting positions; the user dials them in via dev edit.
 const HYD_COMBO_OUTER: DevBox = { x: 380, y: 150, w: 1120, h: 392 };
 const HYD_COMBO_INNER: Record<string, DevBox> = {
-  panel3d: { x: 300, y: 24, w: 812, h: 360 },
+  // Side controls removed → the 3D panel fills the whole combo (was x:300 w:812, leaving a left gap). [user 2026-07-06]
+  panel3d: { x: 8, y: 8, w: 1104, h: 376 },
 };
 
 // ─── CSS keyframes (AGENT arming pulse, TEST pulse) ─────────────────────────
@@ -1811,7 +1825,7 @@ function DslSpdBrkCtrl({ done, active, clickable, onClick }: { done: boolean; ac
 
 // ─── DSL interactive ECAM control panel ──────────────────────────────────────
 function DslControlPanel({
-  controls, scenario, state, perform, disabled, warningActive, fireLit,
+  controls, scenario, state, perform, disabled, warningActive, fireLit, flashing,
 }: {
   controls: import("@/scenarios/types").EngControlDef[];
   scenario: Scenario;
@@ -1820,6 +1834,7 @@ function DslControlPanel({
   disabled?: boolean;
   warningActive: boolean;
   fireLit: boolean;
+  flashing?: boolean;
 }) {
   const isDone   = (id: string) => !!state.completedSteps[id];
   const allDone  = controls.every(c => isDone(c.stepId));
@@ -2108,8 +2123,10 @@ function DslControlPanel({
           return (
             <>
             <DevMovable id="combo_outer" label="ACTION PANEL" fill container editMode={edit} popDelay={0} def={COMBO_OUTER}>
-              {/* Shared container surface so the three items read as ONE panel/box. */}
-              <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(180deg,#0c121b,#070b11)", border: "1px solid #283140", borderRadius: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 30px rgba(0,0,0,0.5)" }} />
+              {/* Shared container surface so the three items read as ONE panel/box.
+                  Carries the bright glow (ccLift) when this is the next action, so the
+                  POPPED panel flashes rather than the empty inline spot. */}
+              <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(180deg,#0c121b,#070b11)", border: "1px solid #283140", borderRadius: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 30px rgba(0,0,0,0.5)", ...(flashing ? { animation: "ccLift 1.5s ease-in-out infinite", "--cc-fc": "57,129,246" } : {}) } as React.CSSProperties} />
               {agent1Badge}
               {firePbCtrl && (
                 <DevMovable id="combo_panel3d" label="3D FIRE PANEL" fill relative editMode={edit}
@@ -2158,7 +2175,7 @@ function DslControlPanel({
               const nextStep = scenario.steps.find(s => s.id === next?.stepId);
               const reqsMet = (nextStep?.requires ?? []).every(r => !!state.completedSteps[r]);
               if (!next) return null;
-              return reqsMet ? `▸ ${next.label}${next.sub ? " → " + next.sub : ""}` : "◈ COMPLETE PRIOR STEPS FIRST";
+              return reqsMet ? `▸ ${next.label}${next.sub ? " → " + next.sub : ""}` : null;
             })()}
           </span>
         ) : null}
@@ -2173,7 +2190,7 @@ function DslControlPanel({
 // the ECAM-ACTIONS trigger (or dev edit), status memo — but with HydPanel3D as the 3D
 // panel and the pumps wired via ed.hydMap. DslControlPanel (fire) is left untouched.
 function HydControlPanel({
-  ed, scenario, state, perform, disabled, warningActive,
+  ed, scenario, state, perform, disabled, warningActive, flashing,
 }: {
   ed: import("@/scenarios/types").EngineDisplayDef;
   scenario: Scenario;
@@ -2181,6 +2198,7 @@ function HydControlPanel({
   perform: (a: PilotAction) => void;
   disabled?: boolean;
   warningActive: boolean;
+  flashing?: boolean;
 }) {
   const hydMap = ed.hydMap ?? {};
   const isDone = (id?: string) => !!id && !!state.completedSteps[id];
@@ -2242,10 +2260,12 @@ function HydControlPanel({
     const t = setTimeout(() => setHydRetracted(true), 2000);
     return () => clearTimeout(t);
   }, [allPumpsDone]);
-  // SECOND pop window — FMC PREP action panel: pops again for the FLAPS-fault +
-  // GPWS-FLAP-MODE selections, then retracts 2 s after GPWS FLAP MODE is set.
-  const apprActionsStarted = !!state.completedSteps["qrh_review"];
-  const apprActionsDone = !!state.completedSteps["gpws_flap_mode"];
+  // SECOND pop window — GPWS action panel (approach CONFIG phase). [user 2026-07-06]
+  // POPS after APPROACH PREPARATION 1/2 (FMC, `approach_prep_hyd`) is done → GPWS FLAP MODE OFF +
+  // LDG FLAP 3 ON are SELECTED on the GPWS 3D panel → COLLAPSES after APPROACH PREPARATION 2/2
+  // (`approach_prep_config`, the config confirm).
+  const apprActionsStarted = !!state.completedSteps["approach_prep_hyd"];
+  const apprActionsDone = !!state.completedSteps["approach_prep_config"];
   const [apprRetracted, setApprRetracted] = useState(false);
   useEffect(() => {
     if (!apprActionsDone) { setApprRetracted(false); return; }
@@ -2257,6 +2277,24 @@ function HydControlPanel({
     || (apprActionsStarted && !apprRetracted);
 
   const hyd3d = <HydPanel3D controlled pumps={pumps} onPush={onPush} disabled={disabled} />;
+
+  // GPWS action panel (approach CONFIG phase / window-2). Replaces the HYD panel while that window
+  // is why the combo is popped. FLAP MODE OFF / LDG FLAP 3 ON are selected on it. [user 2026-07-06]
+  const gpwsMap = ed.gpwsMap ?? {};
+  const gpwsLights: GpwsLights = {};
+  (Object.keys(gpwsMap) as GpwsBtnKey[]).forEach((k) => { const id = gpwsMap[k]; if (id) gpwsLights[k] = { on: isDone(id) }; });
+  const onGpwsPush = (key: GpwsBtnKey) => {
+    const stepId = gpwsMap[key];
+    if (!stepId || disabled || state.completedSteps[stepId]) return;
+    const step = scenario.steps.find((s) => s.id === stepId);
+    const reqsMet = (step?.requires ?? []).every((r) => !!state.completedSteps[r]);
+    if (!reqsMet) return;
+    perform({ kind: "STEP", stepId });
+  };
+  const gpws3d = <GpwsPanel3D controlled lights={gpwsLights} onPush={onGpwsPush} disabled={disabled} />;
+  // Which 3D panel fills the popped combo: GPWS during the approach window, HYD otherwise.
+  const showGpws = (apprActionsStarted && !apprRetracted) && !(ecamActionsStarted && !hydRetracted);
+  const active3d = showGpws ? gpws3d : hyd3d;
 
   return (
     <div style={{ borderTop: "1px solid #1C2130", backgroundColor: warningActive ? "#060A12" : "#050709", padding: "6px 10px 8px" }}>
@@ -2278,10 +2316,24 @@ function HydControlPanel({
       </div>
 
       {popped ? (
-        <DevMovable id="hyd_combo_outer" label="HYD ACTION PANEL" fill container editMode={edit} popDelay={0} def={HYD_COMBO_OUTER}>
-          <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(180deg,#0c121b,#070b11)", border: "1px solid #283140", borderRadius: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 30px rgba(0,0,0,0.5)" }} />
-          <DevMovable id="hyd_combo_panel3d" label="HYD 3D PANEL" fill relative editMode={edit} def={HYD_COMBO_INNER.panel3d}>
-            <div style={{ position: "absolute", inset: 0, background: "transparent" }}>{hyd3d}</div>
+        <DevMovable id="hyd_combo_outer_v2" label="HYD ACTION PANEL" fill container editMode={edit} popDelay={0} def={HYD_COMBO_OUTER}>
+          {/* Pop-out frame. When this panel is the next action, it carries the bright
+              glow (ccLift) so the POPPED panel flashes — not the empty inline spot. */}
+          <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(180deg,#0c121b,#070b11)", border: "1px solid #283140", borderRadius: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 30px rgba(0,0,0,0.5)", ...(flashing ? { animation: "ccLift 1.5s ease-in-out infinite", "--cc-fc": "57,129,246" } : {}) } as React.CSSProperties} />
+          <DevMovable id="hyd_combo_panel3d_v2" label={showGpws ? "GPWS 3D PANEL" : "HYD 3D PANEL"} fill relative editMode={edit} def={HYD_COMBO_INNER.panel3d}>
+            <div style={{ position: "absolute", inset: 0, background: "transparent" }}>{active3d}</div>
+            {/* GPWS actions written on the panel when it pops [user 2026-07-06] */}
+            {showGpws && (
+              <div style={{ position: "absolute", top: 6, left: 8, zIndex: 5, pointerEvents: "none", fontFamily: "monospace", fontSize: "9px", letterSpacing: "0.06em", display: "flex", flexDirection: "column", gap: 3, padding: "5px 8px", borderRadius: 5, background: "rgba(6,10,18,0.72)", border: "1px solid #1C2130" }}>
+                <span style={{ color: C.dim, fontSize: "7px", letterSpacing: "0.22em" }}>GPWS · SELECT</span>
+                {(Object.keys(gpwsMap) as GpwsBtnKey[]).map((k) => {
+                  const stepId = gpwsMap[k]; if (!stepId) return null;
+                  const st = scenario.steps.find((s) => s.id === stepId);
+                  const dn = isDone(stepId);
+                  return <span key={k} style={{ color: dn ? C.green : C.amber }}>{dn ? "✓ " : "▸ "}{st?.label} → {st?.action}</span>;
+                })}
+              </div>
+            )}
           </DevMovable>
           {sideControls.map((ctrl, i) => (
             <DevMovable key={ctrl.stepId} id={`hyd_combo_${ctrl.stepId}`} label={(ctrl.label || ctrl.kind).toUpperCase()} relative editMode={edit}
@@ -2291,11 +2343,15 @@ function HydControlPanel({
           ))}
         </DevMovable>
       ) : (
-        // INLINE (default / production until ECAM ACTIONS): stays in the engine-display top half.
+        // INLINE (default): the HYD overhead panel is ALWAYS visible in the action panel (physical
+        // panel — shown from scenario start, before AND after the failure). Only the SD synoptic is
+        // failure-gated. No side controls → HYD panel fills the full width. [user 2026-07-06]
         <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-          <div style={{ flex: "0 0 38%", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
-            {sideControls.map((ctrl) => <div key={ctrl.stepId}>{renderCtrl(ctrl)}</div>)}
-          </div>
+          {sideControls.length > 0 && (
+            <div style={{ flex: "0 0 38%", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
+              {sideControls.map((ctrl) => <div key={ctrl.stepId}>{renderCtrl(ctrl)}</div>)}
+            </div>
+          )}
           <div style={{ flex: "1 1 0", height: "202px", position: "relative", background: "#080C12" }}>
             <div style={{ position: "absolute", inset: 0 }}>{hyd3d}</div>
           </div>
@@ -2313,7 +2369,7 @@ function HydControlPanel({
               const nextStep = scenario.steps.find(s => s.id === next?.stepId);
               const reqsMet = (nextStep?.requires ?? []).every(r => !!state.completedSteps[r]);
               if (!next) return null;
-              return reqsMet ? `▸ ${next.label}${next.sub ? " → " + next.sub : ""}` : "◈ COMPLETE PRIOR STEPS FIRST";
+              return reqsMet ? `▸ ${next.label}${next.sub ? " → " + next.sub : ""}` : null;
             })()}
           </span>
         ) : null}
@@ -2329,11 +2385,17 @@ export function FirePanel({
   state,
   perform,
   disabled,
+  flashing,
+  actionOnly,
 }: {
   scenario: Scenario;
   state: ScenarioState;
   perform: (a: PilotAction) => void;
   disabled?: boolean;
+  /** true = the action panel is the next-action surface → its POP-OUT flashes. */
+  flashing?: boolean;
+  /** true = render only the control (action) panel, no ENGINE DISPLAY (E/WD shows it). */
+  actionOnly?: boolean;
 }) {
   const done = (id: string) => !!state.completedSteps[id];
 
@@ -2358,6 +2420,8 @@ export function FirePanel({
         style={{ backgroundColor: C.panel, flex: "1 1 0", minHeight: 0, overflowY: "auto" }}
       >
         <style>{FIRE_PANEL_CSS}</style>
+        {/* ENGINE DISPLAY (header + engine grid) — hidden when actionOnly (the E/WD shows it) */}
+        {!actionOnly && (<>
         {/* Header */}
         <div className="flex items-center justify-between px-2 py-[2px] border-b" style={{ borderColor: "#1C2130" }}>
           <span style={{ color: C.dim, fontSize: "8px", letterSpacing: "0.25em", textTransform: "uppercase" }}>ENGINE DISPLAY</span>
@@ -2374,6 +2438,7 @@ export function FirePanel({
           <div style={{ backgroundColor: "#1C2130", alignSelf: "stretch" }} />
           <DslEnginePanel engNum={2} panel={ed.eng2} state={state} warningActive={false} />
         </div>
+        </>)}
 
         {/* Interactive ECAM control panel — only when controlPanel defined */}
         {ed.controlPanel && (ed.panel3d === "hyd" ? (
@@ -2384,6 +2449,7 @@ export function FirePanel({
             perform={perform}
             disabled={disabled}
             warningActive={warningActive}
+            flashing={flashing}
           />
         ) : (
           <DslControlPanel
@@ -2394,6 +2460,7 @@ export function FirePanel({
             disabled={disabled}
             warningActive={warningActive}
             fireLit={fireLit}
+            flashing={flashing}
           />
         ))}
 

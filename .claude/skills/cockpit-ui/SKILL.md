@@ -582,11 +582,32 @@ intake checklist instead and asks which inputs are missing.
 
 ---
 
+## 8a. The live-app SVG PFD (`svg-pfd.tsx`) — the rendering surface reused across scenarios
+
+There are TWO PFD render surfaces. Know which you're touching:
+- **`pfd-mockup.tsx`** — the canvas PFD (`pfd-instruments` LOCKED baseline: VS bar / RA / altitude lerp). Used by most scenarios.
+- **`svg-pfd.tsx`** — the designer-SVG PFD driven imperatively each `requestAnimationFrame` from `buildAircraftState`. Used for `dual-hyd-g-y` (wired in `runner.tsx` by slug); the **standard** SVG PFD to reuse for future scenarios. Mutates the injected SVG via `rootRef.current` queried fresh each frame (StrictMode-safe).
+
+**Boundary (do not cross):** VALUES (VS/speed/altitude/law/vls/gsDev…) come from **`pfd-fma-logic`** `buildAircraftState` (§5c governor G1–G7); WHEN things fire/gate from **`scenario-alt-logic`**; this skill owns only HOW `svg-pfd.tsx` DRAWS them.
+
+**Reusable rendering rules built for it (2026-07-04 — keep when reusing/editing):**
+- **Altitude drum** rolls continuously (mechanical), with an **eased edge-fade mask** (`altFadeGrad`/`altDrumFade`) so digits fade in/out at the window edges — NOT a hard clip and NOT a digital digit-swap (user rejected both). Drives 5 texts, 3 visible.
+- **Tape scale groups are clipped to their tape box** — `#altScale` → `altTapeClip` (top border y997.81 → bottom y3177.73). Scrolling numbers must never spill past the frame (they draw `y+45` with a tall font, so a raw `y` guard is not enough).
+- **VLS "hamburger" strip is DYNAMIC** — `drawVLS(cur, vls)` draws the amber barber-pole from the real `vls` speed down to the tape bottom (hidden when VLS is off-tape). NEVER static artwork (a fixed strip made the selected-speed bug look sub-VLS). Pairs with G6 (target floored at VLS).
+- **ILS is two-stage + geometry** — `drawILS`: DME model `alt≥3700 → 11.5+(alt−3700)·0.004091` (25 NM @7 000 → 11.5 @3 700) then `(alt−39)/318` on the slope; **must match** the `gsDev` geometry in `buildAircraftState`. ident/freq/DME appear at DME≤30, GS/LOC scales+diamonds at DME≤25. Diamonds translate by dots (GS 383 px/dot fly-up, LOC 391 px/dot); ease via `lerpGsDev/lerpLocDev`.
+- **Rate-limited eases in the loop** (the ONLY smoothing): speed 2.5 kt/s (9 kt/s ground rollout braking), VS 450 fpm/s, altitude tracks the actual lerped VS. Diamonds/deviation ease at ×min(1,1.5·dt).
+- **FMA mode-change box** (FCOM DSC-22_30-100-A: box "around each new annunciation", no dims given → user PICS: TIGHT box around the mode TEXT, ONE row, armed row below NOT enclosed): `#fmaBox1/2/3/5` white rects shown **10 s** when that column's active annunciation changes. **FIXED, IDENTICAL box size for every mode column** — the box does NOT resize to the text (user was explicit: "the size of the box has nothing to do with how many letters"). cols 1-3 = **700×190 centred on the column text-x + row-1 (cy 180)**; col5 engagement = 640×470 block. The annunciation sits CENTRED inside. One row (armed row below NOT enclosed). Do NOT size the box to the text via getBBox (that gave different-shaped boxes per mode — the bug the user rejected twice); do NOT enclose the armed row. `drawFMA(s,alt,ts)` tracks per-column signature + change-`ts` in the loop closure; first frame seeds (no box), `fmaBoxT` inits −1e9 (no initial flash). col5 boxes the engagement block (f51/f52/f53 union) — per-line would be finer (queued). STEADY box = normal change; flashing 15 s + triple-click for REVERSIONS not modelled yet (queued).
+- Font = self-hosted Jost via `next/font` (offline). `shape/text-rendering geometricPrecision`.
+Full working record: memory `project_aviator_svg_pfd_app_port`; standalone source: `reference_aviator_svg_pfd_standard`.
+
+---
+
 ## 9. Cross-skill coordination
 
 - For procedure/ECAM logic (e.g. "when does SQUIB light come on") → invoke `a320-fcom-trainer`.
 - This skill handles only the visual: color, geometry, animation, states.
 - If both are needed, `a320-fcom-trainer` produces the logic assessment and this skill produces the visual spec. Both merge into one plan before "go".
+- **PFD VALUES vs RENDERING:** `pfd-fma-logic` (§5c governor) owns what the numbers ARE and how they move (capture, coupling, VLS floor); this skill owns how `svg-pfd.tsx` draws them (§8a). `scenario-alt-logic` owns the gates. A PFD task usually names one surface — say which.
 
 ---
 
@@ -609,6 +630,9 @@ intake checklist instead and asks which inputs are missing.
 Every completed element is recorded here. Claude uses these to calibrate
 future runs — measurements, FCOM citations, and outcomes from real work.
 Add a new entry each time a Checkpoint B passes.
+
+### [2026-07-04] Live-app SVG PFD (`svg-pfd.tsx`) rendering rules codified — see §8a
+Added §8a: the SVG PFD is the reusable render surface for future scenarios (canvas `pfd-mockup` is the other, `pfd-instruments`-LOCKED). Rules built & shipped this session: rolling altitude drum + eased fade mask; tape scale clipped to the frame; DYNAMIC VLS barber-pole at the real `vls` (was static → the selected-speed bug looked sub-VLS); two-stage geometry ILS (DME model + `gsDev` from GS-vs-aircraft altitude, must match `buildAircraftState`); rate-limited eases (incl. 9 kt/s ground rollout). Boundary reaffirmed: VALUES = `pfd-fma-logic` §5c, GATES = `scenario-alt-logic`, DRAW = here. Details: memory `project_aviator_svg_pfd_app_port`.
 
 ### [2026-05-23] ENG 1 FIRE pb — fire-panel.tsx
 - PICS: `~/Desktop/PANELS/fire panel/a320-ovhd-fire-45vu.webp`

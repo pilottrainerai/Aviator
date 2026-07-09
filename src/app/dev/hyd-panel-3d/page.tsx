@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { HydPanel3D, HYD_TUNE_DEFAULT, HYD_PUMP_ORDER, HYD_PUMP_LABELS, HYD_RAT_GUARD_DEFAULT, HYD_ELEC_GUARD_DEFAULT, HYD_RAT_BTN_DEFAULT, HYD_ELEC_BTN_DEFAULT, type HydTune, type HydPos, type HydPumpState, type HydPumpKey, type HydGuard, type HydBtn } from "@/components/cockpit/hyd-panel-3d";
 
-const KEY = "hydTune.v23"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
+const KEY = "hydTune.v28"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
 
 export default function HydPanel3DDevPage() {
   const [tune, setTune] = useState<HydTune>(HYD_TUNE_DEFAULT);
@@ -159,9 +159,21 @@ export default function HydPanel3DDevPage() {
           <input type="color" value={tune.capColor} onChange={(e) => set("capColor", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />
         </label>
         <label style={rowS}>
-          <span style={{ width: 86 }}>Border / frame</span>
+          <span style={{ width: 86 }}>Well / recess</span>
+          <input type="color" value={tune.wellColor} onChange={(e) => set("wellColor", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />
+        </label>
+        <label style={rowS}>
+          <span style={{ width: 86 }}>Border outer</span>
           <input type="color" value={tune.borderColor} onChange={(e) => set("borderColor", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />
         </label>
+        <label style={rowS}>
+          <span style={{ width: 86 }}>Border inner</span>
+          <input type="color" value={tune.borderInnerColor} onChange={(e) => set("borderInnerColor", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />
+        </label>
+        <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 4 }}>BORDER RIMS — GPWS-style metallic bevel</div>
+        {num("Metalness", "borderMetal", 0, 1, 0.02)}
+        {num("Roughness", "borderRough", 0, 1, 0.02)}
+        {num("Reflections", "borderEnv", 0, 4, 0.05)}
         <label style={rowS}>
           <span style={{ width: 86 }}>RAT switch</span>
           <input type="color" value={tune.ratColor} onChange={(e) => set("ratColor", e.target.value)} style={{ flex: 1, height: 22, border: "1px solid #3a434f", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }} />

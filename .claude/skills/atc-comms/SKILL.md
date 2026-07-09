@@ -809,27 +809,65 @@ No scenario change — skill §0a/§0b only.
   enroute). All three starting phases (takeoff · cruise · descent) now in one model.
   Reference impl `eng1-fire-after-v1.ts` (declaration gated `four_hundred_ft_cmd`/
   `engine_secured`, `atc_handoff_to_departure` present).
-- **AUTHORITATIVE current DUAL HYD G+Y card list (19, replaces the 06-09 list)** —
+- **AUTHORITATIVE current DUAL HYD G+Y card list (20, replaces the 06-09 list)** —
   id · kind · gate (`completesStep` noted), in scenario order:
   1. `pm_mayday_declare` · crew · `request_routing` → completes `declare_mayday`
   2. `atc_mayday_ack` · atc · `declare_mayday` → completes `mayday_ack`
   3. `atc_descend_10000` · atc · `start_descent` → completes `cleared_10000`
   4. `atc_assistance_req` · atc · `speed_set`
   5. `atc_vectors_when_ready` · atc · `speed_set`
-  6. `atc_weather_request` · crew · `qrh_summary_gy`
-  7. `atc_weather_delivery` · atc · `qrh_summary_gy` → completes `weather_obtained`
-  8. `atc_intentions_advise` · crew · `fordec_hyd`
-  9. `atc_hold_req` · crew · `inform_atc_intentions`
-  10. `atc_hold_clr` · atc · `inform_atc_intentions`
-  11. `atc_pob_fuel_services` · atc · `inform_atc_intentions`
-  12. `atc_emg_services_req` · crew · `atc_emergency_svcs`  (full emerg svcs + unable to vacate / NWS inop)
-  13. `atc_ready_for_approach` · atc · `approach_cl_hyd`  (request vectors + long final)
-  14. `atc_cleared_approach` · atc · `approach_cl_hyd`  (cleared ILS + Tower handoff)
-  15. `atc_stabilised_report` · crew · `lgr_gravity`
-  16. `atc_established_report` · crew · `landing_cl_hyd`
-  17. `atc_tower_contact` · atc · `landing_cl_hyd`
-  18. `atc_cleared_to_land` · atc · `landing_cl_hyd` → completes `ldg_clearance_done`
-  19. `atc_taxi_to_stand` · crew · `request_taxi_to_stand`  (hold position, request tyre/brake inspection)
-  Verified against the live `.ts` this session (47 steps · 19 cards · `status: DRAFT`).
-  OPTIONAL gap left to the developer: no explicit MUMBAI CONTROL → MUMBAI APPROACH
-  frequency-handoff set (cards 1–5 Control, 6+ Approach).
+  6. `atc_control_to_approach` · atc · `crew_crosscheck`  (CONTROL→APPROACH freq handoff "Mumbai Approach 127.9"; added 2026-06-24)
+  7. `atc_weather_request` · crew · `qrh_summary_gy`
+  8. `atc_weather_delivery` · atc · `qrh_summary_gy` → completes `weather_obtained`
+  9. `atc_intentions_advise` · crew · `fordec_hyd`
+  10. `atc_hold_req` · crew · `inform_atc_intentions`
+  11. `atc_hold_clr` · atc · `inform_atc_intentions`
+  12. `atc_pob_fuel_services` · atc · `inform_atc_intentions`
+  13. `atc_emg_services_req` · crew · `atc_emergency_svcs`  (full emerg svcs + unable to vacate / NWS inop)
+  14. `atc_ready_for_approach` · atc · `approach_cl_hyd`  (request vectors + long final)
+  15. `atc_cleared_approach` · atc · `approach_cl_hyd`  (cleared ILS + Tower handoff)
+  16. `atc_stabilised_report` · crew · `lgr_gravity`
+  17. `atc_established_report` · crew · `landing_cl_hyd`
+  18. `atc_tower_contact` · atc · `landing_cl_hyd`
+  19. `atc_cleared_to_land` · atc · `landing_cl_hyd` → completes `ldg_clearance_done`
+  20. `atc_taxi_to_stand` · crew · `request_taxi_to_stand`  (hold position, request tyre/brake inspection)
+  Verified against the live `.ts` (47 steps · 20 cards · `status: DRAFT`; tsc clean).
+  [2026-06-24] The optional CONTROL→APPROACH frequency-handoff gap is now CLOSED
+  (`atc_control_to_approach`, freq 127.9 = simulation-placeholder, confirm w/ SME).
+- **[2026-06-24] ENG 1 FIRE comms audit (eng1-fire-after-v1.ts):** opening + return
+  sequence already match the model (it is the reference). Two scoring fixes applied
+  [user-input]: (1) `pm_dep_initial_call` — the ICAO **MAYDAY repeat on the new
+  Departure freq is now CORRECT** (was marked wrong; position+STANDBY also stays
+  correct). (2) `atc_pob_fuel_services` — STANDBY (defer while ECAM runs) stays
+  correct AND the **clean POB+endurance answer is now correct** (the card resurfaces
+  at `wx_request` and must be answerable). Single-card limit: can't be presentation-
+  specific, so both read correct. Workbook `atcCalls` flags synced; `tsc` + `node
+  --check` clean. Then two more applied: (3) added **DEPARTURE→APPROACH handoff**
+  `atc_dep_to_approach` (atc, gate `crew_crosscheck`, "Delhi Approach 127.45" =
+  placeholder) — parity with G+Y; (4) `atc_tower_contact` — "Continuing ILS 28, will
+  report established" now **correct** too (was wrong; it is correct in G+Y — resolved
+  the inconsistency). Fire ATC cards 18 → 19; workbook synced (`node --check` clean).
+  NOTE: the fire workbook is otherwise drifted from the live `.ts` (missing ~5 cards)
+  — a separate full parity-rebuild job.
+
+## [2026-07-07] Comms-card VISUAL model — INBOUND / OUTBOUND / CONTEXT (`distraction-modal.tsx`)
+Colour encodes the DIRECTION of each leg; layout stays STACKED + left-aligned (never chat left/right).
+Keys off `distraction.kind` — reusable across every scenario's comms, no per-card wiring.
+- **INBOUND** (ATC → crew) = **GREEN `#35C46E`**. The `message` on a `kind:"atc"` card, labelled
+  `▼ INBOUND · ATC → FLIGHT CREW`, green left-accent box; header tag `▼ INBOUND`.
+- **OUTBOUND** (crew → ATC) = **BLUE `#5C9CF5`**. The crew's `choices` (readback / call), labelled
+  `OUTBOUND ▲`, blue-tinted option buttons; header tag `▲ OUTBOUND` on crew cards.
+- **CONTEXT** = a cue to the crew, NOT on the radio (e.g. "FORDEC complete, advise intentions").
+  NEUTRAL — NOT green, NOT a transmission. On a `kind:"crew"` card the `message` IS such a prompt →
+  **it is NOT shown at all** (redundant); the crew's call lives in the options.
+- **`kind:"crew"` (crew-initiated)** = the whole card is OUTBOUND: header `▲ OUTBOUND`; NO inbound
+  message; options label `CREW CALL`; **NO second OUTBOUND tag on the options row** (header already
+  carries it — never two OUTBOUND labels on one card).
+- **`kind:"atc"`** = header `▼ INBOUND`; show the green inbound message; **DROP `pilotSays`** (rendering
+  the crew's prior call as a second outbound at the top confuses inbound-vs-outbound); options label
+  `CREW READBACK` + `OUTBOUND ▲`.
+- RULES: never two OUTBOUND labels on a card · never label a context cue as INBOUND · never render
+  `pilotSays` as a top outbound leg. See sibling skill `training-card-ui` for the shared card chrome.
+- These ATC direction colors are independent from procedure-card alert/reference colors: INBOUND stays
+  green, OUTBOUND stays blue, CONTEXT stays neutral. Do not borrow ECAM red/amber or reference-chip amber
+  into ATC cards unless the user is explicitly designing a cockpit alert card, not a comms direction card.

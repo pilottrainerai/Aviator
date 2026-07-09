@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Jost, Source_Serif_4 } from "next/font/google";
+import { B612, JetBrains_Mono, Jost, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -25,6 +25,17 @@ const jost = Jost({
   weight: ["400", "500", "600", "700"],
 });
 
+// B612 — typeface commissioned by Airbus + ENAC specifically for cockpit-screen
+// legibility and reduced reading fatigue (open-source). Used for the procedure
+// directive cards and CRM checklist. Applied via class="font-procedure" or
+// fontFamily: "var(--font-procedure)".
+const b612 = B612({
+  variable: "--font-b612",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "700"],
+});
+
 export const metadata: Metadata = {
   title: "Crosscheck — Decision-based A320 abnormal training",
   description:
@@ -38,7 +49,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${sourceSerif.variable} ${jetbrainsMono.variable} ${jost.variable} h-full antialiased`}
+      className={`${sourceSerif.variable} ${jetbrainsMono.variable} ${jost.variable} ${b612.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <Providers>

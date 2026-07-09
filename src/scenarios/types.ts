@@ -50,7 +50,15 @@ export type ScenarioStep = {
   /** Optional: references an ECAMMessage.id — that message turns green when this step is done */
   ecamRef?: string;
   /** "PF" = Pilot Flying, "PM" = Pilot Monitoring. Displayed as a badge on the control. */
-  crew?: "PF" | "PM";
+  crew?: "PF" | "PM" | "CAPT" | "CREW";
+  /** Task category shown top-left on the card (what KIND of task): ECAM · QRH ·
+   *  PROCEDURE · AVIATE · NAVIGATE · COMMS · CRM · CHECKLIST · GLARESHIELD. May be a
+   *  " · "-joined pair (e.g. "CRM · COMMS"). Falls back to a group-derived default. */
+  category?: string;
+  /** Source of the guidance shown bottom-left: FCOM / FCTM / QRH = manual (solid);
+   *  TECHNIQUE = airmanship not in a manual (dashed). May be " · "-joined (e.g.
+   *  "QRH · TECHNIQUE" — manual base + technique layered on). [user 2026-07-07] */
+  reference?: string;
   /**
    * "procedure" (default) = shown in CockpitControls (ECAM actions).
    * "comms" = shown in CommChecklist (crew / cabin / pax / company confirmations).
@@ -64,6 +72,16 @@ export type ScenarioStep = {
   /** Optional on-screen guidance word rendered over the flashing PFD/ND while this
    *  step is the next action (e.g. "AVIATE", "NAVIGATE", "DESCENT"). */
   flashMsg?: string;
+  /** Optional: while this step is the active/next step, the lower-left Context
+   *  Display auto-switches to this tab (e.g. "qrh" to surface the QRH summary
+   *  during the QRH read/review steps). Reverts to "system" on non-tagged steps.
+   *  The trainee can still tap tabs manually within a step. */
+  opensContextTab?: "system" | "qrh" | "graphic" | "info";
+  /** Optional: QRH summary section titles to HIGHLIGHT (and auto-scroll to) while
+   *  this step is active — the "you are here" assessment cue on the QRH card.
+   *  e.g. ["CRUISE"] during the cruise read, ["APPROACH","LANDING","GO-AROUND"]
+   *  during the review. Titles match `QrhSummary.sections[].title`. */
+  qrhHighlightSections?: readonly string[];
   /** Optional structured bullet points shown in CommChecklist when the card is active */
   notes?: readonly string[];
   /**
@@ -212,6 +230,34 @@ export type Scenario = {
    *  Display "QRH" tab. Rendered in the real black-on-white QRH format with a
    *  severity-coloured title cap. DRAFT — procedure content needs SME review. */
   qrhSummary?: QrhSummary;
+  /** Supplementary reference material for the Context Display "INFO" tab —
+   *  FCOM/FCTM extracts, training-video links, experience notes. Every item
+   *  carries a source; only `verified` items render as authoritative, the rest
+   *  show "UNVERIFIED · PENDING SME". DRAFT — content needs SME review. */
+  additionalInfo?: readonly AdditionalInfoItem[];
+};
+
+// ─── Additional Information (Context Display "INFO" tab) ─────────────────────
+// Sourced supplementary material. Discipline mirrors the manual-first rule:
+// nothing renders as authoritative unless `verified` and tied to a source.
+export type InfoSourceType = "fctm" | "fcom" | "qrh" | "video" | "experience";
+export type AdditionalInfoItem = {
+  title: string;
+  /** Plain text / light markdown body. */
+  body: string;
+  source: {
+    type: InfoSourceType;
+    /** Manual citation, e.g. "FCTM AOP-30-30 L2699" or "FCOM DSC-22-30-100". */
+    ref?: string;
+    /** External link (e.g. a training video) — opens out. */
+    url?: string;
+  };
+  /** True once cross-checked against the cited source. */
+  verified: boolean;
+  /** Experience/technique-based → needs pilot sign-off before user-visible. */
+  smeReview?: boolean;
+  /** Optional: tie this item to a phase/step for contextual display later. */
+  phase?: string;
 };
 
 // ─── QRH summary (Context Display "QRH" tab) ─────────────────────────────────
@@ -279,7 +325,30 @@ export type EngineDisplayDef = {
   /** For panel3d:"hyd" — maps each HYD pump pushbutton to the scenario step it performs.
    *  controlPanel steps NOT mapped here render as side controls (FLAPS/GPWS/L-G). */
   hydMap?: { eng1?: string; blueElec?: string; ptu?: string; eng2?: string; yellowElec?: string };
+  /** Approach CONFIG phase (window-2): maps a GPWS pushbutton to the scenario step it performs.
+   *  The GPWS 3D panel replaces the HYD panel while this window is popped. [user 2026-07-06] */
+  gpwsMap?: { terr?: string; sys?: string; gsMode?: string; flapMode?: string; ldgFlap3?: string };
+
+  // ─── New full E/WD (upper ECAM) extras — all optional, state-conditioned ───
+  /** Fuel on board, kg — e.g. [{ value: "9520" }]. Shown as "FOB : <kg> KG". */
+  fob?: SysCase<string>[];
+  /** Thrust rating mode + N1 target, e.g. mode "CLB"/"TOGA", value "86.6". */
+  thrust?: { mode: SysCase<string>[]; value: SysCase<string>[] };
+  /** Slat/flap lever config for the S/F indicator. */
+  flap?: SysCase<FlapConf>[];
+  /** Slat/flap FAULT — turns the affected index (S and/or F) amber per
+   *  FCOM DSC-27-30-20 (e.g. G+Y: FLAPS JAMMED → F amber, SLATS SLOW → S amber). */
+  slatFlapFault?: { slat?: SysCase<boolean>[]; flap?: SysCase<boolean>[] };
+  /** Non-ECAM MEMO lines shown in the lower E/WD when no warning is active
+   *  (FCOM: memos are state-driven, e.g. SEAT BELTS, LDG LT — not the T.O memo). */
+  memo?: EwdMemoItem[];
 };
+
+/** Flap lever positions for the E/WD slat/flap indicator. */
+export type FlapConf = "0" | "1" | "1+F" | "2" | "3" | "FULL";
+
+/** One MEMO line in the lower E/WD. `right` places it in the right column. */
+export type EwdMemoItem = { line: string; color?: SysColor; right?: boolean };
 
 // ─── Scenario Channels (phase-based cockpit state) ────────────────────────────
 // Each ScenarioPhase captures a snapshot of all cockpit channels at a key

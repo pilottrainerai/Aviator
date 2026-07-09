@@ -308,6 +308,18 @@ Any request to change code WITHOUT one of these → return an assessment, list t
 - Use `callouts.txt` verbatim for all PF/PM spoken text.
 - Do not rephrase. "FIRE" is not "Engine fire detected."
 - If callouts.txt does not have it → `simulation-placeholder`, ask user.
+- **Standard ECAM read → clear callout** (vault `library/a320-ecam-philosophy.md`; also
+  `a320-sop.md`, `raw/aviation-fcom/A320-Tasksharing-2020.pdf`): MASTER WARN/CAUT RESET →
+  PM **ANNOUNCE "TITLE OF FAILURE"** (read the alert + its limitation lines) → ECAM ACTIONS →
+  then CLEAR top-down: PM **REQUEST "CLEAR <name of SYS>?"** → PF **"CLEAR"** → PM presses CLR.
+  The clear names the **SYSTEM PREFIX ONLY** (the underlined system on the E/WD: AUTO FLT / HYD /
+  F/CTL / ENG …), NOT the full alert title and NOT the limitations. The announce reads the full
+  title + limitations; the clear is terse. Examples (DUAL HYD G+Y):
+  · `AUTO FLT AP OFF` → announce full, clear **"CLEAR AUTO FLT?"**
+  · `HYD G+Y SYS LO PR` → announce full, clear **"CLEAR HYD?"** (same for `HYD PTU FAULT` → "CLEAR HYD?")
+  · `F/CTL ALTN LAW (PROT LOST) · MANEUVER WITH CARE` → announce full, clear **"CLEAR F/CTL?"**
+  Each clear is 3-part: PM "CLEAR ‹SYS›?" → PF "CLEAR" → PM presses CLR; the alert then transfers to
+  STATUS. NEVER "CLEAR HYD G+Y SYS LO PR?" or re-read limitations in the clear. [user 2026-07-07, vault-sourced]
 
 ### LAND ASAP
 - **Red** = nearest airport, MAYDAY.
@@ -359,12 +371,83 @@ them off three coupled things — understand the coupling before changing any se
 5. **Sequence IS the procedure.** Re-wire `requires` when inserting/removing a card
    so the chain stays unbroken; after editing run `npx tsc --noEmit` and grep the
    removed id to confirm no dangling `requires`.
+6. **Card presentation → `training-card-ui` skill.** A step that does NOT require a
+   physical left-panel (action-panel) input — every ECAM read / clear / announce /
+   callout / CONFIRM card (i.e. NOT `hardware: true`) — is rendered by
+   `flight-check-popup.tsx` and MUST carry the card-design metadata: **`category`**
+   (ECAM / QRH / PROCEDURE / CHECKLIST / AVIATE / COMMS / CRM), **`reference`**
+   (FCOM / FCTM / QRH / TECHNIQUE, manual-first — solid = manual, TECHNIQUE = airmanship),
+   and **`crew` = the DOER** (rendered green; the monitor is derived grey). The `CONFIRM`
+   verb is auto-hidden on the directive (the confirm button carries it). **Hardware steps
+   (`hardware: true`)** stay on the left-panel action card and need no design metadata.
+   So: when connecting ECAM logic to the cards, tag every non-hardware card per the
+   `training-card-ui` skill — same colours/roles/references across every scenario & type.
 
 **Sync discipline (after any localhost `.ts` change):** localhost `.ts` FIRST →
 regenerate the data-driven workbook arrays (`steps`, `atcCalls`) from the `.ts` and
 `node --check` → mirror the canonical vault `scenarios/<slug>/*.md` §5 +
 `change-log.md`. Restart the run (steps load at run start) or the dev server (stale
 HMR) to see step changes.
+
+---
+
+## 8b. Procedure conduct logic — the abnormal "spine" (FCTM-sourced)
+
+Every abnormal/emergency is conducted on the same FCTM spine. Author a scenario's
+STEP ORDER to follow it; do not invent a different order.
+
+### Golden Rules order (AOP-40)
+**FLY → NAVIGATE → COMMUNICATE**, in this order, with tasksharing [`fctm:AOP-40 §1`].
+- **FLY** (PF) — recover/maintain a steady flight path; PM monitors + calls deviations.
+- **NAVIGATE** (PF) — "know where you are / should be / should go / where the weather,
+  terrain and obstacles are" [`fctm:AOP-40 P2`]; set divert routing.
+- **COMMUNICATE** — "the PF must recover a steady flight path, and the flight crew must
+  identify the flight situation. The PF must then inform ATC and the cabin crew of the
+  flight situation and the flight crew's intentions" [`fctm:AOP-40 P2`].
+
+### When does ATC come — before or after ECAM? (the decision)
+- **Immediate / memory actions FIRST.** "in some time critical situations… apply by
+  memory, items referred to as MEMORY ITEMS or OEB immediate actions" [`fctm:AOP-30-30,
+  L2660`]. If the failure has memory items or an immediate securing action (e.g. ENG
+  FIRE → secure the engine), do those first.
+- **Then communicate.** ECAM actions run "once the aircraft trajectory is stabilized and
+  the PF announced 'ECAM actions'" [`fctm:AOP-30-30-A, L2699`]. With no memory items and
+  the aircraft under control (e.g. DUAL HYD G+Y), the crew identifies + COMMUNICATES
+  (declare to ATC + intentions) once stabilized, then orders ECAM ACTIONS.
+- **Net spine:** AVIATE → NAVIGATE → (memory items, if any) → COMMUNICATE (declare) →
+  ECAM ACTIONS → STATUS → (at the appropriate phase) approach prep → briefing.
+
+### ECAM handling sequence (AOP-30-30)
+1. First pilot notices → **MASTER WARN/CAUT RESET** [`fctm:L2729`].
+2. PM: **"<title of failure>" ANNOUNCE** → **ECAM CONFIRM** (check OHP/SD before any
+   action) [`fctm:L2731`].
+3. PF: **OEB CONSIDER** → **"ECAM ACTIONS" ORDER** [`fctm:L2731`].
+4. PM: **ECAM/OEB ACTIONS PERFORM** → **"CLEAR (system)?" REQUEST**; PF **CHECK** +
+   **CONFIRM**; PM presses **CLR** only after all actions checked [`fctm:L2747`].
+5. PF **ANALYZE** each SD page → CLEAR [`fctm:L2756`].
+6. STATUS appears → PM **"STATUS" ANNOUNCE** → PF **"STOP ECAM" ORDER** [`fctm:L2761`].
+7. PF considers normal C/L, resets, additional procedures → **"CONTINUE ECAM"** → PM
+   **STATUS READ**; STATUS-associated procedures are "performed at the appropriate flight
+   phase" [`fctm:L2768`] — i.e. approach prep + briefing.
+
+### Worked map — DUAL HYD G+Y onto the spine
+| FCTM spine | G+Y step id |
+|---|---|
+| MASTER WARN RESET | `cancel_master_warn` |
+| FLY | `maintain_control` |
+| NAVIGATE | `request_routing` |
+| COMMUNICATE (no memory items → declare now) | `declare_mayday` |
+| "ECAM ACTIONS" ORDER | `ecam_actions` |
+| PM performs ECAM | `ptu_off → grn_eng1_pump_off → yel_eng2_pump_off → yel_elec_pump_on` |
+| SD analyse (secondary) | `fctl_check / wheel_check` |
+| STATUS announce / STOP ECAM | `announce_status / stop_ecam` |
+| STATUS read | `read_status / status_read_aloud / inop_sys_card` |
+| ECAM ACTIONS COMPLETED | `crew_crosscheck` |
+| at appropriate phase: approach prep + briefing | `approach_prep_hyd / approach_brief_hyd (+landing +ga)` |
+
+**Authoring rule:** lay every new abnormal's step order on this spine first; cite FCTM;
+flag any deviation. The comms fallout from each milestone is governed by `atc-comms §0b`;
+the PFD/FMA indications by `pfd-fma-logic`.
 
 ---
 
@@ -494,3 +577,20 @@ mirrored to workbook + vault.
 - **Verify done:** `npx tsc --noEmit` clean; grep confirmed no dangling `requires`;
   workbook `node --check` clean; vault §5 + change-log synced.
 - File: `src/scenarios/data/dual-hyd-g-y.ts`
+
+### [2026-06-24] Procedure conduct logic — §8b added [user-input]
+Captured the FCTM "spine" for how every abnormal is conducted (skill §8b; no scenario
+change). Sourced, not invented:
+- **Golden Rules AOP-40** [`fctm:AOP-40`]: FLY → NAVIGATE → COMMUNICATE in order; the
+  PF recovers a steady path, the crew identifies the situation, then the PF informs ATC +
+  cabin of situation + intentions.
+- **ATC-timing decision** [`fctm:AOP-30-30 L2660 / AOP-30-30-A L2699`]: memory items / OEB
+  immediate actions FIRST (e.g. ENG FIRE secures the engine); with none and the aircraft
+  under control (DUAL HYD G+Y) the crew declares THEN orders ECAM ACTIONS.
+- **ECAM handling AOP-30-30** [`fctm:L2729–2768`]: MASTER WARN RESET → "title" ANNOUNCE +
+  ECAM CONFIRM → "ECAM ACTIONS" ORDER → PERFORM/CLEAR → SD ANALYZE → "STATUS"/"STOP ECAM"
+  → STATUS READ (associated procedures done at the appropriate flight phase = approach
+  prep + briefing).
+- Mapped onto the live G+Y step ids (cancel_master_warn … crew_crosscheck … approach
+  briefs). Authoring rule: lay every new abnormal's step order on this spine first.
+- File: `.claude/skills/a320-fcom-trainer/SKILL.md` §8b.

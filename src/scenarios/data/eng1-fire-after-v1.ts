@@ -54,19 +54,15 @@ export const eng1FireAfterV1: Scenario = {
     // FCTM OP-020: ECAM actions begin at 400 ft AGL — PM announces, PF commands.
     // SEQUENCE-gated (not pure wall-clock): fires once AVIATE is complete (engage_ap_fma)
     // AND ≥18 s elapsed (realistic 400 ft floor) — so it tracks the pilot, not the clock.
+    // The trigger stays (PFD reads it via pfd-nd.tsx; a step gates on it) but injects NO
+    // ECAM line: "ECAM ACTIONS at 400 ft" is altitude/PFD logic, NOT an FCOM E/WD line
+    // [user 2026-07-09]. It fires effect-less; reducer.ts still records triggersFired.
     {
       id: "four_hundred_ft",
       atMs: 18_000,
       requiresStep: "engage_ap_fma",
       description: "400 ft AGL — PM announces 'ECAM ACTIONS', procedure begins",
-      effects: [
-        {
-          type: "ADD_ECAM",
-          messages: [
-            { id: "ecam_400ft", line: "400 FT — ECAM ACTIONS", level: "advisory" },
-          ],
-        },
-      ],
+      effects: [],
     },
     // Minimum Acceleration Altitude — informational only, no ECAM message
     {
@@ -270,7 +266,7 @@ export const eng1FireAfterV1: Scenario = {
             type: "CLEAR_ECAM",
             // Clear the primary action lines once AGENT 1 is done; keep the ENG 1
             // FIRE warning + the conditional AGENT 2 branch until the fire is out.
-            ids: ["ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft"],
+            ids: ["ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1"],
           },
         ],
       },
@@ -937,10 +933,10 @@ export const eng1FireAfterV1: Scenario = {
       message: "Select PM initial call on Departure 124.85.",
       standbyResurfaceMs: 25_000,
       choices: [
-        // Correct — position report only, no second MAYDAY
+        // Correct — position report + STANDBY (training-accepted on the new freq)
         { id: "a", label: "IFLY101, heading 280, climbing 4 000 ft, STANDBY",                                      correct: true  },
-        // Wrong — repeats full MAYDAY (not required on DEP)
-        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing 4 000 ft",  correct: false },
+        // Also correct — ICAO MAYDAY repeat on first contact with the new Departure station
+        { id: "b", label: "MAYDAY MAYDAY MAYDAY, IFLY101, engine fire engine 1, heading 280, climbing 4 000 ft, STANDBY",  correct: true },
         // Wrong — states intentions prematurely
         { id: "c", label: "IFLY101, emergency, returning Delhi, request runway 28 ILS, full emergency services",   correct: false },
       ],
@@ -1023,12 +1019,31 @@ export const eng1FireAfterV1: Scenario = {
       standbyResurfaceMs: 30_000,
       standbyResurfaceOnStep: "wx_request",
       choices: [
-        // Correct — STANDBY while ECAM running
+        // Correct — STANDBY while ECAM is still running (first presentation, deferring)
         { id: "a", label: "Standby IFLY101",                                                   correct: true  },
-        // Wrong — too early, ECAM not complete
-        { id: "b", label: "IFLY101, 186 persons on board, endurance 3 hours",                 correct: false },
-        // Wrong — giving emergency services request here (too early, wrong sequence)
+        // Also correct — once ready (card resurfaces at wx_request) the crew answers POB +
+        // endurance; clean operational facts only, no config / no services request here
+        { id: "b", label: "IFLY101, 186 persons on board, endurance 3 hours",                 correct: true  },
+        // Wrong — bundles an emergency-services request into the POB call (wrong sequence)
         { id: "c", label: "IFLY101, 186 POB, 8.4 tonnes fuel, request full emergency services", correct: false },
+      ],
+    },
+
+    // ⑤b Departure → Approach frequency handoff (ATC-initiated 2-part set): once ECAM is
+    //   complete, Departure hands the crew to Approach before the weather request. Crew reads
+    //   back the new frequency. (127.45 = simulation-placeholder — confirm Delhi Approach freq.)
+    {
+      id: "atc_dep_to_approach",
+      atMs: 2_000,
+      requiresStep: "crew_crosscheck",
+      kind: "atc",
+      from: "DELHI DEPARTURE",
+      message: "IFLY101, contact Delhi Approach 127.45.",
+      standbyResurfaceMs: 25_000,
+      choices: [
+        { id: "a", label: "Delhi Approach 127.45, IFLY101", correct: true  },
+        { id: "b", label: "Roger, IFLY101",                 correct: false },
+        { id: "c", label: "Switching, IFLY101",             correct: false },
       ],
     },
 
@@ -1154,7 +1169,7 @@ export const eng1FireAfterV1: Scenario = {
       standbyResurfaceMs: 30_000,
       choices: [
         { id: "a", label: "Wilco, will report established runway 28, IFLY101",               correct: true  },
-        { id: "b", label: "Continuing ILS runway 28, will report established, IFLY101",    correct: false },
+        { id: "b", label: "Continuing ILS runway 28, will report established, IFLY101",    correct: true  },
         { id: "c", label: "Switching, IFLY101",                                             correct: false },
       ],
     },
@@ -1278,6 +1293,14 @@ export const eng1FireAfterV1: Scenario = {
           ],
         },
         {
+          label: "N2", unit: "%",
+          states: [
+            { when: { step: "eng1_master_off" }, value: { v: "0.0", c: "amber" } },
+            { when: { trigger: "fire_warn" },    value: { v: "- -", c: "red" } },
+            { value: { v: "96.8", c: "green" } },
+          ],
+        },
+        {
           label: "STATUS", unit: undefined,
           states: [
             { when: { step: "eng1_master_off" }, value: { v: "SHUT DOWN", c: "amber" } },
@@ -1291,10 +1314,15 @@ export const eng1FireAfterV1: Scenario = {
       rows: [
         { label: "N1",     unit: "%",    states: [{ value: { v: "84.2", c: "green" } }] },
         { label: "EGT",    unit: "°C",   states: [{ value: { v: "618",  c: "green" } }] },
+        { label: "N2",     unit: "%",    states: [{ value: { v: "97.0", c: "green" } }] },
         { label: "FF",     unit: "KG/H", states: [{ value: { v: "2350", c: "green" } }] },
         { label: "STATUS", unit: undefined, states: [{ value: { v: "NORMAL", c: "green" } }] },
       ],
     },
+    // New E/WD extras — DRAFT values, need SME review.
+    fob:    [{ value: "9520" }],
+    thrust: { mode: [{ value: "TOGA" }], value: [{ value: "84.1" }] },
+    flap:   [{ value: "2" }],
   },
 
   // ── System Display DSL (4 tabs: ENG, HYD, ELEC, AIR) ────────────────────────

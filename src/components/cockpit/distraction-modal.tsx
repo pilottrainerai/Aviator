@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ScenarioDistraction, DistractionKind } from "@/scenarios/types";
 
 const KIND_STYLE: Record<
@@ -16,6 +16,10 @@ const KIND_STYLE: Record<
 
 const AUTO_DISMISS_DEFAULT = 20_000;
 
+// Comms exchange direction colours — INBOUND (ATC → crew) green, OUTBOUND (crew → ATC) blue.
+// Same card layout / sequence; colour just encodes who's transmitting. [user 2026-07-07]
+const DIR_IN = "#35C46E", DIR_OUT = "#5C9CF5";
+
 // ─── ATC/Comms modal — always LEFT side ──────────────────────────────────────
 // Positions on the left half of the screen so the crew action popup (right)
 // can be visible simultaneously. No backdrop — cockpit stays readable.
@@ -27,6 +31,7 @@ export function DistractionModal({
   liveAltFt,
   inline = false,
   noAutoDismiss = false,
+  flashing = false,
 }: {
   distraction: ScenarioDistraction;
   onRespond: (choiceId: string, correct: boolean) => void;
@@ -37,9 +42,19 @@ export function DistractionModal({
   inline?: boolean;
   /** true = card NEVER auto-collapses; it stays until answered (no countdown to standby) */
   noAutoDismiss?: boolean;
+  /** true = this card is the active surface → the deep ring + breathing lift (ccLift). */
+  flashing?: boolean;
 }) {
   const altStr = liveAltFt != null ? String(Math.round(liveAltFt / 100) * 100) : "[ALT]";
-  const subAlt = (text: string) => text.replace("[ALT]", altStr);
+  // [STATION] = the controlling agency, dynamic on the changeover: once the aircraft is
+  // through 15 000 ft it's Mumbai Approach, otherwise still Mumbai Control. [STATION_CAPS]
+  // is the same in upper case for the card header (`from`).
+  const station = liveAltFt != null && liveAltFt <= 15_000 ? "Mumbai Approach" : "Mumbai Control";
+  const subAlt = (text: string) =>
+    text
+      .replace(/\[ALT\]/g, altStr)
+      .replace(/\[STATION_CAPS\]/g, station.toUpperCase())
+      .replace(/\[STATION\]/g, station);
 
   const autoDismissMs = distraction.autoDismissMs ?? AUTO_DISMISS_DEFAULT;
   const [remainingMs, setRemainingMs] = useState(autoDismissMs);
@@ -66,6 +81,10 @@ export function DistractionModal({
   }, [autoDismissMs, onStandby, distraction.id, noAutoDismiss]);
 
   const style = KIND_STYLE[distraction.kind];
+  // Crew-initiated card = the crew is making the call → whole card is OUTBOUND; the message
+  // field is a redundant context prompt, so it isn't shown. ATC cards show the INBOUND message
+  // (green) and drop the pilotSays top leg (one clean inbound → one outbound). [user 2026-07-07]
+  const crewInit = distraction.kind === "crew";
   const pct = Math.max(0, (remainingMs / autoDismissMs) * 100);
   const secLeft = Math.ceil(remainingMs / 1000);
   const resurfaceSec = Math.round((distraction.standbyResurfaceMs ?? 25_000) / 1000);
@@ -89,30 +108,23 @@ export function DistractionModal({
           {style.badge}
         </span>
         <span style={{ color: style.accent, fontSize: compact ? "10px" : "11px", fontWeight: 600, letterSpacing: "0.08em" }}>
-          {distraction.from}
+          {subAlt(distraction.from)}
         </span>
-        <span className="ml-auto animate-pulse" style={{ color: style.accent, fontSize: "8px", letterSpacing: "0.15em", fontWeight: 700 }}>
-          INBOUND
+        <span className="ml-auto animate-pulse" style={{ color: crewInit ? DIR_OUT : DIR_IN, fontSize: "8px", letterSpacing: "0.15em", fontWeight: 700 }}>
+          {crewInit ? "▲ OUTBOUND" : "▼ INBOUND"}
         </span>
       </div>
 
-      {/* Exchange — pilot's call (if present) → ATC's reply */}
-      <div style={{ padding: compact ? "8px 16px" : "12px 16px" }}>
-        {distraction.pilotSays && (
-          <div style={{ marginBottom: compact ? "8px" : "10px", paddingBottom: compact ? "8px" : "10px", borderBottom: "1px dashed #1F2A38" }}>
-            <div style={{ color: "#7FB8FF", fontSize: "8px", letterSpacing: "0.2em", fontWeight: 700, marginBottom: "4px" }}>FLIGHT CREW → ATC</div>
-            <p style={{ color: "#A8C8E8", fontSize: compact ? "10px" : "12px", lineHeight: "1.5", letterSpacing: "0.02em", fontStyle: "italic" }}>
-              &ldquo;{distraction.pilotSays}&rdquo;
-            </p>
-          </div>
-        )}
-        {distraction.pilotSays && (
-          <div style={{ color: style.accent, fontSize: "8px", letterSpacing: "0.2em", fontWeight: 700, marginBottom: "4px" }}>ATC → FLIGHT CREW</div>
-        )}
-        <p style={{ color: "#D4D8E8", fontSize: compact ? "11px" : "13px", lineHeight: "1.55", letterSpacing: "0.02em" }}>
-          &ldquo;{subAlt(distraction.message)}&rdquo;
-        </p>
-      </div>
+      {/* Inbound — ATC's transmission (green). Crew-initiated cards have no inbound leg: the
+          crew's call lives in the options below, so we skip the context prompt entirely. */}
+      {!crewInit && (
+        <div style={{ padding: compact ? "8px 16px" : "12px 16px" }}>
+          <div style={{ color: DIR_IN, fontSize: "8px", letterSpacing: "0.2em", fontWeight: 700, marginBottom: "4px" }}>▼ INBOUND · ATC → FLIGHT CREW</div>
+          <p style={{ color: "#D8EFE2", fontSize: compact ? "11px" : "13px", lineHeight: "1.55", letterSpacing: "0.02em", borderLeft: `3px solid ${DIR_IN}`, background: `${DIR_IN}0E`, borderRadius: "6px", padding: compact ? "7px 11px" : "9px 12px" }}>
+            &ldquo;{subAlt(distraction.message)}&rdquo;
+          </p>
+        </div>
+      )}
 
       {/* Choices — or Acknowledge button for info-only cards (empty choices) */}
       <div
@@ -142,8 +154,8 @@ export function DistractionModal({
           </button>
         ) : (
           <div style={{ paddingTop: compact ? "0" : "10px" }}>
-            <div style={{ color: "#8090A8", fontSize: "7px", letterSpacing: "0.2em", fontWeight: 700, paddingBottom: "6px" }}>
-              CREW RESPONSE
+            <div className="flex items-center justify-between" style={{ color: DIR_OUT, fontSize: "7px", letterSpacing: "0.2em", fontWeight: 700, paddingBottom: "6px" }}>
+              <span>{crewInit ? "CREW CALL" : "CREW READBACK"}</span>{/* crew header already says OUTBOUND — no second one */}<span>{crewInit ? "" : "OUTBOUND ▲"}</span>
             </div>
             {distraction.choices.map((choice) => (
               <button
@@ -153,15 +165,15 @@ export function DistractionModal({
                 className="text-left border transition-all"
                 style={{
                   padding: compact ? "6px 10px" : "10px 12px",
-                  borderColor: style.accent + "40",
-                  backgroundColor: style.accent + "0A",
+                  borderColor: DIR_OUT + "40",
+                  backgroundColor: DIR_OUT + "0A",
                   color: "#D0D8E4",
                   fontSize: compact ? "10px" : "11px",
                   lineHeight: "1.45",
                   borderRadius: "2px",
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "1C"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = style.accent + "40"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = style.accent + "0A"; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = DIR_OUT; (e.currentTarget as HTMLButtonElement).style.backgroundColor = DIR_OUT + "1C"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = DIR_OUT + "40"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = DIR_OUT + "0A"; }}
               >
                 {subAlt(choice.label)}
               </button>
@@ -208,8 +220,25 @@ export function DistractionModal({
       <>
         <style>{`@keyframes comms-fade-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }`}</style>
         <div
-          className="font-mono w-full"
-          style={{ backgroundColor: "#060B0D", borderLeft: `3px solid ${style.accent}`, animation: "comms-fade-in 0.2s ease-out both" }}
+          className="w-full"
+          style={{
+            fontFamily: "var(--font-procedure)",
+            backgroundColor: "#070C12",
+            // Full border + lift (matches the procedure card) — replaces the old
+            // border-left side-stripe.
+            border: `1px solid ${style.accent}55`,
+            borderRadius: "8px",
+            overflow: "hidden",
+            // Lighter, cooler drop-shadow for the white column (see flight-check-popup).
+            boxShadow: `0 0 0 1px ${style.accent}22, 0 8px 22px rgba(15,20,30,0.16), inset 0 1px 0 rgba(255,255,255,0.05)`,
+            // When this is the active surface, ccGlowOut overrides the box-shadow with a
+            // bright OUTER breathing glow (cyan for comms) — blooms around the card in its
+            // black well, so the card reads as a lifted object.
+            animation: flashing
+              ? "comms-fade-in 0.2s ease-out both, ccGlowOut 1.5s ease-in-out infinite"
+              : "comms-fade-in 0.2s ease-out both",
+            ...(flashing ? { "--cc-fc": "0,207,255" } : {}),
+          } as CSSProperties}
         >
           {cardContent(true)}
         </div>

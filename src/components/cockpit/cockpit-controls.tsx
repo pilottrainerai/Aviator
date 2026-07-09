@@ -10,9 +10,11 @@ const AVIATE_IDS  = ["continue_rotation", "positive_rate_gear_up", "engage_ap_fm
 const GATE_ID     = "four_hundred_ft_cmd";
 const ECAM_IDS    = ["thr_lever_idle", "eng1_master_off", "eng1_fire_pb", "agent1", "agent2", "level_off_maa", "accel_clean"];
 
-const CREW_LABEL: Record<"PF" | "PM", { bg: string; color: string }> = {
-  PF: { bg: "#00CFFF18", color: "#00CFFF" },
-  PM: { bg: "#FFB30018", color: "#FFB300" },
+const CREW_LABEL: Record<NonNullable<ScenarioStep["crew"]>, { bg: string; color: string }> = {
+  PF:   { bg: "#00CFFF18", color: "#00CFFF" },
+  PM:   { bg: "#FFB30018", color: "#FFB300" },
+  CAPT: { bg: "#00CFFF18", color: "#00CFFF" },
+  CREW: { bg: "#8A94A518", color: "#8A94A5" },
 };
 
 const C = {

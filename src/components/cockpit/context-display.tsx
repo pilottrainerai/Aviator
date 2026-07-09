@@ -1,24 +1,37 @@
 "use client";
 
-// Context Display — the lower-left SD region as a manually-switched tab shell.
+// Context Display — the lower-left SD region as a tab shell.
 //   SYSTEM  → the existing <SystemDisplay> (SD synoptic), unchanged. Default.
 //   QRH     → the scenario's qrhSummary in real black-on-white QRH format.
 //   GRAPHIC → reserved space for the handling-technique diagram (built later).
-// Tabs are manual (instructor or trainee taps them) — nothing auto-switches.
-// Wired in dev-gated (?dev=1); the live flow renders <SystemDisplay> directly.
+// Tabs are tappable manually. In addition, the display AUTO-SWITCHES to follow
+// the active procedure step: a step tagged `opensContextTab` (or whose label
+// mentions "summary") pulls the matching tab up (e.g. QRH during the QRH read /
+// review). It reverts to SYSTEM on untagged steps. The auto-switch only fires
+// when the active step changes, so a manual tap is respected within a step.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ScenarioState } from "@/engine/state";
-import type { Scenario } from "@/scenarios/types";
+import type { Scenario, ScenarioStep } from "@/scenarios/types";
 import { SystemDisplay } from "./system-display";
 import { QrhSummaryCard } from "./qrh-summary-card";
 
-type Tab = "system" | "qrh" | "graphic";
+type Tab = "system" | "qrh" | "graphic" | "info";
+
+// Which tab a step wants up: explicit tag wins; otherwise a label mention of
+// "summary" routes to the QRH tab (the trainee's "summary" cue). Untagged → system.
+function tabForStep(step: ScenarioStep | null | undefined): Tab {
+  if (!step) return "system";
+  if (step.opensContextTab) return step.opensContextTab;
+  if (/summary/i.test(step.label)) return "qrh";
+  return "system";
+}
 
 const TABS: { id: Tab; label: string; sub: string }[] = [
   { id: "system", label: "SYSTEM", sub: "SD" },
   { id: "qrh", label: "QRH", sub: "SUMMARY" },
   { id: "graphic", label: "GRAPHIC", sub: "TECHNIQUE" },
+  { id: "info", label: "INFO", sub: "LEARN MORE" },
 ];
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -66,14 +79,82 @@ function GraphicPlaceholder() {
   );
 }
 
+function AdditionalInfo({
+  items,
+}: {
+  items?: Scenario["additionalInfo"];
+}) {
+  if (!items || items.length === 0) {
+    return <Centered>No additional information for this scenario yet.</Centered>;
+  }
+  return (
+    <div style={{ height: "100%", overflowY: "auto", padding: "10px", background: "#0D1117" }}>
+      {items.map((it, i) => {
+        const authoritative = it.verified && it.source.type !== "experience";
+        const badge =
+          it.source.type === "video"
+            ? { text: it.source.url ? "VIDEO ↗" : "VIDEO", color: "#3DA4FF", bg: "#10243A" }
+            : authoritative
+              ? { text: `VERIFIED · ${it.source.ref ?? it.source.type.toUpperCase()}`, color: "#5BD6A0", bg: "#10261E" }
+              : { text: "UNVERIFIED · PENDING SME", color: "#E0A33B", bg: "#2A2110" };
+        return (
+          <div
+            key={i}
+            style={{
+              marginBottom: "10px",
+              border: "1px solid #1C2130",
+              borderRadius: "4px",
+              background: "#11161F",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "7px 9px", borderBottom: "1px solid #1C2130" }}>
+              <span style={{ color: "#E8ECF4", fontSize: "12px", fontWeight: 700, letterSpacing: "0.02em", fontFamily: "monospace" }}>
+                {it.title}
+              </span>
+              <span style={{ flexShrink: 0, color: badge.color, background: badge.bg, fontSize: "8.5px", fontWeight: 700, letterSpacing: "0.06em", padding: "2px 6px", borderRadius: "3px", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                {badge.text}
+              </span>
+            </div>
+            <div style={{ padding: "8px 9px", color: "#AEB7C7", fontSize: "11px", lineHeight: 1.55, fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
+              {it.body}
+              {it.source.url && (
+                <div style={{ marginTop: "7px" }}>
+                  <a href={it.source.url} target="_blank" rel="noopener noreferrer" style={{ color: "#3DA4FF", fontSize: "10px", textDecoration: "underline" }}>
+                    Open reference ↗
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ContextDisplay({
   state,
   scenario,
+  activeStep,
 }: {
   state: ScenarioState;
   scenario: Scenario;
+  /** The current/next procedure step. Drives the auto-switch (e.g. → QRH on the
+   *  QRH summary/review steps). Optional: when absent the display is fully manual. */
+  activeStep?: ScenarioStep | null;
 }) {
   const [tab, setTab] = useState<Tab>("system");
+
+  // Auto-switch to follow the active step — but only when the step actually
+  // changes, so a manual tap is honored for the rest of that step.
+  const lastStepId = useRef<string | null>(null);
+  useEffect(() => {
+    const id = activeStep?.id ?? null;
+    if (id === lastStepId.current) return;
+    lastStepId.current = id;
+    setTab(tabForStep(activeStep));
+  }, [activeStep]);
 
   return (
     <div
@@ -144,11 +225,12 @@ export function ContextDisplay({
         {tab === "system" && <SystemDisplay state={state} scenario={scenario} />}
         {tab === "qrh" &&
           (scenario.qrhSummary ? (
-            <QrhSummaryCard summary={scenario.qrhSummary} />
+            <QrhSummaryCard summary={scenario.qrhSummary} activeSections={activeStep?.qrhHighlightSections} />
           ) : (
             <Centered>No QRH summary defined for this scenario.</Centered>
           ))}
         {tab === "graphic" && <GraphicPlaceholder />}
+        {tab === "info" && <AdditionalInfo items={scenario.additionalInfo} />}
       </div>
     </div>
   );

@@ -46,6 +46,12 @@
   --font-cockpit: var(--font-jost), "Futura", "Avenir Next",
     "Century Gothic", var(--font-sans);
 
+  /* Procedure / CRM directive typeface. B612 — commissioned by Airbus + ENAC
+     for cockpit-screen legibility and reduced reading fatigue (loaded via
+     next/font/google in layout.tsx). Apply via fontFamily:
+     "var(--font-procedure)" or class="font-procedure". */
+  --font-procedure: var(--font-b612), "B612", var(--font-sans);
+
   --text-xs: 0.6875rem;
   --text-sm: 0.8125rem;
   --text-base: 0.9375rem;
@@ -70,6 +76,11 @@ h1,
 .font-display {
   font-family: var(--font-serif);
   letter-spacing: -0.01em;
+}
+
+/* Procedure / CRM directive cards — B612 (Airbus cockpit typeface) */
+.font-procedure {
+  font-family: var(--font-procedure);
 }
 
 body::before {

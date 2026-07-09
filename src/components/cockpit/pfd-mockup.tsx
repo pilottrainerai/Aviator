@@ -210,6 +210,23 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
       const altitude = live?.altitude ?? 1500;
       const onGround = altitude === 0;
 
+      // Altitude-acquire sequence (FCOM DSC-22_30-70-65): while descending/climbing
+      // toward the FCU selected altitude (state.altArmed), the FMA goes
+      //   OP DES + ALT armed (blue)  →  ALT* (capture, green)  →  ALT (hold, green).
+      // ALT* "engages when the aircraft reaches the altitude capture zone, defined by
+      // the aircraft vertical speed". captureZone ≈ |VS|/6 ft is a trainer approximation
+      // [DRAFT — FCOM gives no exact figure: "defined by VS, among other parameters"].
+      // Driven by the DISPLAYED (lerped) altitude d.alt vs the selected altitude.
+      let vertEngaged = vertMode;   // FMA row-1 vertical label (may become ALT*/ALT)
+      let showAltArmed = false;     // FMA row-2 blue "ALT" armed
+      if (live?.altArmed && live.selectedAlt != null) {
+        const altDiff = Math.abs(d.alt - live.selectedAlt);
+        const captureZone = Math.max(150, Math.abs(live.vs ?? 0) / 6);
+        if (altDiff <= 20)               vertEngaged = "ALT";    // captured / level
+        else if (altDiff <= captureZone) vertEngaged = "ALT*";   // altitude capture
+        else                             showAltArmed = true;    // still descending → ALT armed
+      }
+
       const C_ACTIVE = "#00ff00";  // engaged modes — green
       const C_ARMED  = "#00bfff";  // armed modes — blue
       const C_WHITE  = "#ffffff";  // manual modes + special cues — white
@@ -233,7 +250,7 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
         // "SRS — Green — Takeoff or go-around mode is engaged." No cyan on row 1.
         // FCOM DSC-22_30-70-80 [fcom:L11987-11988]: V/S nulled → FMA shows "V/S = 0" in green.
         const vsVal = live?.vs ?? 0;
-        const vertLabel = (vertMode === "V/S" && vsVal === 0) ? "V/S = 0" : vertMode;
+        const vertLabel = (vertEngaged === "V/S" && vsVal === 0) ? "V/S = 0" : vertEngaged;
         const vertFontSz = vertLabel === "V/S = 0" ? 11 : 14;
         txt(vertLabel, 156, 16, vertFontSz, C_ACTIVE, "center", true, 5);
         txt(latMode,   260, 16, 14, C_ACTIVE, "center", true, 5);
@@ -257,6 +274,12 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
       } else {
         // Airborne: CLB is armed during SRS climb (altitude capture target is armed).
         if (vertMode === "SRS") txt("CLB", 156, 44, 12, C_ARMED, "center", true, 3);
+        // ALT armed (blue) — descending/climbing toward the selected alt, BEFORE the
+        // capture zone (inside the zone it becomes ALT* engaged, so no armed). See the
+        // altitude-acquire block above (FCOM DSC-22_30-70-65).
+        else if (showAltArmed) {
+          txt("ALT", 156, 44, 12, C_ARMED, "center", true, 3);
+        }
         // LVR CLB or LVR MCT cue in thrust column — white, flashing at ~1 Hz.
         if (thrCue) {
           const flashOn = Math.floor(Date.now() / 500) % 2 === 0;
@@ -860,7 +883,9 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
       prevTimestamp = timestamp;
       if (!pausedRef.current) t += 0.004;           // freeze shimmer when paused
       const live = stateRef.current
-        ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current)
+        // pass the live (displayed) altitude so the shared altitude-gated descent
+        // schedule (290/−3000 → 250/−1500 across 10 000) applies to the canvas too.
+        ? buildAircraftState(stateRef.current, scenarioRef.current, elapsedMsRef.current, lerpAlt >= 0 ? lerpAlt : undefined)
         : null;
       if (live) {
         const tgtAlt = live.altitude;
@@ -899,6 +924,12 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
         d.roll   = live.bank;
         d.speed  = Math.round(lerpSpd);
         d.vmax   = live.vmax ?? d.vmax;   // scenario VMO/MMO barber-pole (cruise raises it)
+        // Speed-trend arrow (10-s projection) = the remaining speed change toward the target, so it
+        // points DOWN while DECELERATING and UP while accelerating (FCOM speed-trend). [user 2026-07-01]
+        d.trend  = Math.max(-30, Math.min(30, Math.round(tgtSpd - lerpSpd)));
+        // VLS amber strip — from the scenario state (a FLAP-3 approach VLS sits well below VAPP, so
+        // there is no false amber band under the decelerating speed); falls back to the demo default.
+        d.vls    = live.vls ?? d.vls;
         d.law    = live.law ?? 'NORMAL';  // F/CTL law for amber-X / MAN PITCH TRIM
         d.selSpd = live.selectedSpeed;
         d.mgtSpd = live.selectedSpeed;
@@ -906,11 +937,26 @@ export default function PfdMockup({ state, scenario, elapsedMs, onPfAction, paus
         onAltitudeRef.current?.(lerpAlt);
         d.selAlt = live.selectedAlt;
         d.vs     = Math.round(lerpVs / 10) * 10;
+        // ALT* capture: closing the last capture-zone feet toward an armed selected
+        // altitude, ramp the displayed VS to 0 so the needle reads level AT the
+        // level-off (FCOM: OP DES → ALT* → ALT). Applies to every altArmed level-off
+        // (FL200, 10 000, 7 000). Value-only (pfd-fma-logic) — geometry unchanged.
+        if (live.altArmed && live.selectedAlt != null) {
+          const aDiff = Math.abs(lerpAlt - live.selectedAlt);
+          const cz = Math.max(150, Math.abs(live.vs ?? 0) / 6);
+          if (aDiff <= cz) d.vs = Math.round((d.vs * (aDiff / cz)) / 10) * 10;
+        }
+        // Manual flare: within ~60 ft of the destination field elevation while DESCENDING, ramp the
+        // displayed VS toward 0 so it reads level at the runway (the hand-flown flare — no autoland).
+        // Guarded to d.vs < 0 so takeoff climbs near the departure field are untouched. [user 2026-07-01]
+        const feAgl = lerpAlt - (live.fieldElev ?? 777);
+        if (d.vs < 0 && feAgl <= 60) d.vs = Math.round((d.vs * Math.max(0, feAgl / 60)) / 10) * 10;
         d.hdg    = live.heading;
         d.selHdg = live.selectedHdg;
         d.track  = live.track;
-        // RA = baro alt minus VIDP field elevation (777 ft AMSL)
-        d.ra = Math.max(0, Math.round(Math.min(2500, lerpAlt - 777)));
+        // RA = baro alt minus the DESTINATION field elevation (scenario `fieldElev`; e.g. Mumbai
+        // VABB ~39 ft for the divert, VIDP 777 ft default). Reads 0 only at touchdown. [user 2026-07-01]
+        d.ra = Math.max(0, Math.round(Math.min(2500, lerpAlt - (live.fieldElev ?? 777))));
       } else {
         // Demo / standalone mode — only the attitude indicator shimmers.
         d.pitch = 2    + Math.sin(t) * 0.4;

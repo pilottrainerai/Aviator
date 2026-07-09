@@ -73,8 +73,13 @@ export interface HydBtn { color: string; inOut: number; plateColor?: string; env
 export const HYD_RAT_BTN_DEFAULT: HydBtn = { color: "#000000", inOut: 0, plateColor: "#0a0000", env: 0.15, plateEnv: 0.32 };
 export const HYD_ELEC_BTN_DEFAULT: HydBtn = { color: "#000000", inOut: 0 };
 export interface HydTune {
-  capColor: string;    // button CAP (inner plate) — live fire-panel = #070a0e
-  borderColor: string; // SURROUND/border (outer plate, incl. ELEC PUMP frame) — live fire = #222730
+  capColor: string;    // button CAP (front plate) — live fire-panel = #070a0e
+  wellColor: string;   // RECESS/well the cap sits into (backing plate behind the cap) — defaults to capColor
+  borderColor: string; // SURROUND/border OUTER rim (outer plate, incl. ELEC PUMP frame) — live fire = #222730
+  borderInnerColor: string; // border frame INNER rim (the bevel facing the cap) — defaults to borderColor
+  borderMetal: number; // border rims metalness (GPWS-style bevel) — default 1.0
+  borderRough: number; // border rims roughness (lower = crisper edges) — default 0.4
+  borderEnv: number;   // border rims envMapIntensity (reflection brightness) — default 2.0
   ratColor: string;    // RAT MAN ON switch plates (under the orange guard)
   // ABSOLUTE cap offsets along the press axis (added to the imported baseY):
   neutralY: number;    // default resting position
@@ -96,7 +101,10 @@ export interface HydTune {
 // #000000 (user-dialled 2026-06-21; all plates unlit so the hex shows exactly).
 // panel* defaults mirror eng-start's Blue base (rough 0.6 / metal 1.5 / clearcoat 0.4 / env 1.0)
 // so HYD starts parameter-identical to it; tune live to match the rendered look.
-export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", borderColor: "#000000", ratColor: "#000000", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8296", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 };
+// LOCKED 2026-07-06 [user] — final HYD look. Border two-tone: OUTER rim pure black #000000 (metal 1.0
+// → no reflection = true black), INNER rim #14161b (dark metallic bevel catching the HDRI). Cap+well
+// canvas black. Do not retune without a new user pass.
+export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", wellColor: "#05070a", borderColor: "#000000", borderInnerColor: "#14161b", borderMetal: 1.0, borderRough: 0.4, borderEnv: 2.0, ratColor: "#000000", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8296", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 };
 
 function matNames(o: THREE.Object3D): Set<string> {
   const s = new Set<string>();
@@ -267,6 +275,17 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
     if (cur.length) clusters.push(cur);
     const borderSet = new Set<THREE.Mesh>();
     clusters.forEach((cl) => { if (cl.some((b) => isRat(b.mesh) || isElec(b.mesh))) return; borderSet.add(cl.reduce((a, b) => (b.foot > a.foot ? b : a)).mesh); });
+    // WELL/recess: each plain pump has 3 stacked plates — border (largest foot) + a proud front CAP
+    // (max world-Y) + a backing plate the cap recesses into. That backing plate = the well; give it
+    // its own colour so the cap↔recess edge reads. Defaults to capColor, so no visible change until dialled.
+    const wellSet = new Set<THREE.Mesh>();
+    clusters.forEach((cl) => {
+      if (cl.some((b) => isRat(b.mesh) || isElec(b.mesh))) return; // plain pumps only
+      const nonBorder = cl.filter((b) => !borderSet.has(b.mesh));
+      if (nonBorder.length < 2) return; // single cap plate → no separate well
+      const front = nonBorder.reduce((a, b) => (wp(b.mesh).y > wp(a.mesh).y ? b : a));
+      nonBorder.forEach((b) => { if (b.mesh !== front.mesh) wellSet.add(b.mesh); });
+    });
     // Split the RAT control into its two black parts: the RAISED round button vs the recessed
     // flat backing PLATE. Size is the stable discriminator (skill §10f) — the plate has the
     // largest XZ footprint; everything else in the RAT cluster is the circular button. Only
@@ -281,7 +300,7 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
     const ratRound = (m: THREE.Mesh) => { const s = new THREE.Vector3(); new THREE.Box3().setFromObject(m).getSize(s); return Math.abs(s.x - s.z) < Math.max(s.x, s.z) * 0.3; };
     const ratRoundParts = ratPlates.filter((m) => m !== ratPlateMesh && ratRound(m)).sort((a, b) => ratFoot(b) - ratFoot(a));
     const ratCenterMesh = ratRoundParts[1] ?? ratRoundParts[0] ?? null;
-    const btnClass = plates.map((mesh) => ({ mesh, isBorder: borderSet.has(mesh), isRat: isRat(mesh), isRatPlate: mesh === ratPlateMesh, isElec: isElec(mesh) }));
+    const btnClass = plates.map((mesh) => ({ mesh, isBorder: borderSet.has(mesh), isWell: wellSet.has(mesh), isRat: isRat(mesh), isRatPlate: mesh === ratPlateMesh, isElec: isElec(mesh) }));
 
     // Flat pump caps render UNLIT (MeshBasic) so they show their exact tune colour. BUT the RAT
     // MAN ON button is a RAISED round pushbutton — an unlit material flattens it (no shading on the
@@ -295,6 +314,33 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
         const lit = new THREE.MeshPhysicalMaterial({ color: 0x15171e, roughness: 0.5, metalness: 0.15 }); lit.name = "rat_btn";
         const unlit = new THREE.MeshBasicMaterial({ color: 0x05070a, toneMapped: false }); unlit.name = "rat_btn_unlit";
         mesh.userData.ratLit = lit; mesh.userData.ratUnlit = unlit; mesh.material = lit; return;
+      }
+      if (borderSet.has(mesh)) {
+        // Border frame two-tone: split the bevel ring into OUTER rim + INNER rim (facing the cap) by
+        // radial distance, so each can take its own colour. Geometry is CLONED first (isolated +
+        // revertible); default inner = outer, so it's a no-op until dialled. [user 2026-07-06]
+        const geo = (mesh.geometry = mesh.geometry.clone());
+        const pos = geo.attributes.position;
+        geo.computeBoundingBox();
+        const bb = geo.boundingBox!; const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
+        const rOf = (i: number) => Math.hypot(pos.getX(i) - cx, pos.getZ(i) - cz);
+        let rmin = Infinity, rmax = -Infinity;
+        for (let i = 0; i < pos.count; i++) { const r = rOf(i); if (r < rmin) rmin = r; if (r > rmax) rmax = r; }
+        const mid = (rmin + rmax) / 2;
+        const idx = geo.index; const triN = idx ? idx.count / 3 : pos.count / 3;
+        const vi = (t: number, k: number) => (idx ? idx.getX(t * 3 + k) : t * 3 + k);
+        const outer: number[] = [], inner: number[] = [];
+        for (let t = 0; t < triN; t++) {
+          const a = vi(t, 0), b = vi(t, 1), c = vi(t, 2);
+          ((rOf(a) + rOf(b) + rOf(c)) / 3 > mid ? outer : inner).push(a, b, c);
+        }
+        geo.setIndex([...outer, ...inner]);
+        geo.clearGroups(); geo.addGroup(0, outer.length, 0); geo.addGroup(outer.length, inner.length, 1);
+        // GPWS-style dark-metallic bevel: MeshStandard so it reflects the tinted HDRI (env bound in
+        // the useFrame below). MeshBasic would stay flat/unlit — no metallic effect.
+        const mkBorder = (n: string) => { const m = new THREE.MeshStandardMaterial({ color: 0x14161b, metalness: 1.0, roughness: 0.4, envMapIntensity: 2.0 }); m.name = n; return m; };
+        mesh.material = [mkBorder("border-outer"), mkBorder("border-inner")];
+        return;
       }
       const flat = new THREE.MeshBasicMaterial({ color: 0x05070a, toneMapped: false }); flat.name = "plate"; mesh.material = flat;
     });
@@ -391,7 +437,7 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
   // Colour the plates: RAT button (ratBtn.color) / ELEC button (elecBtn.color) / bezel border
   // (borderColor) / pump cap (capColor).
   useEffect(() => {
-    btnClass.forEach(({ mesh, isBorder, isRat: rat, isRatPlate: ratPlate, isElec: elec }) => {
+    btnClass.forEach(({ mesh, isBorder, isWell, isRat: rat, isRatPlate: ratPlate, isElec: elec }) => {
       // RAT round button + flat plate: the darkness knob fades the LIT material CONTINUOUSLY to
       // near-black (albedo × slider kills the lit diffuse floor; specularIntensity × slider kills the
       // dielectric sheen that otherwise stays grey-black; reflection scales too). Only at the very
@@ -414,14 +460,31 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
         }
         return;
       }
+      // Border frame is a 2-material array [outer, inner] (radial split); colour each rim separately.
+      if (isBorder && Array.isArray(mesh.material)) {
+        const [outer, inner] = mesh.material as THREE.MeshBasicMaterial[];
+        if (outer?.color) { outer.color.set(tune.borderColor); outer.needsUpdate = true; }
+        if (inner?.color) { inner.color.set(tune.borderInnerColor); inner.needsUpdate = true; }
+        return;
+      }
       const mm = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
       const sm = mm as THREE.MeshStandardMaterial;
       if (sm && sm.color) {
-        sm.color.set(elec ? elecBtn.color : isBorder ? tune.borderColor : tune.capColor);
+        sm.color.set(elec ? elecBtn.color : isBorder ? tune.borderColor : isWell ? tune.wellColor : tune.capColor);
         sm.needsUpdate = true;
       }
     });
-  }, [btnClass, tune.capColor, tune.borderColor, ratBtn.color, ratBtn.plateColor, ratBtn.env, ratBtn.plateEnv, elecBtn.color]);
+  }, [btnClass, tune.capColor, tune.wellColor, tune.borderColor, tune.borderInnerColor, ratBtn.color, ratBtn.plateColor, ratBtn.env, ratBtn.plateEnv, elecBtn.color]);
+
+  // Border rims GPWS-style metallic knobs (live). envMap is bound in the useFrame; these own the look.
+  useEffect(() => {
+    btnClass.forEach(({ mesh, isBorder }) => {
+      if (!isBorder || !Array.isArray(mesh.material)) return;
+      (mesh.material as THREE.MeshStandardMaterial[]).forEach((bm) => {
+        if (bm && "metalness" in bm) { bm.metalness = tune.borderMetal; bm.roughness = tune.borderRough; bm.envMapIntensity = tune.borderEnv; bm.needsUpdate = true; }
+      });
+    });
+  }, [btnClass, tune.borderMetal, tune.borderRough, tune.borderEnv]);
 
   // Guard LID colour — recolour the flip-up cover meshes themselves: RAT = red "orange housijng",
   // ELEC = the black cover mesh (which shipped pure-black, so it now gets a real, pickable colour).
@@ -523,7 +586,21 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
   const bound = useRef(false);
   useEffect(() => { bound.current = false; }, [panelMats]);
   useFrame(({ scene: fs }) => {
-    if (!bound.current && fs.environment) { panelMats.forEach((m) => { m.envMap = fs.environment; m.needsUpdate = true; }); bound.current = true; }
+    if (!bound.current && fs.environment) {
+      panelMats.forEach((m) => { m.envMap = fs.environment; m.needsUpdate = true; });
+      // GPWS-style dark-metallic crisp bevel edges on the pump-button BORDERS/surrounds only.
+      // Cap, RAT/ELEC buttons, guards, legends untouched. Effect shows once borderColor is lifted
+      // off pure black (metal reflects the tinted HDRI). [user 2026-07-06 — revertible, backed up]
+      btnClass.forEach(({ mesh, isBorder }) => {
+        if (!isBorder) return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]; // border = [outer, inner]
+        mats.forEach((mm) => {
+          const bm = mm as THREE.MeshStandardMaterial;
+          if (bm && "metalness" in bm) { bm.envMap = fs.environment; bm.needsUpdate = true; } // metal/rough/env owned by the slider effect
+        });
+      });
+      bound.current = true;
+    }
   });
 
   const { camera, size, controls } = useThree();
@@ -538,7 +615,9 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
     const vFov = (cam.fov * Math.PI) / 180;
     const aspect = size.width / Math.max(1, size.height);
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-    const dist = Math.max(w / 2 / Math.tan(hFov / 2), h / 2 / Math.tan(vFov / 2)) * 1.08 + dim[normal];
+    // Tighter fit so the wide HYD panel FILLS the frame (was *1.08 + full depth term → rendered as a
+    // small thin strip in the action panel, reading as "blurry"). Small depth margin avoids clipping. [user 2026-07-06]
+    const dist = Math.max(w / 2 / Math.tan(hFov / 2), h / 2 / Math.tan(vFov / 2)) * 1.02 + dim[normal] * 0.25;
     const viewDir = new THREE.Vector3(normal === "x" ? 1 : 0, normal === "y" ? 1 : 0, normal === "z" ? 1 : 0);
     const heightAxis = dims[1].a;
     cam.up.set(heightAxis === "x" ? -1 : 0, heightAxis === "y" ? -1 : 0, heightAxis === "z" ? -1 : 0);

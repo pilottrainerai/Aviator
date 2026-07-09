@@ -4,9 +4,11 @@ import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
 import type { Scenario, ScenarioStep } from "@/scenarios/types";
 
-const CREW_BADGE: Record<"PF" | "PM", { bg: string; text: string }> = {
-  PF: { bg: "#00CFFF22", text: "#00CFFF" },
-  PM: { bg: "#FFB30022", text: "#FFB300" },
+const CREW_BADGE: Record<NonNullable<ScenarioStep["crew"]>, { bg: string; text: string }> = {
+  PF:   { bg: "#00CFFF22", text: "#00CFFF" },
+  PM:   { bg: "#FFB30022", text: "#FFB300" },
+  CAPT: { bg: "#00CFFF22", text: "#00CFFF" },
+  CREW: { bg: "#8A94A522", text: "#8A94A5" },
 };
 
 const C = {

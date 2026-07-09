@@ -3,13 +3,14 @@
 // HUB_TAG: ENG1_FIRE_PANEL_HUB_BASELINE_V1
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from "react";
 import { useScenarioRunner } from "@/lib/scenarios/runner";
 import type { Scenario, ScenarioDistraction, ScenarioStep, AirportOption } from "@/scenarios/types";
 import type { ScenarioState } from "@/engine/state";
 import type { PilotAction } from "@/engine/events";
 import { ScenarioClock } from "@/components/cockpit/scenario-clock";
 import { EwdDisplay } from "@/components/cockpit/ewd-display";
+import { phaseEngine } from "@/components/cockpit/ewd-gauges";
 import { DecisionPanel } from "@/components/cockpit/decision-panel";
 import { PreflightBrief } from "@/components/cockpit/preflight-brief";
 import { FireBanner } from "@/components/cockpit/fire-banner";
@@ -17,16 +18,20 @@ import { GuidancePanel } from "@/components/cockpit/guidance-panel";
 import { AudioController } from "@/components/cockpit/audio-controller";
 import { NdCanvas, buildAircraftState, getActivePfActionPhase } from "@/components/cockpit/pfd-nd";
 import PfdMockup from "@/components/cockpit/pfd-mockup";
+import SvgPfd from "@/components/cockpit/svg-pfd";
 import { DistractionModal } from "@/components/cockpit/distraction-modal";
 import { ScenarioInspector } from "@/components/dev/scenario-inspector";
 import { GlareshieldPanel } from "@/components/cockpit/glareshield-panel";
-import { FlightCheckPopup } from "@/components/cockpit/flight-check-popup";
+import { CategoryChips, FlightCheckPopup, PerformerChip, ReferenceChips } from "@/components/cockpit/flight-check-popup";
 import { FirePanel } from "@/components/cockpit/fire-panel";
 import { SystemDisplay } from "@/components/cockpit/system-display";
 import { ContextDisplay } from "@/components/cockpit/context-display";
-import { StatusPanel } from "@/components/cockpit/status-panel";
+import { StatusPanel, isStatusReady } from "@/components/cockpit/status-panel";
+import { HydSdPage } from "@/components/cockpit/hyd-sd-page";
 import { getApplicableRequiredSteps, isStepApplicable } from "@/lib/scenarios/step-applicability";
 import { track } from "@/lib/analytics";
+import { DescentProfile } from "@/components/cockpit/descent-profile";
+import { applyDualHydGYCardOverrides } from "@/scenarios/data/dual-hyd-g-y-card-overrides";
 
 const AUTO_END_DELAY_MS = 3_000;
 const DEV_ANN_KEY = "devAnnotations:eng1-fire-v1";
@@ -95,15 +100,19 @@ function FirePanelContainer({
   state,
   perform,
   disabled,
+  flashing,
+  actionOnly,
 }: {
   scenario: import("@/scenarios/types").Scenario;
   state: import("@/engine/state").ScenarioState;
   perform: (a: import("@/engine/events").PilotAction) => void;
   disabled?: boolean;
+  flashing?: boolean;
+  actionOnly?: boolean;
 }) {
   return (
     <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-      <FirePanel scenario={scenario} state={state} perform={perform} disabled={disabled} />
+      <FirePanel scenario={scenario} state={state} perform={perform} disabled={disabled} flashing={flashing} actionOnly={actionOnly} />
     </div>
   );
 }
@@ -336,14 +345,18 @@ export function ScenarioRunner({ scenario }: { scenario: Scenario }) {
 
 function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario: Scenario; selectedAirport?: AirportOption }) {
   const scenario = useMemo<Scenario>(() => {
-    const sequence = loadSavedSequence(baseScenario.meta.slug);
-    if (!sequence.length) return baseScenario;
+    const hydratedBase = baseScenario.meta.slug === "dual-hyd-g-y"
+      ? { ...baseScenario, steps: applyDualHydGYCardOverrides(baseScenario.steps) }
+      : baseScenario;
 
-    const orderedSteps = reorderBySavedSequence(baseScenario.steps, sequence);
-    const orderedDistractions = reorderBySavedSequence(baseScenario.distractions ?? [], sequence);
+    const sequence = loadSavedSequence(baseScenario.meta.slug);
+    if (!sequence.length) return hydratedBase;
+
+    const orderedSteps = reorderBySavedSequence(hydratedBase.steps, sequence);
+    const orderedDistractions = reorderBySavedSequence(hydratedBase.distractions ?? [], sequence);
 
     return {
-      ...baseScenario,
+      ...hydratedBase,
       steps: orderedSteps,
       distractions: orderedDistractions,
     };
@@ -382,6 +395,12 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
   // Live (animated) aircraft altitude, reported by the PFD each frame — used for
   // altitude-gated distractions (e.g. "passing 22 000 ft → descend 10 000").
   const liveAltRef = useRef<number>(35_000);
+  const liveSpeedRef = useRef<number>(265);
+  // Reactive copy of the live altitude for the DescentProfile (the ref doesn't
+  // re-render). Throttled to ~300 ms — CSS transition smooths the gaps.
+  // ponytail: throttled state, not per-frame; below-fold viz, churn is fine.
+  const [liveAlt, setLiveAlt] = useState<number>(35_000);
+  const liveAltTsRef = useRef<number>(0);
 
   // Fire distractions at their scheduled atMs.  If `requiresStep` is set,
   // the distraction also waits for that step to be marked complete — atMs
@@ -398,6 +417,97 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
     }
   }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.distractions]);
 
+  // Altitude-driven step gate: APPROACHING 7 500 ft (descending to the 7 000 hold) completes
+  // the hidden `at_hold_7000` step (silent — no card), which unlocks the approach checklist
+  // and everything after it [Trainer ALT #3]. Only fires once the briefing is done and the
+  // live (animated) altitude has descended to ~7 500.
+  const firedHoldGateRef = useRef(false);
+  useEffect(() => {
+    if (runner.status !== "running" || firedHoldGateRef.current) return;
+    if (!scenario.steps.some((s) => s.id === "at_hold_7000")) return;
+    if (runner.state.completedSteps["at_hold_7000"]) { firedHoldGateRef.current = true; return; }
+    if (!runner.state.completedSteps["approach_brief_ga"]) return;
+    if (liveAltRef.current > 7_600) return;
+    firedHoldGateRef.current = true;
+    runner.perform({ kind: "STEP", stepId: "at_hold_7000" });
+  }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
+
+  // [user 2026-07-05] At/below ~5 100 ft with the 5 000 descent (P33) done → complete the hidden
+  // `at_level_3700` gate, so P35 CONFIGURE FOR APPROACH only happens once LEVEL at 5 000 (ALT).
+  const firedLevel3700Ref = useRef(false);
+  useEffect(() => {
+    if (runner.status !== "running" || firedLevel3700Ref.current) return;
+    if (!scenario.steps.some((s) => s.id === "at_level_3700")) return;
+    if (runner.state.completedSteps["at_level_3700"]) { firedLevel3700Ref.current = true; return; }
+    if (!runner.state.completedSteps["descend_3700"]) return;
+    if (liveAltRef.current > 5_100) return;
+    firedLevel3700Ref.current = true;
+    runner.perform({ kind: "STEP", stepId: "at_level_3700" });
+  }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
+
+  // [user 2026-07-01] At/below 13 000 ft with the briefing done → complete `at_13000`, so the
+  // APPROACH CHECKLIST becomes available AT 13 000 — a window to finish it before the 12 500 decision.
+  const fired13000Ref = useRef(false);
+  useEffect(() => {
+    if (runner.status !== "running" || fired13000Ref.current) return;
+    if (!scenario.steps.some((s) => s.id === "at_13000")) return;
+    if (runner.state.completedSteps["at_13000"]) { fired13000Ref.current = true; return; }
+    if (!runner.state.completedSteps["approach_brief_ga"]) return;
+    if (liveAltRef.current > 13_000) return;
+    fired13000Ref.current = true;
+    runner.perform({ kind: "STEP", stepId: "at_13000" });
+  }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
+
+  // [user 2026-07-01] TOUCHDOWN — once the landing checklist is done and the live tape reaches the
+  // runway (≤ 50 ft), complete `touched_down` so the PFD drops the FD ILS modes and decelerates the
+  // speed to 0 (the hand-flown rollout — no autoland ROLL OUT). Altitude-driven, fires once.
+  const firedTouchdownRef = useRef(false);
+  useEffect(() => {
+    if (runner.status !== "running" || firedTouchdownRef.current) return;
+    if (!scenario.steps.some((s) => s.id === "touched_down")) return;
+    if (runner.state.completedSteps["touched_down"]) { firedTouchdownRef.current = true; return; }
+    if (!runner.state.completedSteps["landing_cl_hyd"]) return;
+    if (liveAltRef.current > 50) return;
+    firedTouchdownRef.current = true;
+    runner.perform({ kind: "STEP", stepId: "touched_down" });
+  }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
+
+  // [user 2026-07-04] FULL STOP — after touchdown, once the live speed has decelerated to ~0 kt on the
+  // rollout, complete `full_stop`. This is what gates the REQUEST TAXI / Mumbai-Tower call, so it can
+  // NEVER appear while still airborne or rolling. Speed-driven, fires once.
+  const firedFullStopRef = useRef(false);
+  useEffect(() => {
+    if (runner.status !== "running" || firedFullStopRef.current) return;
+    if (!scenario.steps.some((s) => s.id === "full_stop")) return;
+    if (runner.state.completedSteps["full_stop"]) { firedFullStopRef.current = true; return; }
+    if (!runner.state.completedSteps["touched_down"]) return;
+    if (liveSpeedRef.current > 5) return;                 // only at the full stop (0 kt)
+    firedFullStopRef.current = true;
+    runner.perform({ kind: "STEP", stepId: "full_stop" });
+  }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
+
+  // [Trainer ALT #3 · user 2026-06-30] Vectors-vs-hold decision — a SINGLE SNAPSHOT at 12 500 ft.
+  // At the first crossing of 12 500 the runner reads the APPROACH CHECKLIST (`approach_cl_hyd`):
+  //   • DONE by 12 500 → `prep_ready` (LONG VECTORS: A14 request → descend 7 000 → at 7 000
+  //     ready-for-approach → descend 5 000 + cleared approach);
+  //   • NOT done → `prep_late` (HOLD: request hold → descend 7 000 → hold there, finish the
+  //     checklist, then approach).
+  // Both paths converge on 7 000. Silent, fires once. liveAltRef = the live (animated) tape.
+  const firedPrepGateRef = useRef(false);
+  useEffect(() => {
+    if (runner.status !== "running" || firedPrepGateRef.current) return;
+    if (!scenario.steps.some((s) => s.id === "prep_ready")) return;
+    if (runner.state.completedSteps["prep_ready"] || runner.state.completedSteps["prep_late"]) { firedPrepGateRef.current = true; return; }
+    if (liveAltRef.current > 12_500) return;                           // decision at 12 500
+    // [user 2026-07-01 · rule 10 atomic loop] Don't fire the decision — and thus its request card —
+    // until the changeover LOOP (check-in → radar continue-descent ack) is complete, so a lower-altitude
+    // request never supersedes the running check-in/ack exchange.
+    if (scenario.steps.some((s) => s.id === "cont_descent_acked") && !runner.state.completedSteps["cont_descent_acked"]) return;
+    firedPrepGateRef.current = true;
+    const ready = !!runner.state.completedSteps["approach_cl_hyd"];    // APP CL done?
+    runner.perform({ kind: "STEP", stepId: ready ? "prep_ready" : "prep_late" });
+  }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
+
   // Cooldown after a correct answer — next queued call waits this long
   const [atcNextAllowedAt, setAtcNextAllowedAt] = useState(0);
 
@@ -413,6 +523,14 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
         !!runner.state.completedSteps["ecam_actions"] &&
         !pumpIds.every((id) => !!runner.state.completedSteps[id]);
       if (ecamPanelActive) return;
+    }
+    // The action panel has PRIORITY over ATC: also suppress while the GPWS action panel is popped
+    // (approach CONFIG window — APPR PREP 1/2 done → APPR PREP 2/2 not yet). [user 2026-07-06]
+    if (ed?.gpwsMap) {
+      const gpwsPanelActive =
+        !!runner.state.completedSteps["approach_prep_hyd"] &&
+        !runner.state.completedSteps["approach_prep_config"];
+      if (gpwsPanelActive) return;
     }
     const now = Date.now();
     if (now < atcNextAllowedAt) {
@@ -450,7 +568,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
         // 1 s for the opening MAYDAY exchange, 15 s default for the rest.
         standbyCountRef.current.delete(d.id);
         setAtcPhase({ kind: "idle" });
-        setAtcNextAllowedAt(Date.now() + (d.gapAfterMs ?? 15_000));
+        setAtcNextAllowedAt(Date.now() + (d.gapAfterMs ?? 5_000));
         // If the distraction declares a step (e.g. PM MAYDAY card completing
         // mayday_atc), complete it now so downstream gates fire correctly.
         if (d.completesStep) {
@@ -593,13 +711,14 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
               : primaryNextStep.hardware
                 ? "firepanel"
                 : "procedure";
-  // Once ECAM ACTIONS is commanded (the action panel pops), STOP all guidance flashing —
-  // including comms — so the trainee just works the panel (B2).
   const ecamCommanded = !!runner.state.completedSteps["ecam_actions"];
-  // SET of surfaces that pulse for the current step. Special case: COMMUNICATE
-  // (declare_mayday) pulses PFD + ND + procedure together (B1).
+  // SET of surfaces that pulse for the current step — the "next action" pointer.
+  // Exactly ONE surface pulses (the next thing to read/press/review) so the pilot's
+  // eye lands on it across the 4-6 screens. This pointer PERSISTS for the whole
+  // scenario (it is NOT switched off after ECAM ACTIONS — the trainee always needs
+  // to see what's next). Special case: COMMUNICATE (declare_mayday) PFD + ND.
   let activeFlashes: string[] =
-    ecamCommanded || !trainingGuide || !primaryNextStep
+    !trainingGuide || !primaryNextStep
       ? []
       : primaryNextStep.id === "start_descent"
         ? ["pfd", "nd"]                          // descent card (after MAYDAY): PFD + ND both pulse
@@ -608,24 +727,50 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
           : [];
   // ATC priority: while a call is pending, DON'T flash the procedure section.
   if (commsCallFlash) activeFlashes = activeFlashes.filter((s) => s !== "procedure");
-  const commsFlashOn = commsCallFlash && !ecamCommanded;
+  const commsFlashOn = commsCallFlash;
   const flashes = new Set(activeFlashes);
-  const FLASH_ANIM = "ccGuideFlash 1.25s ease-out infinite";
-  const guideFlash = (key: string) =>
-    flashes.has(key) ? { animation: FLASH_ANIM, borderRadius: "4px" } : {};
-  // Overlay flash — sits ON TOP of opaque panel content (fire panel / ECAM), so it's visible.
+  const FLASH_ANIM = "ccPulse 1.7s ease-in-out infinite";
+  // Severity colour for the MASTER WARN/CAUT (glareshield) + ECAM flash: RED for a
+  // warning, AMBER for a caution — matches the real warning lights, far more legible
+  // than guidance-blue. Source: the next step's variant, else the live master light,
+  // else the scenario's warning condition (a red warning persists after the light is
+  // cancelled — the situation is still a warning).
+  const warnSituation = !!(scenario.engineDisplay?.warningTrigger && runner.state.triggersFired[scenario.engineDisplay.warningTrigger]);
+  const sevRgb = () =>
+    primaryNextStep?.variant === "warning" ? "255,51,51"
+      : primaryNextStep?.variant === "caution" ? "255,179,0"
+        : runner.state.masterWarnActive ? "255,51,51"
+          : runner.state.masterCautActive ? "255,179,0"
+            : warnSituation ? "255,51,51"
+              : "57,129,246";
+  // Per-surface accent (RGB triplet, consumed as rgba(var(--cc-fc),a)). Glareshield +
+  // ECAM carry the severity colour; comms = cyan; other instruments = guidance blue.
+  const flashRgb = (key: string) =>
+    key === "comms" ? "0,207,255"
+      : key === "glareshield" || key === "firepanel" ? sevRgb()
+        : "57,129,246";
+  // Overlay flash — sits ON TOP of opaque panel content (PFD / ND / glareshield / ECAM,
+  // all black inside). These INSTRUMENT panels use the INSET glow (ccLift) — the glow
+  // lights the black interior from the edges inward. (The comms/procedure CARDS use the
+  // OUTER bloom ccGlowOut instead — see their components.)
   const flashOverlay = (key: string) =>
     flashes.has(key) ? (
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: "4px", animation: FLASH_ANIM }} />
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: "6px", animation: `${key === "glareshield" ? "ccLiftEdge" : "ccLift"} 1.5s ease-in-out infinite`, "--cc-fc": flashRgb(key) } as CSSProperties} />
     ) : null;
-  const flashOverlayIf = (on: boolean) =>
-    on ? (
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: "4px", animation: FLASH_ANIM }} />
-    ) : null;
+  // White-column card highlight (comms + procedure): the deep ring + breathing lift
+  // (ccLift) is applied ON THE CARD itself — see the `flashing` prop on DistractionModal /
+  // FlightCheckPopup — so it hugs the card instead of ringing the whole panel.
+  const commsCardFlash = flashes.has("comms") || commsFlashOn;
+  // The procedure card flashes whenever it's presenting a CONFIRM (guide on). The
+  // CONFIRM is the only thing that advances the scenario, so it ALWAYS needs to flash —
+  // independent of which instrument surface the step also points to (e.g. AVIATE points
+  // to the PFD, but its confirm card must still flash). The card itself gates out the
+  // "READING…" phase (see flashNow in FlightCheckPopup).
+  const procCardFlash = trainingGuide;
   // On-screen guidance word (AVIATE / NAVIGATE / DESCENT) over the flashing PFD/ND.
   // Per-surface guidance word. DESCENT card splits: PFD = "DESCENT", ND = "OFFSET 2 NM R".
   const flashMsgFor = (key: string): string | undefined => {
-    if (!trainingGuide || !primaryNextStep || ecamCommanded) return undefined;
+    if (!trainingGuide || !primaryNextStep) return undefined;
     if (primaryNextStep.id === "start_descent") return key === "nd" ? "OFFSET 2 NM R" : "DESCENT";
     return primaryNextStep.flashMsg;
   };
@@ -686,6 +831,14 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
 
   const remaining = autoEndAt != null ? Math.max(0, autoEndAt - Date.now()) : null;
 
+  // dual-hyd: derive live phase-thrust + SAT/TAT from the governor (computed once, reused).
+  const liveAc = scenario.meta.slug === "dual-hyd-g-y"
+    ? buildAircraftState(runner.state, scenario, runner.elapsedMs, liveAltRef.current) : null;
+  const liveEng = liveAc ? phaseEngine(liveAc.vertMode, liveAltRef.current, liveAc.altitude) : undefined;
+  // Mumbai descent: SAT 32°C at sea level → −44°C at FL350 (ISA+10); TAT = SAT + ram rise (TAS²/7592).
+  const liveSat = liveAc ? Math.round(32 - liveAltRef.current * (76 / 35000)) : undefined;
+  const liveTat = liveAc ? Math.round(liveSat! + (liveAc.tas ?? 0) ** 2 / 7592) : undefined;
+
   return (
     <main className="flex flex-col">
 
@@ -717,69 +870,139 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
       <AudioController active={runner.state.masterWarnActive} cautActive={runner.state.masterCautActive} />
       <ScenarioClock elapsedMs={runner.elapsedMs} state={runner.state} scenario={scenario} />
 
-      <style>{`@keyframes ccGuideFlash{0%{box-shadow:inset 0 0 0 2px rgba(57,129,246,1),0 0 0 0 rgba(57,129,246,.6)}70%{box-shadow:inset 0 0 0 2px rgba(57,129,246,.5),0 0 0 9px rgba(57,129,246,.18)}100%{box-shadow:inset 0 0 0 2px rgba(57,129,246,0),0 0 0 16px rgba(57,129,246,0)}}@keyframes ccGuideMsg{0%,100%{opacity:.6}50%{opacity:1}}`}</style>
+      <style>{`
+        @keyframes ccPulse{
+          0%,100%{box-shadow:inset 0 0 0 1px rgba(var(--cc-fc,57,129,246),.30), 0 0 0 0 rgba(var(--cc-fc,57,129,246),0)}
+          50%{box-shadow:inset 0 0 0 1px rgba(var(--cc-fc,57,129,246),.92), 0 0 16px 1px rgba(var(--cc-fc,57,129,246),.5)}
+        }
+        /* ccLift — the highlight for elements that sit on a BLACK inside (comms /
+           procedure cards, glareshield, ECAM, pop-out). The glow is INSET: it lights
+           the black interior from the edges INWARD (not an outer bloom into the white
+           surroundings). Bright ring at the very edge + an inward glow; colour via --cc-fc. */
+        @keyframes ccLift{
+          0%,100%{box-shadow:
+            inset 0 0 0 1px rgba(var(--cc-fc,57,129,246),.5),
+            inset 0 0 10px 1px rgba(var(--cc-fc,57,129,246),.18)}
+          50%{box-shadow:
+            inset 0 0 0 2px rgba(var(--cc-fc,57,129,246),1),
+            inset 0 0 26px 4px rgba(var(--cc-fc,57,129,246),.5)}
+        }
+        /* ccLiftEdge — SHALLOW inset glow for SMALL panels (master warn/caut): the glow
+           hugs the edges and doesn't reach far into the interior (the deep ccLift reach
+           swallows a small panel). Same bright edge ring, much shorter inward bloom. */
+        @keyframes ccLiftEdge{
+          0%,100%{box-shadow:
+            inset 0 0 0 1px rgba(var(--cc-fc,57,129,246),.5),
+            inset 0 0 5px 0 rgba(var(--cc-fc,57,129,246),.2)}
+          50%{box-shadow:
+            inset 0 0 0 2px rgba(var(--cc-fc,57,129,246),1),
+            inset 0 0 11px 1px rgba(var(--cc-fc,57,129,246),.55)}
+        }
+        /* ccGlowOut — OUTER bloom, for the comms/procedure CARDS: the glow blooms
+           outward around the card in its black well (the card reads as a lifted object).
+           Instruments use the inset ccLift instead. */
+        @keyframes ccGlowOut{
+          0%,100%{box-shadow:
+            inset 0 0 0 1px rgba(var(--cc-fc,57,129,246),.45),
+            0 0 0 0 rgba(var(--cc-fc,57,129,246),0)}
+          50%{box-shadow:
+            inset 0 0 0 2px rgba(var(--cc-fc,57,129,246),1),
+            0 0 22px 3px rgba(var(--cc-fc,57,129,246),.6)}
+        }
+        @keyframes ccGuideMsg{0%,100%{opacity:.6}50%{opacity:1}}
+        @media (prefers-reduced-motion: reduce){
+          [style*="ccPulse"]{animation:none !important;box-shadow:inset 0 0 0 1px rgba(var(--cc-fc,57,129,246),.85), 0 0 14px 1px rgba(var(--cc-fc,57,129,246),.45) !important}
+          [style*="ccLift"]{animation:none !important;box-shadow:inset 0 0 0 2px rgba(var(--cc-fc,57,129,246),1), inset 0 0 24px 3px rgba(var(--cc-fc,57,129,246),.5) !important}
+          [style*="ccLiftEdge"]{animation:none !important;box-shadow:inset 0 0 0 2px rgba(var(--cc-fc,57,129,246),1), inset 0 0 10px 1px rgba(var(--cc-fc,57,129,246),.5) !important}
+          [style*="ccGlowOut"]{animation:none !important;box-shadow:inset 0 0 0 2px rgba(var(--cc-fc,57,129,246),1), 0 0 20px 3px rgba(var(--cc-fc,57,129,246),.55) !important}
+          [style*="ccGuideMsg"]{animation:none !important;opacity:1 !important}
+        }
+      `}</style>
       <div className="flex flex-1 min-h-0">
 
-        {/* ── LEFT PANEL — cockpit instruments ────────────────────────── */}
+        {/* ── LEFT PANEL — 6 equal cockpit screens in a 3×2 grid ──────────── */}
         <div
-          style={{ flex: "0 0 68%", borderRight: "1px solid var(--color-border)", overflow: "hidden", display: "flex", flexDirection: "row" }}
+          style={{ flex: "0 0 68%", borderRight: "1px solid var(--color-border)", overflow: "hidden", display: "flex", flexDirection: "column" }}
         >
-          {/* Left sub-column: PFD + ND → Glareshield → ECAM fills remaining height */}
-          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", padding: "10px 4px 8px 10px", overflow: "hidden" }}>
-            {/* PFD + ND */}
-            <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-              <div style={{ width: "380px", height: "380px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden" }}>
-                <div style={{ position: "relative", width: "100%", height: "100%" }}>
-                  {flashOverlay("pfd")}
-                  {flashLabel("pfd")}
-                  <PfdMockup
-                    state={runner.state}
-                    scenario={scenario}
-                    elapsedMs={runner.elapsedMs}
-                    paused={runner.paused}
-                    onAltitude={(ft) => { liveAltRef.current = ft; }}
-                    onPfAction={(phaseId) => {
-                      const phase = scenario.phases?.find(p => p.id === phaseId);
-                      if (phase?.pfAction?.stepId) {
-                        runner.perform({ kind: "STEP", stepId: phase.pfAction.stepId });
-                      }
-                    }}
-                  />
-                  {/* Dev-mode PAUSED badge on PFD */}
-                  {isDevMode && runner.paused && (
-                    <div style={{
-                      position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)",
-                      background: "rgba(255,215,0,0.15)", border: "1px solid #FFD700",
-                      color: "#FFD700", fontSize: "10px", fontFamily: "monospace",
-                      fontWeight: 700, letterSpacing: "0.12em", padding: "2px 10px",
-                      borderRadius: "3px", pointerEvents: "none",
-                    }}>
-                      ⏸ PAUSED
-                    </div>
-                  )}
+          {/* Glareshield — compact strip across the top */}
+          <div style={{ flexShrink: 0, padding: "8px 10px 0", position: "relative" }}>
+            <GlareshieldPanel
+              scenario={scenario}
+              state={runner.state}
+              perform={runner.perform}
+              disabled={runner.status !== "running"}
+            />
+            {flashOverlay("glareshield")}
+          </div>
+
+          {/* row1: PFD · ND · ACTION  |  row2: E/WD · STATUS · SD — all same size */}
+          <div style={{ flex: "1 1 0", minHeight: 0, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gridTemplateRows: "1fr 1fr", gap: "8px", padding: "8px 10px" }}>
+
+            {/* PFD */}
+            <div style={{ minWidth: 0, minHeight: 0, border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden", position: "relative" }}>
+              {flashOverlay("pfd")}
+              {flashLabel("pfd")}
+              {scenario.meta.slug === "dual-hyd-g-y" ? (
+                <SvgPfd
+                  state={runner.state}
+                  scenario={scenario}
+                  elapsedMs={runner.elapsedMs}
+                  paused={runner.paused}
+                  onAltitude={(ft) => { liveAltRef.current = ft; const now = Date.now(); if (now - liveAltTsRef.current > 300) { liveAltTsRef.current = now; setLiveAlt(ft); } }}
+                  onSpeed={(kt) => { liveSpeedRef.current = kt; }}
+                />
+              ) : (
+                <PfdMockup
+                  state={runner.state}
+                  scenario={scenario}
+                  elapsedMs={runner.elapsedMs}
+                  paused={runner.paused}
+                  onAltitude={(ft) => { liveAltRef.current = ft; }}
+                  onPfAction={(phaseId) => {
+                    const phase = scenario.phases?.find(p => p.id === phaseId);
+                    if (phase?.pfAction?.stepId) {
+                      runner.perform({ kind: "STEP", stepId: phase.pfAction.stepId });
+                    }
+                  }}
+                />
+              )}
+              {isDevMode && runner.paused && (
+                <div style={{
+                  position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)",
+                  background: "rgba(255,215,0,0.15)", border: "1px solid #FFD700",
+                  color: "#FFD700", fontSize: "10px", fontFamily: "monospace",
+                  fontWeight: 700, letterSpacing: "0.12em", padding: "2px 10px",
+                  borderRadius: "3px", pointerEvents: "none",
+                }}>
+                  ⏸ PAUSED
                 </div>
-              </div>
-              <div style={{ width: "330px", height: "330px", border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden", position: "relative" }}>
-                <NdCanvas state={runner.state} scenario={scenario} elapsedMs={runner.elapsedMs} paused={runner.paused} />
-                {flashOverlay("nd")}
-                {flashLabel("nd")}
-              </div>
+              )}
             </div>
-            {/* Glareshield — compact strip */}
-            <div style={{ flexShrink: 0, marginTop: "4px", position: "relative" }}>
-              <GlareshieldPanel
+
+            {/* ND */}
+            <div style={{ minWidth: 0, minHeight: 0, border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden", position: "relative" }}>
+              <NdCanvas state={runner.state} scenario={scenario} elapsedMs={runner.elapsedMs} paused={runner.paused} />
+              {flashOverlay("nd")}
+              {flashLabel("nd")}
+            </div>
+
+            {/* ACTION PANEL — engine display removed (the E/WD shows it) */}
+            <div style={{ minWidth: 0, minHeight: 0, border: "1px solid var(--color-border)", overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
+              <FirePanelContainer
                 scenario={scenario}
                 state={runner.state}
                 perform={runner.perform}
                 disabled={runner.status !== "running"}
+                flashing={flashes.has("firepanel")}
+                actionOnly
               />
-              {flashOverlay("glareshield")}
             </div>
-            {/* ECAM (E/WD) — fills remaining height */}
-            <div style={{ flex: "1 1 0", minHeight: 0, marginTop: "4px", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
-              <EwdDisplay state={runner.state} scenario={scenario} />
+
+            {/* E/WD (engine/warning display) — dual-hyd drives idle/level/cruise/climb/approach
+                thrust from the live PFD phase (reuses buildAircraftState). [user 2026-07-05] */}
+            <div style={{ minWidth: 0, minHeight: 0, border: "1px solid var(--color-border)", overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
+              <EwdDisplay state={runner.state} scenario={scenario} live={liveEng} />
               {flashOverlay("firepanel")}
-              {/* Press the ECAM to command ECAM ACTIONS (pops the HYD action panel). */}
               {trainingGuide && primaryNextStep?.id === "ecam_actions" && !ecamCommanded && (
                 <button
                   type="button"
@@ -789,31 +1012,25 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                 />
               )}
             </div>
-            {/* STATUS page — below ECAM, same left sub-column */}
-            <StatusPanel scenario={scenario} state={runner.state} />
-          </div>
 
-          {/* Right sub-column: Fire/Engine (top) + System Display (mid) */}
-          <div style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: "6px", padding: "10px 10px 8px 4px" }}>
-            <div style={{ flex: "1 1 0", minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
-              <FirePanelContainer
-                scenario={scenario}
-                state={runner.state}
-                perform={runner.perform}
-                disabled={runner.status !== "running"}
-              />
-              {flashOverlay("firepanel")}
+            {/* SD lower page — the affected-system synoptic pops on failure and holds
+                until the crew announces STATUS (FCOM: synoptic → STATUS is the last page).
+                HYD synoptic is G+Y-specific; other scenarios show STATUS only, as before. */}
+            <div style={{ minWidth: 0, minHeight: 0, border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
+              {scenario.meta.slug === "dual-hyd-g-y" && runner.state.completedSteps["crew_crosscheck"]
+                ? null   /* STATUS reviewed + ECAM ACTIONS COMPLETED → SD reverts to clear (blank) [user 2026-07-06] */
+                : scenario.meta.slug === "dual-hyd-g-y" && runner.state.triggersFired["structural_fail"] && !isStatusReady(scenario, runner.state)
+                  ? <HydSdPage />   /* synoptic pops ONLY after the failure fires, holds until STATUS [user 2026-07-06] */
+                  : <StatusPanel scenario={scenario} state={runner.state} sat={liveSat} tat={liveTat} />}
             </div>
-            <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}>
-              {/* Dev-gated (?dev=1): SD region becomes the tabbed Context Display
-                  (SYSTEM / QRH / GRAPHIC, SYSTEM default). Live flow renders the
-                  plain SystemDisplay so behaviour is unchanged. */}
-              {isDevMode ? (
-                <ContextDisplay state={runner.state} scenario={scenario} />
+
+            {/* SD — SYSTEM / QRH / GRAPHIC / INFO */}
+            <div style={{ minWidth: 0, minHeight: 0, border: "1px solid var(--color-border)", overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
+              {(isDevMode || scenario.qrhSummary) ? (
+                <ContextDisplay state={runner.state} scenario={scenario} activeStep={primaryNextStep} />
               ) : (
                 <SystemDisplay state={runner.state} scenario={scenario} />
               )}
-              {/* ECAM ACTIONS: pressing the ECAM/SD IS the action (no confirm). Pulses while it's next. */}
               {trainingGuide && primaryNextStep?.id === "ecam_actions" && !ecamCommanded && (
                 <button
                   type="button"
@@ -823,107 +1040,106 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                 />
               )}
             </div>
+
           </div>
         </div>
 
         {/* ── RIGHT PANEL — 30% — action window ───────────────────────── */}
         <div
-          className="flex flex-col bg-[var(--color-surface)]"
-          style={{ flex: "0 0 30%", minWidth: "300px" }}
+          className="flex flex-col"
+          style={{
+            flex: "0 0 30%", minWidth: "300px",
+            // WHITE canvas for the action window. The comms / procedure / idle
+            // cards stay self-contained dark (cockpit ECAM look, Airbus colours);
+            // only the column behind them is white. The chrome tokens below are
+            // retuned to DARK INK so the section headers (◈ ACTION PANEL, ▸ COMMS,
+            // ▸ PROCEDURE) and dividers stay readable on white. The dark cards get
+            // a lighter drop-shadow (in their own components) so they float clean
+            // on white instead of casting a muddy black halo.
+            background: "#FFFFFF",
+            "--color-surface": "#F7F8FA",
+            "--color-surface-2": "#EEF0F3",
+            "--color-border": "#E6E8EB",
+            "--color-text": "#1A1D23",
+            "--color-text-muted": "#5B616A",
+            "--color-text-faint": "#8A909A",
+          } as CSSProperties}
         >
-          {/* Panel header */}
-          <div
-            className="px-4 py-2 shrink-0 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-border)" }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
-                ◈ ACTION PANEL
-              </span>
-              <button
-                onClick={() => setTrainingGuide((v) => !v)}
-                title="Training guidance — flash the next action's surface"
-                style={{
-                  fontFamily: "monospace", fontSize: "8px", letterSpacing: "0.12em",
-                  padding: "2px 6px", borderRadius: "3px", border: "1px solid var(--color-border)",
-                  color: trainingGuide ? "#3981f6" : "var(--color-text-muted)",
-                  background: trainingGuide ? "rgba(57,129,246,0.12)" : "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                ✦ GUIDE {trainingGuide ? "ON" : "OFF"}
-              </button>
-              <button
-                onClick={() => (runner.paused ? runner.resume() : runner.pause())}
-                className="px-2 py-0.5 border border-[#1C2530] text-[9px] uppercase tracking-wider hover:border-[#3A4555]"
-                style={{ color: runner.paused ? "#50FA7B" : "#FFD700" }}
-              >
-                {runner.paused ? "Resume" : "Pause"}
-              </button>
-              {isDevMode && (
-                <button
-                  onClick={() => setInspectorOpen(true)}
-                  className="px-2 py-0.5 border border-[#1C2530] text-[9px] uppercase tracking-wider hover:border-[#50FA7B]"
-                  style={{ color: "#50FA7B" }}
-                >
-                  🔍 Inspector
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {runner.paused && <span className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: "#FFD700" }}>PAUSED</span>}
-              {distractionQueue.length > 0 && (
-                <span className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: "var(--color-amber)" }}>
-                  {distractionQueue.length} QUEUED
-                </span>
-              )}
-            </div>
-          </div>
+          {/* No panel title — the right 30% column IS comms + procedure (no "ACTION
+              PANEL" label; that name clashes with the engine-display action panel).
+              The GUIDE / PAUSE controls live in the COMMS header below. */}
 
-          {/* Developer Directions box removed — see the fixed Scenario Inspector dev page (/dev/scenario/[slug]). */}
-
-          {/* ── COMMS SECTION — fixed reservation, content scrolls if overflow ── */}
+          {/* ── COMMS SECTION — now the top of the column ── */}
           <div
             className="shrink-0 flex flex-col"
             style={{ borderBottom: "1px solid var(--color-border)", height: "420px", position: "relative" }}
           >
-            {flashOverlayIf(flashes.has("comms") || commsFlashOn)}
             <div
-              className="px-4 py-1.5 shrink-0 flex items-center justify-between"
+              className="px-4 py-1.5 shrink-0 flex items-center justify-between gap-2"
               style={{ borderBottom: "1px solid var(--color-border)" }}
             >
-              <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-muted)]">
+              <span className="font-mono text-[8px] uppercase tracking-[0.25em] font-bold" style={{ color: "var(--color-text)" }}>
                 ▸ COMMS
               </span>
-              {/* A{N} tag — only in ?dev=1 mode, shows which ATC call is active */}
-              {isDevMode && (() => {
-                const activeD = atcPhase.kind === "active" ? atcPhase.d : atcPhase.kind === "standby" ? atcPhase.d : null;
-                if (!activeD || !scenario.distractions) return null;
-                const idx = scenario.distractions.findIndex(d => d.id === activeD.id);
-                if (idx < 0) return null;
-                return (
-                  <span style={{
-                    padding: "2px 8px",
-                    backgroundColor: "#FFEB3B",
-                    color: "#000",
-                    fontSize: "12px",
-                    fontWeight: 800,
-                    fontFamily: "monospace",
-                    letterSpacing: "0.05em",
-                    borderRadius: "3px",
-                  }}>A{idx + 1}</span>
-                );
-              })()}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setTrainingGuide((v) => !v)}
+                  title="Training guidance — flash the next action's surface"
+                  style={{
+                    fontFamily: "monospace", fontSize: "8px", letterSpacing: "0.12em",
+                    padding: "2px 6px", borderRadius: "3px", border: "1px solid var(--color-border)",
+                    color: trainingGuide ? "#1f6fe0" : "var(--color-text-muted)",
+                    background: trainingGuide ? "rgba(31,111,224,0.10)" : "transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  ✦ GUIDE {trainingGuide ? "ON" : "OFF"}
+                </button>
+                <button
+                  onClick={() => (runner.paused ? runner.resume() : runner.pause())}
+                  className="px-2 py-0.5 border border-[var(--color-border)] text-[9px] uppercase tracking-wider"
+                  style={{ color: runner.paused ? "#1f8a4c" : "#9A6B00" }}
+                >
+                  {runner.paused ? "Resume" : "Pause"}
+                </button>
+                {isDevMode && (
+                  <button
+                    onClick={() => setInspectorOpen(true)}
+                    className="px-2 py-0.5 border border-[var(--color-border)] text-[9px] uppercase tracking-wider hover:border-[#1f8a4c]"
+                    style={{ color: "#1f8a4c" }}
+                  >
+                    🔍 Inspector
+                  </button>
+                )}
+                {runner.paused && <span className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: "#9A6B00" }}>PAUSED</span>}
+                {distractionQueue.length > 0 && (
+                  <span className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: "var(--color-amber)" }}>
+                    {distractionQueue.length} QUEUED
+                  </span>
+                )}
+                {/* A{N} tag — only in ?dev=1 mode, shows which ATC call is active */}
+                {isDevMode && (() => {
+                  const activeD = atcPhase.kind === "active" ? atcPhase.d : atcPhase.kind === "standby" ? atcPhase.d : null;
+                  if (!activeD || !scenario.distractions) return null;
+                  const idx = scenario.distractions.findIndex(d => d.id === activeD.id);
+                  if (idx < 0) return null;
+                  return (
+                    <span style={{ padding: "2px 8px", backgroundColor: "#FFEB3B", color: "#000", fontSize: "12px", fontWeight: 800, fontFamily: "monospace", letterSpacing: "0.05em", borderRadius: "3px" }}>A{idx + 1}</span>
+                  );
+                })()}
+              </div>
             </div>
-            {/* Inner scroll container — comms modal is always fully visible */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            {/* Inner scroll container — BLACK well so the card's bright flash pops.
+                (Header stays white; only the content area below it is black.) */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-2 pb-4" style={{ background: "#04070C" }}>
               {atcPhase.kind === "active" ? (
                 <DistractionModal
                   distraction={atcPhase.d}
                   onRespond={handleAtcRespond}
                   onStandby={handleAtcStandby}
-                  liveAltFt={buildAircraftState(runner.state, scenario, runner.elapsedMs).altitude}
+                  liveAltFt={liveAltRef.current}
                   noAutoDismiss={scenario.meta.slug === "dual-hyd-g-y"}
+                  flashing={commsCardFlash}
                   inline
                 />
               ) : atcPhase.kind === "standby" ? (
@@ -939,13 +1155,13 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
           </div>
 
           {/* ── PROCEDURE SECTION — stable reserved space, never shifts ── */}
-          <div className="flex-1 min-h-0 flex flex-col" style={{ minHeight: "180px", ...guideFlash("procedure") }}>
+          <div className="flex-1 min-h-0 flex flex-col" style={{ minHeight: "180px" }}>
             {/* Header */}
             <div
               className="px-4 py-1.5 shrink-0 flex items-center justify-between"
               style={{ borderBottom: "1px solid var(--color-border)" }}
             >
-              <span className="font-mono text-[8px] uppercase tracking-[0.25em] text-[var(--color-text-muted)]">
+              <span className="font-mono text-[8px] uppercase tracking-[0.25em] font-bold" style={{ color: "var(--color-text)" }}>
                 ▸ PROCEDURE
               </span>
               {/* P{N} tag — only in ?dev=1 mode, shows which procedure step is active */}
@@ -967,8 +1183,9 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                 );
               })()}
             </div>
-            {/* Body — single active step card; scrolls internally if card is tall */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            {/* Body — single active step card; BLACK well so the card's bright flash pops.
+                (Header stays white; only the content area below it is black.) */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-2 pb-4" style={{ background: "#04070C" }}>
               {atcPhase.kind === "active" ? (
                 // No procedure card while a radio call is in progress (ATC-comms rule).
                 <div className="flex items-center justify-center text-center px-4" style={{ minHeight: "120px" }}>
@@ -982,6 +1199,7 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                   state={runner.state}
                   perform={performWithGap}
                   disabled={runner.status !== "running"}
+                  flashing={procCardFlash}
                   inline
                 />
               ) : (
@@ -999,6 +1217,15 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
 
         {/* Left 68%: Full procedure progress tracker */}
         <div style={{ flex: "0 0 68%", borderRight: "1px solid var(--color-border)", padding: "16px 12px" }}>
+          {scenario.meta.slug === "dual-hyd-g-y" && (() => {
+            const req = getApplicableRequiredSteps(scenario, runner.state);
+            const done = req.filter((s) => runner.state.completedSteps[s.id]).length;
+            return (
+              <div style={{ marginBottom: 14 }}>
+                <DescentProfile progress={req.length ? done / req.length : 0} currentStepId={primaryNextStep?.id} liveAlt={liveAlt} />
+              </div>
+            );
+          })()}
           <ScenarioProgress scenario={scenario} state={runner.state} />
         </div>
 
@@ -1196,40 +1423,50 @@ function splitHint(hint: string): string[] {
 
 function ProcedureIdleCard({ nextHardwareStep }: { nextHardwareStep?: ScenarioStep | null }) {
   if (nextHardwareStep) {
+    // Box OUTLINE = the alert SEVERITY (red warning / amber caution) — a PTU/pump action still sits
+    // under the red HYD warning, so its box is red. CONTENT (ACTION REQUIRED + the action) is BLUE
+    // for a plain ECAM action line (switch/advisory, not glareshield/irreversible); glareshield and
+    // irreversible content match the box. [user 2026-07-07]
     const isGlareshield = nextHardwareStep.group === "glareshield";
-    const accent = isGlareshield ? "#FFB300" : "#FF3333";
+    const box = nextHardwareStep.variant === "caution" ? "#FFB300" : "#FF3333";
+    const accent = (!isGlareshield && !nextHardwareStep.confirmRequired) ? "#29B6F6" : box;
+    // Action verb colour mirrors the E/WD: a real switch command (PTU / pump OFF) is a BLUE action;
+    // everything else (COMMAND, CANCEL) is white for readability. [user 2026-07-07]
+    const isSwitchAction = nextHardwareStep.variant === "switch";
+    const actCol = isSwitchAction ? "#29B6F6" : "#EAF0F8";
     const hintLines = splitHint(nextHardwareStep.hint ?? "");
 
     return (
-      <div className="font-mono flex flex-col" style={{ borderLeft: `3px solid ${accent}`, backgroundColor: accent === "#FF3333" ? "#0F0505" : "#0A0800" }}>
-        {/* Top accent bar */}
-        <div style={{ height: "2px", background: `linear-gradient(90deg, ${accent}, ${accent}00)` }} />
+      <div className="flex flex-col" style={{
+        fontFamily: "var(--font-procedure)",
+        // Neutral body — severity colour is only AROUND it (border) + the upper banner, not inside. [user 2026-07-07]
+        backgroundColor: "#070C12",
+        // Full border + lift — the BOX OUTLINE carries the alert severity (red/amber).
+        border: `1px solid ${box}55`,
+        borderRadius: "8px",
+        overflow: "hidden",
+        // Lighter, cooler drop-shadow for the white column (see flight-check-popup).
+        boxShadow: `0 0 0 1px ${box}22, 0 8px 22px rgba(15,20,30,0.16), inset 0 1px 0 rgba(255,255,255,0.05)`,
+      }}>
 
-        {/* Attention banner */}
-        <div
-          className="flex items-center gap-3 px-4 py-3"
-          style={{ backgroundColor: accent + "18", borderBottom: `1px solid ${accent}35` }}
-        >
-          <span className="animate-pulse text-[18px]" style={{ lineHeight: 1 }}>←</span>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[9px] font-bold tracking-[0.25em] uppercase" style={{ color: accent }}>
-              ACTION REQUIRED — LEFT PANEL
-            </span>
-            <span className="text-[7px] tracking-[0.18em] uppercase" style={{ color: accent + "70" }}>
-              operate controls on the left display
-            </span>
-          </div>
+        {/* Header — same chip vocabulary as the ECAM procedure cards, plus the left-panel cue. */}
+        <div className="flex items-center gap-2 px-4 py-2" style={{ borderBottom: `1px solid ${box}55` }}>
+          {!isGlareshield && <CategoryChips value={nextHardwareStep.category ?? "ECAM"} ecamColor={box} />}
+          <span className="text-[8px] font-bold tracking-[0.18em] uppercase" style={{ color: box }}>
+            ← Left panel
+          </span>
+          <span className="ml-auto"><PerformerChip crew={nextHardwareStep.crew} /></span>
         </div>
 
-        {/* Step detail */}
+        {/* Step detail — label WHITE, action in the content colour (blue for an ECAM action line) */}
         <div className="px-4 py-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: accent }}>
+            <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: "#EAF0F8" }}>
               {nextHardwareStep.label}
             </span>
             <span
               className="text-[8px] px-2 py-0.5"
-              style={{ backgroundColor: accent + "20", color: accent, border: `1px solid ${accent}40`, borderRadius: "2px" }}
+              style={{ backgroundColor: isSwitchAction ? actCol + "20" : "rgba(255,255,255,0.06)", color: actCol, border: `1px solid ${isSwitchAction ? actCol + "40" : "rgba(255,255,255,0.18)"}`, borderRadius: "2px" }}
             >
               {nextHardwareStep.action}
             </span>
@@ -1241,7 +1478,7 @@ function ProcedureIdleCard({ nextHardwareStep }: { nextHardwareStep?: ScenarioSt
               {hintLines.map((line, i) => (
                 <li key={i} className="flex items-start gap-2">
                   <span style={{ color: accent + "70", fontSize: "8px", marginTop: "3px", flexShrink: 0 }}>▸</span>
-                  <span style={{ color: "#8A9AAB", fontSize: "10px", lineHeight: "1.55", letterSpacing: "0.02em" }}>{line}</span>
+                  <span style={{ color: "#E6ECF5", fontSize: "10px", lineHeight: "1.55", letterSpacing: "0.02em" }}>{line}</span>
                 </li>
               ))}
             </ul>
@@ -1249,11 +1486,23 @@ function ProcedureIdleCard({ nextHardwareStep }: { nextHardwareStep?: ScenarioSt
         </div>
 
         {/* Footer */}
-        {nextHardwareStep.crew && (
-          <div className="px-4 pb-3">
-            <span className="text-[7px] tracking-[0.18em] uppercase" style={{ color: "#3A4858" }}>
-              {nextHardwareStep.crew} — {nextHardwareStep.group?.toUpperCase() ?? "PROCEDURE"}
-            </span>
+        {(nextHardwareStep.reference || isGlareshield) && (
+          <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: `1px solid ${box}20` }}>
+            {nextHardwareStep.reference ? <ReferenceChips value={nextHardwareStep.reference} /> : <span />}
+            {isGlareshield && (
+              <span
+                className="text-[9px] font-bold uppercase tracking-[0.1em]"
+                style={{
+                  color: "#FFB300",
+                  border: "1px solid #FFB30057",
+                  backgroundColor: "#FFB30021",
+                  borderRadius: "5px",
+                  padding: "3px 8px",
+                }}
+              >
+                GLARESHIELD
+              </span>
+            )}
           </div>
         )}
       </div>
