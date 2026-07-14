@@ -3,6 +3,10 @@ name: pfd-instruments
 description: Locked working baseline for the Aviator PFD instruments in pfd-mockup.tsx — VS indicator, Radio Altimeter, and altitude animation. Load this skill before touching any of these three elements. Contains exact geometry, animation loop, and RA formula as confirmed working by the pilot on 2026-06-09. DO NOT change the VS bar movement, RA liftoff, or altitude lerp without reading this first.
 ---
 
+> ⚠️ **FALLBACK — old CANVAS renderer.** The live PFD is now **`svg-pfd.tsx`** (SVG); this file describes
+> the superseded **`pfd-mockup.tsx`** canvas. Its geometry does NOT apply to the SVG PFD — only the RA
+> (`alt − fieldElev`), lerp, and freeze *concepts* carry over. Load the **`pfd`** master skill first.
+
 # PFD Instruments Skill — VS / RA / Altitude baseline
 
 **File:** `src/components/cockpit/pfd-mockup.tsx`

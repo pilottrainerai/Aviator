@@ -169,6 +169,67 @@ reference implementation `eng1-fire-after-v1.ts` (§9 [2026-06-09]).
 
 ---
 
+## 0c. The ENGINE — how ATC comms are wired (read before building; codified 2026-07-12)
+
+Full write-up: vault `abnormals/atc-comms-sequencing-logic.md`. The non-negotiable rules:
+
+1. **ATC comms live in the DISTRACTION layer, NOT as procedure step-cards.** Two layers:
+   `scenario.steps[]` = the procedure checklist (the spine); `scenario.distractions[]` = the live
+   ATC/crew R/T (the voice). Never build an ATC exchange as a step-card — that was the #1 mistake.
+2. **Link radio ↔ card** by `requiresStep` (radio waits for a card) and `completesStep` (a correct
+   readback unlocks a — often hidden — milestone the next card/radio needs). Milestone keys like
+   `wx_received` / `ready_for_approach` / `approach_clearance_rcvd` exist ONLY as `completesStep`
+   gates, not as step-cards.
+3. **Card-gated, NOT time-based.** `atMs` is a *minimum delay after the gating card completes*
+   (~5 s realistic R/T), never a free clock. `gapAfterMs` cools down before the next call surfaces.
+   The queue is serial (one ATC card at a time). A card must not fire until the prior exchange resolves.
+4. **Every ATC card is a proper to-and-fro — no acknowledge-only cards.** Crew-opened exchange =
+   3-part (`pilotSays` crew call → ATC `message` → readback `choices`, one correct). ATC-opened =
+   2-part (ATC `message` → crew `choices`). EVERY card has `choices` (3, one correct) — never
+   `choices: []`. A clearance is READ BACK, never "acknowledged."
+5. **Real R/T only** — Roger / hold approved / cleared / wilco. The word "acknowledged" is banned.
+6. **Frequency handoff chain**: Tower → Departure → Approach → Tower(landing), each once. The
+   Departure→Approach handoff fires **when the crew declares intentions** (fold it into the intention
+   response: "…approved, expect ILS __, contact Approach 1__._"). Pre-handoff exchanges (weather, POB,
+   intention) are on the CURRENT frequency (Departure); post-handoff (ready/cleared approach,
+   emergency services) are Approach; landing is Tower. Weather = with Departure (or ATIS), not Approach.
+7. **Don't print instructions or visible state on a card.** "FMC prep follows in parallel", "state the
+   requirement not a fire category", "LAND ASAP + secondaries remain on the right" — these are notes to
+   the builder or on-screen state, NOT card text. Differentiate instruction-to-Claude vs card content.
+
+Adapt DUAL HYD G+Y — do not invent. Its distraction chain (§0c ref + `dual-hyd-g-y.ts`) is the template.
+
+---
+
+## 0d. BASIC ELEMENTS — validate EVERY scenario against this before declaring done
+
+These are the recurring misses. They are STRUCTURAL rules, not one-off edits: apply the pattern across
+the whole scenario, don't just patch the one card named. Diff the scenario against `dual-hyd-g-y.ts`
+card-for-card — if G+Y has a structural element and this scenario doesn't, that is a miss.
+
+1. **Every pilot→ATC message is a PILOT-INITIATED `kind:"crew"` card + a separate `kind:"atc"` response.**
+   Never a lone `kind:"atc"` card carrying the crew's line in `pilotSays`. Mirror `pm_ready_for_approach`
+   / `pm_wx_request`. This includes the INTENTION call (`pm_intention_call` → `atc_intention_ack`).
+   Ask of every ATC fact the crew acts on: *"how did ATC learn this?"* — there must be a crew card.
+2. **Decision → inform ATC → ATC acknowledges → THEN execute.** After FORDEC/decision, the crew makes a
+   pilot-initiated intentions call (G+Y `inform_atc_intentions`, "YOUR call, not a response"); a hidden
+   `*_acked` gate is completed by the ATC ack; FMC PREP / NITS / approach prep `require` that gate.
+   **No procedure card appears before the return/diversion is acknowledged.**
+3. **Adapt G+Y card-for-card — change VALUES only.** Same structure, same gating chain, same category/
+   reference. Card count flexes with item count; the skeleton does not. Inventing your own = the #1 complaint.
+4. **Performance checks NAME the method** — QRH LDG DIST PROC / EFB (FlySmart) LDG PERF app, "do NOT eyeball".
+   Never a bare "distance ADEQUATE".
+5. **No duplicated action across cards** (e.g. rudder-trim reset lives on ONE card only, not also in FLAP FULL).
+6. **Guarded / irreversible actions require CONFIRMATION** (ENG FIRE pb, ENG MASTER OFF, AGENT) — worded as a
+   guarded pushbutton, irreversible, `confirmRequired`.
+7. **E/WD order (ENG SHUT DOWN family):** left-side action lines complete → **LAND ASAP** (amber, first
+   thing) → then right-side `*` secondary failures. LAND ASAP is never below the secondaries.
+
+Process rule for Claude: when the user names one card, treat it as a symptom — check whether the same rule is
+violated elsewhere and fix the class, not the instance. Run this list top-to-bottom before saying "done".
+
+---
+
 ## 1. Mandatory inputs
 
 Determine STARTING PHASE (§0a) first, then collect ALL of the following.

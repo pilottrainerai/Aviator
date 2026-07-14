@@ -56,6 +56,34 @@ ATC ................................................ NOTIFY   ← L1
 
 Render L1 and L2 visually distinct in the EWD.
 
+## Primary & secondary failure display (FCOM DSC-31-15)
+
+Verbatim rule `[fcom:L53500-53501]`:
+> "The ECAM DU displays **a primary failure as a boxed title**. It identifies a
+> **secondary failure by putting a star in front** of the title of the affected system."
+
+- **Primary failure = boxed title.** The box frames the failure NAME. The underlined
+  system prefix (HYD / F/CTL / AUTO FLT / ENG …) sits *before* the box; only the failure
+  name is boxed. So `HYD [G+Y SYS LO PR]` and `[ENG 1 FIRE]` are both correctly boxed —
+  boxing a primary title is FCOM-correct, not a bug.
+- **Secondary failure = `* <SYSTEM>`** under a `SECONDARY FAILURES` header, in the right
+  column. System name is terse (`* HYD`, `* FUEL`, `* F/CTL`, `* AVNCS VENT` — see the
+  DSC-31-15 worked example `[fcom:L89371]`).
+- **Overflow symbol** (green ↓) shows if primary or secondary failures overflow the area.
+- **ELEC EMER CONFIG inhibits** secondary failures (they are not displayed) `[fcom:L53502]`.
+
+**Sourcing the secondary list — they ARE in FCOM.** A "secondary failure" is *the loss of a
+system resulting from the primary* `[fcom:L53140]`. The FCOM abnormal procedure **prints the
+secondary list in its right column, below LAND ASAP, under a `SECONDARY FAILURES` header** —
+do NOT invent it, and do NOT assume redundancy (GEN 2 / PTU / BLEED 2) removes it: the star
+marks the *affected* system, which still shows even when a redundant source covers the
+function. When a failure leads to an ASSOCIATED procedure, the secondaries live on that
+procedure's page. Worked source — **ENG 1(2) SHUT DOWN** (where ENG 1(2) FIRE lands after
+securing), PRO-ABN-ENG P 72/94: below LAND ASAP → `* HYD` / `* ELEC` / `* AIR BLEED`
+`[fcom:L96079-L96083]`. To find any failure's secondaries: `grep -n "SECONDARY FAILURES"`
+the procedure region, read the `*`-lines. (The DSC-31-15 *illustration* is a figure, but the
+per-procedure `SECONDARY FAILURES` blocks ARE text.)
+
 ## Conditional branches
 
 ECAM procedures branch on sub-conditions, marked with bullets:

@@ -282,7 +282,7 @@ export type QrhSummary = {
 // Declarative config for SystemDisplay + FirePanel. Pure data, no functions.
 // The component resolves each "states" array in order — first matching when wins.
 
-export type SysColor = "green" | "amber" | "red" | "cyan" | "dim";
+export type SysColor = "green" | "amber" | "red" | "cyan" | "dim" | "magenta";
 export type SysSwState = "norm" | "fault" | "off" | "auto" | "open" | "fire" | "armed";
 
 /** Condition: undefined = always matches (use as final/default case) */

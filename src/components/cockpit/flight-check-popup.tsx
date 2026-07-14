@@ -66,6 +66,18 @@ const THEMES: Record<string, Theme> = {
     chip:     "#FFCB57",
     chipBg:   "#2A2110",
   },
+  // Procedure-neutral (slate) — for AVIATE/PROCEDURE cards that are NOT alerts. Amber is reserved
+  // for cautions; a normal PM procedure (POSITIVE CLIMB, 400 FT) must not read as one. [user 2026-07-12]
+  procedure: {
+    bodyBg:   "#07090C",
+    border:   "#8593AB",
+    headerBg: "#8593AB18",
+    accent:   "#8593AB",
+    glow:     "0 0 32px #8593AB22, 0 8px 32px rgba(0,0,0,0.8)",
+    badge:    "PROC",
+    chip:     "#AEB8C7",
+    chipBg:   "#1B212B",
+  },
   crm: {
     bodyBg:   "#050A10",
     border:   "#4F8CFF",
@@ -103,37 +115,51 @@ function hexToRgbTriplet(hex: string): string {
   return `${r},${g},${b}`;
 }
 
+// A neutral card theme built from a CATEGORY colour — border / accent / CONFIRM all match the pill,
+// so the card reads as its category. Real alerts (warning/caution) bypass this for red/amber below.
+// [user 2026-07-13]
+function catTheme(hex: string): Theme {
+  return {
+    bodyBg: "#07090C", border: hex, headerBg: hex + "18", accent: hex,
+    glow: `0 0 32px ${hex}22, 0 8px 32px rgba(0,0,0,0.8)`, badge: "", chip: hex, chipBg: hex + "22",
+  };
+}
+
 function resolveTheme(step: ScenarioStep, executePhase: boolean): Theme {
   const { group, crew, variant, confirmRequired } = step;
   const isEcam = (step.category ?? "").toUpperCase().includes("ECAM");
 
-  // Execute phase (second click on confirmRequired) — always caution amber
-  if (executePhase) return THEMES.caution;
+  // Execute phase (second click on confirmRequired) — follows the FAILED-SYSTEM colour:
+  // red under a Level-3 (warning) failure, amber otherwise. [user 2026-07-12]
+  if (executePhase) return variant === "warning" ? THEMES.critical : THEMES.caution;
 
   // Glareshield warning (MASTER WARN) — critical red
   if (group === "glareshield" && variant === "warning") return THEMES.critical;
 
-  // confirmRequired ECAM steps (MASTER OFF, FIRE PB) — caution amber
-  if (confirmRequired) return THEMES.caution;
+  // confirmRequired ECAM steps (MASTER OFF, FIRE PB) — take the FAILED-SYSTEM colour, not a
+  // fixed amber: red for a red (warning) failure like ENG FIRE, amber for an amber failure.
+  // "AGENT red and all" — the card inherits the ECAM failed-system severity. [user 2026-07-12]
+  if (confirmRequired) return variant === "warning" ? THEMES.critical : THEMES.caution;
 
   // Glareshield caution (MASTER CAUT)
   if (group === "glareshield") return THEMES.caution;
 
-  // ECAM alert severity → card colour: RED warning, AMBER caution (mirrors the E/WD).
-  // This wins over procedure/checklist grouping: LAND ASAP is grouped with checklist flow,
-  // but the ECAM line itself is red and must render as a red ECAM card.
-  if (isEcam && variant === "warning") return THEMES.critical;
-  if (isEcam && variant === "caution") return THEMES.caution;
+  // ECAM cards follow the ALERT SEVERITY ONLY — RED (warning) or AMBER (everything else, incl.
+  // advisory ENG SHUT DOWN / STATUS / STOP ECAM / CLEAR). There is NO third "ECAM gold": an ECAM
+  // card is red if it's a red alert, amber otherwise. The other categories take their pill colour
+  // (below); only ECAM is severity-driven. [user 2026-07-13]
+  if (isEcam) return variant === "warning" ? THEMES.critical : THEMES.caution;
 
-  // Checklists
-  if (group === "chclm") return THEMES.checklist;
+  // Non-alert card → its CATEGORY colour (matches the pill), so EVERY card of a kind is the SAME
+  // colour: ECAM gold, CHECKLIST green, COMMS blue, CRM violet, AVIATE cyan, PROCEDURE slate, QRH
+  // teal. Coloured by CATEGORY, never by group/crew — the old group rules made ECAM cards render
+  // green (group chclm) and PROCEDURE cards blue (group comms). [user 2026-07-13]
+  const primary = (step.category ?? "").split(" · ")[0].toUpperCase();
+  const catCol = CATEGORY_COLOR[primary];
+  if (catCol) return catTheme(catCol);
 
-  // CRM communications
-  if (group === "comms") return THEMES.crm;
-
-  // Procedure / flightcheck — split PF (cyan) vs PM (amber)
-  if (crew === "PF") return THEMES.pf;
-  return THEMES.pm;
+  // Untagged fallback (e.g. an ECAM-action card with no category, on an amber failure) → amber.
+  return crew === "PF" ? THEMES.pf : THEMES.pm;
 }
 
 // ─── Option B card meta: category (top-left) · performer (top-right) · reference (bottom-left) ──

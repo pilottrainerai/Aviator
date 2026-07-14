@@ -154,25 +154,9 @@ export function StatusPanel({
         )}
       </div>
 
-      {/* spacer — pushes the bottom bar to the base of the cell (content sits at top) */}
+      {/* spacer fills the cell — the shared SdPermanentStrip (TAT/SAT/UTC/GW) is now rendered by the
+          runner UNDER every SD page, so STATUS no longer draws its own bottom bar. [user 2026-07-14] */}
       <div style={{ flex: "1 1 0", minHeight: 0 }} />
-
-      {/* Bottom line + TAT/SAT/time/GW bar — the white line spans the width and
-          connects to the column divider (same colour + thickness). Three cells split
-          by the same white line, per the real SD.
-          TAT/SAT are live when the runner passes them (altitude-driven); else static. */}
-      <div className="flex" style={{ flexShrink: 0, borderTop: `1.5px solid ${C.white}`, fontSize: "11px" }}>
-        <div style={{ flex: "1 1 0", padding: "4px 10px", lineHeight: "1.4" }}>
-          <div><span style={{ color: C.white }}>TAT </span><span style={{ color: C.green }}>{tat != null ? String(tat).replace("-", "−") : "−20"}</span><span style={{ color: C.cyan }}> °C</span></div>
-          <div><span style={{ color: C.white }}>SAT </span><span style={{ color: C.green }}>{sat != null ? String(sat).replace("-", "−") : "−36"}</span><span style={{ color: C.cyan }}> °C</span></div>
-        </div>
-        <div style={{ flex: "1 1 0", borderLeft: `1.5px solid ${C.white}`, display: "flex", alignItems: "center", justifyContent: "center", color: C.green, letterSpacing: "0.1em" }}>
-          13 H 58
-        </div>
-        <div style={{ flex: "1 1 0", borderLeft: `1.5px solid ${C.white}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ color: C.white }}>GW</span><span style={{ color: C.green, marginLeft: 6 }}>64000</span><span style={{ color: C.cyan, marginLeft: 5 }}>KG</span>
-        </div>
-      </div>
     </div>
   );
 }

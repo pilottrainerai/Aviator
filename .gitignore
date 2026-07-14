@@ -49,4 +49,7 @@ next-env.d.ts
 
 # Reference manuals (belong in ~/.claude/manuals/a320/, not the repo)
 *.pdf
+
+# local rollback backups of 3D model/asset blobs (not source)
+*.bak_*
 .npm-cache/

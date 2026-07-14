@@ -3,7 +3,7 @@ import Link from "next/link";
 export function Footer() {
   return (
     <footer className="border-t border-[var(--color-border)] mt-auto">
-      <div className="max-w-6xl mx-auto px-8 py-10 grid gap-8 md:grid-cols-4">
+      <div className="max-w-6xl mx-auto px-6 sm:px-8 py-10 grid gap-8 sm:grid-cols-2 md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="h-5 w-5 border border-[var(--color-brand)] rotate-45 relative">
@@ -42,7 +42,7 @@ export function Footer() {
         />
       </div>
       <div className="border-t border-[var(--color-border)]">
-        <div className="max-w-6xl mx-auto px-8 py-6 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-faint)]">
+        <div className="max-w-6xl mx-auto px-6 sm:px-8 py-6 flex items-center justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-muted)]">
           <span>© CROSSCHECK · 2026</span>
           <span>BUILT FOR LINE PILOTS</span>
         </div>
@@ -60,7 +60,7 @@ function FooterCol({
 }) {
   return (
     <div>
-      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-[var(--color-text-faint)] mb-3">
+      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-[var(--color-text-muted)] mb-3">
         {title}
       </div>
       <ul className="flex flex-col gap-2">

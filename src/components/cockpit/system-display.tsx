@@ -35,6 +35,7 @@ export const SYS_COLORS: Record<SysColor, string> = {
   red:   "#FF3333",
   cyan:  "#00CFFF",
   dim:   "#6A7488",
+  magenta: "#E070E0",
 };
 
 // ─── evalSysCase ─────────────────────────────────────────────────────────────

@@ -58,6 +58,77 @@ export function playMasterWarn(): Active {
   };
 }
 
+/**
+ * Mechanical pushbutton click-clack: a bright press-IN tick, then a duller pop-BACK tick
+ * ~110 ms later — the sound of a real cockpit pushbutton dipping and springing back.
+ * Each tick = a short decaying noise burst through a bandpass (the plastic "tick"), no
+ * external audio files.
+ */
+// A REAL recorded pushbutton click, decoded once and cached. Drop the clip at
+// public/audio/switch-click.mp3 (any browser-decodable format: mp3/wav/ogg/m4a — keep the name)
+// and it plays automatically. Until the file exists, playSwitchClick falls back to the synth below.
+const CLICK_URL = "/audio/switch-click.wav";
+const CLICK_VOL = 0.7; // playback level of the sample (0–1)
+let clickBuf: AudioBuffer | null = null;
+let clickLoad: Promise<AudioBuffer | null> | null = null;
+
+function loadClick(ac: AudioContext): Promise<AudioBuffer | null> {
+  if (clickBuf) return Promise.resolve(clickBuf);
+  if (!clickLoad) {
+    clickLoad = fetch(CLICK_URL)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`${r.status}`))))
+      .then((ab) => ac.decodeAudioData(ab))
+      .then((buf) => { clickBuf = buf; return buf; })
+      .catch(() => null); // no file yet (or bad format) → stay on the synth fallback
+  }
+  return clickLoad;
+}
+
+function playBuffer(ac: AudioContext, buf: AudioBuffer): void {
+  const g = ac.createGain(); g.gain.value = CLICK_VOL;
+  const src = ac.createBufferSource(); src.buffer = buf;
+  src.connect(g).connect(ac.destination);
+  src.start();
+}
+
+// Synth fallback — a single soft click, used only until the real sample is present so a press
+// is never silent. Deliberately plain; the recorded sample is the real deal.
+function synthClick(ac: AudioContext): void {
+  const t0 = ac.currentTime;
+  const n = Math.floor(ac.sampleRate * 0.006);
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 2200; bp.Q.value = 0.7;
+  const g = ac.createGain(); g.gain.value = 0.12;
+  src.connect(bp).connect(g).connect(ac.destination);
+  src.start(t0); src.stop(t0 + 0.02);
+}
+
+export function playSwitchClick(): void {
+  const ac = getContext();
+  if (!ac) return;
+  if (clickBuf) { playBuffer(ac, clickBuf); return; } // real sample ready → use it
+  void loadClick(ac);                                 // kick off load for the next clicks
+  synthClick(ac);                                     // this click: immediate fallback, never silent
+}
+
+// Dev only: fetch + decode + play an arbitrary click file by URL, so the dev page can A/B the
+// rendered candidates. Not cached — it's a one-off audition, not the hot path.
+const previewCache = new Map<string, AudioBuffer>();
+export function previewClick(url: string): void {
+  const ac = getContext();
+  if (!ac) return;
+  const cached = previewCache.get(url);
+  if (cached) { playBuffer(ac, cached); return; }
+  void fetch(url)
+    .then((r) => r.arrayBuffer())
+    .then((ab) => ac.decodeAudioData(ab))
+    .then((buf) => { previewCache.set(url, buf); playBuffer(ac, buf); })
+    .catch(() => undefined);
+}
+
 /** Single chime (SC) — FCOM: one brief 800 Hz tone, played once on MASTER CAUTION */
 export function playMasterCaut(): void {
   const ac = getContext();

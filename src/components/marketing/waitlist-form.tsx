@@ -37,7 +37,7 @@ export function WaitlistForm() {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3">
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <input
           type="email"
           required
@@ -45,13 +45,13 @@ export function WaitlistForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="captain@airline.com"
           aria-label="Email address"
-          className="flex-1 h-12 px-4 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-sm font-sans text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-brand)] focus:outline-none transition-colors"
+          className="h-12 flex-1 rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-4 font-sans text-sm text-[var(--color-text)] transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-brand)] focus:outline-none"
           disabled={status === "submitting" || status === "success"}
         />
         <button
           type="submit"
           disabled={status === "submitting" || status === "success"}
-          className="h-12 px-6 bg-[var(--color-brand)] text-[var(--color-bg)] font-mono text-xs uppercase tracking-[0.15em] rounded-sm hover:bg-[var(--color-brand)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="h-12 rounded-sm bg-[var(--color-brand)] px-6 font-mono text-xs uppercase tracking-[0.15em] text-[var(--color-brand-foreground)] transition-colors hover:bg-[var(--color-brand-hover)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {status === "submitting" ? "..." : "Request access"}
         </button>

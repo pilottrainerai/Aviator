@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4126.58 3579">
+  <defs>
+    <style>
+      .cls-4, .cls-5, .cls-6, .cls-7, .cls-8, .cls-9, .cls-10, .cls-11, .cls-12, .cls-13, .cls-14, .cls-15, .cls-16, .cls-17, .cls-18, .cls-19, .cls-20, .cls-21, .cls-22, .cls-23, .cls-24, .cls-25, .cls-26, .cls-27, .cls-28 { font-family: Futura-Medium, Futura; font-weight: 500; }
+      .cls-4, .cls-5, .cls-19, .cls-23 { fill: #2dc3e8; }
+      .cls-4, .cls-18 { font-size: 115.04px; }
+      .cls-5 { font-size: 105.3px; }
+      .cls-6 { font-size: 110.53px; }
+      .cls-6, .cls-8, .cls-12, .cls-13, .cls-14, .cls-18, .cls-20, .cls-21, .cls-22, .cls-27, .cls-28 { fill: #fff; }
+      .cls-7 { font-size: 118.63px; }
+      .cls-7, .cls-9, .cls-10, .cls-11, .cls-15, .cls-16, .cls-17, .cls-24, .cls-25, .cls-26 { fill: #5aba47; }
+      .cls-8 { font-size: 117.04px; }
+      .cls-9 { font-size: 124.27px; }
+      .cls-10 { font-size: 115.43px; }
+      .cls-29 { fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 15px; }
+      .cls-11 { font-size: 114.32px; }
+      .cls-12 { font-size: 127.09px; }
+      .cls-13, .cls-23 { font-size: 131.31px; }
+      .cls-14 { font-size: 115.69px; }
+      .cls-15 { font-size: 142.59px; }
+      .cls-16, .cls-27 { font-size: 153.97px; }
+      .cls-17, .cls-20 { font-size: 133.31px; }
+      .cls-19 { font-size: 41.56px; }
+      .cls-21 { font-size: 145.56px; }
+      .cls-22 { font-size: 137.21px; }
+      .cls-37, .cls-38 { letter-spacing: -.08em; }
+      .cls-39 { letter-spacing: -.07em; }
+      .cls-40, .cls-41 { letter-spacing: -.06em; }
+      .cls-42, .cls-43, .cls-44 { letter-spacing: -.02em; }
+      .cls-45 { letter-spacing: -.05em; }
+      .cls-46, .cls-47, .cls-48, .cls-49, .cls-50 { letter-spacing: -.04em; }
+      .cls-51, .cls-52, .cls-53 { letter-spacing: -.03em; }
+      .cls-24 { font-size: 143.63px; }
+      .cls-25 { font-size: 143.47px; }
+      .cls-26 { font-size: 157.83px; }
+      .cls-55 { letter-spacing: -.01em; }
+      .cls-28 { font-size: 158.98px; }
+      .cls-57, .cls-58, .cls-59 { letter-spacing: .02em; }
+    </style>
+  </defs>
+  <g id="BLACK_BCKRND" data-name="BLACK BCKRND">
+    <rect y="15.04" width="4126.58" height="4096"/>
+  </g>
+  <g id="Fuel_used_indication" data-name="Fuel used indication">
+    <text class="cls-20" transform="translate(1822.4839 484.1883)"><tspan x="0" y="0">F .USED</tspan></text>
+    <text class="cls-20" transform="translate(1936.398 622.9973)"><tspan x="0" y="0">1+2</tspan></text>
+    <text class="cls-24" transform="translate(2820 659.0356) scale(1.0548 1)"><tspan x="0" y="0">3210</tspan></text>
+    <text class="cls-15" transform="translate(1120 651.731) scale(1.13 1)"><tspan x="0" y="0">3111</tspan></text>
+    <text class="cls-15" transform="translate(1900 772.1554) scale(1.13 1)"><tspan x="0" y="0">6321</tspan></text>
+    <text class="cls-23" transform="translate(1977.4604 916.1595) scale(.8942 1)"><tspan class="cls-48" x="0" y="0">K</tspan><tspan x="81.37" y="0">G</tspan></text>
+    <line class="cls-29" x1="1573.23" y1="544.67" x2="1715.27" y2="536.47"/>
+    <line class="cls-29" x1="2406.56" y1="536.51" x2="2543" y2="547.54"/>
+    <line class="cls-29" x1="1573.64" y1="1172.62" x2="1715.68" y2="1164.41"/>
+    <line class="cls-29" x1="2405.71" y1="1162.81" x2="2542.15" y2="1173.84"/>
+  </g>
+  <g id="OIL_QUANTITY_INDICATION" data-name="OIL QUANTITY INDICATION">
+    <text class="cls-20" transform="translate(1937.2957 1109.3777) scale(.9136 1)"><tspan x="0" y="0">OIL</tspan></text>
+    <text class="cls-26" transform="translate(1076.3577 1280.1182) scale(1.0156 1)"><tspan x="0" y="0">15.1</tspan></text>
+    <text class="cls-26" transform="translate(2755.2617 1285.481) scale(1.0373 1)"><tspan x="0" y="0">15.1</tspan></text>
+    <text class="cls-23" transform="translate(1967.2163 1248.7034) scale(.8942 1)"><tspan x="0" y="0">QT</tspan></text>
+  </g>
+  <g id="N1_AND_N2_VIBRATIONS" data-name="N1 AND N2 VIBRATIONS">
+    <text class="cls-12" transform="translate(1814.9112 1523.7723) scale(1.2562 1)"><tspan x="0" y="0">VIB</tspan></text>
+    <text class="cls-12" transform="translate(2141.0847 1523.7723) scale(.8792 1)"><tspan x="0" y="0">N1</tspan></text>
+    <text class="cls-12" transform="translate(2142.1838 1729.6887) scale(.8792 1)"><tspan x="0" y="0">N2</tspan></text>
+    <line class="cls-29" x1="1579.58" y1="1520.51" x2="1737.62" y2="1507.21"/>
+    <line class="cls-29" x1="1573.64" y1="1726.93" x2="1737.62" y2="1713.13"/>
+    <line class="cls-29" x1="2405.71" y1="1507.21" x2="2542.15" y2="1518.95"/>
+    <line class="cls-29" x1="2405.71" y1="1717.14" x2="2542.15" y2="1729.69"/>
+    <text class="cls-16" transform="translate(1155.5253 1625.9465) scale(1.2714 1)"><tspan x="0" y="0">0</tspan><tspan class="cls-37" x="95.03" y="0">.</tspan><tspan x="130.22" y="0">1</tspan></text>
+    <text class="cls-16" transform="translate(1150.8372 1834.1887) scale(1.2714 1)"><tspan x="0" y="0">0</tspan><tspan class="cls-37" x="95.03" y="0">.</tspan><tspan x="130.22" y="0">1</tspan></text>
+    <text class="cls-16" transform="translate(2835.7869 1632.7664) scale(1.2714 1)"><tspan x="0" y="0">0</tspan><tspan class="cls-37" x="95.03" y="0">.</tspan><tspan x="130.22" y="0">6</tspan></text>
+    <text class="cls-16" transform="translate(2831.6768 1837.7365) scale(1.2714 1)"><tspan x="0" y="0">0</tspan><tspan class="cls-37" x="95.03" y="0">.</tspan><tspan x="130.22" y="0">4</tspan></text>
+  </g>
+  <g id="LANDING_ELEVATION" data-name="LANDING ELEVATION">
+    <text class="cls-16" transform="translate(1808.5928 2561.77) scale(1.0253 1)"><tspan x="0" y="0">0.</tspan></text>
+    <text class="cls-27" transform="translate(1572.1597 2560.5288) scale(1.1965 1)"><tspan x="0" y="0">P</tspan></text>
+    <text class="cls-9" transform="translate(1987.9629 2559.0142) scale(1.0733 1)"><tspan x="0" y="0">0</tspan></text>
+    <text class="cls-25" transform="translate(3525.4463 2321.3052) scale(.9296 1)"><tspan x="0" y="0">0</tspan></text>
+    <text class="cls-23" transform="translate(2186.9239 2559.975) scale(1.2199 1)"><tspan x="0" y="0">PSI</tspan></text>
+    <text class="cls-23" transform="translate(3642.3699 2324.1478) scale(1.2199 1)"><tspan x="0" y="0">FT</tspan></text>
+    <text class="cls-13" transform="translate(1947.6144 2322.5854) scale(.9335 1)"><tspan x="0" y="0">LDG</tspan></text>
+    <text class="cls-13" transform="translate(2264.3281 2324.4429) scale(1.0788 1)"><tspan x="0" y="0">ELEV</tspan></text>
+    <text class="cls-10" transform="translate(2635.3047 2317.895) scale(1.0312 1)"><tspan class="cls-51" x="0" y="0">A</tspan><tspan x="82.18" y="0">U</tspan><tspan class="cls-42" x="167.45" y="0">T</tspan><tspan x="220.38" y="0">O</tspan></text>
+  </g>
+  <g id="CABIN_VERTICAL_SPEED" data-name="CABIN VERTICAL SPEED">
+    <text class="cls-4" transform="translate(3607.584 2810.3296) scale(1.0733 1)"><tspan x="0" y="0">FT/MIN</tspan></text>
+    <text class="cls-18" transform="translate(3288.5164 2633.6597) scale(1.0733 1)"><tspan class="cls-58" x="0" y="0">C</tspan><tspan class="cls-30" x="82.68" y="0" xml:space="preserve">AB  V/S</tspan></text>
+    <text class="cls-16" transform="translate(3451.0466 2810.33) scale(.9892 1)"><tspan x="0" y="0">0</tspan></text>
+  </g>
+  <g id="CABIN_ALT" data-name="CABIN ALT">
+    <text class="cls-4" transform="translate(3603.8907 3290.7601) scale(1.2867 1)"><tspan x="0" y="0">FT</tspan></text>
+    <text class="cls-14" transform="translate(3282.7285 3116.5278) scale(1.107 1)"><tspan class="cls-57" x="0" y="0">C</tspan><tspan class="cls-1" x="83.16" y="0" xml:space="preserve">AB  A</tspan><tspan class="cls-45" x="394.37" y="0">L</tspan><tspan x="440.01" y="0">T</tspan></text>
+    <text class="cls-16" transform="translate(3175.5151 3295.4908) scale(.9892 1)"><tspan class="cls-39" x="0" y="0">1</tspan><tspan x="83.98" y="0">300</tspan></text>
+  </g>
+  <g id="ENGINE">
+    <text class="cls-28" transform="translate(180.06 405.9) scale(.93 1)"><tspan x="0" y="0">E</tspan><tspan class="cls-60" x="89.89" y="0">N</tspan><tspan class="cls-33" x="225.35" y="0">G</tspan></text>
+    <text class="cls-28" transform="translate(1721.0513 139.9971) scale(1.1848 1)"><tspan x="0" y="0">C</tspan><tspan class="cls-55" x="111.39" y="0">R</tspan><tspan class="cls-31" x="205.32" y="0">UISE</tspan></text>
+    <line class="cls-29" x1="185.25" y1="424.6" x2="486.37" y2="424.6"/>
+    <text class="cls-28" transform="translate(180.063 2278.9897) scale(1.1765 1)"><tspan x="0" y="0">AIR</tspan></text>
+    <line class="cls-29" x1="185.25" y1="2291.69" x2="486.37" y2="2291.69"/>
+    <line class="cls-29" x1="1735.49" y1="154.79" x2="2385.7" y2="154.79"/>
+  </g>
+  <g id="A_C_ZONES" data-name="A/C ZONES">
+    <text class="cls-6" transform="translate(355.9524 2934.0483) scale(1.1635 1)"><tspan class="cls-59" x="0" y="0">C</tspan><tspan x="79.77" y="0">KPT</tspan></text>
+    <text class="cls-7" transform="translate(511.5693 3095.6978)"><tspan class="cls-54" x="0" y="0">2</tspan><tspan class="cls-2" x="72.41" y="0">4</tspan></text>
+    <text class="cls-6" transform="translate(985.3274 2935.5591) scale(.9453 1)"><tspan x="0" y="0">FWD</tspan></text>
+    <text class="cls-8" transform="translate(1669.9077 2939.7788) scale(1.1765 1)"><tspan x="0" y="0">AFT</tspan></text>
+    <text class="cls-7" transform="translate(1025.0621 3097.2085)"><tspan class="cls-54" x="0" y="0">2</tspan><tspan class="cls-2" x="72.41" y="0">4</tspan></text>
+    <text class="cls-7" transform="translate(1611.2435 3097.2085)"><tspan class="cls-54" x="0" y="0">2</tspan><tspan class="cls-2" x="72.41" y="0">4</tspan></text>
+    <text class="cls-5" transform="translate(2189.8765 3146.0147) scale(.845 1)"><tspan x="0" y="0">C</tspan></text>
+    <text class="cls-19" transform="translate(2146.8301 3090.8936) scale(.902 1)"><tspan x="0" y="0">O</tspan></text>
+    <path class="cls-29" d="M292.41,2971.89s-161.04,86.29,70.37,144.47c127.2,31.98,293.91,32.99,520.42,36.16h1110.42v-333.06"/>
+    <polyline class="cls-29" points="616.42 2797.74 1924.77 2797.74 2063.29 2836.71"/>
+    <line class="cls-29" x1="816.83" y1="2803.36" x2="816.83" y2="3146.13"/>
+    <line class="cls-29" x1="1401.22" y1="3079.25" x2="1401.22" y2="3149.65"/>
+  </g>
+</svg>

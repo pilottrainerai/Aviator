@@ -3,6 +3,11 @@ name: pfd-fma-logic
 description: FCOM-driven LOGIC governor for the Aviator A320 PFD + FMA. Use BEFORE editing buildAircraftState / buildAircraftStateFromPhase or any scenario's PFD/FMA behaviour — what the FMA modes and PFD indications should SHOW given the aircraft/automation/system state, and the physically-consistent dynamic VALUES (speed, rate of climb/descent, altitude, pitch, Mach, VMAX, law) per phase/condition. Enforces FMA self-consistency (modes must correspond to real guidance) and degradation logic across scenarios. Separate from cockpit-ui (visual rendering) and pfd-instruments (locked VS/RA/altitude baseline). Manual-first: every mode, indication, and value traces to FCOM/FCTM — Claude does not invent.
 ---
 
+> ⚠️ **Load the `pfd` master skill first.** This file is the FULL logic/governor/FMA reference and is
+> still CURRENT for values — `pfd` §4 points here and uses it in full. One staleness fix: the live PFD is
+> **`svg-pfd.tsx`** (SVG), NOT `pfd-mockup.tsx` — where this file says VS/RA are "rendered by
+> pfd-instruments/pfd-mockup", read that as `svg-pfd.tsx` (`pfd-instruments` is old-canvas fallback).
+
 # PFD / FMA Logic Skill
 
 You are working on **Aviator** — a precision A320 abnormal-procedure training tool.
@@ -247,6 +252,52 @@ Moderate (−50% max) = realistic idle-descent feel. Naturally: a **gradual band
 already →0 near the level). Altitude tracks the coupled VS, so all three stay coordinated.
 Also: the **10 000 decel completes BY 10 000** (band window 10 000–11 500, not 9 000) so
 250 kt is set as it passes the limit, VS −3000→−1500 easing across the same window.
+
+### 5d. The DEPARTURE "acceleration & cleanup" GOVERNOR (LOCKED — the climb counterpart to §5c)
+
+**Do NOT hand-code S / F / green-dot markers per departure scenario.** Call the shared pure helper
+`departureCleanup()` (`src/avionics/core/departureCleanup.ts`, unit-tested). It is the single source of
+truth for the takeoff→clean-climb characteristic speeds, symmetric to §5c for the descent.
+
+**FCOM DSC-22-10-50-20 rule the governor encodes** — the char-speed marker follows the flap LEVER, and
+the pilot retracts one config as each char speed is reached, SPEED-DRIVEN:
+- lever 2/3 (CONF 2/3) → green **"F"** until speed ≥ F → retract to CONF 1
+- lever 1 (CONF 1 **or 1+F**) → green **"S"** until speed ≥ S → retract to CONF 0 (clean)
+- clean (lever 0) → **green dot**, then accelerate to the climb speed (**≥ 230**, default 250)
+- takeoff roll (`airborne=false`) → **V1 / VR** (V2 = the SRS magenta bug); all cleared at liftoff.
+
+**A CONF 1+F takeoff is lever 1 → it shows S, NEVER F** (F is only correct on the approach, CONF 2/3/FULL).
+This was the recurring bug ([[feedback_pfd_locked_corrections]] #6). "From V2, clean up all the way to green
+dot and at least 230 kt" — the governor does exactly that.
+
+**Wiring** (see the eng-fire branch in `buildAircraftState`, pfd-nd.tsx): declare a `DepartureConfig`
+(takeoffConf + V1/VR/V2 + S/F/green dot + climbSpeed), compute `airborne`, then
+`const clean = approaching ? null : departureCleanup(cfg, liveSpd ?? speed, airborne)` and read
+`clean?.{v1,vr,sSpeed,fSpeed,greenDot}` in the return. **Pass `liveSpd` (buildAircraftState 5th arg,
+already plumbed by SvgPfd) so the S→green-dot flip happens exactly as the animated speed crosses S** —
+that is what makes retraction genuinely "depending on the speed", not phase-stepped. Guard with
+`approaching` so the approach keeps its own CONF 2/3/FULL **F** (never the cleanup S).
+
+### 5e. The APPROACH "deceleration & configuration" GOVERNOR (the MIRROR of §5d)
+
+Call `approachMarkers()` (`src/avionics/core/approachConfig.ts`, unit-tested) for the approach char
+speeds + managed target + low-speed band. It is **config-driven** (not speed-driven like §5d), because
+the approach has explicit **flap steps** in the scenario — the flap step is authoritative:
+
+- CONF 0 (clean) → green dot · **CONF 1 → green "S"** · CONF 2 → F · CONF 3 → F · CONF FULL → (no marker)
+- **magenta MANAGED target** = VMAN of the config: green dot → S → F → F → VAPP (`speedManaged: true`,
+  `selectedSpeed = appr.managedTarget`). The approach speed is MANAGED, not selected — never cyan.
+- **VLS / α-Prot / α-Max DROP with each config** (band moves down the tape as flaps extend).
+
+**The recurring bug this fixes** ([[feedback_pfd_locked_corrections]] #6): a hand-coded approach ladder set
+**green dot at CONF 1 instead of S**, so it skipped S and read "only F again and again", the target was cyan
+not magenta, and the band was frozen. **CONF 1 shows S** — F is CONF 2/3 only, FULL shows no green marker.
+
+**Wiring**: keep the flap-STEP ladder for the descent geometry (speed/alt/vs/gsDev/dme/VFE-vmax per step),
+but derive `apprConf` from the flap steps (most-specific first, they accumulate:
+`(apFinal||apEstab||apFlapFull)?4 : apFlap3?3 : (apGearDn||apFlap2)?2 : apFlap1?1 : 0`) and read char
+speeds / VLS / band / managed target from `approachMarkers(cfg, apprConf)`. Do NOT also hand-set
+`vls/alphaProt/alphaMax/greenDot/sSpeed/fSpeed` in the ladder — the governor is the single source.
 
 ---
 

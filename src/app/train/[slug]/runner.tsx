@@ -28,10 +28,18 @@ import { SystemDisplay } from "@/components/cockpit/system-display";
 import { ContextDisplay } from "@/components/cockpit/context-display";
 import { StatusPanel, isStatusReady } from "@/components/cockpit/status-panel";
 import { HydSdPage } from "@/components/cockpit/hyd-sd-page";
+import { EngineSdPage } from "@/components/cockpit/engine-sd-page";
+import { FuelSdPage } from "@/components/cockpit/fuel-sd-page";
+import { HydEng1SdPage } from "@/components/cockpit/hyd-eng1-sd-page";
+import { ElecSdPage } from "@/components/cockpit/elec-sd-page";
+import { WheelSdPage } from "@/components/cockpit/wheel-sd-page";
+import { CruiseSdPage } from "@/components/cockpit/cruise-sd-page";
+import { SdPermanentStrip } from "@/components/cockpit/sd-permanent-strip";
 import { getApplicableRequiredSteps, isStepApplicable } from "@/lib/scenarios/step-applicability";
 import { track } from "@/lib/analytics";
 import { DescentProfile } from "@/components/cockpit/descent-profile";
 import { applyDualHydGYCardOverrides } from "@/scenarios/data/dual-hyd-g-y-card-overrides";
+import { applyEng1FireCardOverrides } from "@/scenarios/data/eng1-fire-card-overrides";
 
 const AUTO_END_DELAY_MS = 3_000;
 const DEV_ANN_KEY = "devAnnotations:eng1-fire-v1";
@@ -347,6 +355,8 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
   const scenario = useMemo<Scenario>(() => {
     const hydratedBase = baseScenario.meta.slug === "dual-hyd-g-y"
       ? { ...baseScenario, steps: applyDualHydGYCardOverrides(baseScenario.steps) }
+      : baseScenario.meta.slug === "eng1-fire-after-v1"
+      ? { ...baseScenario, steps: applyEng1FireCardOverrides(baseScenario.steps) }
       : baseScenario;
 
     const sequence = loadSavedSequence(baseScenario.meta.slug);
@@ -472,6 +482,22 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
     runner.perform({ kind: "STEP", stepId: "touched_down" });
   }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
 
+  // ENG-FIRE TOUCHDOWN — VIDP RWY 28 (field ~777 ft). Auto-completes `touched_down` once the tape reaches
+  // the runway, so the PFD drops the AP/FD and DECELERATES to 0 on the rollout (the deceleration, like G+Y).
+  // Separate from the gate above (which keys on landing_cl_hyd + ~39 ft); this keys on landing_cl + the VIDP
+  // field band so it can't fire for VABB. [user 2026-07-13]
+  const firedEngTouchdownRef = useRef(false);
+  useEffect(() => {
+    if (runner.status !== "running" || firedEngTouchdownRef.current) return;
+    if (!scenario.steps.some((s) => s.id === "touched_down")) return;
+    if (runner.state.completedSteps["touched_down"]) { firedEngTouchdownRef.current = true; return; }
+    if (!runner.state.completedSteps["landing_cl"]) return;
+    const a = liveAltRef.current;
+    if (a > 800 || a < 700) return;                       // near the VIDP field 777 (excludes VABB 39)
+    firedEngTouchdownRef.current = true;
+    runner.perform({ kind: "STEP", stepId: "touched_down" });
+  }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
+
   // [user 2026-07-04] FULL STOP — after touchdown, once the live speed has decelerated to ~0 kt on the
   // rollout, complete `full_stop`. This is what gates the REQUEST TAXI / Mumbai-Tower call, so it can
   // NEVER appear while still airborne or rolling. Speed-driven, fires once.
@@ -484,6 +510,21 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
     if (liveSpeedRef.current > 5) return;                 // only at the full stop (0 kt)
     firedFullStopRef.current = true;
     runner.perform({ kind: "STEP", stepId: "full_stop" });
+  }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
+
+  // SLATS UP at S SPEED — the takeoff cleanup retracts the slats (1+F → 0) only once the live speed
+  // reaches S, NOT the instant the "flaps up" card (accel_clean) is confirmed. Fires the hidden
+  // `slats_up` gate → the E/WD flap indicator drops to 0 in lockstep with the PFD char-speed marker
+  // (S → green dot). 205 kt = ENG_FIRE_DEP.sSpeed in pfd-nd.tsx — keep in sync. [user 2026-07-12]
+  const firedSlatsUpRef = useRef(false);
+  useEffect(() => {
+    if (runner.status !== "running" || firedSlatsUpRef.current) return;
+    if (!scenario.steps.some((s) => s.id === "slats_up")) return;
+    if (runner.state.completedSteps["slats_up"]) { firedSlatsUpRef.current = true; return; }
+    if (!runner.state.completedSteps["accel_clean"]) return;   // the "flaps up" card must be confirmed first
+    if (liveSpeedRef.current < 205) return;                    // wait till S speed
+    firedSlatsUpRef.current = true;
+    runner.perform({ kind: "STEP", stepId: "slats_up" });
   }, [runner.elapsedMs, runner.status, runner.state.completedSteps, scenario.steps]);
 
   // [Trainer ALT #3 · user 2026-06-30] Vectors-vs-hold decision — a SINGLE SNAPSHOT at 12 500 ft.
@@ -532,6 +573,11 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
         !runner.state.completedSteps["approach_prep_config"];
       if (gpwsPanelActive) return;
     }
+    // NOTE (ENG FIRE, [user 2026-07-11]): "action panel > ATC" is handled DIFFERENTLY here — the fire
+    // scenario surfaces ONE ATC card during the drill (`atc_handoff_to_departure`) as a STANDBY training
+    // discriminator (correct answer = "STANDBY", resurfaces after FIRE PB), rather than hard-suppressing
+    // like G+Y's HYD/GPWS panels. It's the only ATC gated during four_hundred_ft_cmd→engine_secured, so no
+    // blanket suppression is added (that would delete the discriminator). Keep as-is unless we switch models.
     const now = Date.now();
     if (now < atcNextAllowedAt) {
       const delay = atcNextAllowedAt - now;
@@ -836,8 +882,12 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
     ? buildAircraftState(runner.state, scenario, runner.elapsedMs, liveAltRef.current) : null;
   const liveEng = liveAc ? phaseEngine(liveAc.vertMode, liveAltRef.current, liveAc.altitude) : undefined;
   // Mumbai descent: SAT 32°C at sea level → −44°C at FL350 (ISA+10); TAT = SAT + ram rise (TAS²/7592).
-  const liveSat = liveAc ? Math.round(32 - liveAltRef.current * (76 / 35000)) : undefined;
-  const liveTat = liveAc ? Math.round(liveSat! + (liveAc.tas ?? 0) ** 2 / 7592) : undefined;
+  // Permanent bottom-strip data for this scenario. Delhi surface ≈ +30 °C, ram-rise TAT ≈ +33.
+  // GW is LIVE: starts 65 000 (MLW 64 500 + 500, overweight) and REDUCES as fuel burns, so every SD page
+  // stays in sync like the real aircraft. ~0.55 kg/s ≈ 33 kg/min; shown to the nearest 100 kg. [user 2026-07-14]
+  const liveSat = 30;
+  const liveTat = 33;
+  const liveGw = Math.round((65000 - (runner.elapsedMs / 1000) * 0.55) / 100) * 100;
 
   return (
     <main className="flex flex-col">
@@ -942,12 +992,13 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
             <div style={{ minWidth: 0, minHeight: 0, border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden", position: "relative" }}>
               {flashOverlay("pfd")}
               {flashLabel("pfd")}
-              {scenario.meta.slug === "dual-hyd-g-y" ? (
+              {/* ALL scenarios now render the upgraded SVG PFD [2026-07-11]; PfdMockup kept as fallback only */ true ? (
                 <SvgPfd
                   state={runner.state}
                   scenario={scenario}
                   elapsedMs={runner.elapsedMs}
                   paused={runner.paused}
+                  liveAttitude={["eng1-fire-after-v1", "eng-failure-after-v1", "eng1-fire-after-v1-persistent-fire", "elec-emer-config", "rapid-depress"].includes(scenario.meta.slug)}
                   onAltitude={(ft) => { liveAltRef.current = ft; const now = Date.now(); if (now - liveAltTsRef.current > 300) { liveAltTsRef.current = now; setLiveAlt(ft); } }}
                   onSpeed={(kt) => { liveSpeedRef.current = kt; }}
                 />
@@ -1017,11 +1068,31 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                 until the crew announces STATUS (FCOM: synoptic → STATUS is the last page).
                 HYD synoptic is G+Y-specific; other scenarios show STATUS only, as before. */}
             <div style={{ minWidth: 0, minHeight: 0, border: "1px solid var(--color-border)", backgroundColor: "#000", overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
-              {scenario.meta.slug === "dual-hyd-g-y" && runner.state.completedSteps["crew_crosscheck"]
-                ? null   /* STATUS reviewed + ECAM ACTIONS COMPLETED → SD reverts to clear (blank) [user 2026-07-06] */
-                : scenario.meta.slug === "dual-hyd-g-y" && runner.state.triggersFired["structural_fail"] && !isStatusReady(scenario, runner.state)
-                  ? <HydSdPage />   /* synoptic pops ONLY after the failure fires, holds until STATUS [user 2026-07-06] */
-                  : <StatusPanel scenario={scenario} state={runner.state} sat={liveSat} tat={liveTat} />}
+              {/* page area (flex) — SVGs are cropped ABOVE their strip line; the ONE shared live strip
+                  below keeps every page in sync (same GW, reducing as fuel burns). [user 2026-07-14] */}
+              <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                {runner.state.completedSteps["crew_crosscheck"]
+                  ? <CruiseSdPage />   /* ECAM ACTIONS COMPLETE + STATUS reviewed → SD reverts to CRUISE (FCOM
+                                          flight-phase page; single-engine, holding to burn below MLW). [user 2026-07-14] */
+                  : scenario.meta.slug === "dual-hyd-g-y" && runner.state.triggersFired["structural_fail"] && !isStatusReady(scenario, runner.state)
+                    ? <HydSdPage />   /* synoptic pops ONLY after the failure fires, holds until STATUS [user 2026-07-06] */
+                    : (scenario.meta.slug === "eng1-fire-after-v1" || scenario.meta.slug === "eng1-fire-after-v1-persistent-fire")
+                      /* ENG 1 FIRE — FCOM flight-phase / failure page logic: WHEEL (takeoff) → ENGINE (secured
+                         engine) → FUEL@IMBALANCE → HYD@CLEAR HYD → ELEC@CLEAR ELEC → STATUS → CRUISE. */
+                      ? (!runner.state.triggersFired["fire_warn"]
+                          ? <WheelSdPage />
+                          : !isStatusReady(scenario, runner.state)
+                            ? (primaryNextStep?.id === "sd_imbalance"
+                                ? <FuelSdPage />
+                                : primaryNextStep?.id === "clear_hyd"
+                                  ? <HydEng1SdPage />
+                                  : primaryNextStep?.id === "clear_elec"
+                                    ? <ElecSdPage />
+                                    : <EngineSdPage secured={!!runner.state.completedSteps["thr_lever_idle"]} />)
+                            : <StatusPanel scenario={scenario} state={runner.state} />)
+                      : <StatusPanel scenario={scenario} state={runner.state} />}
+              </div>
+              <SdPermanentStrip tat={liveTat} sat={liveSat} clock="04 H 30" gw={liveGw} />
             </div>
 
             {/* SD — SYSTEM / QRH / GRAPHIC / INFO */}

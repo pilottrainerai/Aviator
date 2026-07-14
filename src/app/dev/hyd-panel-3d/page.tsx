@@ -4,6 +4,7 @@
 // (NEUTRAL / IN / OUT) and cross-check the cap colour against the live fire panel.
 import { useEffect, useState } from "react";
 import { HydPanel3D, HYD_TUNE_DEFAULT, HYD_PUMP_ORDER, HYD_PUMP_LABELS, HYD_RAT_GUARD_DEFAULT, HYD_ELEC_GUARD_DEFAULT, HYD_RAT_BTN_DEFAULT, HYD_ELEC_BTN_DEFAULT, type HydTune, type HydPos, type HydPumpState, type HydPumpKey, type HydGuard, type HydBtn } from "@/components/cockpit/hyd-panel-3d";
+import { previewClick } from "@/lib/audio/cockpit-audio";
 
 const KEY = "hydTune.v28"; // bump on every default change to discard stale saved tunes so new defaults load without a manual Reset
 
@@ -137,6 +138,17 @@ export default function HydPanel3DDevPage() {
           style={{ marginTop: 4, padding: "8px 8px", fontSize: 12, fontWeight: 700, letterSpacing: 1, color: "#05070a", background: "#8aabbb", border: "1px solid #3a434f", borderRadius: 6, cursor: "pointer", fontFamily: "monospace" }}>
           ▶ PRESS  (neutral → in → stays)
         </button>
+
+        <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 6 }}>CLICK SOUND — audition, then tell me which to keep</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {([["a", "A · dome"], ["b", "B · tight"], ["c", "C · deep"], ["d", "D · clack"]] as [string, string][]).map(([id, label]) => (
+            <button key={id} type="button" onClick={() => previewClick(`/audio/switch-click-${id}.wav`)}
+              style={{ flex: 1, padding: "6px 4px", fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: "#cdd6e0", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={{ color: "#7d8794", fontSize: 9 }}>Panel currently plays A. Clicking a pump uses the baked default.</div>
 
         <div style={{ color: "#8aabbb", fontSize: 10, marginTop: 6 }}>PREVIEW POSITION</div>
         <div style={{ display: "flex", gap: 6 }}>

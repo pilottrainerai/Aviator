@@ -10,6 +10,7 @@ import { evalSysCase, SYS_COLORS } from "@/components/cockpit/system-display";
 import { EngineFireScenarioPanel } from "@/components/cockpit/engine-fire-panel-scenario";
 import { FireTestPanel3D } from "@/components/cockpit/fire-test-panel-3d";
 import { EngStartPanel3D, ENG_TUNE_DEFAULT, type EngTune } from "@/components/cockpit/eng-start-panel-3d";
+import { Throttle3D, THROTTLE_TUNE_DEFAULT } from "@/components/cockpit/throttle-3d";
 import { HydPanel3D, type HydPumpState, type HydPumpKey } from "@/components/cockpit/hyd-panel-3d";
 import { GpwsPanel3D, type GpwsLights, type GpwsBtnKey } from "@/components/cockpit/gpws-3d";
 
@@ -203,15 +204,15 @@ function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd,
 // Baked default layout for the popped-out action panel (exported from the dev
 // layout editor). Used when there's no per-element localStorage override, so a
 // fresh session / production shows this exact arrangement when the procedure pops.
-const VIEW_DEFAULT = { x: -0.2976, y: -0.0142, zoom: 0.7032 };
+const VIEW_DEFAULT = { x: -0.264, y: 0.169, zoom: 0.7032 }; // baked from dev export [user 2026-07-14]
 
 // Combined action-panel layout: ONE outer frame (fixed viewport coords) holding
 // the thrust levers, master, and 3D fire panel as nested items positioned
 // RELATIVE to the outer. Outer moves/resizes/pops as a unit; each item nudges
 // inside it. (New keys — leaves the old separate-frame layout untouched.)
-const COMBO_OUTER: DevBox = { x: 380, y: 130, w: 1500, h: 392 };
+const COMBO_OUTER: DevBox = { x: 442, y: 130, w: 852, h: 552 }; // baked from dev export [user 2026-07-14]
 const COMBO_INNER: Record<string, DevBox> = {
-  panel3d:         { x: 284, y: 24, w: 1210, h: 360 },
+  panel3d:         { x: -18, y: 2, w: 1193, h: 290 }, // baked from dev export [user 2026-07-14]
   thr_lever_idle:  { x: 6,   y: 24, w: 150,  h: 360 },
   eng1_master_off: { x: 162, y: 24, w: 116,  h: 360 },
 };
@@ -1844,6 +1845,11 @@ function DslControlPanel({
   const [editMode, setEditMode] = useState(true);
   useEffect(() => { try { const v = window.localStorage.getItem("fireDevEdit"); if (v != null) setEditMode(v === "1"); } catch { /* ignore */ } }, []);
   const toggleEdit = () => setEditMode((p) => { const n = !p; try { window.localStorage.setItem("fireDevEdit", n ? "1" : "0"); } catch { /* ignore */ } return n; });
+  // In edit mode, which layout to show/edit: the POPPED (big floating) one or the INLINE (compressed
+  // in-cell) one. Default popped (the main action view); flip to edit the inline layout directly.
+  const [poppedPreview, setPoppedPreview] = useState(true);
+  useEffect(() => { try { const v = window.localStorage.getItem("fireDevPoppedPreview"); if (v != null) setPoppedPreview(v === "1"); } catch { /* ignore */ } }, []);
+  const togglePoppedPreview = () => setPoppedPreview((p) => { const n = !p; try { window.localStorage.setItem("fireDevPoppedPreview", n ? "1" : "0"); } catch { /* ignore */ } return n; });
   // Edit only takes effect where the dev editor is available — never in production
   // (so a stale localStorage `fireDevEdit=1` can't leave the panel popped/editable for trainees).
   const edit = SHOW_LAYOUT_EDITOR && editMode;
@@ -1911,12 +1917,12 @@ function DslControlPanel({
   const a1Armed = !a1ActiveAt || a1Elapsed >= AGENT_ARM_DELAY_MS;
   const a1CountdownSec = a1ActiveAt && a1Elapsed < AGENT_ARM_DELAY_MS ? Math.max(1, Math.ceil((AGENT_ARM_DELAY_MS - a1Elapsed) / 1000)) : 0;
 
-  // Pop-out lifecycle: the action panel rises out once the PF commands ECAM ACTIONS
-  // at 400 ft (step `four_hundred_ft_cmd`). It collapses 5 s AFTER AGENT 2 is
-  // discharged — by then the fire has extinguished (~2 s) so the crew sees the FIRE
-  // light go out with the pb still OUT + guard still OPEN, then it retracts. The
-  // pb/guard keep their actuated state (the 3D panel doesn't reset in controlled mode).
-  const ecamActionsStarted = !!state.completedSteps["four_hundred_ft_cmd"];
+  // Pop-out lifecycle: the action panel rises out only at the FIRST ACTIONABLE ECAM step —
+  // i.e. once the failure is IDENTIFIED (`identify_eng1_fire`) and the crew is ready for
+  // THR LEVER 1, NOT at the 400 ft "ECAM ACTIONS" announce. Once popped it must be worked to
+  // completion (action panel > ATC). It collapses 5 s AFTER AGENT 2 (fire out ~2 s earlier).
+  // The pb/guard keep their actuated state (the 3D panel doesn't reset in controlled mode). [user 2026-07-11]
+  const ecamActionsStarted = !!state.completedSteps["identify_eng1_fire"];
   const retractTrigger = !!state.completedSteps["agent2"];
   const [retracted, setRetracted] = useState(false);
   useEffect(() => {
@@ -1926,7 +1932,7 @@ function DslControlPanel({
   }, [retractTrigger]);
   // Edit mode keeps it popped so the layout can be arranged anytime. With edit
   // off it follows the real trigger: pop on ECAM ACTIONS, retract 3 s after agent 2.
-  const popped = USE_NEW_FIRE_PANEL && (edit || (ecamActionsStarted && !retracted));
+  const popped = USE_NEW_FIRE_PANEL && ((edit && poppedPreview) || (ecamActionsStarted && !retracted));
 
   // Export the current arrangement (every element's box + the 3D view) as JSON so
   // it can be baked in as the default layout.
@@ -1963,6 +1969,13 @@ function DslControlPanel({
               background: editMode ? "#8aabbb" : "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
             Edit: {editMode ? "ON" : "OFF"}
           </button>
+          {editMode && (
+            <button type="button" onClick={togglePoppedPreview}
+              style={{ padding: "3px 9px", fontSize: 10, fontWeight: 700, color: "#05070a",
+                background: poppedPreview ? "#8aabbb" : "#d9a57a", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>
+              Editing: {poppedPreview ? "POPPED" : "INLINE"}
+            </button>
+          )}
           <span style={{ color: "#7c8696" }}>drag body = move · edges/corners = resize</span>
           <button type="button" onClick={exportLayout}
             style={{ padding: "3px 9px", fontSize: 10, fontWeight: 700, color: "#05070a",
@@ -1995,9 +2008,10 @@ function DslControlPanel({
           perform({ kind: "STEP", stepId: id });
         };
 
-        // The ENG MASTER now lives on the 3D ENG START panel, so drop the old 2D
-        // master control from the side controls (the eng1_master_off step is unchanged).
-        const sideControls = controls.filter(c => c.kind !== "fire_pb" && c.kind !== "agent" && c.kind !== "master");
+        // ENG MASTER lives on the 3D ENG START panel and THR LVR now lives on the 3D throttle
+        // (both inside the PedestalOne3D block), so drop both 2D side controls. Their steps
+        // (eng1_master_off / thr_lever_idle) are unchanged — driven by clicks on the 3D block.
+        const sideControls = controls.filter(c => c.kind !== "fire_pb" && c.kind !== "agent" && c.kind !== "master" && c.kind !== "thr_lever");
 
         const fp3dFireDetected = fireLit;
         const fp3dFirePbDone   = isDone(firePbCtrl?.stepId ?? "");
@@ -2043,8 +2057,9 @@ function DslControlPanel({
         // Legacy FirePanel3D removed 2026-06-21 — FireTestPanel3D is the sole live ENG1 fire panel.
         const panel3d = (
           <FireTestPanel3D
-            controlled framing="eng1" panX={view3d.x} panY={view3d.y} zoom={view3d.zoom}
-            fireDetected={fp3dFireDetected} firePbDone={fp3dFirePbDone}
+            bg="transparent"
+            controlled framing="all" panX={view3d.x} panY={view3d.y} zoom={view3d.zoom}
+            fireDetected={fp3dFireDetected} fireSections={[fp3dFireDetected, false, false]} firePbDone={fp3dFirePbDone}
             agent1Disch={fp3dAgent1Disch} agent2Disch={fp3dAgent2Disch}
             onPushFirePb={() => performStep(firePbCtrl?.stepId)}
             onPushAgent1={() => { if (a1Armed) performStep(agent1Ctrl?.stepId); }}
@@ -2058,28 +2073,32 @@ function DslControlPanel({
         // eng1_master_off step (pilot-selected only, forward = ON, back = OFF). In dev
         // mode: drag body to pan, wheel to zoom, bar to move, edges to resize, plus the
         // PARTS editor to re-tune colours/lighting for the cockpit environment.
-        const engStartSection = USE_ENG_START_PANEL ? (
+        // THROTTLE + ENG START — each its OWN movable/resizable element INSIDE the action-panel
+        // container (combo_outer), alongside the FIRE panel. You size & place all three by hand in
+        // dev mode (drag bar, drag edges). Only ENG 1 (left) lever retards to idle; ENG 2 stays put.
+        const pedestalMovables = USE_ENG_START_PANEL ? (
           <>
-            <DevMovable id="engstart_panel" label="ENG START" fill editMode={edit}
-              onBodyDrag={onEngPan} onBodyDragEnd={persistEngView} onWheel={onEngZoom} def={ENG_START_BOX}>
-              <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-                {/* True 3D-camera pan/zoom (stays crisp at any zoom — no CSS scale). */}
-                <EngStartPanel3D
-                  controlled panX={engView.x} panY={engView.y} zoom={engView.zoom}
-                  tune={engTune}
-                  fires={[fp3dFireDetected, false]}
-                  masters={[!isDone("eng1_master_off"), true]}
-                  mode={1}
-                  onToggleMaster={(i) => { if (i === 0) performStep("eng1_master_off"); }}
-                  onCycleMode={() => {}}
-                />
-                {/* Training-guide flash: the WHOLE ENG START box pulses when ENG 1 MASTER is the next action */}
+            <DevMovable id="combo_throttle3" label="THROTTLE" fill relative editMode={edit} def={{ x: -221, y: 143, w: 918, h: 461 }}>
+              <div style={{ position: "absolute", inset: 0 }}>
+                <Throttle3D bg="transparent" controlled viewDir={[0, 0.985, 0.173]} zoom={1.0} tune={THROTTLE_TUNE_DEFAULT} showTrimWheels tiltX={10} tiltY={0}
+                  lever1Deg={isDone("thr_lever_idle") ? 0 : 20} lever2Deg={20}
+                  onThrLever={() => performStep("thr_lever_idle")} />
+              </div>
+            </DevMovable>
+            <DevMovable id="combo_engstart3" label="ENG START" fill relative editMode={edit} def={{ x: 347, y: 176, w: 440, h: 352 }}>
+              <div style={{ position: "absolute", inset: 0 }}>
+                <EngStartPanel3D controlled bg="transparent" tune={engTune}
+                  fires={[fp3dFireDetected, false]} masters={[!isDone("eng1_master_off"), true]} mode={1}
+                  onToggleMaster={(i) => { if (i === 0) performStep("eng1_master_off"); }} />
+                {/* Training-guide flash: the ENG START box pulses when ENG 1 MASTER is the next action */}
                 {isDone("eng1_fire_pb") && !isDone("eng1_master_off") && (
                   <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, borderRadius: 8, animation: "ccGuideFlash 1.15s ease-in-out infinite" }} />
                 )}
               </div>
             </DevMovable>
-            {edit && (
+            {/* ENG START · PARTS material editor hidden FOR NOW — tune is baked into
+                ENG_TUNE_DEFAULT [user 2026-07-09]. Flip `false &&` → `edit &&` to restore. */}
+            {false && edit && (
               <div style={{ position: "fixed", top: 56, left: 12, zIndex: 60, width: 232, maxHeight: "84vh", overflowY: "auto",
                 display: "flex", flexDirection: "column", gap: 4, padding: "10px 12px", borderRadius: 9, background: "rgba(10,14,20,0.95)",
                 border: "1px solid #2a313b", fontFamily: "monospace", fontSize: 11, color: "#cdd6e0" }}>
@@ -2109,6 +2128,9 @@ function DslControlPanel({
                   <button type="button" onClick={() => { setEngView({ x: 0, y: 0, zoom: 1 }); try { window.localStorage.setItem("engStart3dView.v2", JSON.stringify({ x: 0, y: 0, zoom: 1 })); } catch { /* ignore */ } }}
                     style={{ flex: 1, padding: "4px 6px", fontSize: 10, color: "#eef6ff", background: "#2a313b", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>Reset view</button>
                 </div>
+                {/* ponytail: dev-only export so the tuned material can be baked into ENG_TUNE_DEFAULT [user 2026-07-09] */}
+                <button type="button" onClick={(e) => { const json = JSON.stringify(engTune, null, 2); navigator.clipboard?.writeText(json).catch(() => {}); const b = e.currentTarget; const t = b.textContent; b.textContent = "✓ Copied!"; setTimeout(() => { b.textContent = t; }, 1200); }}
+                  style={{ width: "100%", marginTop: 6, padding: "5px 6px", fontSize: 10, fontWeight: 700, color: "#05070a", background: "#7ad9a5", border: "1px solid #3a434f", borderRadius: 5, cursor: "pointer" }}>Copy tune JSON</button>
               </div>
             )}
           </>
@@ -2140,25 +2162,39 @@ function DslControlPanel({
                   <div style={{ padding: 8 }}>{renderCtrl(ctrl)}</div>
                 </DevMovable>
               ))}
+              {pedestalMovables}
             </DevMovable>
-            {engStartSection}
             </>
           );
         }
 
-        // INLINE: idle (action not yet started) and production — the panels stay in
-        // the action panel column. The ENG START panel is NOT shown here: like the
-        // action panel, it only pops out once the PF commands ECAM ACTIONS (see the
-        // `popped` branch above).
+        // INLINE (compressed): all three panels visible — FIRE on top, THROTTLE + ENG START below.
+        // No box background: the whole action panel stays the panel's own colour (uniform), the 3D
+        // panels are transparent on top. Same interactions as the popped view.
         return (
-          <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-            <div style={{ flex: "0 0 38%", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
-              {sideControls.map((ctrl) => <div key={ctrl.stepId}>{renderCtrl(ctrl)}</div>)}
-            </div>
+          <div style={{ position: "relative", width: "100%", height: "320px" }}>
             {firePbCtrl && (
-              <div style={{ flex: "1 1 0", height: "202px", position: "relative", background: "#080C12" }}>
+              <DevMovable id="inline_fire" label="FIRE PANEL" fill relative editMode={edit} def={{ x: -7, y: -38, w: 554, h: 251 }}>
                 <div style={{ position: "absolute", inset: 0 }}>{panel3d}</div>
-              </div>
+              </DevMovable>
+            )}
+            {USE_ENG_START_PANEL && (
+              <>
+                <DevMovable id="inline_throttle" label="THROTTLE" fill relative editMode={edit} def={{ x: -47, y: 112, w: 287, h: 239 }}>
+                  <div style={{ position: "absolute", inset: 0 }}>
+                    <Throttle3D bg="transparent" controlled viewDir={[0, 0.985, 0.173]} zoom={1.0} tune={THROTTLE_TUNE_DEFAULT} showTrimWheels tiltX={10} tiltY={0}
+                      lever1Deg={isDone("thr_lever_idle") ? 0 : 36} lever2Deg={36}
+                      onThrLever={() => performStep("thr_lever_idle")} />
+                  </div>
+                </DevMovable>
+                <DevMovable id="inline_engstart" label="ENG START" fill relative editMode={edit} def={{ x: 196, y: 135, w: 193, h: 188 }}>
+                  <div style={{ position: "absolute", inset: 0 }}>
+                    <EngStartPanel3D controlled bg="transparent" tune={engTune}
+                      fires={[fp3dFireDetected, false]} masters={[!isDone("eng1_master_off"), true]} mode={1}
+                      onToggleMaster={(i) => { if (i === 0) performStep("eng1_master_off"); }} />
+                  </div>
+                </DevMovable>
+              </>
             )}
           </div>
         );

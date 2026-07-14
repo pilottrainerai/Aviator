@@ -12,7 +12,7 @@ import { evalSysCase } from "./system-display";
 import { PHASE_ENGINE_VALUES, type FlightPhase } from "./phase-engine-values";
 
 const SYSCOL: Record<SysColor, string> = {
-  green: "#5aba47", amber: "#e8a13a", red: "#ed1e24", cyan: "#2dc3e8", dim: "#6A7488",
+  green: "#5aba47", amber: "#e8a13a", red: "#ed1e24", cyan: "#2dc3e8", dim: "#6A7488", magenta: "#cf92c1",
 };
 const WHITE = "#fff";
 
@@ -55,10 +55,29 @@ const pts = (arr: number[][]) => arr.map((a) => a.join(",")).join(" ");
 
 function SlatFlap({ conf, flapConf, slatFault = false, flapFault = false }: { conf: FlapConf; flapConf?: FlapConf; slatFault?: boolean; flapFault?: boolean }) {
   // Slats follow `conf` (the lever); flaps follow `flapConf` (may lag/jam separately). [user 2026-07-06]
-  const ts = SFCONF[conf], tf = SFCONF[flapConf ?? conf];
-  // FCOM DSC-27-30-20 (5): the flap-lever CONF figure is GREEN when slats+flaps reach the selected
-  // config, CYAN while in transit / not yet there (incl. jammed — flaps never reach it). [user 2026-07-07]
-  const confReached = tf.f === SFCONF[conf].f && ts.s === SFCONF[conf].s;
+  // Slats/flaps TRANSIT smoothly to the target (RAF lerp), like real surfaces — not a snap. Slats
+  // travel a touch faster than flaps. [user 2026-07-12: "flap/slat movement should be smoother, real"]
+  const targetS = SFCONF[conf].s, targetF = SFCONF[flapConf ?? conf].f;
+  const dispRef = useRef({ s: targetS, f: targetF });
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    let raf = 0, prev = performance.now();
+    const RATE_S = 0.6, RATE_F = 0.45;                 // detent positions per second
+    const loop = (now: number) => {
+      const dt = Math.min(0.05, (now - prev) / 1000); prev = now;
+      const d = dispRef.current; let moving = false;
+      if (Math.abs(d.s - targetS) > 0.002) { d.s += Math.sign(targetS - d.s) * Math.min(Math.abs(targetS - d.s), RATE_S * dt); moving = true; } else d.s = targetS;
+      if (Math.abs(d.f - targetF) > 0.002) { d.f += Math.sign(targetF - d.f) * Math.min(Math.abs(targetF - d.f), RATE_F * dt); moving = true; } else d.f = targetF;
+      setTick((t) => t + 1);
+      if (moving) raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [targetS, targetF]);
+  const dS = dispRef.current.s, dF = dispRef.current.f;
+  // FCOM DSC-27-30-20 (5): the CONF figure is GREEN once the surfaces REACH the selected config, CYAN
+  // while in transit (or jammed — never reach it). [user 2026-07-07]
+  const confReached = Math.abs(dS - SFCONF[conf].s) < 0.02 && Math.abs(dF - SFCONF[conf].f) < 0.02;
   const confCol = confReached ? SYSCOL.green : SYSCOL.cyan;
   // FCOM DSC-27-30-20: on a slat/flap fault the affected index (S / F letter,
   // its position box + connecting line) turns amber. White reference dots stay.
@@ -70,7 +89,7 @@ function SlatFlap({ conf, flapConf, slatFault = false, flapFault = false }: { co
     pts(REL.map((r) => { const c = cen(b, u, pos, sp); return [c[0] + r[0] * BS, c[1] + r[1] * BS]; }));
   const idxPoly = (b: number[], u: number[], REL: number[][], pos: number, sp: number) =>
     pts(REL.map((r) => { const c = cen(b, u, pos, sp); return [c[0] + r[0] * BS * 0.5, c[1] + r[1] * BS * 0.5]; }));
-  const cL = cen(Lc, uL, ts.s, slatSP), cR = cen(Rc, uR, tf.f, flapSP);
+  const cL = cen(Lc, uL, dS, slatSP), cR = cen(Rc, uR, dF, flapSP);
   const nums: Record<FlapConf, string> = { "0": "", "1": "1", "1+F": "1 + F", "2": "2", "3": "3", "FULL": "FULL" };
 
   return (
@@ -78,18 +97,18 @@ function SlatFlap({ conf, flapConf, slatFault = false, flapFault = false }: { co
       {/* white hat (SVG body, verbatim) */}
       <polygon points="2774.59,2349.81 2869.87,2349.81 2900.43,2430.9 2755.01,2425.31" fill="none" stroke={WHITE} strokeWidth={12} />
       {/* index marks (hidden while attached at 0) */}
-      {ts.s > 0.1 && Array.from({ length: SLATMAX }, (_, i) => (
+      {(dS > 0.1 || targetS > 0.1) && Array.from({ length: SLATMAX }, (_, i) => (
         <polygon key={`si${i}`} points={idxPoly(Lc, uL, LREL, i + 1, slatSP)} fill={WHITE} />
       ))}
-      {tf.f > 0.1 && Array.from({ length: FLAPMAX }, (_, i) => (
+      {(dF > 0.1 || targetF > 0.1) && Array.from({ length: FLAPMAX }, (_, i) => (
         <polygon key={`fi${i}`} points={idxPoly(Rc, uR, RREL, i + 1, flapSP)} fill={WHITE} />
       ))}
-      {/* connecting lines (amber on fault, else green) */}
-      {ts.s > 0.04 && <line x1={2774.59} y1={2349.81} x2={cL[0] - 41.25 * BS} y2={cL[1] - 22.37 * BS} stroke={sCol} strokeWidth={12} strokeLinecap="round" />}
-      {tf.f > 0.04 && <line x1={2869.87} y1={2349.81} x2={cR[0] + 52.38 * BS} y2={cR[1] - 29.01 * BS} stroke={fCol} strokeWidth={12} strokeLinecap="round" />}
-      {/* position boxes (empty at 0; amber on fault, else green) */}
-      <polygon points={boxPoly(Lc, uL, LREL, ts.s, slatSP)} fill="none" stroke={sCol} strokeWidth={12} />
-      <polygon points={boxPoly(Rc, uR, RREL, tf.f, flapSP)} fill="none" stroke={fCol} strokeWidth={12} />
+      {/* connecting lines (amber on fault, else green) — travel with the box */}
+      {dS > 0.04 && <line x1={2774.59} y1={2349.81} x2={cL[0] - 41.25 * BS} y2={cL[1] - 22.37 * BS} stroke={sCol} strokeWidth={12} strokeLinecap="round" />}
+      {dF > 0.04 && <line x1={2869.87} y1={2349.81} x2={cR[0] + 52.38 * BS} y2={cR[1] - 29.01 * BS} stroke={fCol} strokeWidth={12} strokeLinecap="round" />}
+      {/* position boxes (empty at 0; amber on fault, else green) — slide to the target */}
+      <polygon points={boxPoly(Lc, uL, LREL, dS, slatSP)} fill="none" stroke={sCol} strokeWidth={12} />
+      <polygon points={boxPoly(Rc, uR, RREL, dF, flapSP)} fill="none" stroke={fCol} strokeWidth={12} />
       {/* S / F labels (amber on fault) + config legend */}
       <text x={2330} y={2410} fill={sLbl} fontSize={150} textAnchor="middle">S</text>
       <text x={3300} y={2410} fill={fLbl} fontSize={150} textAnchor="middle">F</text>
@@ -181,36 +200,46 @@ export function EwdGauges({ state, scenario, phase, live }: { state: ScenarioSta
   const flapFault = P ? false : boolVal(ed?.slatFlapFault?.flap as never, state);
   const ndL = needleTip(1169.14, 511.95, n1L.v);
   const ndR = needleTip(2803.11, 515.71, n1R.v);
+  // FADEC unpowered (FIRE pb) → parameter invalid: gauge shows amber "XX", the arc turns AMBER and
+  // the needle + red overspeed segment DISAPPEAR (per the V-PREP ENG-fire reference). [user 2026-07-12]
+  const n1LX = !isFinite(+n1L.v), n1RX = !isFinite(+n1R.v);
+  const egtLX = !isFinite(+egtL.v), egtRX = !isFinite(+egtR.v);
 
   const V = (x: number, y: number, val: SysVal, size: number) => (
     <text x={x} y={y} fill={SYSCOL[val.c]} fontSize={size} textAnchor="middle">{val.v}</text>
   );
 
   return (
-    <svg viewBox="0 0 4097 2730" style={{ display: "block", width: "100%", fontFamily: "var(--font-cockpit)", fontWeight: 500 }}>
+    <svg viewBox="0 0 4097 2730" preserveAspectRatio="xMidYMid meet" style={{ display: "block", width: "100%", height: "100%", fontFamily: "var(--font-cockpit)", fontWeight: 500 }}>
       <rect width={4097} height={2730} fill="#000" />
 
       {/* N1 gauges */}
-      <path d="M935.13,741.65s-169.18-156.08-51.7-397.05c0,0,98.31-170.24,305.71-164.25,0,0,106.7-8.39,211,92.31" fill="none" stroke={WHITE} strokeWidth={15} />
-      <path d="M1400.15,272.67c28.78,25.08,71.21,100.41,71.21,100.41l-33.21,18.73" fill="none" stroke={SYSCOL.red} strokeWidth={15} />
+      <path d="M935.13,741.65s-169.18-156.08-51.7-397.05c0,0,98.31-170.24,305.71-164.25,0,0,106.7-8.39,211,92.31" fill="none" stroke={n1LX ? SYSCOL.amber : WHITE} strokeWidth={15} />
+      {!n1LX && <path d="M1400.15,272.67c28.78,25.08,71.21,100.41,71.21,100.41l-33.21,18.73" fill="none" stroke={SYSCOL.red} strokeWidth={15} />}
+      {/* Dial markers (ticks + 5/10 scale) — HIDDEN when the gauge is invalid (FADEC lost on FIRE pb):
+          a failed engine shows no dial graduations, just the amber arc + XX. [user 2026-07-14] */}
+      {!n1LX && (
       <g stroke={WHITE} strokeWidth={15}>
         <line x1={909.57} y1={363.97} x2={883.44} y2={344.6} /><line x1={980.29} y1={283.15} x2={961.87} y2={257.49} />
         <line x1={1076.26} y1={230.34} x2={1065.41} y2={199.2} /><line x1={1184.64} y1={214.77} x2={1184.64} y2={180.18} />
         <line x1={1289.34} y1={237.69} x2={1304.63} y2={206.46} /><line x1={1378.42} y1={299.22} x2={1400.15} y2={280.4} />
       </g>
-      <line x1={1169.14} y1={511.95} x2={ndL[0]} y2={ndL[1]} stroke={SYSCOL[n1L.c]} strokeWidth={15} />
-      <text x={960} y={446} fill={WHITE} fontSize={104}>5</text><text x={1244} y={395} fill={WHITE} fontSize={87}>10</text>
+      )}
+      {!n1LX && <line x1={1169.14} y1={511.95} x2={ndL[0]} y2={ndL[1]} stroke={SYSCOL[n1L.c]} strokeWidth={15} />}
+      {!n1LX && <><text x={960} y={446} fill={WHITE} fontSize={104}>5</text><text x={1244} y={395} fill={WHITE} fontSize={87}>10</text></>}
       <rect x={1070.48} y={588.07} width={464.12} height={164.9} fill="none" stroke={WHITE} strokeWidth={10} />
       {V(1300, 729, n1L, 133)}
-      <path d="M2569.41,745.54s-169.18-156.08-51.7-397.05c0,0,98.31-170.24,305.71-164.25,0,0,106.7-8.39,211,92.31" fill="none" stroke={WHITE} strokeWidth={15} />
-      <path d="M3034.43,276.55c28.78,25.08,71.21,100.41,71.21,100.41l-33.21,18.73" fill="none" stroke={SYSCOL.red} strokeWidth={15} />
+      <path d="M2569.41,745.54s-169.18-156.08-51.7-397.05c0,0,98.31-170.24,305.71-164.25,0,0,106.7-8.39,211,92.31" fill="none" stroke={n1RX ? SYSCOL.amber : WHITE} strokeWidth={15} />
+      {!n1RX && <path d="M3034.43,276.55c28.78,25.08,71.21,100.41,71.21,100.41l-33.21,18.73" fill="none" stroke={SYSCOL.red} strokeWidth={15} />}
+      {!n1RX && (
       <g stroke={WHITE} strokeWidth={15}>
         <line x1={2543.85} y1={367.85} x2={2517.72} y2={348.48} /><line x1={2614.57} y1={287.03} x2={2596.15} y2={261.37} />
         <line x1={2710.54} y1={234.23} x2={2699.69} y2={203.08} /><line x1={2818.92} y1={218.65} x2={2818.92} y2={184.07} />
         <line x1={2923.61} y1={241.57} x2={2938.91} y2={210.35} /><line x1={3012.7} y1={303.11} x2={3034.43} y2={284.28} />
       </g>
-      <line x1={2803.11} y1={515.71} x2={ndR[0]} y2={ndR[1]} stroke={SYSCOL[n1R.c]} strokeWidth={15} />
-      <text x={2600} y={446} fill={WHITE} fontSize={104}>5</text><text x={2883} y={395} fill={WHITE} fontSize={87}>10</text>
+      )}
+      {!n1RX && <line x1={2803.11} y1={515.71} x2={ndR[0]} y2={ndR[1]} stroke={SYSCOL[n1R.c]} strokeWidth={15} />}
+      {!n1RX && <><text x={2600} y={446} fill={WHITE} fontSize={104}>5</text><text x={2883} y={395} fill={WHITE} fontSize={87}>10</text></>}
       <rect x={2706.84} y={596.04} width={466.48} height={157.6} fill="none" stroke={WHITE} strokeWidth={10} />
       {V(2940, 734, n1R, 136)}
       <text x={1896} y={627} fill={WHITE} fontSize={150}>N1</text><text x={1955} y={767} fill={SYSCOL.cyan} fontSize={119}>%</text>
@@ -219,14 +248,14 @@ export function EwdGauges({ state, scenario, phase, live }: { state: ScenarioSta
       <text x={3440} y={342} fill={SYSCOL.green} fontSize={146}>{thrVal}<tspan fill={SYSCOL.cyan}> %</tspan></text>
 
       {/* EGT */}
-      <path d="M1478.66,1067.25c-85.67-208.82-308.72-208.82-308.72-208.82-333.71,25.88-329.35,330.19-329.35,330.19h29.45" fill="none" stroke={WHITE} strokeWidth={15} />
-      <path d="M1470.48,1188.62h30.76s-5.75-72.03-22.58-121.37" fill="none" stroke={SYSCOL.red} strokeWidth={15} />
-      <line x1={1092.08} y1={837.43} x2={1119.03} y2={974.9} stroke={SYSCOL.green} strokeWidth={15} />
+      <path d="M1478.66,1067.25c-85.67-208.82-308.72-208.82-308.72-208.82-333.71,25.88-329.35,330.19-329.35,330.19h29.45" fill="none" stroke={egtLX ? SYSCOL.amber : WHITE} strokeWidth={15} />
+      {!egtLX && <path d="M1470.48,1188.62h30.76s-5.75-72.03-22.58-121.37" fill="none" stroke={SYSCOL.red} strokeWidth={15} />}
+      {!egtLX && <line x1={1092.08} y1={837.43} x2={1119.03} y2={974.9} stroke={SYSCOL.green} strokeWidth={15} />}
       <rect x={982.46} y={1098.73} width={374.95} height={164.9} fill="none" stroke={WHITE} strokeWidth={10} />
       {V(1170, 1236, egtL, 144)}
-      <path d="M3111.83,1069.04c-85.67-208.82-308.72-208.82-308.72-208.82-333.71,25.88-329.35,330.19-329.35,330.19h29.45" fill="none" stroke={WHITE} strokeWidth={15} />
-      <path d="M3103.65,1190.4h30.76s-5.75-72.03-22.58-121.37" fill="none" stroke={SYSCOL.red} strokeWidth={15} />
-      <line x1={2725.25} y1={839.21} x2={2752.2} y2={976.68} stroke={SYSCOL.green} strokeWidth={15} />
+      <path d="M3111.83,1069.04c-85.67-208.82-308.72-208.82-308.72-208.82-333.71,25.88-329.35,330.19-329.35,330.19h29.45" fill="none" stroke={egtRX ? SYSCOL.amber : WHITE} strokeWidth={15} />
+      {!egtRX && <path d="M3103.65,1190.4h30.76s-5.75-72.03-22.58-121.37" fill="none" stroke={SYSCOL.red} strokeWidth={15} />}
+      {!egtRX && <line x1={2725.25} y1={839.21} x2={2752.2} y2={976.68} stroke={SYSCOL.green} strokeWidth={15} />}
       <rect x={2619.61} y={1098.31} width={374.95} height={164.9} fill="none" stroke={WHITE} strokeWidth={10} />
       {V(2807, 1236, egtR, 144)}
       <text x={1852} y={1150} fill={WHITE} fontSize={150}>EGT</text>

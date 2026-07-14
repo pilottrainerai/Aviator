@@ -67,9 +67,9 @@ export interface EngTune {
 const PANEL_BLUE = "#456a93"; // darker base so the white labels read clearly (was #7e9fc6)
 export const ENG_TUNE_DEFAULT: EngTune = {
   panel: { color: PANEL_BLUE, roughness: 0.5, metalness: 1.5, clearcoat: 1.0, env: 1.0 }, // match live fire panel finish (glossy)
-  knob: { color: "#8b939d", roughness: 0.4, metalness: 1.0, env: 0.9 }, // defined chrome (not flushed white)
+  knob: { color: "#8f9399", roughness: 0.76, metalness: 1.0, env: 3.25 }, // user-tuned 2026-07-09
   buttonBlack: 100,
-  center: { color: "#181d25", roughness: 0.5, metalness: 0.3 },
+  center: { color: "#b0b4ba", roughness: 0.46, metalness: 0.48 }, // user-tuned 2026-07-09 (light mode knob)
   decalColor: "#ffffff",
 };
 const CAP_BASE = [70, 80, 92];
@@ -90,10 +90,10 @@ type Groups = {
   decal: THREE.MeshBasicMaterial[];    // air con decals
 };
 
-function EngStartScene({ tune, masters, mode, fires, panX, panY, zoom, onToggleMaster, onCycleMode }: {
+export function EngStartScene({ tune, masters, mode, fires, panX, panY, zoom, onToggleMaster, onCycleMode, embedded }: {
   tune: EngTune; masters: boolean[]; mode: number; fires: boolean[];
   panX: number; panY: number; zoom: number;
-  onToggleMaster: (i: number) => void; onCycleMode: () => void;
+  onToggleMaster: (i: number) => void; onCycleMode: () => void; embedded?: boolean;
 }) {
   const { scene } = useGLTF(MODEL_URL);
   const faceTex = useTexture(FACE_TEX_URL);
@@ -257,6 +257,7 @@ function EngStartScene({ tune, masters, mode, fires, panX, panY, zoom, onToggleM
 
   const { camera, size, controls } = useThree();
   useEffect(() => {
+    if (embedded) return;   // merged pedestal (PedestalOne) owns the camera via OrbitControls — skip per-panel framing
     root.updateWorldMatrix(true, true);
     const box = new THREE.Box3().setFromObject(root);
     const center = box.getCenter(new THREE.Vector3());
@@ -284,28 +285,29 @@ function EngStartScene({ tune, masters, mode, fires, panX, panY, zoom, onToggleM
     cam.lookAt(lookAt);
     const orbit = controls as unknown as { target: THREE.Vector3; update: () => void } | null;
     if (orbit?.target) { orbit.target.copy(lookAt); orbit.update(); }
-  }, [camera, size.width, size.height, controls, root, panX, panY, zoom]);
+  }, [camera, size.width, size.height, controls, root, panX, panY, zoom, embedded]);
 
   // rotation is baked onto `root` in useMemo, so render it directly.
   return <primitive object={root} onClick={handleClick} />;
 }
 
-export function EngStartPanel3D({ tune, masters, mode, fires, controlled, panX, panY, zoom, onToggleMaster, onCycleMode }: {
+export function EngStartPanel3D({ tune, masters, mode, fires, controlled, panX, panY, zoom, bg = "#05070a", onToggleMaster, onCycleMode }: {
   tune?: EngTune; masters?: boolean[]; mode?: number; fires?: boolean[];
   // controlled: camera is driven by panX/panY/zoom (true 3D zoom — stays crisp) and
   // OrbitControls is disabled. Used in the scenario embed. Dev page leaves it off → free orbit.
   controlled?: boolean; panX?: number; panY?: number; zoom?: number;
+  bg?: string; // canvas background; pass "transparent" to overlay onto another scene
   onToggleMaster?: (i: number) => void; onCycleMode?: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted) return <div style={{ width: "100%", height: "100%", background: "#070a0e" }} />;
+  if (!mounted) return <div style={{ width: "100%", height: "100%", background: bg === "transparent" ? "transparent" : "#070a0e" }} />;
   return (
     <Canvas
       dpr={cockpitDpr()}
       camera={{ fov: 28, near: 0.01, far: 100, position: [0, 0, 4] }}
       gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
-      style={{ width: "100%", height: "100%", background: "#05070a" }}
+      style={{ width: "100%", height: "100%", background: bg }}
     >
       <ambientLight intensity={0.18} color="#9fb0c4" />
       <directionalLight position={[2.6, 3.2, 4.5]} intensity={2.8} color="#ffffff" />

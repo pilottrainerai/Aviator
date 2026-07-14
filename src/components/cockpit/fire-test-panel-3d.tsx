@@ -91,8 +91,13 @@ function matNames(o: THREE.Object3D): Set<string> {
 }
 
 export interface FireTestPanel3DProps {
+  /** Canvas background; pass "transparent" to float the panel with no black box (like ENG START). */
+  bg?: string;
   /** TEST: lights every FIRE pb red (fire detected). Turning it off resets the drill. */
   fireDetected: boolean;
+  /** Per-section fire [ENG1, APU, ENG2]. When provided, ONLY these sections light red / arm —
+   *  overrides fireDetected's light-ALL behaviour (the ENG1 scenario passes [true,false,false]). */
+  fireSections?: boolean[];
   /** Bump to force a reset of the whole drill (guards close, pbs unpushed, agents re-armed). */
   resetSignal?: number;
   /** Reports the live per-section drill state up to the page (for the status readout). */
@@ -190,7 +195,7 @@ type Section = {
 
 function FireTestPanelScene(props: FireTestPanel3DProps) {
   const {
-    fireDetected, resetSignal, onState, onClickDetected,
+    fireDetected, fireSections, resetSignal, onState, onClickDetected,
     firePopOut, fireAsmRadius, agentShrink, agentCapLight, agentAsmLight, agentCapColor, agentAsmColor, agentCapColorApu, agentAsmColorApu,
     panelColor, panelRoughness, panelMetalness, panelClearcoat, envIntensity, toneMapping,
     guardClosedDeg, guardOpenDeg, squibColor, squibLight, dischColor, dischLight, pressOverride,
@@ -565,11 +570,13 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
         const target = effGuardOpen(i) ? (guardOpenOverride ?? (guardClosedRot + GUARD_OPEN_DELTA)) : guardClosedRot;
         s.guard.rotation.x = settle ? target : THREE.MathUtils.lerp(s.guard.rotation.x, target, 0.08);
       }
-      // FIRE pb: light red on fire; pop out when pushed; carry screws
+      // FIRE pb: light red on fire; pop out when pushed; carry screws. Per-section fire when
+      // fireSections is given (ENG1 scenario → only ENG1); else fireDetected lights all (TEST).
       if (s.firePbMesh) {
+        const secFire = fireSections ? !!fireSections[i] : fireDetected;
         const fp = getMat(s.firePbMesh) as THREE.MeshStandardMaterial;
-        if (fp.color) fp.color.set(fireDetected ? "#b40909" : "#841010");
-        setMaterialLight(s.firePbMesh, C3.fireRed, fireDetected ? 2.0 : 0);
+        if (fp.color) fp.color.set(secFire ? "#b40909" : "#841010");
+        setMaterialLight(s.firePbMesh, C3.fireRed, secFire ? 2.0 : 0);
       }
       const pop = effPbDone(i) ? popY : 0;
       if (s.firePbGroup) s.firePbGroup.position.y = settle ? s.restY + pop : THREE.MathUtils.lerp(s.firePbGroup.position.y, s.restY + pop, 0.14);
@@ -654,12 +661,13 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     if (kind === "guardpb") {
       // Guard two-tap is always UI-local (same as legacy FirePanel3D).
       if (!d.guardOpen[i]) { d.guardOpen[i] = true; bump(); return; }
+      const secFire = fireSections ? !!fireSections[i] : fireDetected;
       if (isCtrl(i)) {
         // ENG1 driven by the engine: emit the push; the runner advances the step.
-        if (fireDetected && !firePbDone) onPushFirePb?.();
+        if (secFire && !firePbDone) onPushFirePb?.();
         return;
       }
-      if (fireDetected && !d.pbDone[i]) {
+      if (secFire && !d.pbDone[i]) {
         d.pbDone[i] = true;
         if (pbWallRef.current[i] == null) pbWallRef.current[i] = Date.now();
         bump();
@@ -740,7 +748,7 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
     const target: THREE.Object3D = faceMesh ?? group;
     let box = new THREE.Box3().setFromObject(target);
     // ENG1 framing fits exactly (no margin) so it can be anchored gap-free.
-    const fitMargin = framing === "eng1" ? 1.0 : 1.12;
+    const fitMargin = framing === "eng1" ? 1.0 : 1.02; // "all": near-tight so the panel fills its box (was 1.12 → big gap)
     if (framing === "eng1" && sections[0]) {
       // Frame the ENG1 zone, ANCHORED to the panel's physical LEFT edge so there's
       // no empty gap to the left of the FIRE label. We keep the face's full Y/Z
@@ -812,13 +820,13 @@ function FireTestPanelScene(props: FireTestPanel3DProps) {
 export function FireTestPanel3D(props: FireTestPanel3DProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted) return <div style={{ width: "100%", height: "100%", background: "#070a0e" }} />;
+  if (!mounted) return <div style={{ width: "100%", height: "100%", background: props.bg === "transparent" ? "transparent" : "#070a0e" }} />;
   return (
     <Canvas
       dpr={cockpitDpr()}
       camera={{ fov: 28, near: 0.01, far: 100, position: [0, 0, 4] }}
       gl={{ antialias: true, alpha: true, toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
-      style={{ width: "100%", height: "100%", background: "#05070a" }}
+      style={{ width: "100%", height: "100%", background: props.bg ?? "#05070a" }}
     >
       <ambientLight intensity={0.18} color="#9fb0c4" />
       <directionalLight position={[2.6, 3.2, 4.5]} intensity={2.8} color="#ffffff" />

@@ -69,6 +69,32 @@ Colour on the pill only (`CATEGORY_COLOR` in `flight-check-popup.tsx`). A pair j
 | CHECKLIST | challenge-response checklists | `#4FB05E` green |
 | GLARESHIELD | glareshield panel badge only; visual color comes from alert severity | warning red `#FF3333`, caution amber `#FFB300` |
 
+### 2a. Card COLOUR = the ECAM FAILED-SYSTEM colour (not a per-interaction colour) [user 2026-07-12]
+The pill carries the *category*; the CARD body/severity carries the **failed-system colour**. A card
+inherits the colour of the ECAM failure it belongs to, driven by `variant`:
+- `variant:"warning"` → **red** (Level-3 failure: ENG FIRE, …). `variant:"caution"` → **amber** (Level-2).
+- Under a RED failure, EVERY action card of that procedure is **red** — IDENTIFY, VERIFY, THR IDLE,
+  ENG MASTER OFF, FIRE PB, **AGENT 1/2**. "AGENT red and all." Set those cards `variant:"warning"`.
+- `resolveTheme` (`flight-check-popup.tsx`): the `confirmRequired` and execute phases **follow the
+  failure severity** (`confirmRequired && warning → red`), they do NOT force amber. So a guarded/
+  irreversible action under a red failure stays red. (G+Y has no `confirmRequired` cards, so this is
+  safe cross-scenario — verify any new scenario's `confirmRequired + warning` cards before relying on it.)
+See vault `ecam-procedure-card-model.md` §2a.
+
+**Card colour = its CATEGORY colour (matches the pill); severity only overrides for real alerts.**
+`resolveTheme` builds the card theme from `CATEGORY_COLOR[primary category]` via `catTheme()`, so the
+card border/accent/CONFIRM all match the pill and **every card of a kind is the same colour**:
+ECAM gold `#D99A3E`, CHECKLIST green, COMMS blue, CRM violet, AVIATE cyan, PROCEDURE slate, QRH teal.
+It is coloured by CATEGORY — **never by group or crew**. (The old group rules were the bug: an ECAM
+card in `group:"chclm"` rendered GREEN, a PROCEDURE card in `group:"comms"` rendered blue.)
+**ECAM is the exception — it's SEVERITY-driven, red or amber only.** `if (isEcam) return warning ?
+critical : caution` — a red ECAM line → RED card + red pill; anything else (caution, advisory ENG
+SHUT DOWN / STATUS / STOP ECAM / CLEAR) → AMBER. **No third "ECAM gold", never green.** Every OTHER
+category takes its own **pill colour** for the card (CHECKLIST green, COMMS blue, CRM violet, AVIATE
+cyan, PROCEDURE slate `#8593AB`, QRH teal). Glareshield + `confirmRequired` also follow severity.
+Only *untagged* cards fall back to the crew split (PF cyan / PM amber). Rule: tag every card's
+category so it colours consistently; ECAM's colour comes from its `variant`. [user 2026-07-13]
+
 ## 3. Reference tagging (manual-first)
 Bottom-left. The whole reference string renders as one neutral pill, matching the procedure-card color
 reference page: `FCOM`, `FCTM`, `QRH`, `TECHNIQUE`, or combined strings such as `FCTM · TECHNIQUE` and

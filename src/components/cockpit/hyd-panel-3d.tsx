@@ -15,6 +15,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useTexture, Environment, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { cockpitDpr } from "@/components/cockpit/cockpit-dpr";
+import { playSwitchClick } from "@/lib/audio/cockpit-audio";
 
 const MODEL_URL = "/models/hyd_panel.glb";
 const FACE_TEX_URL = "/models/hyd_face.png";
@@ -105,6 +106,19 @@ export interface HydTune {
 // → no reflection = true black), INNER rim #14161b (dark metallic bevel catching the HDRI). Cap+well
 // canvas black. Do not retune without a new user pass.
 export const HYD_TUNE_DEFAULT: HydTune = { capColor: "#05070a", wellColor: "#05070a", borderColor: "#000000", borderInnerColor: "#14161b", borderMetal: 1.0, borderRough: 0.4, borderEnv: 2.0, ratColor: "#000000", neutralY: 0.008, inY: -0.041, outY: -0.009, panelColor: "#4a8296", panelRough: 0.72, panelMetal: 1.86, panelClear: 0.6, panelEnv: 0.5, sheenT: 0.95, sheenB: 0.9, sheenL: 0.95, sheenR: 1.35 };
+
+// Momentary pushbutton press "feel": a fast snap IN, then a spring-back to rest with a small
+// PROUD overshoot — the "pop". t in seconds; the whole click lives inside PRESS_TOTAL (~0.21 s).
+// inY = deepest pressed offset, restY = where the cap normally sits (the scenario pos offset).
+const PRESS_DOWN = 0.05, PRESS_UP = 0.16, PRESS_TOTAL = PRESS_DOWN + PRESS_UP;
+function pressCurve(t: number, inY: number, restY: number): number {
+  if (t <= 0) return restY;
+  if (t < PRESS_DOWN) { const k = t / PRESS_DOWN; return restY + (inY - restY) * (1 - (1 - k) * (1 - k)); } // easeOut snap down
+  const k = Math.min(1, (t - PRESS_DOWN) / PRESS_UP);
+  const ease = 1 - Math.pow(1 - k, 3);                      // easeOutCubic spring back to rest
+  const pop = Math.sin(k * Math.PI) * (restY - inY) * 0.16; // proud overshoot mid-return = the pop
+  return inY + (restY - inY) * ease + pop;
+}
 
 function matNames(o: THREE.Object3D): Set<string> {
   const s = new Set<string>();
@@ -347,7 +361,7 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
 
     // Movement groups: pump caps follow the global PRESS; RAT + ELEC buttons follow their own
     // offsets (with their legends). Pump borders + guard covers stay put.
-    const movable: { mesh: THREE.Mesh; baseY: number }[] = [];
+    const movable: { mesh: THREE.Mesh; baseY: number; key?: HydPumpKey | null }[] = [];
     const ratParts: { mesh: THREE.Mesh; baseY: number }[] = [];
     const elecParts: { mesh: THREE.Mesh; baseY: number }[] = [];
     plates.forEach((mesh) => {
@@ -382,6 +396,15 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
         off: col.filter((e) => !e.mesh.name.startsWith("FAULT")).map((e) => e.mat),
       };
       pumpColX[key] = col.reduce((s, e) => s + e.x, 0) / col.length;
+    });
+
+    // Tag each moving cap/legend with the pump column it sits over (nearest world-X), so a
+    // click can press JUST that pump — the momentary tactile dip+pop is per-button, not global.
+    movable.forEach((it) => {
+      const x = it.mesh.getWorldPosition(new THREE.Vector3()).x;
+      let bk: HydPumpKey | null = null, bd = Infinity;
+      for (const k of HYD_PUMP_ORDER) { const cx = pumpColX[k]; if (cx == null) continue; const d = Math.abs(x - cx); if (d < bd) { bd = d; bk = k; } }
+      it.key = bk;
     });
 
     // RAT MAN ON guard — flip-open hinge (like EVAC). The red cover is the "orange housijng"
@@ -536,12 +559,24 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
     });
   }, [panelMats, tune.panelColor, tune.panelRough, tune.panelMetal, tune.panelClear, tune.panelEnv]);
 
-  // Press positions: move the button caps + legends along the panel normal (Y) to the
-  // selected of the THREE tunable positions. Lerped → real mechanical press feel.
-  useFrame(() => {
+  // Press positions: move the button caps + legends along the panel normal (Y). The scenario
+  // `pos` sets each cap's REST offset (lerped, smooth). On top of that, a recent CLICK plays a
+  // momentary spring press on just that pump's cap — snap in, pop back — for real tactile feel.
+  const pressAt = useRef<Map<HydPumpKey, number>>(new Map()); // pump → clock time of its last click
+  const clickQueue = useRef<HydPumpKey[]>([]);                // clicks land here, stamped next frame
+  useFrame(({ clock }) => {
+    const now = clock.elapsedTime;
+    if (clickQueue.current.length) { clickQueue.current.forEach((k) => pressAt.current.set(k, now)); clickQueue.current = []; }
     // neutralY / inY / outY are ABSOLUTE cap offsets (added to baseY) — not deltas.
     const off = pos === "in" ? tune.inY : pos === "out" ? tune.outY : tune.neutralY;
-    movable.forEach(({ mesh, baseY }) => { mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, baseY + off, 0.2); });
+    movable.forEach(({ mesh, baseY, key }) => {
+      const at = key ? pressAt.current.get(key) : undefined;
+      if (at != null && now - at <= PRESS_TOTAL) {
+        mesh.position.y = baseY + pressCurve(now - at, tune.inY, off); // crisp click curve — overrides the rest lerp
+      } else {
+        mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, baseY + off, 0.2); // scenario pos, smoothed
+      }
+    });
     // RAT + ELEC guarded pushbuttons move independently (their own IN/OUT offset).
     ratParts.forEach(({ mesh, baseY }) => { mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, baseY + ratBtn.inOut, 0.2); });
     elecParts.forEach(({ mesh, baseY }) => { mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, baseY + elecBtn.inOut, 0.2); });
@@ -628,30 +663,30 @@ function HydScene({ pumps, tune, pos, ratGuard, elecGuard, ratBtn, elecBtn, show
     if (orbit?.target) { orbit.target.copy(center); orbit.update(); }
   }, [camera, size.width, size.height, controls, root]);
 
-  // Click → resolve the intersection's world-X to the nearest pump column → onPush(key).
-  // Display-only when no onPush (dev page is unaffected).
-  const handleClick = onPush
-    ? (e: { stopPropagation: () => void; point: THREE.Vector3 }) => {
-        e.stopPropagation();
-        if (disabled) return;
-        let best: HydPumpKey | null = null, bd = Infinity;
-        for (const k of HYD_PUMP_ORDER) {
-          const cx = pumpColX[k];
-          if (cx == null) continue;
-          const d = Math.abs(e.point.x - cx);
-          if (d < bd) { bd = d; best = k; }
-        }
-        if (best && bd < 0.6) onPush(best);
-      }
-    : undefined;
-  const setCursor = (c: string) => { if (onPush && !disabled && typeof document !== "undefined") document.body.style.cursor = c; };
+  // Click → resolve the intersection's world-X to the nearest pump column → tactile press
+  // (dip+pop+click-clack) + onPush(key) if a handler is wired. The press/sound run even without
+  // onPush, so the panel feels real on the dev page too. `disabled` mutes everything.
+  const interactive = !disabled;
+  const handleClick = (e: { stopPropagation: () => void; point: THREE.Vector3 }) => {
+    e.stopPropagation();
+    if (disabled) return;
+    let best: HydPumpKey | null = null, bd = Infinity;
+    for (const k of HYD_PUMP_ORDER) {
+      const cx = pumpColX[k];
+      if (cx == null) continue;
+      const d = Math.abs(e.point.x - cx);
+      if (d < bd) { bd = d; best = k; }
+    }
+    if (best && bd < 0.6) { clickQueue.current.push(best); playSwitchClick(); onPush?.(best); }
+  };
+  const setCursor = (c: string) => { if (interactive && typeof document !== "undefined") document.body.style.cursor = c; };
 
   return (
     <primitive
       object={root}
-      onClick={handleClick}
-      onPointerOver={onPush ? () => setCursor("pointer") : undefined}
-      onPointerOut={onPush ? () => setCursor("auto") : undefined}
+      onClick={interactive ? handleClick : undefined}
+      onPointerOver={interactive ? () => setCursor("pointer") : undefined}
+      onPointerOut={interactive ? () => setCursor("auto") : undefined}
     />
   );
 }

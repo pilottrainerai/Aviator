@@ -13,7 +13,7 @@ export function Authed() {
         href="/sign-in"
         className="font-mono text-xs uppercase tracking-[0.15em] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
       >
-        Iniciar sesión
+        Sign in
       </Link>
     );
   }
