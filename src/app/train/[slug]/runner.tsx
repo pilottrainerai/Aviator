@@ -32,6 +32,7 @@ import { EngineSdPage } from "@/components/cockpit/engine-sd-page";
 import { FuelSdPage } from "@/components/cockpit/fuel-sd-page";
 import { HydEng1SdPage } from "@/components/cockpit/hyd-eng1-sd-page";
 import { ElecSdPage } from "@/components/cockpit/elec-sd-page";
+import { BleedSdPage } from "@/components/cockpit/bleed-sd-page";
 import { WheelSdPage } from "@/components/cockpit/wheel-sd-page";
 import { CruiseSdPage } from "@/components/cockpit/cruise-sd-page";
 import { SdPermanentStrip } from "@/components/cockpit/sd-permanent-strip";
@@ -353,9 +354,10 @@ export function ScenarioRunner({ scenario }: { scenario: Scenario }) {
 
 function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario: Scenario; selectedAirport?: AirportOption }) {
   const scenario = useMemo<Scenario>(() => {
+    const ENG_FIRE_SLUGS = ["eng1-fire-after-v1", "eng1-fire-after-v1-persistent-fire"];
     const hydratedBase = baseScenario.meta.slug === "dual-hyd-g-y"
       ? { ...baseScenario, steps: applyDualHydGYCardOverrides(baseScenario.steps) }
-      : baseScenario.meta.slug === "eng1-fire-after-v1"
+      : ENG_FIRE_SLUGS.includes(baseScenario.meta.slug)
       ? { ...baseScenario, steps: applyEng1FireCardOverrides(baseScenario.steps) }
       : baseScenario;
 
@@ -974,8 +976,9 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
         <div
           style={{ flex: "0 0 68%", borderRight: "1px solid var(--color-border)", overflow: "hidden", display: "flex", flexDirection: "column" }}
         >
-          {/* Glareshield — compact strip across the top */}
-          <div style={{ flexShrink: 0, padding: "8px 10px 0", position: "relative" }}>
+          {/* Glareshield — compact strip across PFD + ND columns only (not Action column).
+              Grid below is repeat(3,1fr) gap-2. Two cols + one gap = (100%-16px)*2/3+8px. */}
+          <div style={{ flexShrink: 0, padding: "8px 10px 0", position: "relative", maxWidth: "calc((100% - 16px) * 2 / 3 + 8px)" }}>
             <GlareshieldPanel
               scenario={scenario}
               state={runner.state}
@@ -1078,7 +1081,8 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                     ? <HydSdPage />   /* synoptic pops ONLY after the failure fires, holds until STATUS [user 2026-07-06] */
                     : (scenario.meta.slug === "eng1-fire-after-v1" || scenario.meta.slug === "eng1-fire-after-v1-persistent-fire")
                       /* ENG 1 FIRE — FCOM flight-phase / failure page logic: WHEEL (takeoff) → ENGINE (secured
-                         engine) → FUEL@IMBALANCE → HYD@CLEAR HYD → ELEC@CLEAR ELEC → STATUS → CRUISE. */
+                         engine) → FUEL@IMBALANCE → HYD@CLEAR HYD → ELEC@CLEAR ELEC → BLEED@CLEAR AIR BLEED
+                         → STATUS → CRUISE. */
                       ? (!runner.state.triggersFired["fire_warn"]
                           ? <WheelSdPage />
                           : !isStatusReady(scenario, runner.state)
@@ -1088,7 +1092,9 @@ function RunningScenario({ scenario: baseScenario, selectedAirport }: { scenario
                                   ? <HydEng1SdPage />
                                   : primaryNextStep?.id === "clear_elec"
                                     ? <ElecSdPage />
-                                    : <EngineSdPage secured={!!runner.state.completedSteps["thr_lever_idle"]} />)
+                                    : primaryNextStep?.id === "clear_air_bleed"
+                                      ? <BleedSdPage />
+                                      : <EngineSdPage secured={!!runner.state.completedSteps["thr_lever_idle"]} />)
                             : <StatusPanel scenario={scenario} state={runner.state} />)
                       : <StatusPanel scenario={scenario} state={runner.state} />}
               </div>
@@ -1564,9 +1570,9 @@ function ProcedureIdleCard({ nextHardwareStep }: { nextHardwareStep?: ScenarioSt
               <span
                 className="text-[9px] font-bold uppercase tracking-[0.1em]"
                 style={{
-                  color: "#FFB300",
-                  border: "1px solid #FFB30057",
-                  backgroundColor: "#FFB30021",
+                  color: box,
+                  border: `1px solid ${box}57`,
+                  backgroundColor: `${box}21`,
                   borderRadius: "5px",
                   padding: "3px 8px",
                 }}

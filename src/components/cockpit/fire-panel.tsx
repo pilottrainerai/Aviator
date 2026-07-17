@@ -204,15 +204,23 @@ function DevMovable({ id, label, def, fill, editMode, onBodyDrag, onBodyDragEnd,
 // Baked default layout for the popped-out action panel (exported from the dev
 // layout editor). Used when there's no per-element localStorage override, so a
 // fresh session / production shows this exact arrangement when the procedure pops.
-const VIEW_DEFAULT = { x: -0.264, y: 0.169, zoom: 0.7032 }; // baked from dev export [user 2026-07-14]
+const VIEW_DEFAULT = { x: -0.2642095557418274, y: 0.1986376641630874, zoom: 0.7032 }; // baked from dev export [user 2026-07-16]
+
+// ── CANONICAL ACTION-PANEL SIZE ("the loop") ────────────────────────────────
+// Every scenario's action panel uses this ONE size so the popped and inline
+// frames are identical across all scenarios. Reference = ENG 1 FIRE. Change the
+// size here and every panel (fire + HYD + any future one) follows — no drift.
+// Only the on-screen x/y position stays per-panel; w/h + inline height are shared.
+const ACTION_PANEL_SIZE = { w: 797.171875, h: 549.0078125 };  // popped outer w×h [user 2026-07-16]
+const ACTION_PANEL_INLINE_H = 320;             // inline content height (px)
 
 // Combined action-panel layout: ONE outer frame (fixed viewport coords) holding
 // the thrust levers, master, and 3D fire panel as nested items positioned
 // RELATIVE to the outer. Outer moves/resizes/pops as a unit; each item nudges
 // inside it. (New keys — leaves the old separate-frame layout untouched.)
-const COMBO_OUTER: DevBox = { x: 442, y: 130, w: 852, h: 552 }; // baked from dev export [user 2026-07-14]
+const COMBO_OUTER: DevBox = { x: 414.953125, y: 89.19140625, ...ACTION_PANEL_SIZE }; // baked from dev export [user 2026-07-16]
 const COMBO_INNER: Record<string, DevBox> = {
-  panel3d:         { x: -18, y: 2, w: 1193, h: 290 }, // baked from dev export [user 2026-07-14]
+  panel3d:         { x: -18, y: -10.6171875, w: 1128.15234375, h: 307.24609375 }, // baked from dev export [user 2026-07-16]
   thr_lever_idle:  { x: 6,   y: 24, w: 150,  h: 360 },
   eng1_master_off: { x: 162, y: 24, w: 116,  h: 360 },
 };
@@ -221,10 +229,12 @@ const COMBO_INNER: Record<string, DevBox> = {
 const ENG_START_BOX: DevBox = { x: 380, y: 540, w: 760, h: 380 };
 // HYD action panel — popped-out floating layout (mirror of COMBO_OUTER/INNER for the
 // HYD scenario). Defaults are starting positions; the user dials them in via dev edit.
-const HYD_COMBO_OUTER: DevBox = { x: 380, y: 150, w: 1120, h: 392 };
+// Same SIZE as the ENG-FIRE action panel (ACTION_PANEL_SIZE) so every scenario's
+// popped panel matches; keeps its own x/y. Inner 3D refit to fill the new box with
+// an 8px margin — the panel is `controlled` so it self-fits the frame. [user 2026-07-15]
+const HYD_COMBO_OUTER: DevBox = { x: 380, y: 150, ...ACTION_PANEL_SIZE };
 const HYD_COMBO_INNER: Record<string, DevBox> = {
-  // Side controls removed → the 3D panel fills the whole combo (was x:300 w:812, leaving a left gap). [user 2026-07-06]
-  panel3d: { x: 8, y: 8, w: 1104, h: 376 },
+  panel3d: { x: 8, y: 8, w: ACTION_PANEL_SIZE.w - 16, h: ACTION_PANEL_SIZE.h - 16 },
 };
 
 // ─── CSS keyframes (AGENT arming pulse, TEST pulse) ─────────────────────────
@@ -1842,7 +1852,9 @@ function DslControlPanel({
 
   // Dev layout-edit mode: ON = drag bodies to move + edge/corner resize handles;
   // OFF = elements are fully interactive (clickable / orbitable). Persisted.
-  const [editMode, setEditMode] = useState(true);
+  // Default OFF so a fresh load starts interactive (real flow): dev can flip Edit ON
+  // (persisted via localStorage) to arrange the layout.
+  const [editMode, setEditMode] = useState(false);
   useEffect(() => { try { const v = window.localStorage.getItem("fireDevEdit"); if (v != null) setEditMode(v === "1"); } catch { /* ignore */ } }, []);
   const toggleEdit = () => setEditMode((p) => { const n = !p; try { window.localStorage.setItem("fireDevEdit", n ? "1" : "0"); } catch { /* ignore */ } return n; });
   // In edit mode, which layout to show/edit: the POPPED (big floating) one or the INLINE (compressed
@@ -2063,7 +2075,7 @@ function DslControlPanel({
             agent1Disch={fp3dAgent1Disch} agent2Disch={fp3dAgent2Disch}
             onPushFirePb={() => performStep(firePbCtrl?.stepId)}
             onPushAgent1={() => { if (a1Armed) performStep(agent1Ctrl?.stepId); }}
-            onPushAgent2={() => performStep(agent2Ctrl?.stepId)}
+            onPushAgent2={() => { if (agent2Available) performStep(agent2Ctrl?.stepId); }}
           />
         );
 
@@ -2172,22 +2184,22 @@ function DslControlPanel({
         // No box background: the whole action panel stays the panel's own colour (uniform), the 3D
         // panels are transparent on top. Same interactions as the popped view.
         return (
-          <div style={{ position: "relative", width: "100%", height: "320px" }}>
+          <div style={{ position: "relative", width: "100%", height: ACTION_PANEL_INLINE_H }}>
             {firePbCtrl && (
-              <DevMovable id="inline_fire" label="FIRE PANEL" fill relative editMode={edit} def={{ x: -7, y: -38, w: 554, h: 251 }}>
+              <DevMovable id="inline_fire" label="FIRE PANEL" fill relative editMode={edit} def={{ x: -29.40234375, y: -38, w: 576.40234375, h: 251 }}>
                 <div style={{ position: "absolute", inset: 0 }}>{panel3d}</div>
               </DevMovable>
             )}
             {USE_ENG_START_PANEL && (
               <>
-                <DevMovable id="inline_throttle" label="THROTTLE" fill relative editMode={edit} def={{ x: -47, y: 112, w: 287, h: 239 }}>
+                <DevMovable id="inline_throttle" label="THROTTLE" fill relative editMode={edit} def={{ x: -45.67578125, y: 110.26953125, w: 287, h: 239 }}>
                   <div style={{ position: "absolute", inset: 0 }}>
                     <Throttle3D bg="transparent" controlled viewDir={[0, 0.985, 0.173]} zoom={1.0} tune={THROTTLE_TUNE_DEFAULT} showTrimWheels tiltX={10} tiltY={0}
                       lever1Deg={isDone("thr_lever_idle") ? 0 : 36} lever2Deg={36}
                       onThrLever={() => performStep("thr_lever_idle")} />
                   </div>
                 </DevMovable>
-                <DevMovable id="inline_engstart" label="ENG START" fill relative editMode={edit} def={{ x: 196, y: 135, w: 193, h: 188 }}>
+                <DevMovable id="inline_engstart" label="ENG START" fill relative editMode={edit} def={{ x: 196, y: 135, w: 185.72265625, h: 167.61328125 }}>
                   <div style={{ position: "absolute", inset: 0 }}>
                     <EngStartPanel3D controlled bg="transparent" tune={engTune}
                       fires={[fp3dFireDetected, false]} masters={[!isDone("eng1_master_off"), true]} mode={1}
@@ -2388,7 +2400,7 @@ function HydControlPanel({
               {sideControls.map((ctrl) => <div key={ctrl.stepId}>{renderCtrl(ctrl)}</div>)}
             </div>
           )}
-          <div style={{ flex: "1 1 0", height: "202px", position: "relative", background: "#080C12" }}>
+          <div style={{ flex: "1 1 0", height: ACTION_PANEL_INLINE_H, position: "relative", background: "#080C12" }}>
             <div style={{ position: "absolute", inset: 0 }}>{hyd3d}</div>
           </div>
         </div>
@@ -2463,7 +2475,7 @@ export function FirePanel({
           <span style={{ color: C.dim, fontSize: "8px", letterSpacing: "0.25em", textTransform: "uppercase" }}>ENGINE DISPLAY</span>
           {fireLit && (
             <span className="animate-pulse font-bold" style={{ color: C.amber, fontSize: "7px", letterSpacing: "0.2em" }}>
-              ▲ {state.alarmLabel ?? "CAUTION"}
+              ▲ {state.alarmLabel ?? "WARNING"}
             </span>
           )}
         </div>

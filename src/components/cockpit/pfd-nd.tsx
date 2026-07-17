@@ -1397,8 +1397,8 @@ if (scenario?.meta?.slug === "rapid-depress") {
     bank,
     gs,
     tas,
-    selectedSpeed: approaching ? (appr?.managedTarget ?? speed) : 165,  // approach = VMAN of the config; takeoff = SRS V2+10
-    speedManaged:  true,   // MAGENTA managed bug throughout — SRS/climb on departure, VMAN (green dot/S/F/VAPP) on approach
+    selectedSpeed: approaching ? (appr?.managedTarget ?? speed) : (levelOff ? 230 : 165),  // after level-off crew selects 230 kt (VFE CONF 1) throughout acceleration; pre-level-off = SRS V2+10
+    speedManaged:  approaching ? true : !levelOff,   // MAGENTA (managed) during SRS departure + approach; CYAN (selected) after level-off at MAA
     selectedAlt:   apSelAlt ?? 3000,  // approach descent → platform; else FCU pre-selected ~3000ft QNH
     selectedHdg:   280,   // RWY 28
     heading:       280,

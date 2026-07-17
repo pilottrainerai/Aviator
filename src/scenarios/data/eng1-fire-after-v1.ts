@@ -215,11 +215,9 @@ export const eng1FireAfterV1: Scenario = {
       variant: "warning",
       crew: "PF",
       hardware: true,
-      // No ecamRef → this E/WD line does NOT self-clear when performed; the fire-drill lines
-      // (THR/MASTER/FIRE PB/AGENT 1) persist until CLEAR ENG 1 FIRE. Only AGENT 2 self-clears (on
-      // discharge, via its ecamRef), and ATC NOTIFY has no ecamRef either. [user 2026-07-14]
       requires: ["verify_eng1_fire"],
       confirmRequired: true,   // confirm-before-action on the affected engine (identify + confirm correct lever) — FCOM/FCTM, like the FIRE pb / ENG MASTER [user 2026-07-13]
+      ecamRef: "ecam_thr",
     },
 
     // ── 2 ── FCOM: "ENG MASTER (AFFECTED) → OFF"
@@ -234,6 +232,7 @@ export const eng1FireAfterV1: Scenario = {
       crew: "PM",
       hardware: true,
       confirmRequired: true,
+      ecamRef: "ecam_master",
       afterEffect: {
         // ENG 1 SHUT DOWN memo appears once the ENG MASTER is OFF (engine is shut down) — it shows
         // BELOW the still-running fire drill (AGENT / ATC). The fire tree is cleared later by the crew's
@@ -271,6 +270,7 @@ export const eng1FireAfterV1: Scenario = {
       crew: "PM",
       hardware: true,
       confirmRequired: true,
+      ecamRef: "ecam_fire_pb",
       afterEffect: {
         // 2 s delay: secondary systems respond to FIRE PB isolation
         // FCOM DSC-31-15: secondary failures appear on E/WD right column with * prefix.
@@ -324,6 +324,7 @@ export const eng1FireAfterV1: Scenario = {
       requires: ["eng1_fire_pb"],
       crew: "PM",
       hardware: true,
+      ecamRef: "ecam_agent1",
       afterEffect: {
         // BOTH bottles required: AGENT 1 does NOT put the fire out — the FIRE WARNING persists the full
         // FCOM 30 s, which unlocks the AGENT 2 branch. This effect ONLY fires the 30-s trigger — the
@@ -402,7 +403,10 @@ export const eng1FireAfterV1: Scenario = {
       // Directional control is a FLYING task that begins the instant thrust goes
       // asymmetric — at THR LEVER IDLE, in parallel with the PM's fire drill. NOT
       // deferred to engine_secured. [user 2026-07-12 — card P8 timing]
-      requires: ["thr_lever_idle"],
+      // verify_eng1_fire added so an accidental early THR LEVER pull does NOT cause
+      // this card to surface before the ECAM procedure has started — it would block
+      // the FlightCheckPopup. Both must be done; in normal flow verify precedes thr_lever.
+      requires: ["thr_lever_idle", "verify_eng1_fire"],
     },
 
     // (LAND ASAP announce is defined AFTER the ENG SHUT DOWN action lines — see below sd_wing_ai —
@@ -466,7 +470,10 @@ export const eng1FireAfterV1: Scenario = {
       variant: "advisory",
       crew: "PM",
       group: "flightcheck",
-      requires: ["clear_eng_fire"],
+      // ENG SHUT DOWN follow-on only after BOTH the MAYDAY/CLR sequence AND the
+      // acceleration phase are complete (V/S 0 → accel → green dot → MCT). Prevents
+      // the SD* cards from surfacing before the flight-management cards. [user 2026-07-17]
+      requires: ["clear_eng_fire", "mct_open_clb"],
       ecamRef: "sd_mode_ign",
     },
     {
@@ -1368,12 +1375,13 @@ export const eng1FireAfterV1: Scenario = {
       ],
     },
 
-    // [D2] A9 — Departure — POB + endurance — fires ~25 s after mayday_atc
-    //   Crew says STANDBY — ECAM checklist still running.
+    // [D2] A9 — Departure — POB + endurance — fires after hold clearance acknowledged.
+    //   Gate: pm_hold_req done (hold approved by ATC) + 20 s delay so the crew can complete
+    //   the atc_hold_clearance readback exchange before this question lands. [user 2026-07-17]
     {
       id: "atc_pob_fuel_services",
-      atMs: 25_000,
-      requiresStep: "mayday_atc",
+      atMs: 20_000,
+      requiresStep: "pm_hold_req",
       kind: "atc",
       from: "DELHI DEPARTURE",
       message: "IFLY101, say persons on board and endurance.",

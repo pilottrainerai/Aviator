@@ -16,7 +16,7 @@ const persistentFireSteps = eng1FireAfterV1.steps.map((step) => {
       effects: [
         {
           type: "CLEAR_ECAM" as const,
-          ids: ["ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1", "ecam_400ft"],
+          ids: ["ecam_thr", "ecam_master", "ecam_fire_pb", "ecam_agent1"],
         },
       ],
     },

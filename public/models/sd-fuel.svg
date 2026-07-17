@@ -325,9 +325,10 @@
       <polygon class="cls-40" points="925.42 991.82 1006.48 1032.35 1006.48 951.29 925.42 991.82"/>
     </g>
     <g id="layer3_lp_valves" data-name="layer3 lp valves">
+      <!-- ENG 1 LP cock — CLOSED (perpendicular to pipe = horizontal line only, no vertical) -->
       <circle class="cls-38" cx="1094.25" cy="583.68" r="110"/>
-      <line class="cls-38" x1="1094.25" y1="473.68" x2="1094.25" y2="693.68"/>
-      <line class="cls-38" x1="988.42" y1="579.64" x2="1204.15" y2="579"/>
+      <line class="cls-38" x1="984.25" y1="583.68" x2="1204.25" y2="583.68"/>
+      <!-- ENG 2 LP cock — OPEN (in-line with vertical pipe = vertical line) -->
       <circle class="cls-38" cx="3011" cy="577.43" r="110"/>
       <line class="cls-38" x1="3011" y1="467.43" x2="3011" y2="687.43"/>
       
